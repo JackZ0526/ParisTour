@@ -9,6 +9,7 @@ import {
   type CloudSaveStatus,
   type CloudSyncStatus,
 } from '../services/tripCloud'
+import { ActivityBars, SyncOrbitIcon } from './LoadingIndicator'
 
 type ToastKind = 'save' | 'sync'
 
@@ -53,35 +54,6 @@ function FloppyIcon({ spinning }: { spinning?: boolean }) {
       <rect x="9" y="8" width="7" height="2" fill="currentColor" opacity="0.25" />
       <rect x="8" y="16" width="16" height="10" rx="1" fill="var(--paper)" opacity="0.95" />
       <rect x="11" y="18" width="4" height="6" rx="0.5" fill="currentColor" opacity="0.45" />
-    </svg>
-  )
-}
-
-function SyncIcon({ spinning }: { spinning?: boolean }) {
-  return (
-    <svg
-      className={`cloud-sync-orbit ${spinning ? 'is-spinning' : ''}`}
-      width="28"
-      height="28"
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden
-    >
-      <circle cx="16" cy="16" r="11" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
-      <path
-        d="M16 5a11 11 0 0 1 11 11"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M16 27A11 11 0 0 1 5 16"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeOpacity="0.55"
-      />
-      <circle cx="16" cy="16" r="3.2" fill="currentColor" />
     </svg>
   )
 }
@@ -146,7 +118,7 @@ export function CloudSaveIndicator() {
             </svg>
           ) : done ? (
             <div className="cloud-save-ok">
-              {isSave ? <FloppyIcon /> : <SyncIcon />}
+              {isSave ? <FloppyIcon /> : <SyncOrbitIcon spinning={false} />}
               <svg
                 className="cloud-save-check-badge"
                 width="14"
@@ -168,21 +140,14 @@ export function CloudSaveIndicator() {
           ) : isSave ? (
             <FloppyIcon spinning={busy} />
           ) : (
-            <SyncIcon spinning={busy} />
+            <SyncOrbitIcon spinning={busy} />
           )}
         </div>
         <div className="cloud-save-copy">
           <span className="cloud-save-kicker">{isSave ? 'AUTO SAVE' : 'LIVE SYNC'}</span>
           <span className="cloud-save-label">{label}</span>
         </div>
-        {busy && (
-          <span className="cloud-save-bars" aria-hidden>
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-        )}
+        {busy && <ActivityBars size="md" className="cloud-save-toast-bars" />}
       </div>
     </div>,
     document.body,

@@ -105,26 +105,32 @@ select {
   animation-delay: 0.32s;
 }
 
-/* Shared wait / progress motion (copper–sage, not generic purple) */
-@keyframes loading-spin {
+/* AddPlaceDialog: animate panel height between AI / Google tabs */
+.add-place-body {
+  overflow: hidden;
+}
+
+.add-place-body--ready {
+  transition: height 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes add-place-tab-in {
+  from {
+    opacity: 0.55;
+    transform: scale(0.98);
+  }
   to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes loading-dot-bounce {
-  0%,
-  80%,
-  100% {
-    opacity: 0.35;
-    transform: translateY(0);
-  }
-  40% {
     opacity: 1;
-    transform: translateY(-2px);
+    transform: scale(1);
   }
 }
 
+.add-place-tab-pane {
+  transform-origin: top center;
+  animation: add-place-tab-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Shared wait / progress ? same family as CloudSave orbit + equalizer bars */
 @keyframes loading-pulse-soft {
   0%,
   100% {
@@ -135,25 +141,62 @@ select {
   }
 }
 
-.loading-spinner {
-  animation: loading-spin 0.75s linear infinite;
-}
-
-.loading-dots .loading-dot:nth-child(1) {
-  animation: loading-dot-bounce 1.05s ease-in-out infinite;
-}
-.loading-dots .loading-dot:nth-child(2) {
-  animation: loading-dot-bounce 1.05s ease-in-out 0.15s infinite;
-}
-.loading-dots .loading-dot:nth-child(3) {
-  animation: loading-dot-bounce 1.05s ease-in-out 0.3s infinite;
-}
-
 .loading-pulse-soft {
   animation: loading-pulse-soft 1.6s ease-in-out infinite;
 }
 
-/* Game-style autosave toast — fixed bottom-left HUD */
+.load-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: 0;
+  padding-bottom: 1px;
+  color: currentColor;
+}
+
+.load-bars--sm {
+  height: 10px;
+}
+
+.load-bars--md {
+  height: 14px;
+}
+
+.load-bars i {
+  display: block;
+  width: 2.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform-origin: bottom;
+  animation: cloud-save-bar 0.85s ease-in-out infinite;
+}
+
+.load-bars--sm i {
+  height: 9px;
+  width: 2px;
+}
+
+.load-bars--md i {
+  height: 12px;
+  width: 3px;
+}
+
+.load-bars i:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.load-bars i:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.load-bars i:nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+.cloud-save-toast-bars {
+  margin-left: auto;
+  color: var(--gold);
+}
+
+/* Game-style autosave toast ? fixed bottom-left HUD */
 @keyframes cloud-save-slide {
   from {
     opacity: 0;
@@ -290,6 +333,214 @@ select {
   transform-origin: center;
 }
 
+/* LLM thinking ? same CloudSave toast chrome, dual-orbit cast mark */
+@keyframes llm-think-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes llm-think-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes llm-think-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@keyframes llm-think-ring-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes llm-think-tick {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes llm-think-charge {
+  0% {
+    opacity: 0.2;
+    transform: scaleY(0.22);
+  }
+  35% {
+    opacity: 0.95;
+    transform: scaleY(1);
+  }
+  55% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0.25;
+    transform: scaleY(0.3);
+  }
+}
+
+@keyframes llm-think-soft-flash {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  45% {
+    filter: brightness(1.22);
+  }
+}
+
+@keyframes llm-think-aura {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.22;
+    transform: scale(1.05);
+  }
+}
+
+/* Embed CloudSave toast chrome inline (not fixed corner). */
+.cloud-save-toast.llm-think-embed {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  pointer-events: auto;
+  margin: 0 auto;
+  min-width: 13rem;
+  max-width: min(22rem, 100%);
+  animation: cloud-save-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.llm-think-toast-glow {
+  background: radial-gradient(circle at 20% 50%, rgba(196, 165, 116, 0.5), transparent 65%) !important;
+}
+
+.llm-think-orbit {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: llm-think-soft-flash 1.6s ease-in-out infinite;
+}
+
+.llm-think-orbit .llm-think-aura {
+  transform-origin: 16px 16px;
+  transform-box: fill-box;
+  animation: llm-think-aura 1.4s ease-in-out infinite;
+}
+
+.llm-think-orbit .llm-think-pulse-ring {
+  transform-origin: 16px 16px;
+  transform-box: fill-box;
+  animation: llm-think-ring-pulse 1.35s ease-in-out infinite;
+}
+
+.llm-think-orbit .llm-think-arc-a {
+  transform-origin: 16px 16px;
+  transform-box: fill-box;
+  animation: llm-think-spin 1.15s linear infinite;
+}
+
+.llm-think-orbit .llm-think-arc-b {
+  transform-origin: 16px 16px;
+  transform-box: fill-box;
+  animation: llm-think-spin-rev 1.75s linear infinite;
+}
+
+.llm-think-orbit .llm-think-core {
+  transform-origin: 16px 16px;
+  transform-box: fill-box;
+  animation: llm-think-breathe 1.25s ease-in-out infinite;
+}
+
+.llm-think-orbit .llm-think-ticks path:nth-child(1) {
+  animation: llm-think-tick 1.4s ease-in-out infinite;
+}
+.llm-think-orbit .llm-think-ticks path:nth-child(2) {
+  animation: llm-think-tick 1.4s ease-in-out 0.18s infinite;
+}
+.llm-think-orbit .llm-think-ticks path:nth-child(3) {
+  animation: llm-think-tick 1.4s ease-in-out 0.36s infinite;
+}
+.llm-think-orbit .llm-think-ticks path:nth-child(4) {
+  animation: llm-think-tick 1.4s ease-in-out 0.54s infinite;
+}
+.llm-think-orbit .llm-think-ticks path:nth-child(5) {
+  animation: llm-think-tick 1.4s ease-in-out 0.27s infinite;
+}
+.llm-think-orbit .llm-think-ticks path:nth-child(6) {
+  animation: llm-think-tick 1.4s ease-in-out 0.45s infinite;
+}
+
+.llm-charge-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  margin-left: 0;
+  padding-bottom: 1px;
+  color: currentColor;
+}
+
+.llm-charge-bars i {
+  display: block;
+  width: 2.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform-origin: bottom;
+  animation: llm-think-charge 1.15s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+}
+
+.llm-charge-bars.load-bars--sm i {
+  height: 10px;
+  width: 2.5px;
+}
+
+.llm-charge-bars.load-bars--md i {
+  height: 14px;
+  width: 3px;
+}
+
+.llm-charge-bars i:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.llm-charge-bars i:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.llm-charge-bars i:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.llm-charge-bars i:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+.llm-think-pulse {
+  animation: loading-pulse-soft 1.35s ease-in-out infinite;
+}
+
 .cloud-save-ok {
   position: relative;
   display: grid;
@@ -329,32 +580,306 @@ select {
   color: #c5dbc9;
 }
 
-.cloud-save-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
-  margin-left: auto;
-  padding-bottom: 1px;
+
+
+/* Timeline sortable cards ? iOS-like float / peer shift */
+body.timeline-dragging {
+  cursor: grabbing;
+  user-select: none;
+  touch-action: none;
 }
 
-.cloud-save-bars i {
+.timeline-drag-handle:hover {
+  background: color-mix(in srgb, var(--mist) 70%, var(--sage) 30%);
+  color: var(--ink);
+}
+
+.timeline-drag-float {
+  will-change: left, top, transform;
+  backface-visibility: hidden;
+}
+
+.timeline-drag-float-lifted {
+  transition: transform 180ms cubic-bezier(0.22, 1.2, 0.36, 1);
+  transform: translate3d(0, 0, 0) scale(1.02) rotate(1.15deg);
+}
+
+.timeline-drag-float-settle {
+  transition:
+    left 200ms cubic-bezier(0.22, 1.15, 0.36, 1),
+    top 200ms cubic-bezier(0.22, 1.15, 0.36, 1),
+    transform 200ms ease;
+  transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+}
+
+.timeline-drag-float-card {
+  box-shadow:
+    0 4px 12px rgba(28, 36, 32, 0.08),
+    0 18px 40px rgba(28, 36, 32, 0.18);
+  transform: translateZ(0);
+}
+
+/*
+ * Outer float rotates for the tilted-card look; content counter-rotates so
+ * glyphs stay axis-aligned (subpixel AA stays sharp). Border/shadow still tilt.
+ */
+.timeline-drag-float-lifted .timeline-drag-float-content {
+  transform: rotate(-1.15deg);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.timeline-drag-float-settle .timeline-drag-float-content {
+  transform: rotate(0deg);
+  transition: transform 200ms ease;
+}
+
+.timeline-sortable-item {
+  will-change: transform;
+}
+
+/* Keep enter/push transforms from clipping against parent overflow:hidden */
+.timeline-sortable-item.timeline-card-entering,
+.timeline-sortable-item.timeline-card-pushed {
+  overflow: visible;
+  z-index: 2;
+}
+
+@keyframes timeline-card-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -36px, 0) scale(0.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, 6px, 0) scale(1.012);
+  }
+  78% {
+    transform: translate3d(0, -2px, 0) scale(0.998);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Vertical-only peer shift ? horizontal jitter was clipping the left edge */
+@keyframes timeline-card-pushed {
+  0% {
+    transform: translate3d(0, -44px, 0);
+  }
+  42% {
+    transform: translate3d(0, 8px, 0);
+  }
+  68% {
+    transform: translate3d(0, -2.5px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.timeline-card-entering {
+  animation: timeline-card-enter 700ms cubic-bezier(0.22, 1.08, 0.32, 1) both;
+  transform-origin: 50% 0%;
+  backface-visibility: hidden;
+}
+
+.timeline-card-pushed {
+  animation: timeline-card-pushed 700ms cubic-bezier(0.25, 0.9, 0.3, 1) both;
+  backface-visibility: hidden;
+}
+
+/* ?? Gommage (??) delete dissolve ?? */
+
+@keyframes timeline-card-gommage {
+  0% {
+    opacity: 1;
+    filter: saturate(1) brightness(1) contrast(1);
+    transform: scale(1);
+    clip-path: inset(0% 0% 0% 0% round 16px);
+  }
+  22% {
+    opacity: 0.95;
+    filter: saturate(0.45) brightness(1.06) contrast(1.05);
+    transform: scale(1.015);
+    clip-path: inset(0% 0% 0% 0% round 16px);
+  }
+  48% {
+    opacity: 0.55;
+    filter: saturate(0.12) brightness(1.1) contrast(1.08);
+    transform: scale(0.99) rotate(-0.4deg);
+    clip-path: inset(2% 1.5% 3% 2% round 14px);
+  }
+  72% {
+    opacity: 0.18;
+    filter: saturate(0) brightness(1.14) contrast(1.1);
+    transform: scale(0.97) rotate(0.35deg);
+    clip-path: inset(8% 6% 10% 7% round 10px);
+  }
+  100% {
+    opacity: 0;
+    filter: saturate(0) brightness(1.18) contrast(1.12);
+    transform: scale(0.94);
+    clip-path: inset(18% 12% 22% 14% round 6px);
+  }
+}
+
+@keyframes timeline-card-contract {
+  0% {
+    transform: translate3d(0, 10px, 0);
+  }
+  62% {
+    transform: translate3d(0, -1.5px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes timeline-exit-slot-collapse {
+  0% {
+    height: var(--exit-h, 140px);
+    margin-block: 0;
+    opacity: 1;
+  }
+  100% {
+    height: 0;
+    margin-block: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes gommage-petal-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.3);
+  }
+  8% {
+    opacity: 0.98;
+    transform: translate3d(0, -6px, 0) rotate(10deg) scale(1.05);
+  }
+  45% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--gommage-dx), var(--gommage-dy), 0)
+      rotate(var(--gommage-rot)) scale(0.45);
+  }
+}
+
+.timeline-card-exiting {
+  pointer-events: none;
+  /* Keep overflow visible so petals can drift past the card edges */
+  overflow: visible;
+  z-index: 3;
+}
+
+.timeline-card-exiting.timeline-card-exiting-collapse {
+  overflow: hidden;
+  animation: timeline-exit-slot-collapse 400ms cubic-bezier(0.33, 0.1, 0.2, 1) forwards;
+}
+
+/* Exiting card's own leg: fade only ? do not collapse spacing. */
+.timeline-card-exiting .timeline-leg-slot {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.timeline-card-gommage {
+  position: relative;
+  animation: timeline-card-gommage 620ms cubic-bezier(0.33, 0.05, 0.35, 1) forwards;
+  transform-origin: center center;
+  will-change: transform, opacity, filter, clip-path;
+}
+
+.gommage-petals {
+  position: absolute;
+  inset: -28% -18% -8%;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.gommage-petal {
+  position: absolute;
   display: block;
-  width: 3px;
-  height: 12px;
-  border-radius: 1px;
-  background: var(--gold);
-  transform-origin: bottom;
-  animation: cloud-save-bar 0.85s ease-in-out infinite;
+  border-radius: 60% 40% 55% 45% / 65% 55% 45% 35%;
+  box-shadow: 0 1px 2px rgba(90, 16, 28, 0.22);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: gommage-petal-drift var(--gommage-dur, 720ms) cubic-bezier(0.18, 0.55, 0.28, 1)
+    var(--gommage-delay, 0ms) both;
 }
 
-.cloud-save-bars i:nth-child(2) {
-  animation-delay: 0.12s;
-}
-.cloud-save-bars i:nth-child(3) {
-  animation-delay: 0.24s;
-}
-.cloud-save-bars i:nth-child(4) {
-  animation-delay: 0.36s;
+.timeline-card-contract {
+  animation: timeline-card-contract 640ms cubic-bezier(0.28, 0.82, 0.28, 1) both;
 }
 
+.timeline-leg-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-block: 0;
+  opacity: 1;
+  transition:
+    grid-template-rows 340ms cubic-bezier(0.22, 1, 0.36, 1) 90ms,
+    margin 340ms cubic-bezier(0.22, 1, 0.36, 1) 90ms,
+    opacity 240ms ease;
+}
+
+.timeline-leg-slot-inner {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 200ms ease,
+    transform 220ms ease;
+}
+
+/* Add/delete: fade traffic legs only ? keep slot height so card gaps stay put. */
+.timeline-leg-slot-faded {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.timeline-leg-slot:not(.timeline-leg-slot-faded) {
+  opacity: 1;
+  transition:
+    grid-template-rows 340ms cubic-bezier(0.22, 1, 0.36, 1) 90ms,
+    margin 340ms cubic-bezier(0.22, 1, 0.36, 1) 90ms,
+    opacity 280ms ease;
+}
+
+/* Drag: collapse to a soft gap ? content fades out first, then height eases in. */
+.timeline-leg-slot-collapsed {
+  grid-template-rows: 0fr;
+  /* Keep breathing room between cards while dragging */
+  margin-block: 10px;
+  pointer-events: none;
+}
+
+.timeline-leg-slot-collapsed .timeline-leg-slot-inner {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease;
+}
+
+/* Drag expand: open height first, then fade content back in */
+.timeline-leg-slot:not(.timeline-leg-slot-collapsed) {
+  transition:
+    grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 320ms ease,
+    opacity 280ms ease;
+}
+
+.timeline-leg-slot:not(.timeline-leg-slot-collapsed) .timeline-leg-slot-inner {
+  transition:
+    opacity 220ms ease 140ms,
+    transform 240ms ease 140ms;
+}

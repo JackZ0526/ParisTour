@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
 import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
@@ -100,7 +100,17 @@ export function TripMap({
   onSelectPlace,
 }: Props) {
   const { isLoaded, loadError } = useGoogleMapsReady()
-  const dayOrigin = useMemo(() => getDayOrigin(day.day, hotel), [day.day, hotel])
+  // Depend on hotel primitives so other-day edits (new hotel object, same coords) do not churn.
+  const dayOrigin = useMemo(
+    () => getDayOrigin(day.day, hotel),
+    [day.day, hotel.id, hotel.lat, hotel.lng, hotel.name],
+  )
+
+  /** Stable center for GoogleMap — new object identity would pan the map on every parent render. */
+  const mapCenter = useMemo(
+    () => ({ lat: dayOrigin.lat, lng: dayOrigin.lng }),
+    [dayOrigin.lat, dayOrigin.lng],
+  )
 
   /** Place id + coords for this day only — ignores unrelated customPlaces churn (e.g. Day 1 edits). */
   const stopsFingerprint = useMemo(
@@ -149,12 +159,18 @@ export function TripMap({
   const onUnmount = useCallback(() => setMap(null), [])
 
   /** Only refit when this day's route/places change — not when other days' data updates. */
-  const viewportKey = `${day.day}|${dayOrigin.id}|${stopsFingerprint}|${navPlan.stopsKey || ''}`
+  const viewportKey = useMemo(
+    () => `${day.day}|${dayOrigin.id}|${stopsFingerprint}|${navPlan.stopsKey || ''}`,
+    [day.day, dayOrigin.id, stopsFingerprint, navPlan.stopsKey],
+  )
+  const lastFittedKeyRef = useRef('')
 
   useEffect(() => {
     if (!map || !isLoaded) return
     // Wait until nav settles so route geometry is included (cached days are instant).
     if (navLoading) return
+    // Same day viewport — skip. Avoids one-shot pan when parent re-renders after other-day edits.
+    if (lastFittedKeyRef.current === viewportKey) return
 
     const points = collectViewportPoints(dayOrigin, stops, navPlan)
     if (!points.length) return
@@ -164,6 +180,7 @@ export function TripMap({
     if (points.length === 1) {
       map.setCenter(points[0])
       map.setZoom(14)
+      lastFittedKeyRef.current = viewportKey
       return
     }
 
@@ -175,6 +192,7 @@ export function TripMap({
     const applyFit = () => {
       if (cancelled) return
       map.fitBounds(bounds, padding)
+      lastFittedKeyRef.current = viewportKey
       // Avoid over-zooming on short hops; never zoom in past this (keeps path padding).
       google.maps.event.addListenerOnce(map, 'idle', () => {
         if (cancelled) return
@@ -191,9 +209,13 @@ export function TripMap({
       cancelled = true
       window.cancelAnimationFrame(raf)
     }
-    // viewportKey encodes day + places + nav identity for this day only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, isLoaded, navLoading, viewportKey])
+
+  // Switching days must allow a fresh fit even if a previous day shared a key shape.
+  useEffect(() => {
+    lastFittedKeyRef.current = ''
+  }, [day.day])
 
   if (loadError) {
     const help = googleMapsLoadErrorHelp(loadError)
@@ -286,7 +308,7 @@ export function TripMap({
       <div className="h-[420px] w-full md:h-[560px]">
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
-          center={{ lat: dayOrigin.lat, lng: dayOrigin.lng }}
+          center={mapCenter}
           zoom={13}
           options={mapOptions}
           onLoad={onLoad}

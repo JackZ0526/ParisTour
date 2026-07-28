@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import { PATH_MODE_COLORS } from '../services/googleNav'
@@ -11,9 +11,17 @@ import {
   SELECTED_HOTEL_PLACE_ID,
 } from '../utils/dayOrigin'
 import { AddPlaceDialog } from './AddPlaceDialog'
+import { GommagePetals } from './GommagePetals'
 import { GooglePlacePhoto } from './GooglePlacePhoto'
 import { LoadingIndicator } from './LoadingIndicator'
 import { HouseIcon, PlaneIcon } from './markerIcons'
+
+/** Dissolve + petal flight before slot collapse. */
+const GOMMAGE_DISSOLVE_MS = 560
+/** Collapse exiting li height so list doesn't pop on unmount. */
+const GOMMAGE_COLLAPSE_MS = 400
+const CONTRACT_SETTLE_MS = 680
+const ENTER_ANIM_MS = 720
 
 const typeLabel: Record<string, string> = {
   cafe: '咖啡馆',
@@ -63,6 +71,26 @@ function PinIcon() {
       <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
     </svg>
   )
+}
+
+function travelChipFromLeg(leg: ResolvedDayLeg | null | undefined): string | null {
+  if (!leg) return null
+  if (leg.displayMode === 'TRANSIT') {
+    const lines = (leg.transitLines || [])
+      .map((l) => l.label)
+      .filter(Boolean)
+      .slice(0, 2)
+    return lines.length ? lines.join(' · ') : '公共交通'
+  }
+  if (leg.displayMode === 'DRIVING') return '驾车'
+  if (leg.displayMode === 'WALKING') {
+    const m = leg.distanceMeters || 0
+    if (m > 0 && m < 400) return '很少走'
+    if (m > 0 && m < 1200) return '短步行'
+    if (m >= 1200) return '中等步行'
+    return '步行'
+  }
+  return null
 }
 
 function LegConnector({
@@ -157,6 +185,39 @@ interface Props {
   readOnly?: boolean
 }
 
+/** iOS-like list shift while dragging `from` toward `hover`. */
+function listShiftPx(
+  index: number,
+  from: number,
+  hover: number,
+  slot: number,
+): number {
+  if (index === from) return 0
+  if (from < hover) {
+    if (index > from && index <= hover) return -slot
+  } else if (from > hover) {
+    if (index >= hover && index < from) return slot
+  }
+  return 0
+}
+
+type DragSession = {
+  from: number
+  hover: number
+  /** Grab point relative to card top-left */
+  grabX: number
+  grabY: number
+  width: number
+  height: number
+  /** Frozen shift step (card height + gap) — live measure causes jitter. */
+  slot: number
+  /** Untransformed slot centers captured at drag start. */
+  mids: number[]
+  /** Document coords of card at drag start */
+  startLeft: number
+  startTop: number
+}
+
 export function DayTimeline({
   day,
   hotel,
@@ -178,9 +239,105 @@ export function DayTimeline({
   tripPlaceNames,
   readOnly = false,
 }: Props) {
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [overIndex, setOverIndex] = useState<number | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [drag, setDrag] = useState<DragSession | null>(null)
+  const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
+  const [dropping, setDropping] = useState(false)
+  const [enterAnim, setEnterAnim] = useState<{
+    stopKey: string
+    index: number
+  } | null>(null)
+  const [exitAnim, setExitAnim] = useState<{
+    stopKey: string
+    index: number
+    collapsing?: boolean
+    heightPx?: number
+  } | null>(null)
+  const [contractAnim, setContractAnim] = useState<{
+    fromIndex: number
+  } | null>(null)
+
+  const dragRef = useRef<DragSession | null>(null)
+  const pointerRef = useRef({ x: 0, y: 0 })
+  const floatRef = useRef({ x: 0, y: 0 })
+  const velocityRef = useRef({ y: 0, lastY: 0, lastT: 0 })
+  const rafRef = useRef<number | null>(null)
+  const itemRefs = useRef<(HTMLLIElement | null)[]>([])
+  const suppressClickRef = useRef(false)
+  const expectEnterRef = useRef(false)
+  const prevStopKeysRef = useRef<string[]>([])
+  const enterClearTimerRef = useRef<number | null>(null)
+  const exitTimerRef = useRef<number | null>(null)
+  const contractTimerRef = useRef<number | null>(null)
+
+  dragRef.current = drag
+
+  const stopKeyOf = (stop: (typeof day.stops)[number], index: number) =>
+    stop.id || `${day.day}-${stop.placeId}-${index}`
+
+  const clearEnterAnim = () => {
+    if (enterClearTimerRef.current != null) {
+      window.clearTimeout(enterClearTimerRef.current)
+      enterClearTimerRef.current = null
+    }
+    setEnterAnim(null)
+  }
+
+  const clearExitTimers = () => {
+    if (exitTimerRef.current != null) {
+      window.clearTimeout(exitTimerRef.current)
+      exitTimerRef.current = null
+    }
+    if (contractTimerRef.current != null) {
+      window.clearTimeout(contractTimerRef.current)
+      contractTimerRef.current = null
+    }
+  }
+
+  // Animate newly added stops (user add only — not sync / day switch).
+  // useLayoutEffect so enter classes apply before first paint (avoids flash/hitch).
+  useLayoutEffect(() => {
+    const keys = day.stops.map((s, i) => stopKeyOf(s, i))
+    const prev = prevStopKeysRef.current
+    if (expectEnterRef.current && keys.length > prev.length) {
+      const newKey = keys.find((k) => !prev.includes(k))
+      const index = newKey != null ? keys.indexOf(newKey) : -1
+      if (newKey && index >= 0) {
+        if (enterClearTimerRef.current != null) {
+          window.clearTimeout(enterClearTimerRef.current)
+        }
+        setEnterAnim({ stopKey: newKey, index })
+        // Fallback clear — kept outside this effect's cleanup so later
+        // day.stops updates (nav/enrichment) don't cancel it mid-animation.
+        enterClearTimerRef.current = window.setTimeout(() => {
+          enterClearTimerRef.current = null
+          setEnterAnim(null)
+        }, ENTER_ANIM_MS)
+        expectEnterRef.current = false
+        prevStopKeysRef.current = keys
+        return
+      }
+    }
+    expectEnterRef.current = false
+    prevStopKeysRef.current = keys
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day.stops])
+
+  useEffect(() => {
+    return () => {
+      if (enterClearTimerRef.current != null) {
+        window.clearTimeout(enterClearTimerRef.current)
+      }
+      clearExitTimers()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleAddCustomLocal = (place: Place, mode: 'best' | 'end') => {
+    expectEnterRef.current = true
+    onAddCustom(place, mode)
+    setAddOpen(false)
+  }
 
   const dayOrigin = getDayOrigin(day.day, hotel)
   const metroHint =
@@ -197,6 +354,279 @@ export function DayTimeline({
   })
   const stopNumbers = numberedStopIndexes(stopPlaces)
 
+  const isFixedAt = (index: number) => {
+    const place = stopPlaces[index]
+    if (!place) return true
+    const isCheckIn =
+      day.day === 1 && index === 0 && place.id === SELECTED_HOTEL_PLACE_ID
+    const isOvernight =
+      !isLastDay &&
+      index === day.stops.length - 1 &&
+      place.id === SELECTED_HOTEL_PLACE_ID
+    return isCheckIn || isOvernight
+  }
+
+  const requestDelete = (stopKey: string, index: number) => {
+    if (readOnly || isFixedAt(index) || drag || exitAnim) return
+    clearEnterAnim()
+    const el = itemRefs.current[index]
+    const heightPx = el?.offsetHeight ?? 140
+    if (el) {
+      el.style.setProperty('--exit-h', `${heightPx}px`)
+    }
+    setExitAnim({ stopKey, index, heightPx, collapsing: false })
+
+    // After dissolve, collapse the slot height so unmount doesn't jump.
+    exitTimerRef.current = window.setTimeout(() => {
+      setExitAnim((prev) =>
+        prev && prev.stopKey === stopKey ? { ...prev, collapsing: true } : prev,
+      )
+      exitTimerRef.current = window.setTimeout(() => {
+        exitTimerRef.current = null
+        onDelete(stopKey)
+        setExitAnim(null)
+        setContractAnim({ fromIndex: index })
+        contractTimerRef.current = window.setTimeout(() => {
+          contractTimerRef.current = null
+          setContractAnim(null)
+        }, CONTRACT_SETTLE_MS)
+      }, GOMMAGE_COLLAPSE_MS)
+    }, GOMMAGE_DISSOLVE_MS)
+  }
+
+  const captureLayout = (fromIndex: number) => {
+    const first = itemRefs.current[0]
+    const fromEl = itemRefs.current[fromIndex]
+    // Subtract any existing transform so we capture resting layout.
+    const fromShift = 0
+    const originTop = first
+      ? first.getBoundingClientRect().top - fromShift
+      : 0
+
+    let slot = 120
+    const fromCard = fromEl?.querySelector(
+      '[data-timeline-card]',
+    ) as HTMLElement | null
+    if (fromCard) slot = Math.max(96, fromCard.offsetHeight + 20)
+
+    const mids: number[] = []
+    let cursor = originTop
+    for (let i = 0; i < day.stops.length; i++) {
+      const el = itemRefs.current[i]
+      const card = el?.querySelector('[data-timeline-card]') as HTMLElement | null
+      const h = card?.offsetHeight ?? el?.offsetHeight ?? slot - 12
+      mids.push(cursor + h / 2)
+      cursor += slot
+    }
+    return { mids, slot }
+  }
+
+  const pickHoverIndex = (
+    clientY: number,
+    from: number,
+    currentHover: number,
+    mids: number[],
+  ) => {
+    if (!mids.length) return from
+    let candidate = mids.length - 1
+    for (let i = 0; i < mids.length; i++) {
+      if (clientY < mids[i]) {
+        candidate = i
+        break
+      }
+    }
+    // Hysteresis: stay on current slot until past its mid by a margin.
+    if (candidate !== currentHover && currentHover >= 0 && currentHover < mids.length) {
+      const mid = mids[currentHover]
+      const margin = 22
+      if (candidate > currentHover && clientY < mid + margin) return currentHover
+      if (candidate < currentHover && clientY > mid - margin) return currentHover
+    }
+    if (isFixedAt(candidate) && candidate !== from) {
+      // Snap to nearest movable index.
+      for (let d = 1; d < mids.length; d++) {
+        const up = candidate - d
+        const down = candidate + d
+        if (up >= 0 && (!isFixedAt(up) || up === from)) return up
+        if (down < mids.length && (!isFixedAt(down) || down === from)) return down
+      }
+      return from
+    }
+    return candidate
+  }
+
+  const stopRaf = () => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }
+
+  const tickFloat = () => {
+    const session = dragRef.current
+    if (!session) {
+      rafRef.current = null
+      return
+    }
+    const targetX = pointerRef.current.x - session.grabX
+    const targetY = pointerRef.current.y - session.grabY
+    // Viscous follow — lags behind the finger for sticky inertia.
+    const ease = 0.22
+    floatRef.current = {
+      x: floatRef.current.x + (targetX - floatRef.current.x) * ease,
+      y: floatRef.current.y + (targetY - floatRef.current.y) * ease,
+    }
+    setFloatPos({ ...floatRef.current })
+
+    const hover = pickHoverIndex(
+      pointerRef.current.y,
+      session.from,
+      session.hover,
+      session.mids,
+    )
+    if (hover !== session.hover) {
+      const next = { ...session, hover }
+      dragRef.current = next
+      setDrag(next)
+    }
+
+    rafRef.current = requestAnimationFrame(tickFloat)
+  }
+
+  const endDrag = (commit: boolean) => {
+    stopRaf()
+    const session = dragRef.current
+    if (!session) return
+
+    const from = session.from
+    // Inertia: flick slightly biases the drop slot.
+    const predictedY = pointerRef.current.y + velocityRef.current.y * 140
+    const to = commit
+      ? pickHoverIndex(predictedY, from, session.hover, session.mids)
+      : from
+    const settled = { ...session, hover: to }
+    dragRef.current = settled
+    setDrag(settled)
+    setDropping(true)
+
+    // Aim float at the frozen mid of the target slot (not live transformed rect).
+    const mid = session.mids[to]
+    if (mid != null) {
+      floatRef.current = {
+        x: session.startLeft,
+        y: mid - session.height / 2,
+      }
+      setFloatPos({ ...floatRef.current })
+    }
+
+    window.setTimeout(() => {
+      if (commit && from !== to) onReorder(from, to)
+      dragRef.current = null
+      setDrag(null)
+      setDropping(false)
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 40)
+    }, 200)
+  }
+
+  useEffect(() => {
+    if (!drag) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.body.classList.add('timeline-dragging')
+    return () => {
+      document.body.style.overflow = prev
+      document.body.classList.remove('timeline-dragging')
+    }
+  }, [drag])
+
+  useEffect(() => {
+    if (!drag || dropping) return
+
+    const onMove = (e: PointerEvent) => {
+      const now = performance.now()
+      const dt = Math.max(1, now - velocityRef.current.lastT)
+      velocityRef.current = {
+        y: (e.clientY - velocityRef.current.lastY) / dt,
+        lastY: e.clientY,
+        lastT: now,
+      }
+      pointerRef.current = { x: e.clientX, y: e.clientY }
+    }
+    const onUp = () => endDrag(true)
+    const onCancel = () => endDrag(false)
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(drag), dropping, day.stops.length])
+
+  useEffect(() => () => stopRaf(), [])
+
+  const beginDrag = (
+    index: number,
+    e: ReactPointerEvent,
+    cardEl: HTMLElement,
+  ) => {
+    if (readOnly || isFixedAt(index) || drag || exitAnim) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const rect = cardEl.getBoundingClientRect()
+    const layout = captureLayout(index)
+    const session: DragSession = {
+      from: index,
+      hover: index,
+      grabX: e.clientX - rect.left,
+      grabY: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+      slot: layout.slot,
+      mids: layout.mids,
+      startLeft: rect.left,
+      startTop: rect.top,
+    }
+    pointerRef.current = { x: e.clientX, y: e.clientY }
+    floatRef.current = { x: rect.left, y: rect.top }
+    velocityRef.current = { y: 0, lastY: e.clientY, lastT: performance.now() }
+    dragRef.current = session
+    setFloatPos({ x: rect.left, y: rect.top })
+    setDrag(session)
+    setDropping(false)
+    stopRaf()
+    rafRef.current = requestAnimationFrame(tickFloat)
+
+    try {
+      cardEl.setPointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const dragging = Boolean(drag)
+  const avgSlot = drag?.slot ?? 120
+  /** Drag-reorder: collapse leg height so cards can pack while sorting. */
+  const collapseLegs = dragging
+  /** Add/delete: fade legs only — keep layout space so card gaps stay stable. */
+  const fadeLegs = Boolean(enterAnim || exitAnim)
+  const legSlotClassName = (extra = '') =>
+    [
+      'timeline-leg-slot',
+      collapseLegs ? 'timeline-leg-slot-collapsed' : '',
+      fadeLegs ? 'timeline-leg-slot-faded' : '',
+      extra,
+    ]
+      .filter(Boolean)
+      .join(' ')
+
   return (
     <div className="space-y-4">
       <div className="animate-fade-up rounded-2xl border border-white/70 bg-[var(--card)] p-4">
@@ -212,10 +642,22 @@ export function DayTimeline({
               {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
             </span>
             {copyRefreshing && !dayRegenerating && (
-              <LoadingIndicator variant="badge" label="标题生成中…" size="sm" showDots />
+              <LoadingIndicator
+                variant="badge"
+                label="标题生成中…"
+                size="sm"
+                showDots
+                mode="thinking"
+              />
             )}
             {dayRegenerating && (
-              <LoadingIndicator variant="badge" label="正在重新生成今天…" size="sm" showDots />
+              <LoadingIndicator
+                variant="badge"
+                label="正在重新生成今天…"
+                size="sm"
+                showDots
+                mode="thinking"
+              />
             )}
           </div>
           {!readOnly && (
@@ -256,6 +698,7 @@ export function DayTimeline({
               label="正在重新生成今天的行程…"
               size="sm"
               showDots
+              mode="thinking"
             />
           </div>
         )}
@@ -295,120 +738,297 @@ export function DayTimeline({
 
       {/* Day origin → first stop (airport on day 1, hotel otherwise) */}
       {day.stops.length > 0 && (
-        <LegConnector
-          leg={navPlan.hotelToFirst}
-          calculating={navLoading && !navPlan.hotelToFirst}
-          fallbackLabel={
-            navLoading
-              ? dayOrigin.kind === 'airport'
-                ? '计算从机场出发…'
-                : '计算从酒店出发…'
-              : navPlan.hotelToFirstText || metroHint
-          }
-        />
+        <div
+          className={legSlotClassName()}
+          aria-hidden={collapseLegs || fadeLegs || undefined}
+        >
+          <div className="timeline-leg-slot-inner">
+            <LegConnector
+              leg={navPlan.hotelToFirst}
+              calculating={navLoading && !navPlan.hotelToFirst}
+              fallbackLabel={
+                navLoading
+                  ? dayOrigin.kind === 'airport'
+                    ? '计算从机场出发…'
+                    : '计算从酒店出发…'
+                  : navPlan.hotelToFirstText || metroHint
+              }
+            />
+          </div>
+        </div>
       )}
 
-      <ol className="space-y-1">
+      <ol
+        className={`space-y-1 ${dragging ? 'select-none' : ''} ${
+          enterAnim || exitAnim ? 'overflow-visible' : ''
+        }`}
+      >
         {day.stops.map((stop, index) => {
           const place = getPlace(stop.placeId, customPlaces)
           const active = selectedPlaceId === place.id
           const n = stopNumbers[index]
-          const stopKey = stop.id || `${day.day}-${place.id}-${index}`
+          const stopKey = stopKeyOf(stop, index)
           const isHotelStop = isHotelPlace(place)
           const isAirportStop = isAirportPlace(place)
-          const isCheckInHotel =
+          const isFixedHotel = isFixedAt(index)
+          const pinTitle =
             day.day === 1 && index === 0 && place.id === SELECTED_HOTEL_PLACE_ID
-          const isOvernightHotel =
-            !isLastDay &&
-            index === day.stops.length - 1 &&
-            place.id === SELECTED_HOTEL_PLACE_ID
-          const isFixedHotel = isCheckInHotel || isOvernightHotel
-          const pinTitle = isCheckInHotel
-            ? '酒店入住点固定为首站'
-            : '回酒店过夜固定为末站'
-          const isOver =
-            !isFixedHotel && overIndex === index && dragIndex !== null && dragIndex !== index
+              ? '酒店入住点固定为首站'
+              : '回酒店过夜固定为末站'
           const legToNext = navPlan.betweenStops[index]
+          const legInbound =
+            index === 0 ? navPlan.hotelToFirst : navPlan.betweenStops[index - 1]
+          const travelChip =
+            travelChipFromLeg(legInbound) || stop.walkLevel || null
+          const isDragSource = drag?.from === index
+          const shiftY =
+            drag && !isDragSource
+              ? listShiftPx(index, drag.from, drag.hover, avgSlot)
+              : 0
+          const isDropTarget =
+            dragging && drag && drag.hover === index && drag.from !== index
+          const isEntering = enterAnim?.stopKey === stopKey
+          const isPushedByEnter =
+            Boolean(enterAnim) && !isEntering && index > (enterAnim?.index ?? -1)
+          const isExiting = exitAnim?.stopKey === stopKey
+          const isContracting =
+            Boolean(contractAnim) && index >= (contractAnim?.fromIndex ?? Infinity)
+
+          const cardInner = (
+            <div
+              className={`flex items-start gap-3 rounded-2xl border p-3 ${
+                active
+                  ? 'border-[var(--copper)] bg-white shadow-[var(--shadow)]'
+                  : 'border-white/70 bg-[var(--card)]'
+              }`}
+            >
+              {isFixedHotel ? (
+                <span
+                  className="mt-1 inline-flex h-7 w-7 select-none items-center justify-center rounded-md bg-[var(--mist)] text-[var(--stone)]"
+                  title={pinTitle}
+                  aria-label={pinTitle}
+                >
+                  <PinIcon />
+                </span>
+              ) : readOnly ? (
+                <span className="mt-1 inline-flex h-7 w-7" aria-hidden />
+              ) : (
+                <span
+                  className="timeline-drag-handle mt-1 inline-flex h-7 cursor-grab select-none items-center justify-center rounded-md bg-[var(--mist)] px-2 text-xs text-[var(--stone)] touch-none active:cursor-grabbing"
+                  title="按住拖动排序"
+                  aria-label="按住拖动排序"
+                  onPointerDown={(e) => {
+                    const card = (e.currentTarget as HTMLElement).closest(
+                      '[data-timeline-card]',
+                    ) as HTMLElement | null
+                    if (card) beginDrag(index, e, card)
+                  }}
+                >
+                  ⋮⋮
+                </span>
+              )}
+              {isHotelStop ? (
+                <span
+                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                  title="酒店"
+                  aria-label="酒店"
+                >
+                  <HouseIcon />
+                </span>
+              ) : isAirportStop ? (
+                <span
+                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                  title="机场"
+                  aria-label="机场"
+                >
+                  <PlaneIcon />
+                </span>
+              ) : (
+                <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
+                  {n}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (suppressClickRef.current || dragging) return
+                  onSelectPlace(place.id)
+                }}
+                className="flex min-w-0 flex-1 items-start gap-3 text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--stone)]">
+                      {stop.time}
+                    </span>
+                    <span className="text-xs text-[var(--stone)]">
+                      {typeLabel[place.type] || place.type}
+                    </span>
+                  </div>
+                  <p className="mt-1 font-medium">{place.name}</p>
+                  <p className="mt-1 text-sm text-[var(--stone)]">{stop.note}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
+                    {travelChip && (
+                      <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                        {travelChip}
+                      </span>
+                    )}
+                    {stop.duration && (
+                      <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                        {stop.duration}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <GooglePlacePhoto
+                  name={place.name}
+                  nameLocal={place.nameLocal}
+                  location={place.location}
+                  fallback={place.image}
+                  alt={place.name}
+                  className="h-16 w-16 shrink-0 rounded-xl"
+                  showBadge={false}
+                />
+              </button>
+              {isFixedHotel ? (
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0" aria-hidden />
+              ) : readOnly ? (
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0" aria-hidden />
+              ) : (
+                <button
+                  type="button"
+                  title="删除地点"
+                  aria-label="删除地点"
+                  disabled={Boolean(exitAnim)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    requestDelete(stopKey, index)
+                  }}
+                  className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] hover:bg-red-50 hover:text-red-700 disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <TrashIcon />
+                </button>
+              )}
+            </div>
+          )
 
           return (
-            <li key={stopKey}>
-              <div
-                draggable={!readOnly && !isFixedHotel}
-                onDragStart={(e) => {
-                  if (readOnly || isFixedHotel) {
-                    e.preventDefault()
-                    return
-                  }
-                  const target = e.target as HTMLElement
-                  if (target.closest('button, a')) {
-                    e.preventDefault()
-                    return
-                  }
-                  setDragIndex(index)
-                  e.dataTransfer.effectAllowed = 'move'
-                  e.dataTransfer.setData('text/plain', String(index))
-                }}
-                onDragEnd={() => {
-                  setDragIndex(null)
-                  setOverIndex(null)
-                }}
-                onDragOver={(e) => {
-                  if (readOnly || isFixedHotel) return
-                  e.preventDefault()
-                  setOverIndex(index)
-                }}
-                onDrop={(e) => {
-                  if (readOnly || isFixedHotel) return
-                  e.preventDefault()
-                  const from = dragIndex ?? Number(e.dataTransfer.getData('text/plain'))
-                  if (Number.isFinite(from)) onReorder(from, index)
-                  setDragIndex(null)
-                  setOverIndex(null)
-                }}
-                className={`rounded-2xl border transition ${
-                  isOver
-                    ? 'border-[var(--copper)] ring-2 ring-[var(--copper)]/25'
-                    : 'border-transparent'
-                } ${dragIndex === index ? 'opacity-60' : ''}`}
-              >
+            <li
+              key={stopKey}
+              ref={(el) => {
+                itemRefs.current[index] = el
+              }}
+              className={`timeline-sortable-item relative ${
+                isEntering ? 'timeline-card-entering' : ''
+              } ${isPushedByEnter ? 'timeline-card-pushed' : ''} ${
+                isExiting ? 'timeline-card-exiting' : ''
+              } ${
+                isExiting && exitAnim?.collapsing
+                  ? 'timeline-card-exiting-collapse'
+                  : ''
+              } ${isContracting ? 'timeline-card-contract' : ''}`}
+              style={{
+                transform: shiftY ? `translate3d(0, ${shiftY}px, 0)` : undefined,
+                transition: dragging
+                  ? 'transform 280ms cubic-bezier(0.25, 0.85, 0.3, 1)'
+                  : enterAnim || exitAnim || contractAnim
+                    ? undefined
+                    : 'transform 200ms ease',
+                zIndex: isDropTarget || isEntering || isExiting ? 2 : 1,
+                ...(isExiting && exitAnim?.heightPx != null
+                  ? ({
+                      ['--exit-h' as string]: `${exitAnim.heightPx}px`,
+                    } satisfies CSSProperties)
+                  : null),
+              }}
+              onAnimationEnd={(e) => {
+                if (!isEntering) return
+                if (e.target !== e.currentTarget) return
+                if (e.animationName !== 'timeline-card-enter') return
+                clearEnterAnim()
+              }}
+            >
+              <div className="relative">
                 <div
-                  className={`flex items-start gap-3 rounded-2xl border p-3 ${
-                    active
-                      ? 'border-[var(--copper)] bg-white shadow-[var(--shadow)]'
-                      : 'border-white/70 bg-[var(--card)]'
+                  data-timeline-card
+                  className={`rounded-2xl border ${
+                    isDropTarget
+                      ? 'border-[var(--copper)]/50 ring-2 ring-[var(--copper)]/20'
+                      : 'border-transparent'
+                  } ${isDragSource ? 'opacity-0' : 'opacity-100'} ${
+                    isExiting ? 'timeline-card-gommage' : ''
                   }`}
+                  style={{
+                    transition: isExiting
+                      ? undefined
+                      : 'box-shadow 200ms ease, opacity 160ms ease',
+                  }}
                 >
-                  {isFixedHotel ? (
-                    <span
-                      className="mt-1 inline-flex h-7 w-7 select-none items-center justify-center rounded-md bg-[var(--mist)] text-[var(--stone)]"
-                      title={pinTitle}
-                      aria-label={pinTitle}
-                    >
-                      <PinIcon />
-                    </span>
-                  ) : (
-                    <span
-                      className="mt-1 cursor-grab select-none rounded-md bg-[var(--mist)] px-2 py-1 text-xs text-[var(--stone)] active:cursor-grabbing"
-                      title="拖动排序"
-                      aria-label="拖动排序"
-                    >
-                      ⋮⋮
-                    </span>
-                  )}
+                  {cardInner}
+                </div>
+                {isExiting && !exitAnim?.collapsing && <GommagePetals />}
+              </div>
+
+              {index < day.stops.length - 1 && (
+                <div
+                  className={legSlotClassName()}
+                  aria-hidden={collapseLegs || fadeLegs || undefined}
+                >
+                  <div className="timeline-leg-slot-inner">
+                    <LegConnector
+                      leg={legToNext}
+                      calculating={navLoading && !legToNext}
+                      fallbackLabel={
+                        navLoading
+                          ? '计算前往方式…'
+                          : stop.transport || '查看地图导航'
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+
+      {drag && (
+        <div
+          className={`timeline-drag-float pointer-events-none fixed z-[80] ${
+            dropping ? 'timeline-drag-float-settle' : 'timeline-drag-float-lifted'
+          }`}
+          style={{
+            left: floatPos.x,
+            top: floatPos.y,
+            width: drag.width,
+          }}
+        >
+          <div className="timeline-drag-float-card rounded-2xl border border-white/80 bg-[var(--card)] ring-1 ring-[var(--ink)]/5">
+            <div className="timeline-drag-float-content">
+            {(() => {
+              const stop = day.stops[drag.from]
+              if (!stop) return null
+              const place = getPlace(stop.placeId, customPlaces)
+              const n = stopNumbers[drag.from]
+              const isHotelStop = isHotelPlace(place)
+              const isAirportStop = isAirportPlace(place)
+              const legInbound =
+                drag.from === 0
+                  ? navPlan.hotelToFirst
+                  : navPlan.betweenStops[drag.from - 1]
+              const travelChip =
+                travelChipFromLeg(legInbound) || stop.walkLevel || null
+              return (
+                <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+                  <span className="mt-1 inline-flex h-7 cursor-grabbing items-center justify-center rounded-md bg-[var(--mist)] px-2 text-xs text-[var(--stone)]">
+                    ⋮⋮
+                  </span>
                   {isHotelStop ? (
-                    <span
-                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
-                      title="酒店"
-                      aria-label="酒店"
-                    >
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white">
                       <HouseIcon />
                     </span>
                   ) : isAirportStop ? (
-                    <span
-                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
-                      title="机场"
-                      aria-label="机场"
-                    >
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white">
                       <PlaneIcon />
                     </span>
                   ) : (
@@ -416,79 +1036,48 @@ export function DayTimeline({
                       {n}
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onSelectPlace(place.id)}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--stone)]">
-                          {stop.time}
-                        </span>
-                        <span className="text-xs text-[var(--stone)]">
-                          {typeLabel[place.type] || place.type}
-                        </span>
-                      </div>
-                      <p className="mt-1 font-medium">{place.name}</p>
-                      <p className="mt-1 text-sm text-[var(--stone)]">{stop.note}</p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
-                        {stop.walkLevel && (
-                          <span className="rounded-full bg-[var(--mist)] px-2 py-1">
-                            {stop.walkLevel}
-                          </span>
-                        )}
-                        {stop.duration && (
-                          <span className="rounded-full bg-[var(--mist)] px-2 py-1">
-                            {stop.duration}
-                          </span>
-                        )}
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--stone)]">
+                        {stop.time}
+                      </span>
+                      <span className="text-xs text-[var(--stone)]">
+                        {typeLabel[place.type] || place.type}
+                      </span>
                     </div>
-                    <GooglePlacePhoto
-                      name={place.name}
-                      nameLocal={place.nameLocal}
-                      location={place.location}
-                      fallback={place.image}
-                      alt={place.name}
-                      className="h-16 w-16 shrink-0 rounded-xl"
-                      showBadge={false}
-                    />
-                  </button>
-                  {isFixedHotel ? (
-                    // Keep the same width as the delete button so thumbnails stay aligned.
-                    <span className="mt-0.5 inline-flex h-8 w-8 shrink-0" aria-hidden />
-                  ) : readOnly ? (
-                    <span className="mt-0.5 inline-flex h-8 w-8 shrink-0" aria-hidden />
-                  ) : (
-                    <button
-                      type="button"
-                      title="删除地点"
-                      aria-label="删除地点"
-                      onClick={() => onDelete(stopKey)}
-                      className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] hover:bg-red-50 hover:text-red-700"
-                    >
-                      <TrashIcon />
-                    </button>
-                  )}
+                    <p className="mt-1 font-medium">{place.name}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-[var(--stone)]">
+                      {stop.note}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
+                      {travelChip && (
+                        <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                          {travelChip}
+                        </span>
+                      )}
+                      {stop.duration && (
+                        <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                          {stop.duration}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <GooglePlacePhoto
+                    name={place.name}
+                    nameLocal={place.nameLocal}
+                    location={place.location}
+                    fallback={place.image}
+                    alt={place.name}
+                    className="h-16 w-16 shrink-0 rounded-xl"
+                    showBadge={false}
+                  />
                 </div>
-              </div>
-
-              {index < day.stops.length - 1 && (
-                <LegConnector
-                  leg={legToNext}
-                  calculating={navLoading && !legToNext}
-                  fallbackLabel={
-                    navLoading
-                      ? '计算前往方式…'
-                      : stop.transport || '查看地图导航'
-                  }
-                />
-              )}
-            </li>
-          )
-        })}
-      </ol>
+              )
+            })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!day.stops.length && (
         <p className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]">
@@ -522,7 +1111,7 @@ export function DayTimeline({
             })}
             tripPlaceNames={tripPlaceNames}
             onClose={() => setAddOpen(false)}
-            onAddCustom={onAddCustom}
+            onAddCustom={handleAddCustomLocal}
           />
         </>
       )}

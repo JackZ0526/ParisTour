@@ -5,7 +5,11 @@ import {
   isLlmConfigured,
   type HotelDetailCopy,
 } from '../services/llm'
-import { memoizeLlmCall, peekLlmMemo } from '../services/llmMemo'
+import {
+  memoizePlaceDetailCopy,
+  peekPlaceDetailCopy,
+  placeDetailKeysFromPlace,
+} from '../services/placeDetailMemo'
 import type { DayPlan, Place, SelectedHotel } from '../types'
 import { GooglePlacePage } from './GooglePlacePage'
 
@@ -23,10 +27,6 @@ const PLACE_LABELS = {
   intro: '地点简介',
   reason: '为什么推荐',
   loadingText: '正在生成地点简介与推荐理由…',
-}
-
-function placeDetailKey(placeId: string) {
-  return `place-detail:${placeId}`
 }
 
 export function PlacePanel({
@@ -65,7 +65,8 @@ export function PlacePanel({
       return
     }
 
-    const memoHit = peekLlmMemo<HotelDetailCopy>(placeDetailKey(placeId))
+    const detailKeys = placeDetailKeysFromPlace(place)
+    const memoHit = peekPlaceDetailCopy(...detailKeys)
     if (memoHit) {
       setStory({ ...memoHit, tripFit: '' })
       setStoryLoading(false)
@@ -87,7 +88,7 @@ export function PlacePanel({
     const p = ctx.place
     if (!p) return
 
-    void memoizeLlmCall(placeDetailKey(placeId), () =>
+    void memoizePlaceDetailCopy(detailKeys, () =>
       generatePlaceDetailCopy({
         name: p.name,
         nameLocal: p.nameLocal,

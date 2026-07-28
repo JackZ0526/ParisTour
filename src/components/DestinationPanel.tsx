@@ -107,7 +107,7 @@ export function DestinationPanel({ value, onChange }: Props) {
             <p className="text-sm text-[var(--stone)]">热门目的地</p>
             <div className="flex flex-wrap items-center gap-2">
               {loadingChips && (
-                <LoadingIndicator label="正在生成推荐…" size="sm" showDots />
+                <LoadingIndicator label="正在生成推荐…" size="sm" showDots mode="thinking" />
               )}
               {!loadingChips && chipSource === 'fallback' && (
                 <p className="text-xs text-[var(--mist)]">推荐暂用默认列表</p>
@@ -120,7 +120,7 @@ export function DestinationPanel({ value, onChange }: Props) {
                   aria-busy={refreshing || undefined}
                   className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)] disabled:opacity-50"
                 >
-                  {refreshing && <ButtonSpinner />}
+                  {refreshing && <ButtonSpinner mode="thinking" />}
                   {refreshing ? '正在想…' : '再给我来一批'}
                 </button>
               )}
@@ -138,6 +138,7 @@ export function DestinationPanel({ value, onChange }: Props) {
                 label="大模型正在想热门目的地…"
                 showDots
                 size="sm"
+                mode="thinking"
               />
             ) : (
               chips.map((chip) => {
@@ -169,7 +170,7 @@ export function DestinationPanel({ value, onChange }: Props) {
 
           {refreshing && chips.length > 0 && (
             <div className="mt-2">
-              <LoadingIndicator label="正在想下一批热门目的地…" size="sm" showDots />
+              <LoadingIndicator label="正在想下一批热门目的地…" size="sm" showDots mode="thinking" />
             </div>
           )}
 

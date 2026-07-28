@@ -1164,13 +1164,14 @@ export default function App() {
   }
 
   function handleAddCustom(place: Place, mode: 'best' | 'end') {
-    handleAddOnDay(day.day, place, { mode })
+    // Don't auto-open PlacePanel / GooglePlacePage after add-from-dialog.
+    handleAddOnDay(day.day, place, { mode, select: false })
   }
 
   function handleAddOnDay(
     dayNum: number,
     place: Place,
-    options?: { mode?: 'best' | 'end'; insertAt?: number },
+    options?: { mode?: 'best' | 'end'; insertAt?: number; select?: boolean },
   ) {
     const mode = options?.mode || 'best'
     setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
@@ -1260,7 +1261,9 @@ export default function App() {
 
     const targetIndex = days.findIndex((d) => d.day === dayNum)
     if (targetIndex >= 0) setDayIndex(targetIndex)
-    setSelectedPlaceId(place.id)
+    if (options?.select !== false) {
+      setSelectedPlaceId(place.id)
+    }
   }
 
   function handleSwitchDay(dayNum: number) {
@@ -1694,6 +1697,7 @@ export default function App() {
                       label="正在根据航班与时差推算行程起算日…"
                       showDots
                       size="sm"
+                      mode="thinking"
                     />
                   ) : itineraryStartDate ? (
                     <p>
@@ -1711,6 +1715,7 @@ export default function App() {
                           label="正在核对抵达时间…"
                           showDots
                           size="sm"
+                          mode="thinking"
                         />
                       ) : null}
                     </p>
@@ -1757,6 +1762,7 @@ export default function App() {
                   <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
                     <LoadingIndicator
                       variant="block"
+                      mode="thinking"
                       label={
                         <span
                           key={itineraryLoadingLineIndex}

@@ -505,7 +505,7 @@ export function HotelPicker({
             aria-busy={refreshing || undefined}
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)] disabled:opacity-50"
           >
-            {refreshing && <ButtonSpinner />}
+            {refreshing && <ButtonSpinner mode="thinking" />}
             {refreshing ? '推荐中…' : '换一批推荐'}
           </button>
         </div>
@@ -597,7 +597,7 @@ export function HotelPicker({
                   aria-busy={refreshing || undefined}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] disabled:opacity-50"
                 >
-                  {refreshing && <ButtonSpinner />}
+                  {refreshing && <ButtonSpinner mode="thinking" />}
                   {refreshing ? '推荐中…' : '按喜好推荐'}
                 </button>
               </div>
@@ -608,9 +608,12 @@ export function HotelPicker({
 
       {refreshing && (
         <LoadingIndicator
+          variant="block"
           label={refreshHint || '正在请大模型推荐巴黎酒店，并核对 Google 地点信息…'}
           showDots
           size="sm"
+          mode="thinking"
+          className="py-3"
         />
       )}
 

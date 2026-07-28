@@ -40,6 +40,8 @@ interface Props {
   footer?: ReactNode
   /** When true, backdrop / Esc call onClose (default true). */
   closeOnBackdrop?: boolean
+  /** Overlay stacking class; default sits under AddPlaceDialog (z-2100). */
+  overlayClassName?: string
   onClose: () => void
 }
 
@@ -53,6 +55,7 @@ export function GooglePlacePage({
   llmNarrative,
   footer,
   closeOnBackdrop = true,
+  overlayClassName = 'z-[2000]',
   onClose,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
@@ -127,7 +130,9 @@ export function GooglePlacePage({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
+    <div
+      className={`fixed inset-0 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${overlayClassName}`}
+    >
       <button
         type="button"
         className="absolute inset-0 cursor-default"
@@ -268,6 +273,7 @@ export function GooglePlacePage({
                     label={llmNarrative.labels?.loadingText || '正在生成简介与推荐理由…'}
                     showDots
                     size="sm"
+                    mode="thinking"
                   />
                 )}
                 {llmNarrative.intro && (
@@ -308,6 +314,7 @@ export function GooglePlacePage({
                       label={llmNarrative.labels.loadingMoreText}
                       showDots
                       size="sm"
+                      mode="thinking"
                     />
                   )}
               </div>

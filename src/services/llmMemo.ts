@@ -50,6 +50,16 @@ export function peekLlmMemo<T>(key: string): T | undefined {
   return hit.value as T
 }
 
+/** Write / alias a value into the memo without invoking the producer. */
+export function seedLlmMemo<T>(
+  key: string,
+  value: T,
+  options?: { ttlMs?: number },
+): void {
+  const ttl = options?.ttlMs ?? DEFAULT_TTL_MS
+  results.set(key, { value, expiresAt: Date.now() + ttl })
+}
+
 export function clearLlmMemo(prefix?: string) {
   if (!prefix) {
     results.clear()

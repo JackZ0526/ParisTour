@@ -75,8 +75,27 @@ export function TripChatPanel({
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<TripChatTurn[]>([])
   const [actionNotes, setActionNotes] = useState<string[]>([])
+  const [panelMounted, setPanelMounted] = useState(false)
+  const [panelEntered, setPanelEntered] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
+
+  // Keep the panel mounted through the close animation so exit can play.
+  useEffect(() => {
+    if (open) {
+      setPanelMounted(true)
+      return
+    }
+    setPanelEntered(false)
+  }, [open])
+
+  useEffect(() => {
+    if (!panelMounted || !open) return
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setPanelEntered(true))
+    })
+    return () => cancelAnimationFrame(id)
+  }, [panelMounted, open])
 
   useEffect(() => {
     if (!open) {
@@ -534,8 +553,23 @@ export function TripChatPanel({
         {open ? '关闭助手' : '行程助手'}
       </button>
 
-      {open && (
-        <div className="fixed bottom-20 right-5 z-[2000] flex h-[min(70vh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur">
+      {panelMounted && (
+        <div
+          role="dialog"
+          aria-label="行程助手"
+          aria-hidden={!open}
+          inert={!open || undefined}
+          onTransitionEnd={(e) => {
+            if (e.target !== e.currentTarget) return
+            if (e.propertyName !== 'opacity') return
+            if (!open) setPanelMounted(false)
+          }}
+          className={`fixed bottom-20 right-5 z-[2000] flex h-[min(70vh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            panelEntered
+              ? 'translate-x-0 translate-y-0 opacity-100'
+              : 'pointer-events-none translate-x-2 translate-y-3 opacity-0'
+          }`}
+        >
           <div className="border-b border-[var(--mist)] px-4 py-3">
             <h3 className="font-display text-xl leading-tight">行程助手</h3>
             <p className="mt-0.5 text-xs text-[var(--stone)]">
@@ -588,7 +622,7 @@ export function TripChatPanel({
 
             {busy && (
               <div className="rounded-2xl bg-white/80 px-3 py-2">
-                <LoadingIndicator label="助手思考中…" showDots size="sm" />
+                <LoadingIndicator label="助手思考中…" showDots size="sm" mode="thinking" />
               </div>
             )}
             {error && <p className="text-xs text-red-700">{error}</p>}
@@ -606,19 +640,21 @@ export function TripChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="跟我说你想怎么改行程…"
-              disabled={busy}
+              disabled={busy || !open}
+              tabIndex={open ? undefined : -1}
               aria-busy={busy || undefined}
               className="min-w-0 flex-1 rounded-full border border-[var(--ink)]/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-[var(--sage)]"
             />
             <button
               type="submit"
-              disabled={busy || !input.trim()}
+              disabled={busy || !input.trim() || !open}
+              tabIndex={open ? undefined : -1}
               aria-busy={busy || undefined}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--sage)] px-3 py-2 text-sm text-white disabled:opacity-50"
             >
               {busy ? (
                 <>
-                  <ButtonSpinner />
+                  <ButtonSpinner mode="thinking" />
                   思考中
                 </>
               ) : (

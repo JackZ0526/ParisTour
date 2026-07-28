@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchGooglePlaceDetails,
   type GooglePlaceDetails,
 } from '../services/googlePlaceDetails'
 import {
   generatePlaceDescription,
+  generatePlaceDetailCopy,
   getOpenAIModel,
   getOpenAIModelLabel,
   isLlmConfigured,
@@ -12,14 +13,21 @@ import {
   recommendPlacesForDay,
   setOpenAIModel,
   subscribeOpenAIModel,
+  type HotelDetailCopy,
   type PlaceRecommendation,
   type RecommendPlaceType,
 } from '../services/llm'
+import {
+  memoizePlaceDetailCopy,
+  peekPlaceDetailCopy,
+  placeDetailKeysFromGoogle,
+} from '../services/placeDetailMemo'
 import {
   getDayRecommendCache,
   setDayRecommendCache,
 } from '../services/recommendCache'
 import type { Place, PlaceType } from '../types'
+import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
 
@@ -53,6 +61,14 @@ const recommendTabs: Array<{ id: RecommendPlaceType; label: string }> = [
   { id: 'restaurant', label: '餐厅' },
 ]
 
+const GOOGLE_PLACE_LABELS = {
+  title: '行程顾问点评',
+  intro: '地点简介',
+  reason: '为什么推荐',
+  loadingText: '正在生成地点简介与推荐理由…',
+  loadingMoreText: '正在生成推荐理由…',
+}
+
 export function AddPlaceDialog({
   open,
   dayNumber,
@@ -70,6 +86,12 @@ export function AddPlaceDialog({
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
   const [googleType, setGoogleType] = useState<PlaceType>('attraction')
+  const [googleDetail, setGoogleDetail] = useState<{
+    details: GooglePlaceDetails
+    type: PlaceType
+  } | null>(null)
+  const [googleStory, setGoogleStory] = useState<HotelDetailCopy | null>(null)
+  const [googleStoryLoading, setGoogleStoryLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [addingName, setAddingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -81,12 +103,57 @@ export function AddPlaceDialog({
   const [loadingDetailsKey, setLoadingDetailsKey] = useState<string | null>(null)
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
   const [openaiModel, setOpenaiModelState] = useState(() => getOpenAIModel())
+  const chromeRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
+  const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
+  const [heightReady, setHeightReady] = useState(false)
 
   useEffect(() => {
     return subscribeOpenAIModel(() => {
       setOpenaiModelState(getOpenAIModel())
     })
   }, [])
+
+  // Reset height animation gate when the sheet closes so reopen doesn't tween from stale size.
+  useEffect(() => {
+    if (!open) {
+      setHeightReady(false)
+      setBodyHeight(undefined)
+    }
+  }, [open])
+
+  // Measure tab content and animate body height on tab / content size changes.
+  useLayoutEffect(() => {
+    if (!open || googleDetail) return
+    const measureEl = measureRef.current
+    const chromeEl = chromeRef.current
+    if (!measureEl || !chromeEl) return
+
+    const apply = () => {
+      const maxBody = Math.max(0, window.innerHeight * 0.88 - chromeEl.offsetHeight)
+      const next = Math.min(measureEl.scrollHeight, maxBody)
+      setBodyHeight(next)
+    }
+
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(measureEl)
+    window.addEventListener('resize', apply)
+
+    let cancelled = false
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setHeightReady(true)
+      })
+    })
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+      window.removeEventListener('resize', apply)
+    }
+  }, [open, mainTab, googleDetail])
 
   function applyCachedRecommendations(list: PlaceRecommendation[], batch: number) {
     setRecommendations(list)
@@ -149,6 +216,9 @@ export function AddPlaceDialog({
     setMainTab('ai')
     setCategory('attraction')
     setError(null)
+    setGoogleDetail(null)
+    setGoogleStory(null)
+    setGoogleStoryLoading(false)
 
     const cached = getDayRecommendCache(dayNumber)
     if (cached) {
@@ -288,6 +358,8 @@ export function AddPlaceDialog({
       }
       onAddCustom(place, mode)
       setGoogleQuery('')
+      setGoogleDetail(null)
+      // Parent also closes; dismiss detail + add sheet after join.
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : '添加失败')
@@ -297,57 +369,174 @@ export function AddPlaceDialog({
     }
   }
 
-  async function addFromGoogle(mode: 'best' | 'end') {
+  async function searchGooglePlace() {
     const q = googleQuery.trim()
-    if (!q) return
-    await resolveAndAdd(q, googleType, mode)
+    if (!q || searching) return
+    if (!isLoaded) {
+      setError('Google Maps 尚未加载完成，请稍后再试。')
+      return
+    }
+    setSearching(true)
+    setError(null)
+    try {
+      const query = q.toLowerCase().includes('paris') ? q : `${q} Paris`
+      const details = await fetchGooglePlaceDetails(query)
+      if (!details?.location) {
+        throw new Error('未找到该地点或缺少坐标，请换个关键词。')
+      }
+      setGoogleDetail({ details, type: googleType })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '搜索失败')
+    } finally {
+      setSearching(false)
+    }
   }
+
+  function closeGoogleDetail() {
+    setGoogleDetail(null)
+    setGoogleStory(null)
+    setGoogleStoryLoading(false)
+    setError(null)
+  }
+
+  // Generate intro + 推荐理由 when Google detail opens (same memo as PlacePanel).
+  useEffect(() => {
+    if (!googleDetail) {
+      setGoogleStory(null)
+      setGoogleStoryLoading(false)
+      return
+    }
+
+    const { details, type } = googleDetail
+    const detailKeys = placeDetailKeysFromGoogle(details)
+    const memoHit = peekPlaceDetailCopy(...detailKeys)
+    if (memoHit) {
+      setGoogleStory({ ...memoHit, tripFit: '' })
+      setGoogleStoryLoading(false)
+      return
+    }
+
+    // First load only: show Google summary while LLM narrative generates.
+    setGoogleStory({
+      intro: details.summary || '',
+      reason: '',
+      tripFit: '',
+    })
+
+    if (!isLlmConfigured()) return
+
+    let cancelled = false
+    setGoogleStoryLoading(true)
+    void memoizePlaceDetailCopy(detailKeys, () =>
+      generatePlaceDetailCopy({
+        name: details.name,
+        type: typeLabel[type] || type,
+        address: details.address,
+        existingDescription: details.summary,
+        day: dayNumber,
+        dayTitle,
+        dayTheme,
+        dayPace,
+        hotelArea,
+      }).then((copy) => {
+        if (!copy) {
+          return {
+            intro: details.summary || '',
+            reason: '',
+            tripFit: '',
+          }
+        }
+        return { ...copy, tripFit: '' }
+      }),
+    )
+      .then((copy) => {
+        if (cancelled || !copy) return
+        setGoogleStory(copy)
+      })
+      .finally(() => {
+        if (!cancelled) setGoogleStoryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // Snapshot day context on open; remount / same place should hit memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleDetail])
 
   if (!open) return null
 
+  const googleBusyBest =
+    googleDetail != null && addingName === `${googleDetail.details.name}:best`
+  const googleBusyEnd =
+    googleDetail != null && addingName === `${googleDetail.details.name}:end`
+
   return (
-    <div className="fixed inset-0 z-[2100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
+    <>
+      {/* Keep search sheet under the Google detail page while previewing. */}
+      <div
+        className={`fixed inset-0 z-[2100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${
+          googleDetail ? 'pointer-events-none invisible' : ''
+        }`}
+      >
       <button type="button" className="absolute inset-0" aria-label="关闭" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
         className="relative z-10 flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
-        <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
-          <div>
-            <h3 className="font-display text-2xl">添加地点</h3>
+        <div ref={chromeRef} className="shrink-0">
+          <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
+            <div>
+              <h3 className="font-display text-2xl">添加地点</h3>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)]"
+            >
+              关闭
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)]"
-          >
-            关闭
-          </button>
+
+          <div className="flex gap-2 px-4 pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setMainTab('ai')
+                closeGoogleDetail()
+              }}
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                mainTab === 'ai' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
+              }`}
+            >
+              AI 推荐
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMainTab('google')
+                closeGoogleDetail()
+              }}
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                mainTab === 'google' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
+              }`}
+            >
+              Google 搜索
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-2 px-4 pt-3">
-          <button
-            type="button"
-            onClick={() => setMainTab('ai')}
-            className={`rounded-full px-3 py-1.5 text-sm ${
-              mainTab === 'ai' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
-            }`}
-          >
-            AI 推荐
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab('google')}
-            className={`rounded-full px-3 py-1.5 text-sm ${
-              mainTab === 'google' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
-            }`}
-          >
-            Google 搜索
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div
+          className={`add-place-body min-h-0${heightReady ? ' add-place-body--ready' : ''}`}
+          style={bodyHeight != null ? { height: bodyHeight } : undefined}
+        >
+          <div className="h-full overflow-y-auto overscroll-contain">
+            <div
+              ref={measureRef}
+              key={mainTab}
+              className="add-place-tab-pane p-4"
+            >
           {mainTab === 'ai' ? (
             <div className="space-y-3">
               <p className="text-xs text-[var(--stone)]">
@@ -415,6 +604,7 @@ export function AddPlaceDialog({
                   label="AI 正在根据行程推荐…"
                   showDots
                   size="md"
+                  mode="thinking"
                 />
               ) : (
                 <ul className="space-y-2">
@@ -564,7 +754,7 @@ export function AddPlaceDialog({
                                       aria-busy={busyBest || undefined}
                                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                                     >
-                                      {busyBest && <ButtonSpinner />}
+                                      {busyBest && <ButtonSpinner mode="thinking" />}
                                       {busyBest ? '加入中…' : '最顺路'}
                                     </button>
                                     <button
@@ -582,7 +772,7 @@ export function AddPlaceDialog({
                                       aria-busy={busyEnd || undefined}
                                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
                                     >
-                                      {busyEnd && <ButtonSpinner />}
+                                      {busyEnd && <ButtonSpinner mode="thinking" />}
                                       {busyEnd ? '加入中…' : '加到最后'}
                                     </button>
                                   </div>
@@ -612,7 +802,7 @@ export function AddPlaceDialog({
                 aria-busy={loadingRecs || undefined}
                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
               >
-                {loadingRecs && <ButtonSpinner />}
+                {loadingRecs && <ButtonSpinner mode="thinking" />}
                 {loadingRecs ? '正在换一批…' : '换一批'}
               </button>
 
@@ -628,7 +818,7 @@ export function AddPlaceDialog({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    void addFromGoogle('end')
+                    void searchGooglePlace()
                   }
                 }}
               />
@@ -645,42 +835,94 @@ export function AddPlaceDialog({
                   <option value="transport">交通</option>
                 </select>
               </label>
-              <p className="text-xs text-[var(--stone)]">
-                {isLlmConfigured()
-                  ? '添加时会用大模型生成中文简介。'
-                  : '未配置大模型密钥时，将使用 Google 地点摘要作为简介。'}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={searching || !googleQuery.trim()}
-                  onClick={() => void addFromGoogle('best')}
-                  aria-busy={(searching && addingName?.endsWith(':best')) || undefined}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
-                >
-                  {searching && addingName?.endsWith(':best') && <ButtonSpinner />}
-                  {searching && addingName?.endsWith(':best')
-                    ? '加入中…'
-                    : '最顺路加入'}
-                </button>
-                <button
-                  type="button"
-                  disabled={searching || !googleQuery.trim()}
-                  onClick={() => void addFromGoogle('end')}
-                  aria-busy={(searching && addingName?.endsWith(':end')) || undefined}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
-                >
-                  {searching && addingName?.endsWith(':end') && <ButtonSpinner />}
-                  {searching && addingName?.endsWith(':end')
-                    ? '加入中…'
-                    : '加到最后'}
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={searching || !googleQuery.trim()}
+                onClick={() => void searchGooglePlace()}
+                aria-busy={searching || undefined}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
+              >
+                {searching && <ButtonSpinner />}
+                {searching ? '搜索中…' : '搜索地点'}
+              </button>
               {error && <p className="text-sm text-red-700">{error}</p>}
             </div>
           )}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      <GooglePlacePage
+        open={Boolean(googleDetail)}
+        name={googleDetail?.details.name || ''}
+        location={googleDetail?.details.location}
+        fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
+        showMap={false}
+        overlayClassName="z-[2200]"
+        llmNarrative={
+          googleDetail
+            ? {
+                intro:
+                  googleStory?.intro ||
+                  googleDetail.details.summary ||
+                  undefined,
+                reason: googleStory?.reason || undefined,
+                loading: googleStoryLoading,
+                labels: GOOGLE_PLACE_LABELS,
+              }
+            : null
+        }
+        footer={
+          googleDetail ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={searching}
+                  onClick={() =>
+                    void resolveAndAdd(
+                      googleDetail.details.name,
+                      googleDetail.type,
+                      'best',
+                      googleStory?.intro || googleDetail.details.summary,
+                      googleDetail.details,
+                    )
+                  }
+                  aria-busy={googleBusyBest || undefined}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
+                >
+                  {googleBusyBest && <ButtonSpinner mode="thinking" />}
+                  {googleBusyBest ? '加入中…' : '最顺路'}
+                </button>
+                <button
+                  type="button"
+                  disabled={searching}
+                  onClick={() =>
+                    void resolveAndAdd(
+                      googleDetail.details.name,
+                      googleDetail.type,
+                      'end',
+                      googleStory?.intro || googleDetail.details.summary,
+                      googleDetail.details,
+                    )
+                  }
+                  aria-busy={googleBusyEnd || undefined}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
+                >
+                  {googleBusyEnd && <ButtonSpinner mode="thinking" />}
+                  {googleBusyEnd ? '加入中…' : '加到最后'}
+                </button>
+              </div>
+              <p className="text-xs text-[var(--stone)]">
+                「最顺路」按当日路线插入最佳位置；「加到最后」追加到当天末尾。
+              </p>
+            </div>
+          ) : null
+        }
+        onClose={closeGoogleDetail}
+      />
+    </>
   )
 }

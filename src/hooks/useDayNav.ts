@@ -46,7 +46,10 @@ export function useDayNav(
   enabled = true,
 ) {
   const { isLoaded } = useGoogleMapsReady()
-  const origin = useMemo(() => getDayOrigin(day.day, hotel), [day.day, hotel])
+  const origin = useMemo(
+    () => getDayOrigin(day.day, hotel),
+    [day.day, hotel.id, hotel.lat, hotel.lng, hotel.name],
+  )
   const [plan, setPlan] = useState<DayNavPlan>(() => emptyPlan('', undefined, origin.kind))
   const [loading, setLoading] = useState(false)
   const requestIdRef = useRef(0)
