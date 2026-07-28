@@ -190,12 +190,6 @@ export default defineConfig(({ mode }) => {
       paidApiAuthPlugin(supabaseUrl, supabaseAnon),
       shareInviteDevPlugin(),
     ],
-    resolve: {
-      // Allow api/*.ts NodeNext-style `.js` imports to resolve to `.ts` under Vite SSR.
-      extensionAlias: {
-        '.js': ['.ts', '.js'],
-      },
-    },
     server: {
       // Windows often resolves localhost → 127.0.0.1; default Node may bind [::1] only
       host: '127.0.0.1',
