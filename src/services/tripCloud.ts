@@ -252,15 +252,70 @@ export async function saveTripSnapshot(
   if (error) throw error
 }
 
-/** Debounced cloud writer — call after local mutations. */
+/** Debounced cloud writer — only persists when the snapshot actually changed. */
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveTripId: string | null = null
 let saveInFlight = false
+let pendingAfterFlight = false
+/** Last successfully uploaded snapshot JSON, keyed by trip id. */
+const lastSavedJsonByTrip = new Map<string, string>()
+
+export type CloudSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+
+let cloudSaveStatus: CloudSaveStatus = 'idle'
+let cloudSaveError: string | null = null
+let savedHideTimer: ReturnType<typeof setTimeout> | null = null
+const cloudSaveListeners = new Set<() => void>()
+
+export function getCloudSaveStatus(): CloudSaveStatus {
+  return cloudSaveStatus
+}
+
+export function getCloudSaveError(): string | null {
+  return cloudSaveError
+}
+
+export function subscribeCloudSaveStatus(listener: () => void): () => void {
+  cloudSaveListeners.add(listener)
+  return () => {
+    cloudSaveListeners.delete(listener)
+  }
+}
+
+function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) {
+  cloudSaveStatus = next
+  cloudSaveError = error
+  if (savedHideTimer) {
+    clearTimeout(savedHideTimer)
+    savedHideTimer = null
+  }
+  if (next === 'saved') {
+    savedHideTimer = setTimeout(() => {
+      if (cloudSaveStatus === 'saved') {
+        cloudSaveStatus = 'idle'
+        cloudSaveError = null
+        cloudSaveListeners.forEach((l) => l())
+      }
+    }, 2400)
+  }
+  cloudSaveListeners.forEach((l) => l())
+}
+
+function snapshotJson(snapshot: TripSnapshot): string {
+  return JSON.stringify(snapshot)
+}
+
+export function rememberSavedSnapshot(tripId: string, snapshot: TripSnapshot): void {
+  if (!tripId) return
+  lastSavedJsonByTrip.set(tripId, snapshotJson(snapshot))
+}
 
 export function scheduleTripCloudSave(tripId: string, canEdit: boolean) {
   if (!canEdit || !tripId) return
   saveTripId = tripId
   if (saveTimer) clearTimeout(saveTimer)
+  setCloudSaveStatus('pending')
+  // Coalesce rapid edits into one write ~1.5s after the last change.
   saveTimer = setTimeout(() => {
     void flushTripCloudSave()
   }, 1500)
@@ -272,21 +327,49 @@ export async function flushTripCloudSave(): Promise<void> {
     saveTimer = null
   }
   const tripId = saveTripId
-  if (!tripId || saveInFlight) return
+  if (!tripId) return
+  if (saveInFlight) {
+    pendingAfterFlight = true
+    return
+  }
+
+  const snapshot = collectTripSnapshot()
+  const json = snapshotJson(snapshot)
+  if (lastSavedJsonByTrip.get(tripId) === json) {
+    if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
+      setCloudSaveStatus('idle')
+    }
+    return
+  }
+
   saveInFlight = true
+  setCloudSaveStatus('saving')
   try {
-    const snapshot = collectTripSnapshot()
     await saveTripSnapshot(tripId, snapshot)
+    lastSavedJsonByTrip.set(tripId, json)
+    setCloudSaveStatus('saved')
   } catch (err) {
     console.warn('[tripCloud] save failed', err)
+    setCloudSaveStatus(
+      'error',
+      err instanceof Error ? err.message : '保存失败',
+    )
   } finally {
     saveInFlight = false
+    if (pendingAfterFlight) {
+      pendingAfterFlight = false
+      void flushTripCloudSave()
+    }
   }
 }
 
 export function applyAccessibleTripLocally(trip: AccessibleTrip) {
   applyTripSnapshot(trip.snapshot)
+  rememberSavedSnapshot(trip.id, trip.snapshot)
+  saveTripId = trip.id
+  setCloudSaveStatus('idle')
 }
+
 
 export async function listTripShares(tripId: string): Promise<TripShareRow[]> {
   const sb = getSupabase()

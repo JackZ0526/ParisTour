@@ -8,6 +8,7 @@ import {
 } from './components/FlightPanel'
 import { HotelPicker } from './components/HotelPicker'
 import { LoadingIndicator } from './components/LoadingIndicator'
+import { CloudSaveIndicator } from './components/CloudSaveIndicator'
 import { PlacePanel } from './components/PlacePanel'
 import { ShareDialog } from './components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
@@ -1472,6 +1473,7 @@ export default function App() {
               可编辑共享
             </span>
           )}
+          {canEdit && <CloudSaveIndicator />}
           {trips.length > 1 && (
             <select
               className="max-w-[min(100%,320px)] truncate rounded-full border border-[var(--stone)]/30 bg-[var(--card)] px-3 py-1.5 text-sm"
