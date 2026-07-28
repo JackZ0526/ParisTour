@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { DayTimeline } from './components/DayTimeline'
 import {
   FlightPanel,
@@ -220,7 +221,7 @@ function chineseDayCount(n: number): string {
     4: '四',
     5: '五',
     6: '六',
-    7: '七',
+    7: '��',
     8: '八',
     9: '九',
     10: '十',
@@ -1711,6 +1712,7 @@ export default function App() {
           setHotelCandidates,
         }}
       />
+      <Analytics />
     </div>
   )
 }
