@@ -102,6 +102,24 @@ export function TripMap({
   const { isLoaded, loadError } = useGoogleMapsReady()
   const dayOrigin = useMemo(() => getDayOrigin(day.day, hotel), [day.day, hotel])
 
+  /** Place id + coords for this day only — ignores unrelated customPlaces churn (e.g. Day 1 edits). */
+  const stopsFingerprint = useMemo(
+    () =>
+      day.stops
+        .map((s) => {
+          try {
+            const place = getPlace(s.placeId, customPlaces)
+            const { lat, lng } = place.location
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return s.placeId
+            return `${s.placeId}@${lat.toFixed(5)},${lng.toFixed(5)}`
+          } catch {
+            return s.placeId
+          }
+        })
+        .join('|'),
+    [day.stops, customPlaces],
+  )
+
   const stops = useMemo(() => {
     const list: Place[] = []
     for (const s of day.stops) {
@@ -115,7 +133,9 @@ export function TripMap({
       }
     }
     return list
-  }, [day, customPlaces])
+    // Fingerprint captures id/order/coords; omit day/customPlaces identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopsFingerprint])
 
   const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
 
@@ -127,6 +147,9 @@ export function TripMap({
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const onLoad = useCallback((m: google.maps.Map) => setMap(m), [])
   const onUnmount = useCallback(() => setMap(null), [])
+
+  /** Only refit when this day's route/places change — not when other days' data updates. */
+  const viewportKey = `${day.day}|${dayOrigin.id}|${stopsFingerprint}|${navPlan.stopsKey || ''}`
 
   useEffect(() => {
     if (!map || !isLoaded) return
@@ -168,22 +191,9 @@ export function TripMap({
       cancelled = true
       window.cancelAnimationFrame(raf)
     }
-  }, [
-    map,
-    isLoaded,
-    navLoading,
-    dayOrigin.lat,
-    dayOrigin.lng,
-    dayOrigin.id,
-    stops,
-    day.day,
-    navPlan.stopsKey,
-    navPlan.routePath,
-    navPlan.hotelLinkPath,
-    navPlan.hotelToFirst,
-    navPlan.betweenStops,
-    navPlan.lastToDestination,
-  ])
+    // viewportKey encodes day + places + nav identity for this day only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, isLoaded, navLoading, viewportKey])
 
   if (loadError) {
     const help = googleMapsLoadErrorHelp(loadError)

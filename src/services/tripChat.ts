@@ -164,6 +164,7 @@ function systemPrompt(ctx: TripChatContext): string {
     '当用户要求添加/删除/替换/重排/切换日期/选中地点，或选择/增加/删除/换一批/替换酒店时，必须在 JSON 的 actions 里给出操作；纯问答时 actions 为空数组。',
     '介绍当前酒店或候选项时：直接根据「酒店快照」回答，不要编造不存在的酒店；无需 actions。',
     '添加地点时 placeName 用 Google Maps 可搜到的正式名称。',
+    '类型区分：placeType=cafe 指咖啡馆（精品咖啡、面包/甜点、brunch/早午餐小店），不是法语里常当餐厅的 café / brasserie；正餐用 restaurant。',
     '日期默认（硬规则）：用户说「今天/本日/这天」或未指定日期时，一律针对「当前查看的日期」操作；actions 里不要填 day 字段（省略即可，系统会用当前日）。',
     '只有用户明确说「第N天 / Day N / 换成第N天」时，才设置 day=N，或使用 switch_day。不要因为行程快照里其它天有同名地点就擅自改其它天。',
     'select_place / 介绍地点：优先当前查看日；不要为了找到地点自动跳到其它天，除非用户点名了那一天。',

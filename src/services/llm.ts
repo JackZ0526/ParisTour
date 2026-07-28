@@ -546,7 +546,7 @@ export async function generatePlaceDescription(input: {
   const key = `place-desc:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
   return memoizeLlmCall(key, async () => {
     const system =
-      '你是巴黎旅行文案助手。用简洁中文写地点简介，2–3 句，面向秋季游客，不要用列表，不要夸张营销套话。'
+      '你是巴黎旅行文案助手。用简洁中文写地点简介，2–3 句，面向秋季游客，不要用列表，不要夸张营销套话。若类型是 cafe/咖啡馆，按「喝咖啡、吃面包甜点或 brunch」的小店来写，不要写成正餐餐厅；法语 café 常指餐厅，此处不是那个意思。'
     const user = [
       `地点：${input.name}`,
       `类型：${input.type}`,
@@ -973,6 +973,13 @@ export interface PlaceRecommendation {
 
 const RECOMMEND_TYPES: RecommendPlaceType[] = ['cafe', 'attraction', 'restaurant']
 
+/**
+ * French "café" often means a restaurant/brasserie. Our `cafe` type is coffee + pastry/brunch only.
+ * Shared across recommend / full-plan / single-day regen prompts.
+ */
+const CAFE_VS_RESTAURANT_RULE =
+  '类型区分（硬规则）：type=cafe 只指「咖啡馆」——以精品咖啡、面包/甜点、轻食或 brunch/早午餐为主的小店（specialty coffee、boulangerie-pâtisserie 可坐、brunch spot），不是正餐。法语里 café / café-restaurant / brasserie 常指吃饭的餐厅，禁止标成 cafe。午餐与晚餐正餐必须用 type=restaurant（bistro、brasserie、餐厅等）。不要用 cafe 顶替正餐，也不要用 restaurant 顶替早间咖啡/甜点/brunch 站。'
+
 function normalizeRecommendType(raw: unknown): RecommendPlaceType {
   const v = String(raw || '').toLowerCase()
   if (v.includes('cafe') || v.includes('coffee') || v === '咖啡馆') return 'cafe'
@@ -1009,7 +1016,7 @@ export async function recommendPlacesForDay(input: {
   ])
 
   const system =
-    '你是巴黎秋季旅行顾问。根据游客当天已有行程，推荐互补、少重复、步行友好的地点。不要推荐卢浮宫或凡尔赛。只输出 JSON。'
+    '你是巴黎秋季旅行顾问。根据游客当天已有行程，推荐互补、少重复、步行友好的地点。不要推荐卢浮宫或凡尔赛。只输出 JSON。注意：cafe=咖啡馆（咖啡/面包甜点/brunch），不是法语里当餐厅用的 café。'
   const user = JSON.stringify({
     day: input.day,
     title: input.title,
@@ -1022,6 +1029,9 @@ export async function recommendPlacesForDay(input: {
     batch,
     rules: [
       '共推荐至少 12 个地点：attraction / cafe / restaurant 每类至少 4 个',
+      CAFE_VS_RESTAURANT_RULE,
+      'cafe 类：优先 Google 高分 specialty coffee、烘焙店可坐位、brunch/早午餐小店；不要推荐以正餐为主的 brasserie / café-restaurant',
+      'restaurant 类：正餐（午餐/晚餐），可含 bistro、brasserie、各国菜；不要用咖啡店/纯甜品店凑数',
       '严禁推荐 alreadyOnThisDay 与 alreadyOnTrip 中的地点',
       '尽量避开 avoidAlso（上一批推荐）；batch>1 时必须给出明显不同的新名单，不要复用上一批',
       'name 用可被 Google Maps 搜到的正式名称，可附 nameLocal 中文名',
@@ -1393,7 +1403,7 @@ export async function generateFullItinerary(
     '巴黎市区'
 
   const system =
-    '你是巴黎秋季旅行规划师。根据旅客的日期、航班与酒店，生成完整多日行程。只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。'
+    '你是巴黎秋季旅行规划师。根据旅客的日期、航班与酒店，生成完整多日行程。只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。注意：cafe=咖啡馆（咖啡/面包甜点/brunch），不是法语里当餐厅用的 café。'
 
   const user = JSON.stringify({
     trip: {
@@ -1420,15 +1430,16 @@ export async function generateFullItinerary(
       `必须输出恰好 ${n} 天（day 字段为 1..${n}），每天都有 title/theme/pace/summary/stops`,
       'Day 1：抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；Day 1 不强制咖啡馆开场。',
       '除最后一天外：每一天的最后一站必须是回酒店过夜（placeKey "hotel-selected"，type hotel）。Day 1 若还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）；中间日早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站仍须写回酒店。',
-      '除 Day 1 与迪士尼日外：若当天安排了景点/餐饮，第一站（离开酒店后的第一站）必须是高分精品咖啡馆（type=cafe，真实可搜店名）。',
+      '除 Day 1 与迪士尼日外：若当天安排了景点/餐饮，第一站（离开酒店后的第一站）必须是高分精品咖啡馆（type=cafe：咖啡/面包甜点/brunch 小店，真实可搜店名；不是正餐餐厅）。',
       disneyDay
         ? `倒数第二天（Day ${disneyDay}）必须是巴黎迪士尼全日：pace=乐园日。出游站只允许一个 "attr-disney"（Disneyland Paris），不要咖啡馆、不要餐厅站、不要其他景点；园内用餐不必单独写站。末站回酒店过夜（"hotel-selected"）。即当天 stops 实质上只有：迪士尼 + 回酒店。`
         : '行程不足 3 天时可不安排独立迪士尼日。',
       '必去（硬规则）：整个行程必须包含香榭丽舍大街（placeKey "attr-champs"）与凯旋门（placeKey "attr-arc"），可安排在同一天（二者相邻、顺路），不要拆成无关的重复街段。',
-      '最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆。',
+      '最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆（咖啡/甜点/brunch，非正餐 brasserie）。',
       '去重（硬规则）：整个行程不要重复同一景点/地标（同一正式名或同一 placeKey 只出现一次）；同一天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。',
       '每天行程开始约 10:00（自然醒）；不要安排 7–8 点观光（机场相关除外）。迪士尼日也尽量 10:00 左右出门，不要 7:45 强行早起。',
-      '餐饮（硬规则）：除「仅酒店→机场」或时间过紧的返程日、以及迪士尼日外，每天必须安排午餐与晚餐两顿正餐（type=restaurant，约 12:00–14:00 与 19:00–21:00）。推荐高分、性价比高的真实可搜餐厅；不局限于法餐，意餐/亚洲菜/bistro 等均可。饭店须顺路、靠近当日片区聚类，少绕路少额外步行。',
+      CAFE_VS_RESTAURANT_RULE,
+      '餐饮（硬规则）：除「仅酒店→机场」或时间过紧的返程日、以及迪士尼日外，每天必须安排午餐与晚餐两顿正餐（type=restaurant，约 12:00–14:00 与 19:00–21:00）。推荐高分、性价比高的真实可搜餐厅；不局限于法餐，意餐/亚洲菜/bistro 等均可。饭店须顺路、靠近当日片区聚类，少绕路少额外步行。正餐不得用 cafe 类型代替。',
       'Day 1 餐饮：抵达办入住后若仍有空档，再安排午餐和/或晚餐；落地过晚可只安排晚餐。',
       '动线：同日景点尽量同片区聚类，控制步行（walkLevel 优先 很少走/短步行）；跨区用地铁，少换乘。',
       '不要安排卢浮宫或凡尔赛作为行程重点。',
@@ -1713,7 +1724,7 @@ export async function generateSingleDayItinerary(
   } else if (isLast) {
     roleRules.push(
       '今天是最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。',
-      '国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆。',
+      '国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆（咖啡/甜点/brunch，非正餐 brasserie）。',
     )
   } else if (isDisney) {
     roleRules.push(
@@ -1722,8 +1733,8 @@ export async function generateSingleDayItinerary(
   } else {
     roleRules.push(
       '中间日：早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站必须回酒店过夜（placeKey "hotel-selected"，type hotel）。',
-      '若当天安排了景点/餐饮，第一站（离开酒店后的第一站）必须是高分精品咖啡馆（type=cafe，真实可搜店名）。',
-      '餐饮（硬规则）：必须安排午餐与晚餐两顿正餐（type=restaurant，约 12:00–14:00 与 19:00–21:00）。推荐高分、性价比高的真实可搜餐厅。',
+      '若当天安排了景点/餐饮，第一站（离开酒店后的第一站）必须是高分精品咖啡馆（type=cafe：咖啡/面包甜点/brunch 小店，真实可搜店名；不是正餐餐厅）。',
+      '餐饮（硬规则）：必须安排午餐与晚餐两顿正餐（type=restaurant，约 12:00–14:00 与 19:00–21:00）。推荐高分、性价比高的真实可搜餐厅。正餐不得用 cafe 类型代替。',
       '若 occupiedElsewhere 尚未包含香榭丽舍/凯旋门，今天应优先安排 placeKey "attr-champs" 与 "attr-arc"（可同日、顺路）。',
     )
   }
@@ -1736,7 +1747,7 @@ export async function generateSingleDayItinerary(
     .filter(Boolean)
 
   const system =
-    '你是巴黎秋季旅行规划师。根据旅客的日期、航班与酒店，只重新规划指定的那一天行程。只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。'
+    '你是巴黎秋季旅行规划师。根据旅客的日期、航班与酒店，只重新规划指定的那一天行程。只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。注意：cafe=咖啡馆（咖啡/面包甜点/brunch），不是法语里当餐厅用的 café。'
 
   const user = JSON.stringify({
     trip: {
@@ -1772,6 +1783,7 @@ export async function generateSingleDayItinerary(
     hardRules: [
       `只输出 Day ${dayNumber} 这一天（day 字段必须为 ${dayNumber}），以及 places[] 中当天用到的非特殊地点。`,
       ...roleRules,
+      CAFE_VS_RESTAURANT_RULE,
       '去重（硬规则）：不要使用 occupiedElsewhere 中已出现的景点/地标（同一正式名或同一 placeId）；当天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。',
       '每天行程开始约 10:00（自然醒）；不要安排 7–8 点观光（机场相关除外）。迪士尼日也尽量 10:00 左右出门。',
       '动线：同日景点尽量同片区聚类，控制步行（walkLevel 优先 很少走/短步行）；跨区用地铁，少换乘。',

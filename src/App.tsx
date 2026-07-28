@@ -383,6 +383,7 @@ export default function App() {
     signOut,
     notifyTripChanged,
     refreshTrips,
+    tripSyncEpoch,
   } = useAuth()
   const readOnly = !canEdit
   const [shareOpen, setShareOpen] = useState(false)
@@ -435,6 +436,63 @@ export default function App() {
   /** Skip autosave during hydrate + React Strict Mode double-effect. */
   const cloudSaveSkipRunsRef = useRef(2)
   const cloudHydratedAtRef = useRef(Date.now())
+  /** Nav distance/time recomputes mutate stop clocks — not user content edits. */
+  const suppressCloudSaveRef = useRef(false)
+  const dayIndexRef = useRef(dayIndex)
+  const daysRef = useRef(days)
+  const selectedPlaceIdRef = useRef(selectedPlaceId)
+  dayIndexRef.current = dayIndex
+  daysRef.current = days
+  selectedPlaceIdRef.current = selectedPlaceId
+
+  // Live sync: pull cloud-applied localStorage into React state without remounting / jumping to Day 1.
+  useEffect(() => {
+    if (tripSyncEpoch <= 0) return
+
+    const viewingDayNum = daysRef.current[dayIndexRef.current]?.day
+    const prevSelected = selectedPlaceIdRef.current
+
+    const nextHotels = initialHotelState()
+    const nextFlights = initialFlightsState()
+    const nextDates = loadTripDates()
+    const nextItinerary = loadItineraryState()
+    ensureBaselineFromGenerated(nextItinerary)
+
+    setHotel(nextHotels.hotel)
+    setHotelCandidates(nextHotels.candidates)
+    setTripDates(nextDates)
+    setFlights(nextFlights)
+    setDays(nextItinerary.days)
+    setCustomPlaces(nextItinerary.customPlaces)
+    setItineraryGenerated(
+      Boolean(nextItinerary.generated && nextItinerary.days.length),
+    )
+    setItineraryFingerprint(nextItinerary.fingerprint || null)
+    setItineraryGenError(null)
+    setDayRegenError(null)
+    setCopyRefreshing(false)
+    prevStopsKeyRef.current = null
+    suppressCopyRef.current = true
+
+    const nextDays = nextItinerary.days
+    let nextIndex = 0
+    if (viewingDayNum != null && nextDays.length) {
+      const byNum = nextDays.findIndex((d) => d.day === viewingDayNum)
+      if (byNum >= 0) nextIndex = byNum
+      else nextIndex = Math.min(dayIndexRef.current, nextDays.length - 1)
+    }
+    setDayIndex(nextIndex)
+
+    if (prevSelected) {
+      const stillOnDay = nextDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
+      const stillInCustom = Boolean(nextItinerary.customPlaces?.[prevSelected])
+      const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
+      setSelectedPlaceId(stillOnDay || stillInCustom || isHotel ? prevSelected : null)
+    }
+
+    cloudSaveSkipRunsRef.current = 2
+    cloudHydratedAtRef.current = Date.now()
+  }, [tripSyncEpoch])
 
   useEffect(() => {
     if (cloudSaveSkipRunsRef.current > 0) {
@@ -443,6 +501,11 @@ export default function App() {
     }
     // After remount/sync, ignore transient effect noise (do not defer-upload).
     if (Date.now() - cloudHydratedAtRef.current < 2000) return
+    // Distance / stop-clock recalculation only — keep local UI, skip cloud write.
+    if (suppressCloudSaveRef.current) {
+      suppressCloudSaveRef.current = false
+      return
+    }
     if (!canEdit) return
     notifyTripChanged()
   }, [
@@ -871,6 +934,7 @@ export default function App() {
     const applyKey = `${navPlan.stopsKey}::${day1HotelHm || ''}`
     if (navTimesAppliedKeyRef.current === applyKey) return
 
+    suppressCloudSaveRef.current = true
     setDays((prev) => {
       const idx = prev.findIndex((d) => d.day === day.day)
       if (idx < 0) return prev
@@ -899,6 +963,7 @@ export default function App() {
         recomputed.stops.length === prev[idx].stops.length &&
         recomputed.stops.every((s, i) => s.time === prev[idx].stops[i]?.time)
       ) {
+        suppressCloudSaveRef.current = false
         return prev
       }
       const next = [...prev]
@@ -925,11 +990,18 @@ export default function App() {
     const transitSeconds = day1TransitSecondsRef.current
     const hotelHm = computeDay1HotelArrivalHm(flights.outbound, transitSeconds)
     if (!hotelHm) return
+    suppressCloudSaveRef.current = true
     setDays((prev) => {
       const idx = prev.findIndex((d) => d.day === 1)
-      if (idx < 0) return prev
+      if (idx < 0) {
+        suppressCloudSaveRef.current = false
+        return prev
+      }
       const nextDay = applyDay1HotelArrivalTimes(prev[idx], hotelHm)
-      if (nextDay === prev[idx]) return prev
+      if (nextDay === prev[idx]) {
+        suppressCloudSaveRef.current = false
+        return prev
+      }
       const next = [...prev]
       next[idx] = nextDay
       return next
@@ -1778,7 +1850,7 @@ export default function App() {
                       />
                       <div className="space-y-4">
                         <TripMap
-                          key={`map-${day.day}-${hotel.id}-${dayPlacesKey}`}
+                          key={`map-${day.day}-${hotel.id}`}
                           hotel={hotel}
                           day={day}
                           customPlaces={placesWithHotel}

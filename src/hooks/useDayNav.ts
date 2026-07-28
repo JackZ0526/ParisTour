@@ -58,9 +58,22 @@ export function useDayNav(
         `${origin.kind}:${origin.id}`,
         `${origin.lat.toFixed(5)},${origin.lng.toFixed(5)}`,
         day.pace,
-        day.stops.map((s) => `${s.id || ''}:${s.placeId}`).join(','),
+        day.stops
+          .map((s) => {
+            try {
+              const place = getPlace(s.placeId, customPlaces)
+              const { lat, lng } = place.location
+              if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                return `${s.id || ''}:${s.placeId}@${lat.toFixed(5)},${lng.toFixed(5)}`
+              }
+            } catch {
+              /* fall through */
+            }
+            return `${s.id || ''}:${s.placeId}`
+          })
+          .join(','),
       ].join('|'),
-    [day.day, day.stops, day.pace, origin.kind, origin.id, origin.lat, origin.lng],
+    [day.day, day.stops, day.pace, origin.kind, origin.id, origin.lat, origin.lng, customPlaces],
   )
 
   const stopPoints = useMemo(() => {
@@ -77,9 +90,10 @@ export function useDayNav(
       }
     }
     return list
-    // stopsKey encodes place order/ids — omit day.stops to avoid refetch when only times change.
+    // stopsKey encodes place order/ids — omit customPlaces identity so other-day
+    // place dictionary churn does not refetch this day's navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customPlaces, stopsKey, enabled])
+  }, [stopsKey, enabled])
 
   useLayoutEffect(() => {
     if (!enabled || !isLoaded) {

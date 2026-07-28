@@ -49,6 +49,11 @@ type AuthContextValue = {
   switchTrip: (tripId: string) => Promise<void>
   refreshTrips: () => Promise<void>
   notifyTripChanged: (opts?: { force?: boolean }) => void
+  /**
+   * Increments on live remote apply. App soft-reloads trip data without remounting
+   * (so the user keeps the day / selection they were viewing).
+   */
+  tripSyncEpoch: number
 }
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
@@ -103,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tripReady, setTripReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bootKey, setBootKey] = useState(0)
+  const [tripSyncEpoch, setTripSyncEpoch] = useState(0)
 
   const user = session?.user ?? null
   const email = (user?.email || '').toLowerCase()
@@ -320,7 +326,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (status !== 'ready' || !activeTripId || !tripReady) return
     return subscribeTripRealtime(activeTripId, () => {
-      setBootKey((k) => k + 1)
+      // Soft sync: refresh localStorage-backed state in App without remounting to Day 1.
+      setTripSyncEpoch((k) => k + 1)
     })
   }, [status, activeTripId, tripReady])
 
@@ -343,6 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       switchTrip,
       refreshTrips,
       notifyTripChanged,
+      tripSyncEpoch,
     }),
     [
       status,
@@ -362,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       switchTrip,
       refreshTrips,
       notifyTripChanged,
+      tripSyncEpoch,
     ],
   )
 
