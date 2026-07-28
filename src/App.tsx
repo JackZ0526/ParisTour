@@ -677,13 +677,8 @@ export default function App() {
         itineraryStartDate: itineraryStartDate || tripDates.startDate,
         nights: Math.max(0, numberOfDays - 1),
         hotel: {
-          name: hotel.name,
-          address: hotel.address,
+          ...hotel,
           area: areaLabel || undefined,
-          areaKey: hotel.areaKey,
-          lat: hotel.lat,
-          lng: hotel.lng,
-          nearestMetro: hotel.nearestMetro,
         },
         outbound: flightContextBrief(flights.outbound),
         returnFlight: flightContextBrief(flights.returnFlight),
@@ -812,7 +807,7 @@ export default function App() {
     if (!itineraryReady || !itineraryGenerated || itineraryGenerating) return
     if (navLoading) return
     if (!day.stops.length) return
-    if (!navPlan.stopsKey.startsWith(`${day.day}|`)) return
+    if (!navPlan.stopsKey?.startsWith(`${day.day}|`)) return
 
     const transitSeconds =
       day.day === 1

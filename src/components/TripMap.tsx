@@ -67,11 +67,11 @@ function collectViewportPoints(
     const overview = leg.directionsResult?.routes?.[0]?.overview_path
     if (overview?.length) {
       for (const ll of overview) {
-        const lit =
-          typeof ll.lat === 'function'
-            ? { lat: ll.lat(), lng: ll.lng() }
-            : { lat: (ll as google.maps.LatLngLiteral).lat, lng: (ll as google.maps.LatLngLiteral).lng }
-        if (Number.isFinite(lit.lat) && Number.isFinite(lit.lng)) points.push(lit)
+        const lat = typeof ll.lat === 'function' ? ll.lat() : Number(ll.lat)
+        const lng = typeof ll.lng === 'function' ? ll.lng() : Number(ll.lng)
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          points.push({ lat, lng })
+        }
       }
     }
   }

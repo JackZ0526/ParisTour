@@ -521,15 +521,19 @@ export function matchPlaceInDay(
   const q = placeName.toLowerCase().trim()
   if (!q) return null
 
-  let best: { stopIndex: number; placeId: string; stopId: string; place: Place; score: number } | null =
-    null
+  let bestScore = 0
+  let bestStopIndex = -1
+  let bestPlaceId = ''
+  let bestStopId = ''
+  let bestPlace: Place | null = null
 
-  day.stops.forEach((s, i) => {
+  for (let i = 0; i < day.stops.length; i++) {
+    const s = day.stops[i]
     let place: Place
     try {
       place = getPlace(s.placeId, customPlaces)
     } catch {
-      return
+      continue
     }
     const name = place.name.toLowerCase()
     const local = (place.nameLocal || '').toLowerCase()
@@ -537,19 +541,19 @@ export function matchPlaceInDay(
     if (name === q || local === q) score = 100
     else if (name.includes(q) || local.includes(q) || q.includes(name)) score = 80
     else if (name.split(/\s+/).some((w) => w && q.includes(w))) score = 40
-    if (!score) return
-    const stopId = s.id || `d${day.day}-${s.placeId}-${i}`
-    if (!best || score > best.score) {
-      best = { stopIndex: i, placeId: s.placeId, stopId, place, score }
-    }
-  })
+    if (!score || score <= bestScore) continue
+    bestScore = score
+    bestStopIndex = i
+    bestPlaceId = s.placeId
+    bestStopId = s.id || `d${day.day}-${s.placeId}-${i}`
+    bestPlace = place
+  }
 
-  return best
-    ? {
-        stopIndex: best.stopIndex,
-        placeId: best.placeId,
-        stopId: best.stopId,
-        place: best.place,
-      }
-    : null
+  if (!bestPlace || bestStopIndex < 0) return null
+  return {
+    stopIndex: bestStopIndex,
+    placeId: bestPlaceId,
+    stopId: bestStopId,
+    place: bestPlace,
+  }
 }

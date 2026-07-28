@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/timetable-lookup/(.*)",
+      "destination": "/api/timetable-lookup?rest=$1"
+    },
+    {
+      "source": "/api/aerodatabox/(.*)",
+      "destination": "/api/aerodatabox?rest=$1"
+    },
+    {
+      "source": "/api/gemini/(.*)",
+      "destination": "/api/gemini?rest=$1"
+    },
+    {
+      "source": "/api/openai/(.*)",
+      "destination": "/api/openai?rest=$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
