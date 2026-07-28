@@ -123,7 +123,7 @@ export function AddPlaceDialog({
         setError(
           isLlmConfigured()
             ? '大模型这次没有返回可用推荐，请再点「换一批」或改用 Google 搜索。'
-            : '未配置大模型 API Key，无法生成 AI 推荐。请设置 VITE_OPENAI_API_KEY。',
+            : '未配置大模型。请在服务端设置 OPENAI_API_KEY（不要用 VITE_ 前缀）。',
         )
         return
       }

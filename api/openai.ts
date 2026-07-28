@@ -22,11 +22,10 @@ async function handle(req: Request): Promise<Response> {
     return methodNotAllowed(['GET', 'POST'])
   }
 
-  const apiKey = readEnv('OPENAI_API_KEY', 'VITE_OPENAI_API_KEY')
-  if (!apiKey) return missingKey('OPENAI_API_KEY or VITE_OPENAI_API_KEY')
+  const apiKey = readEnv('OPENAI_API_KEY')
+  if (!apiKey) return missingKey('OPENAI_API_KEY')
 
-  const base =
-    readEnv('OPENAI_BASE_URL', 'VITE_OPENAI_BASE_URL') || 'https://api.openai.com/v1'
+  const base = readEnv('OPENAI_BASE_URL') || 'https://api.openai.com/v1'
 
   const url = new URL(req.url)
   let rest = url.searchParams.get('rest') || ''

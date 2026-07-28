@@ -648,7 +648,7 @@ export default function App() {
   const runFullItineraryGeneration = useCallback(async () => {
     if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
     if (!isLlmConfigured()) {
-      setItineraryGenError('未配置 OpenAI API Key（VITE_OPENAI_API_KEY），无法生成行程。')
+      setItineraryGenError('未配置服务端 OPENAI_API_KEY，无法生成行程。')
       return
     }
 
@@ -1186,7 +1186,7 @@ export default function App() {
     if (!itineraryGenerated || !days.length) return
     if (dayRegenerating || itineraryGenerating) return
     if (!isLlmConfigured()) {
-      setDayRegenError('未配置 OpenAI API Key（VITE_OPENAI_API_KEY），无法重新生成当天行程。')
+      setDayRegenError('未配置服务端 OPENAI_API_KEY，无法重新生成当天行程。')
       return
     }
 

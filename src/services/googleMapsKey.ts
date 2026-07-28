@@ -1,24 +1,19 @@
-/** Your Google Maps Platform API key */
-export const GOOGLE_MAPS_API_KEY = 'AIzaSyCBJlMRB8sXi9oUIOrfgF8LWTQPDtTVBsw'
-
-const LEGACY_STORAGE_KEY = 'paris-tour-google-maps-key'
-
-/** Always use the project Google Maps API key (env override allowed). */
+/** Google Maps Platform browser key — must be client-side; lock down with HTTP referrers. */
 export function getGoogleMapsApiKey(): string {
-  // Clear any older locally saved key so it cannot override yours
+  // Clear any older locally saved key so it cannot override env
   try {
-    localStorage.removeItem(LEGACY_STORAGE_KEY)
+    localStorage.removeItem('paris-tour-google-maps-key')
   } catch {
     /* ignore */
   }
 
-  return (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY).trim()
+  return (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || ''
 }
 
-/** @deprecated Kept for compatibility; key is fixed to GOOGLE_MAPS_API_KEY. */
+/** @deprecated No-op; key comes from VITE_GOOGLE_MAPS_API_KEY only. */
 export function setGoogleMapsApiKey(_key: string) {
   try {
-    localStorage.removeItem(LEGACY_STORAGE_KEY)
+    localStorage.removeItem('paris-tour-google-maps-key')
   } catch {
     /* ignore */
   }

@@ -22,10 +22,12 @@ async function handle(req: Request): Promise<Response> {
     return methodNotAllowed(['GET', 'POST'])
   }
 
-  const key = readEnv('GEMINI_API_KEY', 'VITE_GEMINI_API_KEY')
+  const key = readEnv('GEMINI_API_KEY')
   const url = new URL(req.url)
   let rest = url.searchParams.get('rest') || ''
   url.searchParams.delete('rest')
+  // Never trust a browser-supplied key=
+  url.searchParams.delete('key')
   if (!rest) {
     const prefix = '/api/gemini'
     rest = url.pathname.startsWith(prefix)
@@ -34,11 +36,11 @@ async function handle(req: Request): Promise<Response> {
   }
 
   const target = new URL(`https://generativelanguage.googleapis.com/${rest}${url.search}`)
-  if (key && !target.searchParams.get('key')) {
+  if (key) {
     target.searchParams.set('key', key)
   }
   if (!target.searchParams.get('key')) {
-    return missingKey('GEMINI_API_KEY or VITE_GEMINI_API_KEY')
+    return missingKey('GEMINI_API_KEY')
   }
 
   try {

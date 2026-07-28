@@ -4,8 +4,12 @@ import { memoizeLlmCall } from './llmMemo'
 /**
  * Lightweight LLM helpers for place blurbs and day titles.
  *
- * Provider switching (OpenAI ↔ Gemini auto-fallback + manual toggle) is temporarily
- * disabled. Flip ENABLE_LLM_PROVIDER_SWITCH to true to restore it; keep VITE_GEMINI_API_KEY in .env.
+ * API keys NEVER ship to the browser. All OpenAI / Gemini calls go through
+ * `/api/openai` and `/api/gemini` (Vite dev proxy or Vercel serverless), which
+ * inject OPENAI_API_KEY / GEMINI_API_KEY server-side.
+ *
+ * Provider switching (OpenAI ↔ Gemini) is temporarily disabled.
+ * Flip ENABLE_LLM_PROVIDER_SWITCH to true to restore it.
  */
 
 export type LlmProvider = 'openai' | 'gemini'
@@ -33,26 +37,13 @@ export type OpenAIModelId = (typeof OPENAI_MODEL_OPTIONS)[number]['id']
 
 const OPENAI_MODEL_IDS = new Set<string>(OPENAI_MODEL_OPTIONS.map((m) => m.id))
 
-function geminiKey() {
-  return (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim() || ''
-}
-
-function openaiKey() {
-  return (import.meta.env.VITE_OPENAI_API_KEY as string | undefined)?.trim() || ''
-}
-
-function openaiBase() {
-  return (
-    (import.meta.env.VITE_OPENAI_BASE_URL as string | undefined)?.trim() ||
-    'https://api.openai.com/v1'
-  )
-}
-
+/** Public (non-secret) model id for the UI — not an API key. */
 function defaultOpenAIModel(): string {
   const fromEnv = (import.meta.env.VITE_OPENAI_MODEL as string | undefined)?.trim()
   if (fromEnv && OPENAI_MODEL_IDS.has(fromEnv)) return fromEnv
   return 'gpt-5.6-luna'
 }
+
 
 function readStoredOpenAIModel(): string | null {
   try {
@@ -104,13 +95,15 @@ export function subscribeOpenAIModel(listener: () => void): () => void {
 }
 
 export function isLlmConfigured(): boolean {
-  if (ENABLE_LLM_PROVIDER_SWITCH) return Boolean(geminiKey() || openaiKey())
-  return Boolean(openaiKey())
+  // Keys live only on the server. Opt out with VITE_LLM_ENABLED=false.
+  const flag = (import.meta.env.VITE_LLM_ENABLED as string | undefined)?.trim().toLowerCase()
+  if (flag === '0' || flag === 'false' || flag === 'off') return false
+  return true
 }
 
 export function isProviderConfigured(provider: LlmProvider): boolean {
   if (provider === 'gemini' && !ENABLE_LLM_PROVIDER_SWITCH) return false
-  return provider === 'openai' ? Boolean(openaiKey()) : Boolean(geminiKey())
+  return isLlmConfigured()
 }
 
 export function getProviderModelName(provider: LlmProvider): string {
@@ -132,8 +125,6 @@ function readStoredProvider(): LlmProvider | null {
 }
 
 function defaultProvider(): LlmProvider {
-  if (openaiKey()) return 'openai'
-  if (geminiKey()) return 'gemini'
   return 'openai'
 }
 
@@ -183,11 +174,7 @@ export function toggleLlmProvider(): LlmProvider {
 }
 
 export function canSwitchLlmProvider(): boolean {
-  return (
-    ENABLE_LLM_PROVIDER_SWITCH &&
-    Boolean(openaiKey()) &&
-    Boolean(geminiKey())
-  )
+  return ENABLE_LLM_PROVIDER_SWITCH && isLlmConfigured()
 }
 
 export function consumeLlmSwitchNotice(): string | null {
@@ -250,10 +237,8 @@ function friendlyLlmError(status: number, body: string, provider: LlmProvider): 
 }
 
 async function callGemini(system: string, user: string): Promise<string> {
-  const key = geminiKey()
-  if (!key) throw new LlmRequestError('未配置 Gemini API Key。', 'missing_key')
-
-  const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`
+  // Key injected by /api/gemini (Vite proxy or Vercel) — never send from the browser.
+  const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -322,15 +307,10 @@ function extractOpenAIMessageText(data: {
 }
 
 async function callOpenAIMessages(messages: OpenAIChatMessage[]): Promise<string> {
-  const key = openaiKey()
-  if (!key) throw new LlmRequestError('未配置 OpenAI API Key。', 'missing_key')
-
-  const base = openaiBase().replace(/\/$/, '')
-  const useProxy = base.includes('api.openai.com')
-  const url = useProxy ? '/api/openai/chat/completions' : `${base}/chat/completions`
+  // Key injected by /api/openai — never send Authorization from the browser.
+  const url = '/api/openai/chat/completions'
   const headers = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${key}`,
   }
 
   let body = buildOpenAIChatBody(messages)
@@ -410,7 +390,9 @@ async function callProvider(provider: LlmProvider, system: string, user: string)
 
 /** Multi-turn chat completion (OpenAI). Throws on failure. */
 export async function openaiChat(messages: OpenAIChatMessage[]): Promise<string> {
-  if (!openaiKey()) throw new LlmRequestError('未配置 OpenAI API Key。', 'missing_key')
+  if (!isLlmConfigured()) {
+    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+  }
   return callOpenAIMessages(messages)
 }
 
@@ -447,18 +429,16 @@ export async function openaiResponsesWithWebSearch(input: {
   instructions: string
   user: string
 }): Promise<string> {
-  const key = openaiKey()
-  if (!key) throw new LlmRequestError('未配置 OpenAI API Key。', 'missing_key')
+  if (!isLlmConfigured()) {
+    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+  }
 
-  const base = openaiBase().replace(/\/$/, '')
-  const useProxy = base.includes('api.openai.com')
-  const url = useProxy ? '/api/openai/responses' : `${base}/responses`
+  const url = '/api/openai/responses'
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
       model: openaiModel(),
@@ -509,7 +489,7 @@ async function generateText(
       throw new LlmRequestError(
         ENABLE_LLM_PROVIDER_SWITCH
           ? '未配置可用的大模型 API Key（OpenAI / Gemini）。'
-          : '未配置 OpenAI API Key（VITE_OPENAI_API_KEY）。',
+          : '未配置服务端 OPENAI_API_KEY（请写在 .env / Vercel，不要用 VITE_ 前缀）。',
       )
     }
     return null

@@ -5,6 +5,19 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const rapidApiKey = env.RAPIDAPI_KEY || env.AERODATABOX_RAPIDAPI_KEY || ''
+  const openaiKey = env.OPENAI_API_KEY || ''
+  const geminiKey = env.GEMINI_API_KEY || ''
+  const openaiBase = (env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
+
+  let openaiTarget = 'https://api.openai.com'
+  let openaiPrefix = '/v1'
+  try {
+    const u = new URL(openaiBase)
+    openaiTarget = u.origin
+    openaiPrefix = u.pathname.replace(/\/$/, '') || ''
+  } catch {
+    /* keep defaults */
+  }
 
   return {
     plugins: [react(), tailwindcss()],
@@ -51,15 +64,41 @@ export default defineConfig(({ mode }) => {
             })
           },
         },
+        // Gemini — key injected server-side from GEMINI_API_KEY
         '/api/gemini': {
           target: 'https://generativelanguage.googleapis.com',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/gemini/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              if (!geminiKey) return
+              try {
+                const incoming = new URL(req.url || '/', 'http://localhost')
+                incoming.searchParams.delete('key')
+                incoming.searchParams.set('key', geminiKey)
+                proxyReq.path = `${proxyReq.path.split('?')[0]}?${incoming.searchParams.toString()}`
+              } catch {
+                /* ignore */
+              }
+            })
+          },
         },
+        // OpenAI-compatible — key injected server-side from OPENAI_API_KEY
         '/api/openai': {
-          target: 'https://api.openai.com',
+          target: openaiTarget,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/openai/, '/v1'),
+          rewrite: (path) => {
+            const rest = path.replace(/^\/api\/openai/, '')
+            return `${openaiPrefix}${rest}`
+          },
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              if (openaiKey) {
+                proxyReq.setHeader('Authorization', `Bearer ${openaiKey}`)
+              }
+              proxyReq.setHeader('Accept', 'application/json')
+            })
+          },
         },
       },
     },

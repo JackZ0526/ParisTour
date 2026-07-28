@@ -23,13 +23,17 @@ npm run dev
 ### 环境变量（`.env`，已 gitignore）
 
 ```env
-VITE_GOOGLE_MAPS_API_KEY=你的_Google_Maps_Key
-VITE_AVIATIONSTACK_KEY=你的_AviationStack_Key
-VITE_OPENAI_API_KEY=可选_用于_AI_简介与推荐
-# 或 VITE_GEMINI_API_KEY=
+# 服务端密钥（不要加 VITE_ 前缀）
+RAPIDAPI_KEY=
+OPENAI_API_KEY=
+# GEMINI_API_KEY=
+
+# 浏览器可用（Maps 必须在前端加载；请在 Google Cloud 限制 HTTP referrer）
+VITE_GOOGLE_MAPS_API_KEY=
+# VITE_OPENAI_MODEL=gpt-5.6-luna
 ```
 
-Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**（或 Routes API）。
+Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**（或 Routes API），并为 Maps Key 限制 `http://127.0.0.1:5173/*` 与生产域名。
 
 ## 修改数据
 
