@@ -638,7 +638,7 @@ export function DayTimeline({
             <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-xs text-[var(--sage)]">
               {day.pace}
             </span>
-            <span className="rounded-full bg-[var(--mist)] px-2.5 py-1 text-xs text-[var(--stone)]">
+            <span className="hidden rounded-full bg-[var(--mist)] px-2.5 py-1 text-xs text-[var(--stone)] sm:inline-flex">
               {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
             </span>
             {copyRefreshing && !dayRegenerating && (
@@ -683,7 +683,7 @@ export function DayTimeline({
           </div>
           )}
         </div>
-        <h3 className="font-display mt-2 text-3xl">{day.title}</h3>
+        <h3 className="font-display mt-2 text-2xl sm:text-3xl">{day.title}</h3>
         <p className="text-sm text-[var(--copper)]">{day.theme}</p>
         <p className="mt-2 text-sm text-[var(--stone)]">{day.summary}</p>
         {dayRegenError && (
@@ -796,7 +796,7 @@ export function DayTimeline({
 
           const cardInner = (
             <div
-              className={`flex items-start gap-3 rounded-2xl border p-3 ${
+              className={`flex items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 ${
                 active
                   ? 'border-[var(--copper)] bg-white shadow-[var(--shadow)]'
                   : 'border-white/70 bg-[var(--card)]'
@@ -854,7 +854,7 @@ export function DayTimeline({
                   if (suppressClickRef.current || dragging) return
                   onSelectPlace(place.id)
                 }}
-                className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                className="flex min-w-0 flex-1 items-start gap-2 text-left sm:gap-3"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -886,7 +886,7 @@ export function DayTimeline({
                   location={place.location}
                   fallback={place.image}
                   alt={place.name}
-                  className="h-16 w-16 shrink-0 rounded-xl"
+                  className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
                   showBadge={false}
                 />
               </button>
@@ -1068,7 +1068,7 @@ export function DayTimeline({
                     location={place.location}
                     fallback={place.image}
                     alt={place.name}
-                    className="h-16 w-16 shrink-0 rounded-xl"
+                    className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
                     showBadge={false}
                   />
                 </div>

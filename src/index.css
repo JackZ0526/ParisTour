@@ -38,7 +38,13 @@ body {
     radial-gradient(ellipse 80% 50% at 10% -10%, rgba(196, 165, 116, 0.28), transparent 55%),
     radial-gradient(ellipse 60% 40% at 90% 0%, rgba(95, 122, 120, 0.22), transparent 50%),
     linear-gradient(165deg, #ecefe8 0%, #e2e7df 45%, #d9e0db 100%);
-  background-attachment: fixed;
+  background-attachment: scroll;
+}
+
+@media (min-width: 640px) {
+  body {
+    background-attachment: fixed;
+  }
 }
 
 h1,
@@ -259,12 +265,19 @@ select {
 .cloud-save-toast {
   position: fixed;
   left: max(1rem, env(safe-area-inset-left));
-  bottom: max(1rem, env(safe-area-inset-bottom));
+  /* Sit above the chat FAB on narrow screens to avoid overlap. */
+  bottom: max(4.75rem, calc(env(safe-area-inset-bottom) + 3.75rem));
   z-index: 1900;
   min-width: 11.5rem;
   max-width: min(18rem, calc(100vw - 2rem));
   pointer-events: none;
   animation: cloud-save-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 640px) {
+  .cloud-save-toast {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
 
 .cloud-save-toast-glow {

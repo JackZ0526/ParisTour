@@ -387,6 +387,10 @@ export default function App() {
   } = useAuth()
   const readOnly = !canEdit
   const [shareOpen, setShareOpen] = useState(false)
+  /** Below `lg`, itinerary shows one pane at a time to avoid a tall stacked map. */
+  const [mobileItineraryPane, setMobileItineraryPane] = useState<
+    'timeline' | 'map'
+  >('timeline')
   const initialHotels = useMemo(() => initialHotelState(), [])
   const initialFlights = useMemo(() => initialFlightsState(), [])
   const initialItinerary = useMemo(() => {
@@ -1541,11 +1545,13 @@ export default function App() {
     ITINERARY_LOADING_LINES[itineraryLoadingLineIndex] ?? ITINERARY_LOADING_LINES[0]
 
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+    <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
-          <span className="truncate text-[var(--stone)]">{email}</span>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
+          <span className="max-w-[11rem] truncate text-[var(--stone)] sm:max-w-[16rem]">
+            {email}
+          </span>
           {role === 'viewer' && (
             <span className="rounded-full bg-[var(--mist)] px-2.5 py-0.5 text-xs text-[var(--stone)]">
               只读
@@ -1558,7 +1564,7 @@ export default function App() {
           )}
           {trips.length > 1 && (
             <select
-              className="max-w-[min(100%,320px)] truncate rounded-full border border-[var(--stone)]/30 bg-[var(--card)] px-3 py-1.5 text-sm"
+              className="max-w-full truncate rounded-full border border-[var(--stone)]/30 bg-[var(--card)] px-3 py-1.5 text-sm sm:max-w-[min(100%,320px)]"
               value={activeTrip?.id || ''}
               onChange={(e) => {
                 void switchTrip(e.target.value).catch((err) => {
@@ -1574,7 +1580,7 @@ export default function App() {
             </select>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
           {role === 'owner' && activeTrip && (
             <button
               type="button"
@@ -1582,7 +1588,7 @@ export default function App() {
                 setShareOpen(true)
                 void refreshTrips().catch(() => undefined)
               }}
-              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
+              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)] sm:px-4"
             >
               分享
             </button>
@@ -1591,9 +1597,10 @@ export default function App() {
             <button
               type="button"
               onClick={handleClearAllTripState}
-              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
+              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)] sm:px-4"
             >
-              清空全部
+              <span className="sm:hidden">清空</span>
+              <span className="hidden sm:inline">清空全部</span>
             </button>
           )}
           <button
@@ -1601,7 +1608,7 @@ export default function App() {
             onClick={() => {
               void signOut()
             }}
-            className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
+            className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)] sm:px-4"
           >
             退出
           </button>
@@ -1616,7 +1623,7 @@ export default function App() {
         />
       )}
 
-      <header className="relative overflow-hidden rounded-[28px] border border-white/60 bg-[linear-gradient(135deg,rgba(28,36,32,0.92),rgba(74,99,86,0.88))] px-6 py-10 text-[var(--paper)] shadow-[var(--shadow)] sm:px-10 sm:py-14">
+      <header className="relative overflow-hidden rounded-2xl border border-white/60 bg-[linear-gradient(135deg,rgba(28,36,32,0.92),rgba(74,99,86,0.88))] px-5 py-7 text-[var(--paper)] shadow-[var(--shadow)] sm:rounded-[28px] sm:px-10 sm:py-14">
         <div
           className="pointer-events-none absolute inset-0 opacity-35"
           style={{
@@ -1628,12 +1635,16 @@ export default function App() {
           }}
         />
         <div className="relative max-w-2xl animate-fade-up">
-          <p className="text-xs uppercase tracking-[0.28em] text-[var(--gold)]">{hero.eyebrow}</p>
-          <h1 className="font-display mt-2 text-5xl leading-none sm:text-6xl md:text-7xl">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--gold)] sm:text-xs">
+            {hero.eyebrow}
+          </p>
+          <h1 className="font-display mt-2 text-[2rem] leading-[1.05] sm:text-5xl sm:leading-none md:text-6xl lg:text-7xl">
             {hero.title}
           </h1>
-          <p className="mt-4 max-w-lg text-base text-[var(--paper)]/85 sm:text-lg">{hero.blurb}</p>
-          <div className="mt-6 flex flex-wrap gap-2 text-sm">
+          <p className="mt-3 max-w-lg text-sm text-[var(--paper)]/85 sm:mt-4 sm:text-base md:text-lg">
+            {hero.blurb}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs sm:mt-6 sm:text-sm">
             {hero.tags.map((tag) => (
               <span key={tag} className="rounded-full bg-white/10 px-3 py-1 backdrop-blur">
                 {tag}
@@ -1643,7 +1654,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mt-10 space-y-12">
+      <main className="mt-8 space-y-10 sm:mt-10 sm:space-y-12">
         <TripDatesPanel
           key={`dates-${panelResetKey}`}
           value={tripDates}
@@ -1670,7 +1681,7 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="font-display text-3xl">
+              <h2 className="font-display text-2xl sm:text-3xl">
                 {chineseDayCount(numberOfDays)}行程
               </h2>
               <p className="mt-1 text-sm text-[var(--stone)]">
@@ -1801,60 +1812,111 @@ export default function App() {
 
                 {showItineraryContent && (
                   <>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {days.map((d, i) => {
-                        const cal = dateForTripDay(itineraryStartDate, d.day)
-                        return (
-                          <button
-                            key={d.day}
-                            type="button"
-                            onClick={() => {
-                              setDayIndex(i)
-                              setSelectedPlaceId(null)
-                              setDayRegenError(null)
-                            }}
-                            className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${
-                              i === dayIndex
-                                ? 'bg-[var(--ink)] text-[var(--paper)]'
-                                : 'bg-white/70 text-[var(--ink)] hover:bg-white'
-                            }`}
-                          >
-                            <span className="block leading-tight">
-                              D{d.day}
-                              {cal ? ` · ${formatTripDayLabel(cal)}` : ''}
-                            </span>
-                            <span className="block text-[11px] opacity-80">{d.title}</span>
-                          </button>
-                        )
-                      })}
+                    <div className="sticky top-0 z-20 -mx-3 space-y-2 bg-[color-mix(in_srgb,var(--paper)_92%,transparent)] px-3 py-2 backdrop-blur-md sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+                      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {days.map((d, i) => {
+                          const cal = dateForTripDay(itineraryStartDate, d.day)
+                          return (
+                            <button
+                              key={d.day}
+                              type="button"
+                              onClick={() => {
+                                setDayIndex(i)
+                                setSelectedPlaceId(null)
+                                setDayRegenError(null)
+                              }}
+                              className={`shrink-0 rounded-full px-3 py-2 text-sm transition sm:px-4 ${
+                                i === dayIndex
+                                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                                  : 'bg-white/70 text-[var(--ink)] hover:bg-white'
+                              }`}
+                            >
+                              <span className="block leading-tight">
+                                D{d.day}
+                                {cal ? ` · ${formatTripDayLabel(cal)}` : ''}
+                              </span>
+                              <span className="block max-w-[9.5rem] truncate text-[11px] opacity-80 sm:max-w-none">
+                                {d.title}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <div
+                        className="flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
+                        role="tablist"
+                        aria-label="行程视图"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={mobileItineraryPane === 'timeline'}
+                          onClick={() => setMobileItineraryPane('timeline')}
+                          className={`flex-1 rounded-full px-3 py-2 text-sm transition ${
+                            mobileItineraryPane === 'timeline'
+                              ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                              : 'text-[var(--ink)]'
+                          }`}
+                        >
+                          时间线
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={mobileItineraryPane === 'map'}
+                          onClick={() => setMobileItineraryPane('map')}
+                          className={`flex-1 rounded-full px-3 py-2 text-sm transition ${
+                            mobileItineraryPane === 'map'
+                              ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                              : 'text-[var(--ink)]'
+                          }`}
+                        >
+                          地图
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                      <DayTimeline
-                        key={`timeline-${day.day}-${hotel.id}`}
-                        day={day}
-                        hotel={hotel}
-                        customPlaces={placesWithHotel}
-                        selectedPlaceId={selectedPlaceId}
-                        navPlan={navPlan}
-                        navLoading={navLoading}
-                        copyRefreshing={copyRefreshing}
-                        dayRegenerating={dayRegenerating}
-                        dayRegenError={dayRegenError}
-                        isLastDay={day.day === lastDayNum}
-                        onSelectPlace={setSelectedPlaceId}
-                        onReorder={handleReorder}
-                        onDelete={handleDelete}
-                        onAddCustom={handleAddCustom}
-                        onResetDay={() => {
-                          void handleResetDay()
-                        }}
-                        canRestoreDayDefault={canRestoreDayDefault}
-                        onRestoreDayDefault={handleRestoreDayDefault}
-                        tripPlaceNames={tripPlaceNames}
-                        readOnly={readOnly}
-                      />
-                      <div className="space-y-4">
+                      <div
+                        className={
+                          mobileItineraryPane === 'timeline'
+                            ? 'block'
+                            : 'hidden lg:block'
+                        }
+                      >
+                        <DayTimeline
+                          key={`timeline-${day.day}-${hotel.id}`}
+                          day={day}
+                          hotel={hotel}
+                          customPlaces={placesWithHotel}
+                          selectedPlaceId={selectedPlaceId}
+                          navPlan={navPlan}
+                          navLoading={navLoading}
+                          copyRefreshing={copyRefreshing}
+                          dayRegenerating={dayRegenerating}
+                          dayRegenError={dayRegenError}
+                          isLastDay={day.day === lastDayNum}
+                          onSelectPlace={setSelectedPlaceId}
+                          onReorder={handleReorder}
+                          onDelete={handleDelete}
+                          onAddCustom={handleAddCustom}
+                          onResetDay={() => {
+                            void handleResetDay()
+                          }}
+                          canRestoreDayDefault={canRestoreDayDefault}
+                          onRestoreDayDefault={handleRestoreDayDefault}
+                          tripPlaceNames={tripPlaceNames}
+                          readOnly={readOnly}
+                        />
+                      </div>
+                      <div
+                        className={`space-y-4 ${
+                          mobileItineraryPane === 'map'
+                            ? 'block'
+                            : 'hidden lg:block'
+                        }`}
+                      >
                         <TripMap
                           key={`map-${day.day}-${hotel.id}`}
                           hotel={hotel}

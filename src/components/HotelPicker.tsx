@@ -484,7 +484,7 @@ export function HotelPicker({
     <section className={`space-y-4 ${readOnly ? '[&_button]:pointer-events-none [&_input]:pointer-events-none [&_textarea]:pointer-events-none' : ''}`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-3xl text-[var(--ink)]">酒店</h2>
+          <h2 className="font-display text-2xl text-[var(--ink)] sm:text-3xl">酒店</h2>
           <p className="mt-1 max-w-xl text-sm text-[var(--stone)]">
             {readOnly
               ? '当前为只读共享，无法修改酒店。'

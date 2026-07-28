@@ -131,7 +131,7 @@ export function PlacePanel({
       <aside className="rounded-2xl border border-dashed border-[var(--stone)]/30 bg-[var(--card)] px-4 py-6 text-center text-sm text-[var(--stone)]">
         {place
           ? `已选中「${place.name}」，详情以弹层展示。`
-          : '点击地图标记或左侧行程地点，打开与酒店相同的 Google 详情页'}
+          : '点击地图标记或行程地点，打开与酒店相同的 Google 详情页'}
       </aside>
 
       <GooglePlacePage
