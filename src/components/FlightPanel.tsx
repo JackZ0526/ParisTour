@@ -235,7 +235,7 @@ export function FlightPanel({
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-3xl">航班</h2>
+          <h2 className="font-display text-2xl sm:text-3xl">航班</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
             {readOnly
               ? '当前为只读共享，无法修改航班。'

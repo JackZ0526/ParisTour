@@ -269,7 +269,7 @@ export function TripMap({
 
   if (!isLoaded) {
     return (
-      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-white/70 bg-[var(--card)] md:h-[560px]">
+      <div className="flex h-[min(52vh,360px)] items-center justify-center rounded-2xl border border-white/70 bg-[var(--card)] md:h-[560px]">
         <LoadingIndicator variant="block" label="正在加载 Google Maps…" showDots size="md" />
       </div>
     )
@@ -305,7 +305,7 @@ export function TripMap({
         </div>
       )}
 
-      <div className="h-[420px] w-full md:h-[560px]">
+      <div className="h-[min(52vh,360px)] w-full md:h-[560px]">
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
           center={mapCenter}

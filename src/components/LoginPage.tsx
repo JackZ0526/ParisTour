@@ -72,10 +72,10 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16">
-      <div className="animate-fade-up rounded-[28px] border border-white/60 bg-[var(--card)] p-8 shadow-[var(--shadow)] sm:p-10">
+    <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10 sm:py-16">
+      <div className="animate-fade-up rounded-2xl border border-white/60 bg-[var(--card)] p-6 shadow-[var(--shadow)] sm:rounded-[28px] sm:p-10">
         <p className="text-xs uppercase tracking-[0.28em] text-[var(--sage)]">Paris Tour</p>
-        <h1 className="font-display mt-2 text-4xl text-[var(--ink)]">邀请制登录</h1>
+        <h1 className="font-display mt-2 text-3xl text-[var(--ink)] sm:text-4xl">邀请制登录</h1>
         <p className="mt-3 text-sm text-[var(--stone)]">
           仅白名单邮箱可注册与使用。登录后加载你的行程存档；也可查看他人分享给你的行程。
         </p>

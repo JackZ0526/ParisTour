@@ -548,10 +548,22 @@ export function TripChatPanel({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-[2000] rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)]"
+        className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2000] rounded-full bg-[var(--ink)] px-3.5 py-3 text-sm font-medium text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)] sm:bottom-5 sm:right-5 sm:px-4"
       >
-        {open ? '关闭助手' : '行程助手'}
+        <span className="sm:hidden">{open ? '关闭' : '助手'}</span>
+        <span className="hidden sm:inline">{open ? '关闭助手' : '行程助手'}</span>
       </button>
+
+      {panelMounted && (
+        <button
+          type="button"
+          aria-label="关闭行程助手"
+          className={`fixed inset-0 z-[1999] bg-black/45 transition-opacity duration-300 sm:hidden ${
+            panelEntered ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+          onClick={() => setOpen(false)}
+        />
+      )}
 
       {panelMounted && (
         <div
@@ -561,23 +573,36 @@ export function TripChatPanel({
           inert={!open || undefined}
           onTransitionEnd={(e) => {
             if (e.target !== e.currentTarget) return
-            if (e.propertyName !== 'opacity') return
+            if (e.propertyName !== 'opacity' && e.propertyName !== 'transform') return
             if (!open) setPanelMounted(false)
           }}
-          className={`fixed bottom-20 right-5 z-[2000] flex h-[min(70vh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`fixed z-[2000] flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] inset-x-0 bottom-0 h-[min(85dvh,640px)] w-full rounded-t-3xl sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(70vh,560px)] sm:w-[min(92vw,380px)] sm:rounded-2xl ${
             panelEntered
               ? 'translate-x-0 translate-y-0 opacity-100'
-              : 'pointer-events-none translate-x-2 translate-y-3 opacity-0'
+              : 'pointer-events-none translate-y-6 opacity-0 sm:translate-x-2 sm:translate-y-3'
           }`}
         >
           <div className="border-b border-[var(--mist)] px-4 py-3">
-            <h3 className="font-display text-xl leading-tight">行程助手</h3>
-            <p className="mt-0.5 text-xs text-[var(--stone)]">
-              当前第 {currentDay} 天 · {getOpenAIModelLabel()}
-            </p>
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--mist)] sm:hidden" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-display text-xl leading-tight">行程助手</h3>
+                <p className="mt-0.5 text-xs text-[var(--stone)]">
+                  当前第 {currentDay} 天 · {getOpenAIModelLabel()}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-full px-2.5 py-1 text-sm text-[var(--stone)] hover:bg-[var(--mist)] hover:text-[var(--ink)] sm:hidden"
+                aria-label="关闭助手"
+              >
+                关闭
+              </button>
+            </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3">
             {!history.length && (
               <div className="space-y-2">
                 <p className="text-sm text-[var(--stone)]">
@@ -630,7 +655,7 @@ export function TripChatPanel({
           </div>
 
           <form
-            className="flex gap-2 border-t border-[var(--mist)] p-3"
+            className="flex gap-2 border-t border-[var(--mist)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
             onSubmit={(e) => {
               e.preventDefault()
               void submit(input)
