@@ -196,13 +196,6 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: {
-        // Avoid browser CORS when looking up flights via AviationStack
-        // AviationStack free tier is HTTP-only
-        '/api/aviationstack': {
-          target: 'http://api.aviationstack.com',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/aviationstack/, '/v1'),
-        },
         // AeroDataBox (RapidAPI) — key injected server-side, never exposed to the browser
         '/api/aerodatabox': {
           target: 'https://aerodatabox.p.rapidapi.com',
