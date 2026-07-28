@@ -21,6 +21,7 @@ import {
 } from '../services/recommendCache'
 import type { Place, PlaceType } from '../types'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
+import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
 
 interface Props {
   open: boolean
@@ -314,7 +315,6 @@ export function AddPlaceDialog({
       >
         <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--stone)]">Itinerary</p>
             <h3 className="font-display text-2xl">添加地点</h3>
           </div>
           <button
@@ -410,7 +410,12 @@ export function AddPlaceDialog({
               </div>
 
               {loadingRecs ? (
-                <p className="py-8 text-center text-sm text-[var(--stone)]">AI 正在根据行程推荐…</p>
+                <LoadingIndicator
+                  variant="block"
+                  label="AI 正在根据行程推荐…"
+                  showDots
+                  size="md"
+                />
               ) : (
                 <ul className="space-y-2">
                   {visible.map((item) => {
@@ -457,7 +462,11 @@ export function AddPlaceDialog({
                           {expanded && (
                             <div className="space-y-3 border-t border-[var(--mist)] px-3 pb-3 pt-3">
                               {loadingDetails ? (
-                                <p className="text-sm text-[var(--stone)]">正在加载 Google 照片…</p>
+                                <LoadingIndicator
+                                  label="正在加载 Google 照片…"
+                                  showDots
+                                  size="sm"
+                                />
                               ) : (
                                 <>
                                   {activePhoto ? (
@@ -552,8 +561,10 @@ export function AddPlaceDialog({
                                           details,
                                         )
                                       }
-                                      className="rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
+                                      aria-busy={busyBest || undefined}
+                                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                                     >
+                                      {busyBest && <ButtonSpinner />}
                                       {busyBest ? '加入中…' : '最顺路'}
                                     </button>
                                     <button
@@ -568,8 +579,10 @@ export function AddPlaceDialog({
                                           details,
                                         )
                                       }
-                                      className="rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
+                                      aria-busy={busyEnd || undefined}
+                                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
                                     >
+                                      {busyEnd && <ButtonSpinner />}
                                       {busyEnd ? '加入中…' : '加到最后'}
                                     </button>
                                   </div>
@@ -596,8 +609,10 @@ export function AddPlaceDialog({
                 type="button"
                 disabled={loadingRecs || searching}
                 onClick={() => void refreshRecommendations()}
-                className="w-full rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
+                aria-busy={loadingRecs || undefined}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
               >
+                {loadingRecs && <ButtonSpinner />}
                 {loadingRecs ? '正在换一批…' : '换一批'}
               </button>
 
@@ -640,8 +655,10 @@ export function AddPlaceDialog({
                   type="button"
                   disabled={searching || !googleQuery.trim()}
                   onClick={() => void addFromGoogle('best')}
-                  className="rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
+                  aria-busy={(searching && addingName?.endsWith(':best')) || undefined}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                 >
+                  {searching && addingName?.endsWith(':best') && <ButtonSpinner />}
                   {searching && addingName?.endsWith(':best')
                     ? '加入中…'
                     : '最顺路加入'}
@@ -650,8 +667,10 @@ export function AddPlaceDialog({
                   type="button"
                   disabled={searching || !googleQuery.trim()}
                   onClick={() => void addFromGoogle('end')}
-                  className="rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
+                  aria-busy={(searching && addingName?.endsWith(':end')) || undefined}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
                 >
+                  {searching && addingName?.endsWith(':end') && <ButtonSpinner />}
                   {searching && addingName?.endsWith(':end')
                     ? '加入中…'
                     : '加到最后'}

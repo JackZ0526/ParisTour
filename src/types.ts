@@ -22,7 +22,7 @@ export interface HotelCandidate {
   lng: number
   /** Short why-this-hotel line from recommend */
   reason?: string
-  /** How this stay fits the 7-day trip + user preferences */
+  /** How this stay fits the trip + user preferences */
   tripFit?: string
   isBest?: boolean
   source: 'llm' | 'custom'
@@ -80,15 +80,28 @@ export interface FlightLegTemplate {
   notes: string
 }
 
+/** Airport endpoint on a flight card / lookup result. */
+export interface FlightEndpoint {
+  code?: string
+  name?: string
+  city?: string
+  terminal?: string
+  /** Raw airport-local string, e.g. `2026-11-09 14:35-08:00` — format at display. */
+  scheduled?: string
+  actual?: string
+  /** IANA zone when known, e.g. `America/Vancouver` (optional; caches without it still format). */
+  timeZone?: string
+}
+
 export interface FlightInfo {
   flightNumber: string
   airline?: string
   status?: string
-  from?: { code?: string; name?: string; city?: string; terminal?: string; scheduled?: string; actual?: string }
-  to?: { code?: string; name?: string; city?: string; terminal?: string; scheduled?: string; actual?: string }
+  from?: FlightEndpoint
+  to?: FlightEndpoint
   duration?: string
   aircraft?: string
-  source: 'recommended' | 'live' | 'llm' | 'manual'
+  source: 'recommended' | 'live' | 'llm' | 'timetable' | 'aerodatabox' | 'manual'
   rawNote?: string
 }
 

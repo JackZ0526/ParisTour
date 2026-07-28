@@ -158,12 +158,15 @@ function buildItinerarySnapshot(ctx: TripChatContext) {
 
 function systemPrompt(ctx: TripChatContext): string {
   return [
-    '你是 Paris Tour 行程助手，帮助用户了解与调整巴黎秋季七日行程与住宿。',
+    '你是 Paris Tour 行程助手，帮助用户了解与调整巴黎秋季行程与住宿。',
     '用简洁中文回复。可以介绍地点/酒店、解释节奏、建议改动，并在需要时输出可执行操作。',
     '不要推荐卢浮宫或凡尔赛。',
     '当用户要求添加/删除/替换/重排/切换日期/选中地点，或选择/增加/删除/换一批/替换酒店时，必须在 JSON 的 actions 里给出操作；纯问答时 actions 为空数组。',
     '介绍当前酒店或候选项时：直接根据「酒店快照」回答，不要编造不存在的酒店；无需 actions。',
-    '添加地点时 placeName 用 Google Maps 可搜到的正式名称；未指定日期则用当前查看的日期。',
+    '添加地点时 placeName 用 Google Maps 可搜到的正式名称。',
+    '日期默认（硬规则）：用户说「今天/本日/这天」或未指定日期时，一律针对「当前查看的日期」操作；actions 里不要填 day 字段（省略即可，系统会用当前日）。',
+    '只有用户明确说「第N天 / Day N / 换成第N天」时，才设置 day=N，或使用 switch_day。不要因为行程快照里其它天有同名地点就擅自改其它天。',
+    'select_place / 介绍地点：优先当前查看日；不要为了找到地点自动跳到其它天，除非用户点名了那一天。',
     '删除/重排/替换时地点名尽量匹配行程快照里的 name；酒店名尽量匹配酒店快照里的 name 或 area。',
     '酒店操作：',
     '- select_hotel：从候选项中选中当前住宿',
@@ -189,7 +192,7 @@ function systemPrompt(ctx: TripChatContext): string {
     '{"type":"refresh_hotels","preferences":"左岸、地铁方便、中档","keepCustom":true}',
     '{"type":"replace_hotel","fromHotelName":"旧酒店或区位","toHotelName":"新店名?","preferences":"更安静/更便宜?"} ',
     '{"type":"replace_hotels","fromHotelNames":["酒店A","酒店B"],"preferences":"..."}',
-    `当前查看第 ${ctx.currentDay} 天`,
+    `当前查看第 ${ctx.currentDay} 天（默认操作日；未点名其它天时所有行程改动都作用于此日）`,
     `酒店快照：${JSON.stringify(buildHotelSnapshot(ctx))}`,
     `行程快照：${JSON.stringify(buildItinerarySnapshot(ctx))}`,
   ].join('\n')
@@ -377,7 +380,84 @@ export async function sendTripChatMessage(input: {
   }
 
   const reply = String(parsed.reply || parsed.message || '').trim() || '好的。'
-  return { reply, actions: parseActions(parsed.actions) }
+  const actions = pinActionsToCurrentDay(
+    parseActions(parsed.actions),
+    input.userMessage,
+    input.ctx.currentDay,
+  )
+  return { reply, actions }
+}
+
+const CN_DAY: Record<string, number> = {
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
+  十: 10,
+}
+
+/** Detect an explicitly named trip day in the user message (第N天 / Day N). */
+export function explicitDayFromMessage(message: string): number | null {
+  const text = message.trim()
+  if (!text) return null
+
+  const digit = text.match(/(?:第\s*)(\d{1,2})\s*天|(?:day|Day)\s*(\d{1,2})/)
+  if (digit) {
+    const n = Number(digit[1] || digit[2])
+    if (n >= 1 && n <= 30) return n
+  }
+
+  const cn = text.match(/第\s*([一二三四五六七八九十])\s*天/)
+  if (cn && CN_DAY[cn[1]]) return CN_DAY[cn[1]]
+
+  return null
+}
+
+/**
+ * Unless the user named another day, strip action.day / drop switch_day so
+ * apply logic falls back to the currently selected day.
+ */
+export function pinActionsToCurrentDay(
+  actions: TripChatAction[],
+  userMessage: string,
+  currentDay: number,
+): TripChatAction[] {
+  const explicit = explicitDayFromMessage(userMessage)
+  if (explicit != null) {
+    return actions.map((action) => {
+      if (action.type === 'switch_day') return action
+      if (
+        action.type === 'remove_place' ||
+        action.type === 'add_place' ||
+        action.type === 'replace_place' ||
+        action.type === 'reorder_place'
+      ) {
+        return { ...action, day: action.day ?? explicit }
+      }
+      return action
+    })
+  }
+
+  const out: TripChatAction[] = []
+  for (const action of actions) {
+    if (action.type === 'switch_day') continue
+    if (
+      action.type === 'remove_place' ||
+      action.type === 'add_place' ||
+      action.type === 'replace_place' ||
+      action.type === 'reorder_place'
+    ) {
+      out.push({ ...action, day: currentDay })
+      continue
+    }
+    out.push(action)
+  }
+  return out
 }
 
 function normalizeHotelQuery(hotelName: string): string {
@@ -394,10 +474,14 @@ function areaAliases(area: string): string[] {
   const aliases = [a]
   if (/marais|玛黑/.test(a)) aliases.push('marais', '玛黑', 'le marais')
   if (/opéra|opera|欧培拉|saint-lazare/.test(a)) aliases.push('opera', 'opéra', '欧培拉')
-  if (/boulevard|2e|2ème|泊松/.test(a)) aliases.push('boulevards', '大道')
-  if (/saint-germain|saint germain|左岸|6e|6ème/.test(a))
+  // Digit-safe: 12e ≠ 2e, 16e ≠ 6e
+  if (/boulevard|(?:^|[^\d])2\s*(?:e|ème|eme)|泊松/.test(a)) aliases.push('boulevards', '大道')
+  if (/saint-germain|saint germain|圣日耳曼|(?:^|[^\d])6\s*(?:e|ème|eme)|(?:^|[^\d])6\s*区/.test(a))
     aliases.push('saint-germain', '圣日耳曼', '左岸')
-  if (/latin|拉丁|odeon|odéon/.test(a)) aliases.push('latin', '拉丁')
+  if (/latin|拉丁|odeon|odéon|(?:^|[^\d])5\s*(?:e|ème|eme)|(?:^|[^\d])5\s*区/.test(a))
+    aliases.push('latin', '拉丁')
+  if (/trocad|特罗卡德罗|passy|(?:^|[^\d])16\s*(?:e|ème|eme)|(?:^|[^\d])16\s*区|75116|75016/.test(a))
+    aliases.push('trocadero', '特罗卡德罗', '16区', 'passy')
   return aliases
 }
 

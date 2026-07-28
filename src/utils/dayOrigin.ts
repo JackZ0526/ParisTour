@@ -35,11 +35,9 @@ export interface DayOrigin extends Coordinates {
   kind: DayOriginKind
   id: string
   label: string
-  /** Short label for timeline connectors */
-  prefix: string
 }
 
-/** Day 1 starts at CDG; other days start at the selected hotel. */
+/** Day 1 starts at CDG; mid-trip and last day start at the selected hotel. */
 export function getDayOrigin(dayNumber: number, hotel: SelectedHotel): DayOrigin {
   if (dayNumber === 1) {
     return {
@@ -47,7 +45,6 @@ export function getDayOrigin(dayNumber: number, hotel: SelectedHotel): DayOrigin
       kind: 'airport',
       id: CDG_PLACE_ID,
       label: '戴高乐机场 CDG',
-      prefix: '从机场出发',
     }
   }
 
@@ -57,7 +54,6 @@ export function getDayOrigin(dayNumber: number, hotel: SelectedHotel): DayOrigin
     kind: 'hotel',
     id: hotel.id,
     label: hotel.name,
-    prefix: '从酒店出发',
   }
 }
 
@@ -74,4 +70,33 @@ export function isSamePoint(
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(h)) <= withinMeters
+}
+
+export function isHotelPlace(place: Pick<Place, 'id' | 'type'>): boolean {
+  return place.type === 'hotel' || place.id === SELECTED_HOTEL_PLACE_ID
+}
+
+/** Airport / major transport hubs (CDG arrival origin or return stop). */
+export function isAirportPlace(
+  place: Pick<Place, 'id' | 'type'> & { name?: string },
+): boolean {
+  if (place.id === CDG_PLACE_ID) return true
+  if (place.type !== 'transport') return false
+  const name = place.name?.toLowerCase() || ''
+  return /cdg|airport|机场|aéroport|aeroport/i.test(name)
+}
+
+/**
+ * Sequence numbers for timeline/map: hotel & airport use special icons and
+ * do not consume 1, 2, 3… — only numbered place stops advance the counter.
+ */
+export function numberedStopIndexes(
+  places: Array<Pick<Place, 'id' | 'type'> & { name?: string }>,
+): (number | null)[] {
+  let n = 0
+  return places.map((place) => {
+    if (isHotelPlace(place) || isAirportPlace(place)) return null
+    n += 1
+    return n
+  })
 }

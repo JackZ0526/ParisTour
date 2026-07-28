@@ -159,6 +159,115 @@ function buildLegLabel(leg: NavLegResult, displayMode: NavMode): string {
   return `驾车 ${leg.durationText} · ${leg.distanceText}`
 }
 
+/** Paris wall-clock parts for a UTC instant (itinerary destination TZ). */
+function parisDateParts(date: Date): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+} {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value || 0)
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour'),
+    minute: get('minute'),
+  }
+}
+
+/** Convert a Europe/Paris civil datetime to a Date (UTC instant). */
+function parisWallTimeToDate(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute = 0,
+): Date {
+  // Iterate from a CET/CEST guess until wall time matches Paris.
+  let utc = Date.UTC(year, month - 1, day, hour - 2, minute, 0)
+  for (let i = 0; i < 4; i++) {
+    const got = parisDateParts(new Date(utc))
+    const gotMins = got.hour * 60 + got.minute
+    const wantMins = hour * 60 + minute
+    const dayDelta =
+      Date.UTC(got.year, got.month - 1, got.day) - Date.UTC(year, month - 1, day)
+    utc += wantMins * 60_000 - gotMins * 60_000 - dayDelta
+  }
+  return new Date(utc)
+}
+
+/**
+ * Directions needs a departure time for transit. Using "now" overnight in Paris
+ * often returns walk-only routes (no line names). Prefer live daytime departures;
+ * overnight, plan mid-morning so metro/bus lines still appear for itinerary legs.
+ */
+function transitDepartureTime(): Date {
+  const now = new Date()
+  const paris = parisDateParts(now)
+  if (paris.hour >= 7 && paris.hour < 22) return now
+
+  // Overnight / late evening: plan mid-morning so metro & daytime buses appear.
+  let year = paris.year
+  let month = paris.month
+  let day = paris.day
+  if (paris.hour >= 22) {
+    const nextParisDay = parisDateParts(new Date(now.getTime() + 12 * 3600 * 1000))
+    year = nextParisDay.year
+    month = nextParisDay.month
+    day = nextParisDay.day
+  }
+  return parisWallTimeToDate(year, month, day, 10, 0)
+}
+
+type DirectionsStepLike = google.maps.DirectionsStep & {
+  transit_details?: google.maps.TransitDetails
+  transitDetails?: google.maps.TransitDetails
+  travelMode?: google.maps.TravelMode | string
+}
+
+type TransitLineLike = google.maps.TransitLine & {
+  shortName?: string
+  textColor?: string
+}
+
+function stepTravelMode(step: DirectionsStepLike): string {
+  return String(step.travel_mode || step.travelMode || '').toUpperCase()
+}
+
+function stepTransitDetails(step: DirectionsStepLike): google.maps.TransitDetails | null {
+  return step.transit || step.transit_details || step.transitDetails || null
+}
+
+function readTransitLine(line?: google.maps.TransitLine | null): {
+  shortName?: string
+  longName?: string
+  vehicleName?: string
+  vehicleType?: string
+  color?: string
+} {
+  if (!line) return {}
+  const anyLine = line as TransitLineLike
+  return {
+    shortName: (line.short_name || anyLine.shortName || '').trim() || undefined,
+    longName: (line.name || '').trim() || undefined,
+    vehicleName: (line.vehicle?.name || '').trim() || undefined,
+    vehicleType: line.vehicle?.type ? String(line.vehicle.type) : undefined,
+    color: line.color || undefined,
+  }
+}
+
 function stepPath(step: google.maps.DirectionsStep): google.maps.LatLngLiteral[] {
   const raw = step.path?.length ? step.path : step.lat_lngs
   if (raw?.length) return raw.map(toLiteral)
@@ -193,14 +302,17 @@ function segmentsFromDirectionsResult(
     if (leg.distance?.text) distanceTexts.push(leg.distance.text)
     if (leg.duration?.text) durationTexts.push(leg.duration.text)
 
-    for (const step of leg.steps || []) {
+    for (const step of (leg.steps || []) as DirectionsStepLike[]) {
       const path = stepPath(step)
       if (path.length >= 2) {
         if (!fullPath.length) fullPath.push(...path)
         else fullPath.push(...path.slice(1))
       }
 
-      if (step.travel_mode === google.maps.TravelMode.WALKING) {
+      const travelMode = stepTravelMode(step)
+      const transit = stepTransitDetails(step)
+
+      if (travelMode === 'WALKING' || travelMode === String(google.maps.TravelMode.WALKING)) {
         if (path.length >= 2) {
           segments.push({
             mode: 'WALKING',
@@ -214,7 +326,7 @@ function segmentsFromDirectionsResult(
         continue
       }
 
-      if (step.travel_mode === google.maps.TravelMode.DRIVING) {
+      if (travelMode === 'DRIVING' || travelMode === String(google.maps.TravelMode.DRIVING)) {
         if (path.length >= 2) {
           segments.push({
             mode: 'DRIVING',
@@ -228,15 +340,19 @@ function segmentsFromDirectionsResult(
         continue
       }
 
-      if (step.travel_mode === google.maps.TravelMode.TRANSIT && step.transit) {
-        const line = step.transit.line
-        const pathMode = vehicleToPathMode(line?.vehicle?.type)
-        const shortName = line?.short_name || undefined
-        const longName = line?.name || undefined
-        const vehicleName = line?.vehicle?.name || undefined
-        const label = formatTransitLineLabel(pathMode, shortName, longName, vehicleName)
+      if (travelMode === 'TRANSIT' || transit) {
+        const lineInfo = readTransitLine(transit?.line)
+        const pathMode = vehicleToPathMode(lineInfo.vehicleType)
+        const label = formatTransitLineLabel(
+          pathMode,
+          lineInfo.shortName,
+          lineInfo.longName,
+          lineInfo.vehicleName,
+        )
         const color =
-          normalizeHexColor(line?.color) || PATH_MODE_COLORS[pathMode] || PATH_MODE_COLORS.TRANSIT
+          normalizeHexColor(lineInfo.color) ||
+          PATH_MODE_COLORS[pathMode] ||
+          PATH_MODE_COLORS.TRANSIT
 
         if (path.length >= 2) {
           segments.push({
@@ -249,15 +365,18 @@ function segmentsFromDirectionsResult(
           })
         }
 
-        const key = `${pathMode}:${shortName || longName || label}`
-        if (!seenLine.has(key)) {
-          seenLine.add(key)
-          transitLines.push({
-            mode: pathMode,
-            label,
-            shortName,
-            color,
-          })
+        // Chips only when Google provided a real line id/name — never invent routes.
+        if (lineInfo.shortName || lineInfo.longName) {
+          const key = `${pathMode}:${lineInfo.shortName || lineInfo.longName}`
+          if (!seenLine.has(key)) {
+            seenLine.add(key)
+            transitLines.push({
+              mode: pathMode,
+              label,
+              shortName: lineInfo.shortName,
+              color,
+            })
+          }
         }
         continue
       }
@@ -343,10 +462,11 @@ function computeViaDirectionsService(
       language: 'zh-CN',
       region: 'fr',
     }
-    // Real-time transit departures when asking for public transport
+    // Transit schedules need a departure; overnight "now" often yields walk-only
+    // routes with no line names — prefer Paris daytime for itinerary planning.
     if (mode === 'TRANSIT') {
       request.transitOptions = {
-        departureTime: new Date(),
+        departureTime: transitDepartureTime(),
         modes: [
           google.maps.TransitMode.BUS,
           google.maps.TransitMode.RAIL,
@@ -456,6 +576,11 @@ export async function fetchGoogleNavLeg(
 const WALK_MAX_SECONDS = 18 * 60
 const WALK_MAX_METERS = 1400
 
+function isWalkOnlyLeg(leg: NavLegResult): boolean {
+  if (!leg.segments.length) return false
+  return leg.segments.every((s) => s.mode === 'WALKING')
+}
+
 function asResolved(leg: NavLegResult, displayMode: NavMode): ResolvedDayLeg {
   // Ensure walking/driving legs have at least one colored segment
   let segments = leg.segments
@@ -503,7 +628,14 @@ export async function resolveTravelLeg(
   }
 
   const transit = await fetchGoogleNavLeg(origin, destination, 'TRANSIT')
-  if (transit) return asResolved(transit, 'TRANSIT')
+  if (transit) {
+    // Walk-only "transit" responses (common overnight) must not show「公共交通」.
+    if (!transit.transitLines.length && isWalkOnlyLeg(transit)) {
+      if (walk) return asResolved(walk, 'WALKING')
+      return asResolved(transit, 'WALKING')
+    }
+    return asResolved(transit, 'TRANSIT')
+  }
 
   if (walk) return asResolved(walk, 'WALKING')
   return null

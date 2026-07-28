@@ -17,7 +17,7 @@ export const recommendedFlights: FlightLegTemplate[] = [
     arriveLocal: '加载中…',
     duration: '约 9–10 小时',
     aircraft: 'Airbus A350',
-    notes: '优先 AviationStack；失败时用大模型联网补查。',
+    notes: '由大模型联网检索公开航班信息。',
   },
   {
     id: 'return-af374',
@@ -31,6 +31,6 @@ export const recommendedFlights: FlightLegTemplate[] = [
     arriveLocal: '加载中…',
     duration: '约 10 小时',
     aircraft: 'Airbus A350',
-    notes: '返程主飞 AF374；API 失败时会联网补查。若你的机票不同可自行改航班号。',
+    notes: '返程主飞 AF374；由大模型联网检索。若你的机票不同可自行改航班号。',
   },
 ]

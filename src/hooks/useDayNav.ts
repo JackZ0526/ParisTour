@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getPlace } from '../data/places'
 import {
   planDayNavigation,
@@ -28,10 +28,22 @@ const emptyPlan = (
   stopsKey,
 })
 
+/** Session cache: reuse Directions results when switching days (invalidate when places/origin change). */
+const navPlanCache = new Map<string, DayNavPlan>()
+
+export function clearDayNavCache() {
+  navPlanCache.clear()
+}
+
+function cacheablePlan(plan: DayNavPlan): boolean {
+  return !plan.error
+}
+
 export function useDayNav(
   day: DayPlan,
   hotel: SelectedHotel,
   customPlaces: Record<string, Place>,
+  enabled = true,
 ) {
   const { isLoaded } = useGoogleMapsReady()
   const origin = useMemo(() => getDayOrigin(day.day, hotel), [day.day, hotel])
@@ -41,11 +53,18 @@ export function useDayNav(
 
   const stopsKey = useMemo(
     () =>
-      `${day.day}|${origin.kind}:${origin.id}|${day.stops.map((s) => `${s.id || ''}:${s.placeId}`).join(',')}`,
-    [day.day, day.stops, origin.kind, origin.id],
+      [
+        day.day,
+        `${origin.kind}:${origin.id}`,
+        `${origin.lat.toFixed(5)},${origin.lng.toFixed(5)}`,
+        day.pace,
+        day.stops.map((s) => `${s.id || ''}:${s.placeId}`).join(','),
+      ].join('|'),
+    [day.day, day.stops, day.pace, origin.kind, origin.id, origin.lat, origin.lng],
   )
 
   const stopPoints = useMemo(() => {
+    if (!enabled) return [] as { lat: number; lng: number }[]
     const list: { lat: number; lng: number }[] = []
     for (const s of day.stops) {
       try {
@@ -58,10 +77,39 @@ export function useDayNav(
       }
     }
     return list
-  }, [day.stops, customPlaces, stopsKey])
+    // stopsKey encodes place order/ids — omit day.stops to avoid refetch when only times change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customPlaces, stopsKey, enabled])
 
-  useEffect(() => {
-    if (!isLoaded) return
+  useLayoutEffect(() => {
+    if (!enabled || !isLoaded) {
+      setLoading((prev) => (prev ? false : prev))
+      if (!enabled) {
+        const summary = '日期、航班和酒店还没齐，导航先歇着'
+        const hotelToFirstText =
+          origin.kind === 'airport'
+            ? '正在计算从机场出发的方式…'
+            : '正在计算从酒店出发的方式…'
+        setPlan((prev) =>
+          prev.stopsKey === stopsKey &&
+          prev.walkSummaryText === summary &&
+          prev.hotelToFirstText === hotelToFirstText &&
+          !prev.hotelToFirst &&
+          prev.betweenStops.length === 0
+            ? prev
+            : emptyPlan(stopsKey, summary, origin.kind),
+        )
+      }
+      return
+    }
+
+    const cached = navPlanCache.get(stopsKey)
+    if (cached) {
+      requestIdRef.current += 1
+      setLoading(false)
+      setPlan((prev) => (prev === cached || prev.stopsKey === cached.stopsKey ? prev : cached))
+      return
+    }
 
     const requestId = ++requestIdRef.current
     setPlan(
@@ -81,6 +129,11 @@ export function useDayNav(
       { originKind: origin.kind },
     )
       .then((next) => {
+        // Always cache a successful result so switching back does not refetch,
+        // even if this request was superseded for the UI.
+        if (cacheablePlan(next)) {
+          navPlanCache.set(stopsKey, next)
+        }
         if (requestId !== requestIdRef.current) return
         setPlan(next)
       })
@@ -100,6 +153,7 @@ export function useDayNav(
         setLoading(false)
       })
   }, [
+    enabled,
     isLoaded,
     origin.lat,
     origin.lng,

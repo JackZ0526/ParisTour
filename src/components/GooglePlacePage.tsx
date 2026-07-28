@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
@@ -8,6 +9,7 @@ import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../services/googleMa
 import type { Coordinates } from '../types'
 import { GoogleReviewsList } from './GoogleReviewsList'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
+import { LoadingIndicator } from './LoadingIndicator'
 
 export interface LlmPlaceNarrative {
   intro?: string
@@ -34,6 +36,10 @@ interface Props {
   showMap?: boolean
   /** Optional LLM story block (used for hotel detail). */
   llmNarrative?: LlmPlaceNarrative | null
+  /** Sticky footer (e.g. custom-hotel decision buttons). */
+  footer?: ReactNode
+  /** When true, backdrop / Esc call onClose (default true). */
+  closeOnBackdrop?: boolean
   onClose: () => void
 }
 
@@ -45,6 +51,8 @@ export function GooglePlacePage({
   fallbackImage,
   showMap = true,
   llmNarrative,
+  footer,
+  closeOnBackdrop = true,
   onClose,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
@@ -52,19 +60,40 @@ export function GooglePlacePage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = useState(0)
+  const swipeStartX = useRef<number | null>(null)
 
   const query = placeDetailsQuery(name, nameLocal)
   const apiKey = getGoogleMapsApiKey()
   const embedSrc = googleMapsEmbedApiUrl(query, apiKey)
 
+  const photos =
+    details?.photos?.length ? details.photos : fallbackImage ? [fallbackImage] : []
+  const activePhoto = photos[photoIndex] || photos[0]
+
+  function stepPhoto(delta: number) {
+    if (photos.length < 2) return
+    setPhotoIndex((i) => (i + delta + photos.length) % photos.length)
+  }
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && closeOnBackdrop) {
+        onClose()
+        return
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        stepPhoto(-1)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        stepPhoto(1)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, onClose, closeOnBackdrop, photos.length])
 
   useEffect(() => {
     if (!open || !isLoaded) return
@@ -97,22 +126,24 @@ export function GooglePlacePage({
 
   if (!open) return null
 
-  const photos =
-    details?.photos?.length ? details.photos : fallbackImage ? [fallbackImage] : []
-  const activePhoto = photos[photoIndex] || photos[0]
-
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
-      <button type="button" className="absolute inset-0 cursor-default" aria-label="关闭" onClick={onClose} />
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        aria-label="关闭"
+        onClick={() => {
+          if (closeOnBackdrop) onClose()
+        }}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`${name} Google 地点页`}
-        className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+        className="relative z-10 flex max-h-[min(92vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
-        <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--stone)]">Google 地点页</p>
             <h3 className="font-display text-2xl leading-tight">{details?.name || name}</h3>
             {nameLocal && (
               <p className="text-sm text-[var(--stone)]">{nameLocal}</p>
@@ -127,20 +158,68 @@ export function GooglePlacePage({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-          {loading && <p className="text-sm text-[var(--stone)]">正在加载 Google 地点信息…</p>}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+          {loading && (
+            <LoadingIndicator label="正在加载 Google 地点信息…" showDots size="sm" />
+          )}
           {error && <p className="text-sm text-amber-800">{error}</p>}
 
           {activePhoto && (
-            <div className="overflow-hidden rounded-2xl">
-              <img
-                src={activePhoto}
-                alt={details?.name || name}
-                className="h-56 w-full object-cover sm:h-72"
-                referrerPolicy="no-referrer"
-              />
+            <div className="space-y-2">
+              <div
+                className="relative overflow-hidden rounded-2xl select-none"
+                onPointerDown={(e) => {
+                  if (photos.length < 2) return
+                  swipeStartX.current = e.clientX
+                }}
+                onPointerUp={(e) => {
+                  if (swipeStartX.current == null || photos.length < 2) return
+                  const dx = e.clientX - swipeStartX.current
+                  swipeStartX.current = null
+                  if (Math.abs(dx) < 40) return
+                  stepPhoto(dx < 0 ? 1 : -1)
+                }}
+                onPointerCancel={() => {
+                  swipeStartX.current = null
+                }}
+              >
+                <img
+                  src={activePhoto}
+                  alt={details?.name || name}
+                  className="h-56 w-full object-cover sm:h-72"
+                  referrerPolicy="no-referrer"
+                  draggable={false}
+                />
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="上一张"
+                      onClick={() => stepPhoto(-1)}
+                      className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="下一张"
+                      onClick={() => stepPhoto(1)}
+                      className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                      {photoIndex + 1} / {photos.length}
+                    </div>
+                  </>
+                )}
+              </div>
               {photos.length > 1 && (
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2 overflow-x-auto pb-1">
                   {photos.map((url, i) => (
                     <button
                       key={url + i}
@@ -185,9 +264,11 @@ export function GooglePlacePage({
                   {llmNarrative.labels?.title || '行程顾问点评'}
                 </p>
                 {llmNarrative.loading && !llmNarrative.intro && !llmNarrative.reason && (
-                  <p className="text-sm text-[var(--stone)]">
-                    {llmNarrative.labels?.loadingText || '正在生成简介与推荐理由…'}
-                  </p>
+                  <LoadingIndicator
+                    label={llmNarrative.labels?.loadingText || '正在生成简介与推荐理由…'}
+                    showDots
+                    size="sm"
+                  />
                 )}
                 {llmNarrative.intro && (
                   <div>
@@ -223,9 +304,11 @@ export function GooglePlacePage({
                   (llmNarrative.intro || llmNarrative.reason) &&
                   !llmNarrative.tripFit &&
                   llmNarrative.labels?.loadingMoreText && (
-                    <p className="text-xs text-[var(--stone)]">
-                      {llmNarrative.labels.loadingMoreText}
-                    </p>
+                    <LoadingIndicator
+                      label={llmNarrative.labels.loadingMoreText}
+                      showDots
+                      size="sm"
+                    />
                   )}
               </div>
             )}
@@ -248,7 +331,14 @@ export function GooglePlacePage({
             </div>
           )}
         </div>
+
+        {footer && (
+          <div className="shrink-0 border-t border-[var(--mist)] bg-[var(--paper)] px-4 py-3">
+            {footer}
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

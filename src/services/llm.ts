@@ -1,3 +1,4 @@
+import type { FlightInfo } from '../types'
 import { memoizeLlmCall } from './llmMemo'
 
 /**
@@ -599,7 +600,7 @@ export async function generateHotelDetailCopy(input: {
   if (!isLlmConfigured()) return null
 
   const system =
-    '你是巴黎秋季七日行程住宿顾问。为酒店详情页写简洁中文点评。只输出 JSON，不要 markdown。'
+    '你是巴黎秋季行程住宿顾问。为酒店详情页写简洁中文点评。只输出 JSON，不要 markdown。'
   const user = JSON.stringify({
     hotel: {
       name: input.name,
@@ -616,7 +617,7 @@ export async function generateHotelDetailCopy(input: {
     rules: [
       'intro：2–3 句酒店简介（氛围、区位、适合谁），可吸收 existingDescription 但要更完整',
       'reason：1–2 句说明为何出现在推荐列表 / 为何值得考虑',
-      'tripFit：2–3 句说明它与七日行程（地铁出行、迪士尼日、自驾日、抵达日倒时差等）以及 userPreferences 的匹配关系；若无偏好则按行程常识写',
+      'tripFit：2–3 句说明它与本次行程（地铁出行、迪士尼日、自驾日、抵达日倒时差等）以及 userPreferences 的匹配关系；若无偏好则按行程常识写',
       '不要编造具体房价数字；不要推荐卢浮宫/凡尔赛周边作为唯一卖点',
     ],
     format: { intro: 'string', reason: 'string', tripFit: 'string' },
@@ -659,7 +660,7 @@ export async function generatePlaceDetailCopy(input: {
   if (!isLlmConfigured()) return null
 
   const system =
-    '你是巴黎秋季七日行程顾问。为地点详情页写简洁中文点评。只输出 JSON，不要 markdown。'
+    '你是巴黎秋季行程顾问。为地点详情页写简洁中文点评。只输出 JSON，不要 markdown。'
   const user = JSON.stringify({
     place: {
       name: input.name,
@@ -707,6 +708,12 @@ export async function generateDayCopy(input: {
   pace: string
   placeNames: string[]
   hotelArea?: string
+  /** Chinese label for hotel district (e.g. 16区特罗卡德罗) — use this in 落脚点 copy */
+  hotelAreaLabel?: string
+  /** Calendar date for this itinerary day (YYYY-MM-DD), after timezone-aware start */
+  calendarDate?: string
+  /** Total daytime days in this itinerary (not a fixed 7) */
+  totalDays?: number
 }): Promise<{ title: string; theme: string; summary: string } | null> {
   if (!input.placeNames.length) {
     return {
@@ -716,14 +723,23 @@ export async function generateDayCopy(input: {
     }
   }
 
-  const key = `day-copy:${input.day}|${input.pace}|${input.hotelArea || ''}|${input.placeNames.join('>')}`
+  const totalDays = input.totalDays && input.totalDays > 0 ? input.totalDays : undefined
+  const hotelLabel = (input.hotelAreaLabel || input.hotelArea || '').trim()
+  const key = `day-copy:${input.day}|${totalDays || ''}|${input.calendarDate || ''}|${input.pace}|${hotelLabel}|${input.placeNames.join('>')}`
   return memoizeLlmCall(key, async () => {
+    const lengthHint = totalDays ? `${totalDays} 日行程` : '本次行程'
+    const baseRule = hotelLabel
+      ? `若提到酒店落脚片区，必须写「${hotelLabel}」，不要写成其他区（如圣日耳曼、玛黑）。`
+      : '不要编造错误的酒店落脚片区。'
     const system =
-      '你是巴黎七日行程编辑。根据当天地点列表，用简体中文生成短标题、主题与总结。标题 2–6 字（如「西侧经典」「左岸轻松」），主题一句话，总结 2 句说明节奏与亮点。只输出 JSON。'
+      `你是巴黎${lengthHint}编辑。根据当天地点列表，用简体中文生成短标题、主题与总结。标题 2–6 字（如「西侧经典」「左岸轻松」），主题一句话，总结 2 句说明节奏与亮点。${baseRule}只输出 JSON。`
     const user = JSON.stringify({
       day: input.day,
+      totalDays: totalDays || null,
+      calendarDate: input.calendarDate || null,
       pace: input.pace,
       hotelArea: input.hotelArea || '',
+      hotelAreaLabel: hotelLabel || null,
       places: input.placeNames,
       format: { title: 'string', theme: 'string', summary: 'string' },
     })
@@ -747,12 +763,198 @@ export async function generateDayCopy(input: {
   })
 }
 
+export interface ItineraryStartInput {
+  tripStartDate: string
+  tripEndDate?: string | null
+  destination?: string
+  hotelName?: string | null
+  outbound: {
+    flightNumber: string
+    airline?: string
+    from?: FlightInfo['from']
+    to?: FlightInfo['to']
+    duration?: string
+    status?: string
+    rawNote?: string
+  }
+}
+
+export interface ItineraryStartResult {
+  /** Paris local arrival calendar date YYYY-MM-DD */
+  arrivalDateParis: string
+  /** Paris local arrival time if known, e.g. 14:35 */
+  arrivalTimeParis?: string
+  /** Calendar date that itinerary Day 1 should map to */
+  itineraryStartDate: string
+  /** True when Day 1 stays on trip startDate */
+  startsOnTripStartDate: boolean
+  /** Short Chinese explanation for the itinerary section */
+  reasonZh: string
+}
+
+/**
+ * Given Vancouver→Paris outbound flight + trip dates, ask the LLM whether
+ * itinerary Day 1 should start on the trip start date or the next Paris day
+ * (overnight / timezone shift).
+ */
+export async function resolveItineraryStart(
+  input: ItineraryStartInput,
+): Promise<ItineraryStartResult | null> {
+  const start = input.tripStartDate?.trim()
+  if (!start || !input.outbound?.flightNumber) return null
+  if (!isLlmConfigured()) return null
+
+  const dest = (input.destination || '巴黎').trim() || '巴黎'
+  const out = input.outbound
+  const cacheKey = [
+    'itinerary-start',
+    start,
+    input.tripEndDate || '',
+    dest,
+    out.flightNumber,
+    out.from?.scheduled || '',
+    out.from?.actual || '',
+    out.to?.scheduled || '',
+    out.to?.actual || '',
+    out.duration || '',
+  ].join('|')
+
+  return memoizeLlmCall(cacheKey, async () => {
+    const system =
+      '你是跨时区旅行规划助手。根据温哥华（America/Vancouver）出发、巴黎（Europe/Paris）抵达的去程航班，判断行程 Day 1 应对齐哪个巴黎日历日。只输出 JSON，不要 markdown。'
+    const user = JSON.stringify({
+      trip: {
+        startDate: start,
+        endDate: input.tripEndDate || null,
+        destination: dest,
+        hotel: input.hotelName || null,
+        originCity: '温哥华',
+        originAirportHint: 'YVR',
+        arrivalCity: '巴黎',
+        arrivalAirportHint: 'CDG',
+      },
+      outboundFlight: {
+        flightNumber: out.flightNumber,
+        airline: out.airline || null,
+        from: out.from || null,
+        to: out.to || null,
+        duration: out.duration || null,
+        status: out.status || null,
+        note: out.rawNote || null,
+      },
+      rules: [
+        '时区：温哥华 PDT/PST 与巴黎 CEST/CET 通常差 8–9 小时；YVR→CDG 直飞约 9–10 小时，傍晚起飞常次日下午抵达巴黎',
+        'arrivalDateParis / arrivalTimeParis：巴黎当地抵达日历日与时刻（能从航班信息推断则写；不确定可据常规 AF375 类班次合理推断并在 reasonZh 说明）',
+        'itineraryStartDate：行程第 1 天对应的巴黎日历日。若抵达已是次日、或抵达过晚不适合安排完整 Day 1，则用抵达日（常为 startDate 的次日）；若同日上午/中午抵达且可开始行程，则用 startDate',
+        'startsOnTripStartDate：itineraryStartDate 是否等于 trip.startDate',
+        'reasonZh：一句简体中文，面向旅客，说明时差/过夜航班与行程起算日，例如「去程抵达已是巴黎时间 11月10日，行程从第2个日历日起算」',
+        '日期一律 YYYY-MM-DD；不要编造与航班信息明显矛盾的抵达日',
+      ],
+      format: {
+        arrivalDateParis: 'YYYY-MM-DD',
+        arrivalTimeParis: 'HH:MM?',
+        itineraryStartDate: 'YYYY-MM-DD',
+        startsOnTripStartDate: 'boolean',
+        reasonZh: 'string',
+      },
+    })
+
+    const text = await generateText(system, user)
+    if (!text) return fallbackItineraryStart(start, out, input.tripEndDate)
+
+    const parsed = extractJsonObject(text)
+    if (!parsed) return fallbackItineraryStart(start, out, input.tripEndDate)
+
+    const arrivalDateParis = normalizeIsoDate(parsed.arrivalDateParis) || start
+    let itineraryStartDate =
+      normalizeIsoDate(parsed.itineraryStartDate) || arrivalDateParis || start
+    const end = normalizeIsoDate(input.tripEndDate)
+    if (end && itineraryStartDate > end) {
+      itineraryStartDate = end
+    }
+    const arrivalTimeParis = String(parsed.arrivalTimeParis || '').trim() || undefined
+    const startsOnTripStartDate =
+      typeof parsed.startsOnTripStartDate === 'boolean'
+        ? parsed.startsOnTripStartDate
+        : itineraryStartDate === start
+    const reasonZh =
+      String(parsed.reasonZh || '').trim() ||
+      (startsOnTripStartDate
+        ? `去程预计巴黎当地 ${formatZhMonthDay(arrivalDateParis)} 抵达，行程从出发日当天起算。`
+        : `去程抵达已是巴黎时间 ${formatZhMonthDay(arrivalDateParis)}，行程从该日起算。`)
+
+    return {
+      arrivalDateParis,
+      arrivalTimeParis,
+      itineraryStartDate,
+      startsOnTripStartDate,
+      reasonZh,
+    }
+  }).catch(() => fallbackItineraryStart(start, out, input.tripEndDate))
+}
+
+function normalizeIsoDate(value: unknown): string | null {
+  const raw = String(value || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+  const d = new Date(`${raw}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  return raw
+}
+
+function formatZhMonthDay(isoDate: string): string {
+  const d = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return isoDate
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+function addOneCalendarDay(isoDate: string): string {
+  const d = new Date(`${isoDate}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Heuristic when LLM is unavailable: overnight YVR→CDG usually arrives next Paris day. */
+function fallbackItineraryStart(
+  tripStartDate: string,
+  outbound: ItineraryStartInput['outbound'],
+  tripEndDate?: string | null,
+): ItineraryStartResult {
+  const arriveText = `${outbound.to?.scheduled || ''} ${outbound.to?.actual || ''} ${outbound.rawNote || ''}`
+  const explicitNext =
+    /(\+1|次日|隔日|第二天|翌日|已是|跨日)/i.test(arriveText) ||
+    /\b\d{4}-\d{2}-\d{2}\b/.test(arriveText)
+  // Typical AF375 / YVR evening departure → CDG afternoon next day
+  const assumeOvernight = true
+  let arrivalDateParis =
+    normalizeIsoDate(outbound.to?.scheduled?.match(/\d{4}-\d{2}-\d{2}/)?.[0]) ||
+    (assumeOvernight || explicitNext ? addOneCalendarDay(tripStartDate) : tripStartDate)
+  const end = normalizeIsoDate(tripEndDate)
+  if (end && arrivalDateParis > end) {
+    arrivalDateParis = end
+  }
+  const startsOnTripStartDate = arrivalDateParis === tripStartDate
+  return {
+    arrivalDateParis,
+    arrivalTimeParis: undefined,
+    itineraryStartDate: arrivalDateParis,
+    startsOnTripStartDate,
+    reasonZh: startsOnTripStartDate
+      ? `去程预计巴黎当地 ${formatZhMonthDay(arrivalDateParis)} 抵达，行程从出发日当天起算。`
+      : `温哥华–巴黎时差下，去程抵达多半已是巴黎时间 ${formatZhMonthDay(arrivalDateParis)}，行程从该日起算。`,
+  }
+}
+
 function fallbackDayCopy(input: {
   day: number
   pace: string
   placeNames: string[]
+  totalDays?: number
 }): { title: string; theme: string; summary: string } {
   const highlights = input.placeNames.slice(0, 3).join('、')
+  const lastDay = input.totalDays && input.totalDays > 0 ? input.totalDays : undefined
   const title =
     input.pace === '乐园日'
       ? '迪士尼日'
@@ -760,7 +962,7 @@ function fallbackDayCopy(input: {
         ? '近郊自驾'
         : input.day === 1
           ? '抵达巴黎'
-          : input.day === 7
+          : lastDay != null && input.day === lastDay
             ? '返程日'
             : highlights.slice(0, 6) || `第 ${input.day} 天`
 
@@ -918,6 +1120,8 @@ export async function recommendHotelsForTrip(input?: {
   preferences?: string
   /** How many hotels to return (1–8). Default 5. */
   count?: number
+  /** Itinerary daytime day count when known */
+  dayCount?: number
 }): Promise<HotelRecommendation[]> {
   if (!isLlmConfigured()) {
     throw new LlmRequestError('未配置 OpenAI API Key，无法推荐酒店。', 'missing_key')
@@ -926,19 +1130,25 @@ export async function recommendHotelsForTrip(input?: {
   const batch = Math.max(1, input?.batch || 1)
   const count = Math.max(1, Math.min(8, input?.count || 5))
   const preferences = input?.preferences?.trim() || ''
+  const dayCount = input?.dayCount && input.dayCount > 0 ? input.dayCount : undefined
+  const tripLabel = dayCount ? `${dayCount}日巴黎行程` : '巴黎行程'
   const system =
-    '你是巴黎秋季旅行住宿顾问。为温哥华出发的七日行程推荐真实可搜到的酒店。只输出 JSON。'
+    `你是巴黎秋季旅行住宿顾问。为温哥华出发的${tripLabel}推荐真实可搜到的酒店。只输出 JSON。`
   const user = JSON.stringify({
-    trip: 'Paris autumn 7-day, metro-first, avoid Louvre/Versailles focus',
+    trip: dayCount
+      ? `Paris autumn ${dayCount}-day, metro-first, avoid Louvre/Versailles focus`
+      : 'Paris autumn trip, metro-first, avoid Louvre/Versailles focus',
+    dayCount: dayCount || null,
     batch,
     count,
     userPreferences: preferences || null,
     avoidAlso: input?.excludeNames || [],
     rules: [
       `恰好推荐 ${count} 家真实酒店（中档为主，可含 1 家稍高档）`,
-      '优先 Marais / Opéra / Grands Boulevards / Saint-Germain / Latin 等地铁便利区',
+      'area 统一写成「N区 (Français / 中文)」格式，例如「4区 (Marais / 玛黑)」「9区 (Opéra / 歌剧院)」「16区 (Trocadéro / 特罗卡德罗)」',
+      '优先 3–4区玛黑 / 2区大林荫道 / 9区歌剧院 / 6区圣日耳曼 / 5区拉丁区 等地铁便利区',
       '若提供 userPreferences，必须优先满足（区位、预算、风格、安静/便利等）',
-      'name 用 Google Maps 可搜到的正式店名；尽量附 address',
+      'name 用 Google Maps 可搜到的正式店名；尽量附带含邮编的 address（如 75004 Paris）',
       count === 1
         ? '仅 1 家时 isBest 必须为 true'
         : '恰好 1 家 isBest=true 作为最优推荐，其余 false',
@@ -949,7 +1159,7 @@ export async function recommendHotelsForTrip(input?: {
       hotels: [
         {
           name: 'string',
-          area: 'string',
+          area: '4区 (Marais / 玛黑)',
           address: 'string?',
           description: 'string',
           nearestMetro: 'string?',
@@ -990,7 +1200,7 @@ export async function recommendHotelsForTrip(input?: {
       description: String(row.description || row.reason || '').trim() || `${name}，适合巴黎行程住宿。`,
       nearestMetro: String(row.nearestMetro || '').trim() || undefined,
       priceHint: String(row.priceHint || '').trim() || undefined,
-      reason: String(row.reason || '地铁便利，适合七日行程').trim(),
+      reason: String(row.reason || '地铁便利，适合本次行程').trim(),
       isBest: Boolean(row.isBest),
     })
     seen.add(key)
@@ -1014,4 +1224,644 @@ export async function recommendHotelsForTrip(input?: {
   }
 
   return out
+}
+
+export interface DestinationSuggestion {
+  name: string
+  subtitle?: string
+}
+
+/**
+ * Suggest popular travel destinations for quick-select chips.
+ * Returns Chinese labels with optional local/English subtitle.
+ */
+export async function suggestPopularDestinations(options?: {
+  /** Names/subtitles from the current chip batch to avoid */
+  excludeNames?: string[]
+  /** Currently selected destination (also avoided when refreshing) */
+  currentDestination?: string
+  /** Bump when asking for a fresh batch */
+  batch?: number
+  /** Target chip count (clamped to 6–10) */
+  count?: number
+}): Promise<DestinationSuggestion[]> {
+  if (!isLlmConfigured()) {
+    throw new LlmRequestError('未配置 OpenAI API Key，无法生成热门目的地。', 'missing_key')
+  }
+
+  const count = Math.min(10, Math.max(6, options?.count ?? 8))
+  const batch = Math.max(1, options?.batch || 1)
+  const avoidAlso = [
+    ...(options?.excludeNames || []),
+    ...(options?.currentDestination?.trim() ? [options.currentDestination.trim()] : []),
+  ]
+  const exclude = toExcludeSet(avoidAlso)
+
+  const system =
+    '你是旅行灵感助手。为中文用户推荐当下热门旅游城市/目的地。只输出 JSON，不要解释。'
+  const user = JSON.stringify({
+    count,
+    batch,
+    avoidAlso,
+    currentDestination: options?.currentDestination?.trim() || '',
+    rules: [
+      `推荐 ${count} 个热门旅游目的地（城市为主，可含个别地区）`,
+      'name 用简体中文常见称呼（如 巴黎、东京、巴塞罗那）',
+      'subtitle 用当地官方或英文常用名（如 Paris、Tokyo）',
+      '覆盖欧亚美等不同区域，避免全是同一国家',
+      '不要编造不存在的地名',
+      '严禁推荐 avoidAlso 与 currentDestination 中已出现的城市（含中英文名）',
+      'batch>1 时必须给出明显不同的新名单，不要复用上一批',
+    ],
+    format: {
+      destinations: [{ name: '巴黎', subtitle: 'Paris' }],
+    },
+  })
+
+  const text = await generateText(system, user, { strict: true })
+  if (!text) {
+    throw new LlmRequestError('大模型没有返回热门目的地。')
+  }
+
+  const parsed = extractJsonObject(text)
+  const list = (parsed?.destinations as unknown[]) || []
+  if (!Array.isArray(list) || !list.length) {
+    throw new LlmRequestError('无法解析热门目的地列表。')
+  }
+
+  const out: DestinationSuggestion[] = []
+  const seen = new Set<string>()
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const name = String(row.name || '').trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    const subtitle = String(row.subtitle || '').trim() || undefined
+    const subKey = subtitle?.toLowerCase()
+    if (exclude.has(key) || (subKey && exclude.has(subKey)) || seen.has(key)) continue
+    out.push({ name, subtitle })
+    seen.add(key)
+    if (subKey) seen.add(subKey)
+  }
+
+  if (!out.length) {
+    throw new LlmRequestError('热门目的地列表为空。')
+  }
+
+  return out.slice(0, 10)
+}
+
+export interface FullItineraryPlaceDraft {
+  key: string
+  name: string
+  nameLocal?: string
+  type: PlaceTypeForItinerary
+  area?: string
+  description?: string
+  ratingHint?: string
+  durationHint?: string
+}
+
+export type PlaceTypeForItinerary =
+  | 'cafe'
+  | 'attraction'
+  | 'restaurant'
+  | 'transport'
+  | 'hotel'
+
+export interface FullItineraryStopDraft {
+  time: string
+  placeKey: string
+  note: string
+  transport?: string
+  walkLevel?: '很少走' | '短步行' | '中等步行'
+  duration?: string
+}
+
+export interface FullItineraryDayDraft {
+  day: number
+  title: string
+  theme: string
+  pace: '轻松' | '适中' | '乐园日' | '自驾日'
+  summary: string
+  metroHintFromArea?: Record<string, string>
+  stops: FullItineraryStopDraft[]
+}
+
+export interface FullItineraryDraft {
+  days: FullItineraryDayDraft[]
+  places: FullItineraryPlaceDraft[]
+}
+
+export interface GenerateFullItineraryInput {
+  destination: string
+  dayCount: number
+  tripStartDate: string
+  tripEndDate: string
+  itineraryStartDate: string
+  nights?: number
+  hotel: {
+    name: string
+    address: string
+    area?: string
+    areaKey?: string
+    lat: number
+    lng: number
+    nearestMetro?: string
+  }
+  outbound?: {
+    flightNumber: string
+    airline?: string
+    from?: FlightInfo['from']
+    to?: FlightInfo['to']
+    duration?: string
+    status?: string
+    rawNote?: string
+  } | null
+  returnFlight?: {
+    flightNumber: string
+    airline?: string
+    from?: FlightInfo['from']
+    to?: FlightInfo['to']
+    duration?: string
+    status?: string
+    rawNote?: string
+  } | null
+  preferences?: string
+}
+
+/**
+ * Generate a complete multi-day Paris itinerary as structured JSON.
+ * Caller resolves place names via Google Places and persists the result.
+ */
+export async function generateFullItinerary(
+  input: GenerateFullItineraryInput,
+): Promise<FullItineraryDraft> {
+  if (!isLlmConfigured()) {
+    throw new LlmRequestError('未配置 OpenAI API Key，无法生成行程。', 'missing_key')
+  }
+
+  const n = Math.max(1, Math.min(30, Math.floor(input.dayCount) || 1))
+  const disneyDay = n >= 3 ? n - 1 : null
+  const hotelArea =
+    input.hotel.area ||
+    input.hotel.areaKey ||
+    '巴黎市区'
+
+  const system =
+    '你是巴黎秋季旅行规划师。根据旅客的日期、航班与酒店，生成完整多日行程。只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。'
+
+  const user = JSON.stringify({
+    trip: {
+      destination: input.destination || '巴黎',
+      dayCount: n,
+      nights: input.nights ?? Math.max(0, n - 1),
+      tripStartDate: input.tripStartDate,
+      tripEndDate: input.tripEndDate,
+      itineraryStartDate: input.itineraryStartDate,
+      preferences: input.preferences || null,
+    },
+    hotel: {
+      name: input.hotel.name,
+      address: input.hotel.address,
+      area: hotelArea,
+      areaKey: input.hotel.areaKey || null,
+      lat: input.hotel.lat,
+      lng: input.hotel.lng,
+      nearestMetro: input.hotel.nearestMetro || null,
+    },
+    outboundFlight: input.outbound || null,
+    returnFlight: input.returnFlight || null,
+    hardRules: [
+      `必须输出恰好 ${n} 天（day 字段为 1..${n}），每天都有 title/theme/pace/summary/stops`,
+      'Day 1：抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；Day 1 不强制咖啡馆开场。',
+      '除最后一天外：每一天的最后一站必须是回酒店过夜（placeKey "hotel-selected"，type hotel）。Day 1 若还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）；中间日早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站仍须写回酒店。',
+      '除 Day 1 与迪士尼日外：若当天安排了景点/餐饮，第一站（离开酒店后的第一站）必须是高分精品咖啡馆（type=cafe，真实可搜店名）。',
+      disneyDay
+        ? `倒数第二天（Day ${disneyDay}）必须是巴黎迪士尼全日：pace=乐园日。出游站只允许一个 "attr-disney"（Disneyland Paris），不要咖啡馆、不要餐厅站、不要其他景点；园内用餐不必单独写站。末站回酒店过夜（"hotel-selected"）。即当天 stops 实质上只有：迪士尼 + 回酒店。`
+        : '行程不足 3 天时可不安排独立迪士尼日。',
+      '必去（硬规则）：整个行程必须包含香榭丽舍大街（placeKey "attr-champs"）与凯旋门（placeKey "attr-arc"），可安排在同一天（二者相邻、顺路），不要拆成无关的重复街段。',
+      '最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆。',
+      '去重（硬规则）：整个行程不要重复同一景点/地标（同一正式名或同一 placeKey 只出现一次）；同一天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。',
+      '每天行程开始约 10:00（自然醒）；不要安排 7–8 点观光（机场相关除外）。迪士尼日也尽量 10:00 左右出门，不要 7:45 强行早起。',
+      '餐饮（硬规则）：除「仅酒店→机场」或时间过紧的返程日、以及迪士尼日外，每天必须安排午餐与晚餐两顿正餐（type=restaurant，约 12:00–14:00 与 19:00–21:00）。推荐高分、性价比高的真实可搜餐厅；不局限于法餐，意餐/亚洲菜/bistro 等均可。饭店须顺路、靠近当日片区聚类，少绕路少额外步行。',
+      'Day 1 餐饮：抵达办入住后若仍有空档，再安排午餐和/或晚餐；落地过晚可只安排晚餐。',
+      '动线：同日景点尽量同片区聚类，控制步行（walkLevel 优先 很少走/短步行）；跨区用地铁，少换乘。',
+      '不要安排卢浮宫或凡尔赛作为行程重点。',
+      'places[] 列出所有非特殊地点：key 与 stops.placeKey 对应；name 必须是 Google Maps 可搜到的正式名；附 area（如 玛黑/16区）。',
+      '特殊 placeKey 固定："hotel-selected"（酒店）、"attr-disney"（迪士尼）、"attr-cdg"（戴高乐机场）、"attr-champs"（香榭丽舍大街）、"attr-arc"（凯旋门）——这些可不必重复写在 places[]。',
+      'metroHintFromArea 至少给 custom 一条中文地铁/交通提示。',
+      'time 用 HH:MM；最后一天去机场可用「按航班倒推」。',
+    ],
+    format: {
+      places: [
+        {
+          key: 'cafe-day2',
+          name: 'Café Kitsuné Palais Royal',
+          nameLocal: 'string?',
+          type: 'cafe|attraction|restaurant|transport|hotel',
+          area: 'string?',
+          description: 'string',
+          ratingHint: 'string?',
+          durationHint: 'string?',
+        },
+      ],
+      days: [
+        {
+          day: 1,
+          title: '抵达巴黎',
+          theme: '落地 · 安顿',
+          pace: '轻松|适中|乐园日|自驾日',
+          summary: 'string',
+          metroHintFromArea: { custom: 'string' },
+          stops: [
+            {
+              time: 'HH:MM',
+              placeKey: 'hotel-selected',
+              note: 'string',
+              transport: 'string?',
+              walkLevel: '很少走|短步行|中等步行',
+              duration: 'string?',
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  const text = await generateText(system, user, { strict: true })
+  if (!text) {
+    throw new LlmRequestError('大模型没有返回行程。')
+  }
+
+  const parsed = extractJsonObject(text)
+  if (!parsed) {
+    throw new LlmRequestError('无法解析行程 JSON，请再试一次。')
+  }
+
+  const rawPlaces = Array.isArray(parsed.places) ? (parsed.places as unknown[]) : []
+  const rawDays = Array.isArray(parsed.days) ? (parsed.days as unknown[]) : []
+  if (!rawDays.length) {
+    throw new LlmRequestError('行程天数为空，请再试一次。')
+  }
+
+  const places: FullItineraryPlaceDraft[] = []
+  const seenKeys = new Set<string>()
+  for (const item of rawPlaces) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const key = String(row.key || row.id || '').trim()
+    const name = String(row.name || '').trim()
+    if (!key || !name || seenKeys.has(key)) continue
+    seenKeys.add(key)
+    const typeRaw = String(row.type || 'attraction').toLowerCase()
+    let type: PlaceTypeForItinerary = 'attraction'
+    if (typeRaw.includes('cafe') || typeRaw.includes('coffee')) type = 'cafe'
+    else if (typeRaw.includes('restaurant') || typeRaw.includes('food')) type = 'restaurant'
+    else if (typeRaw.includes('hotel')) type = 'hotel'
+    else if (typeRaw.includes('transport') || typeRaw.includes('airport')) type = 'transport'
+    places.push({
+      key,
+      name,
+      nameLocal: String(row.nameLocal || '').trim() || undefined,
+      type,
+      area: String(row.area || '').trim() || undefined,
+      description: String(row.description || '').trim() || undefined,
+      ratingHint: String(row.ratingHint || '').trim() || undefined,
+      durationHint: String(row.durationHint || '').trim() || undefined,
+    })
+  }
+
+  const days: FullItineraryDayDraft[] = []
+  for (const item of rawDays) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const dayNum = Number(row.day)
+    if (!Number.isFinite(dayNum) || dayNum < 1) continue
+    const stopsRaw = Array.isArray(row.stops) ? (row.stops as unknown[]) : []
+    const stops: FullItineraryStopDraft[] = []
+    for (const s of stopsRaw) {
+      if (!s || typeof s !== 'object') continue
+      const stop = s as Record<string, unknown>
+      const placeKey = String(stop.placeKey || stop.placeId || '').trim()
+      if (!placeKey) continue
+      const walk = String(stop.walkLevel || '').trim()
+      stops.push({
+        time: String(stop.time || '10:00').trim() || '10:00',
+        placeKey,
+        note: String(stop.note || '').trim() || '按当天节奏灵活调整。',
+        transport: String(stop.transport || '').trim() || undefined,
+        walkLevel:
+          walk === '很少走' || walk === '短步行' || walk === '中等步行'
+            ? walk
+            : '短步行',
+        duration: String(stop.duration || '').trim() || undefined,
+      })
+    }
+    const paceRaw = String(row.pace || '适中').trim()
+    let pace: FullItineraryDayDraft['pace'] = '适中'
+    if (paceRaw === '轻松' || paceRaw === '适中' || paceRaw === '乐园日' || paceRaw === '自驾日') {
+      pace = paceRaw
+    } else if (/disney|迪士尼|乐园/i.test(paceRaw)) pace = '乐园日'
+    else if (/自驾/i.test(paceRaw)) pace = '自驾日'
+    else if (/轻松/i.test(paceRaw)) pace = '轻松'
+
+    const metro =
+      row.metroHintFromArea && typeof row.metroHintFromArea === 'object'
+        ? (row.metroHintFromArea as Record<string, string>)
+        : { custom: '按导航或地铁前往下一个地点。' }
+
+    days.push({
+      day: dayNum,
+      title: String(row.title || `第 ${dayNum} 天`).trim().slice(0, 16),
+      theme: String(row.theme || '').trim() || '巴黎日程',
+      pace,
+      summary: String(row.summary || '').trim() || '今天按地图与体力微调即可。',
+      metroHintFromArea: metro,
+      stops,
+    })
+  }
+
+  if (!days.length) {
+    throw new LlmRequestError('无法解析行程天数，请再试一次。')
+  }
+
+  return { days, places }
+}
+
+export interface OccupiedPlaceBrief {
+  day: number
+  name: string
+  placeId?: string
+  type?: string
+}
+
+export interface GenerateSingleDayItineraryInput {
+  destination: string
+  dayCount: number
+  dayNumber: number
+  calendarDate?: string
+  tripStartDate: string
+  tripEndDate: string
+  itineraryStartDate: string
+  nights?: number
+  hotel: GenerateFullItineraryInput['hotel']
+  outbound?: GenerateFullItineraryInput['outbound']
+  returnFlight?: GenerateFullItineraryInput['returnFlight']
+  /** Places already used on other days — avoid duplicates. */
+  occupiedPlaces: OccupiedPlaceBrief[]
+  preferences?: string
+}
+
+export interface SingleDayItineraryDraft {
+  day: FullItineraryDayDraft
+  places: FullItineraryPlaceDraft[]
+}
+
+function parseItineraryPlaces(rawPlaces: unknown[]): FullItineraryPlaceDraft[] {
+  const places: FullItineraryPlaceDraft[] = []
+  const seenKeys = new Set<string>()
+  for (const item of rawPlaces) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const key = String(row.key || row.id || '').trim()
+    const name = String(row.name || '').trim()
+    if (!key || !name || seenKeys.has(key)) continue
+    seenKeys.add(key)
+    const typeRaw = String(row.type || 'attraction').toLowerCase()
+    let type: PlaceTypeForItinerary = 'attraction'
+    if (typeRaw.includes('cafe') || typeRaw.includes('coffee')) type = 'cafe'
+    else if (typeRaw.includes('restaurant') || typeRaw.includes('food')) type = 'restaurant'
+    else if (typeRaw.includes('hotel')) type = 'hotel'
+    else if (typeRaw.includes('transport') || typeRaw.includes('airport')) type = 'transport'
+    places.push({
+      key,
+      name,
+      nameLocal: String(row.nameLocal || '').trim() || undefined,
+      type,
+      area: String(row.area || '').trim() || undefined,
+      description: String(row.description || '').trim() || undefined,
+      ratingHint: String(row.ratingHint || '').trim() || undefined,
+      durationHint: String(row.durationHint || '').trim() || undefined,
+    })
+  }
+  return places
+}
+
+function parseItineraryDay(row: Record<string, unknown>, fallbackDay: number): FullItineraryDayDraft | null {
+  const dayNum = Number(row.day)
+  const day = Number.isFinite(dayNum) && dayNum >= 1 ? dayNum : fallbackDay
+  const stopsRaw = Array.isArray(row.stops) ? (row.stops as unknown[]) : []
+  const stops: FullItineraryStopDraft[] = []
+  for (const s of stopsRaw) {
+    if (!s || typeof s !== 'object') continue
+    const stop = s as Record<string, unknown>
+    const placeKey = String(stop.placeKey || stop.placeId || '').trim()
+    if (!placeKey) continue
+    const walk = String(stop.walkLevel || '').trim()
+    stops.push({
+      time: String(stop.time || '10:00').trim() || '10:00',
+      placeKey,
+      note: String(stop.note || '').trim() || '按当天节奏灵活调整。',
+      transport: String(stop.transport || '').trim() || undefined,
+      walkLevel:
+        walk === '很少走' || walk === '短步行' || walk === '中等步行'
+          ? walk
+          : '短步行',
+      duration: String(stop.duration || '').trim() || undefined,
+    })
+  }
+  if (!stops.length) return null
+
+  const paceRaw = String(row.pace || '适中').trim()
+  let pace: FullItineraryDayDraft['pace'] = '适中'
+  if (paceRaw === '轻松' || paceRaw === '适中' || paceRaw === '乐园日' || paceRaw === '自驾日') {
+    pace = paceRaw
+  } else if (/disney|迪士尼|乐园/i.test(paceRaw)) pace = '乐园日'
+  else if (/自驾/i.test(paceRaw)) pace = '自驾日'
+  else if (/轻松/i.test(paceRaw)) pace = '轻松'
+
+  const metro =
+    row.metroHintFromArea && typeof row.metroHintFromArea === 'object'
+      ? (row.metroHintFromArea as Record<string, string>)
+      : { custom: '按导航或地铁前往下一个地点。' }
+
+  return {
+    day,
+    title: String(row.title || `第 ${day} 天`).trim().slice(0, 16),
+    theme: String(row.theme || '').trim() || '巴黎日程',
+    pace,
+    summary: String(row.summary || '').trim() || '今天按地图与体力微调即可。',
+    metroHintFromArea: metro,
+    stops,
+  }
+}
+
+/**
+ * Regenerate a single itinerary day with the same hard rules as full generation,
+ * while avoiding places already used on other days.
+ */
+export async function generateSingleDayItinerary(
+  input: GenerateSingleDayItineraryInput,
+): Promise<SingleDayItineraryDraft> {
+  if (!isLlmConfigured()) {
+    throw new LlmRequestError('未配置 OpenAI API Key，无法生成行程。', 'missing_key')
+  }
+
+  const n = Math.max(1, Math.min(30, Math.floor(input.dayCount) || 1))
+  const dayNumber = Math.max(1, Math.min(n, Math.floor(input.dayNumber) || 1))
+  const disneyDay = n >= 3 ? n - 1 : null
+  const isFirst = dayNumber === 1
+  const isLast = dayNumber === n && n > 1
+  const isDisney = disneyDay != null && dayNumber === disneyDay
+  const hotelArea =
+    input.hotel.area ||
+    input.hotel.areaKey ||
+    '巴黎市区'
+
+  const roleRules: string[] = []
+  if (isFirst) {
+    roleRules.push(
+      '今天是 Day 1 抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；不强制咖啡馆开场。',
+      '若 Day 1 还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）。',
+      'Day 1 餐饮：抵达办入住后若仍有空档，再安排午餐和/或晚餐；落地过晚可只安排晚餐。',
+    )
+  } else if (isLast) {
+    roleRules.push(
+      '今天是最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。',
+      '国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆。',
+    )
+  } else if (isDisney) {
+    roleRules.push(
+      `今天是倒数第二天（Day ${dayNumber}）巴黎迪士尼全日：pace=乐园日。出游站只允许一个 "attr-disney"（Disneyland Paris），不要咖啡馆、不要餐厅站、不要其他景点；园内用餐不必单独写站。末站回酒店过夜（"hotel-selected"）。即当天 stops 实质上只有：迪士尼 + 回酒店。`,
+    )
+  } else {
+    roleRules.push(
+      '中间日：早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站必须回酒店过夜（placeKey "hotel-selected"，type hotel）。',
+      '若当天安排了景点/餐饮，第一站（离开酒店后的第一站）必须是高分精品咖啡馆（type=cafe，真实可搜店名）。',
+      '餐饮（硬规则）：必须安排午餐与晚餐两顿正餐（type=restaurant，约 12:00–14:00 与 19:00–21:00）。推荐高分、性价比高的真实可搜餐厅。',
+      '若 occupiedElsewhere 尚未包含香榭丽舍/凯旋门，今天应优先安排 placeKey "attr-champs" 与 "attr-arc"（可同日、顺路）。',
+    )
+  }
+
+  const occupiedNames = input.occupiedPlaces
+    .map((p) => p.name?.trim())
+    .filter(Boolean)
+  const occupiedIds = input.occupiedPlaces
+    .map((p) => p.placeId?.trim())
+    .filter(Boolean)
+
+  const system =
+    '你是巴黎秋季旅行规划师。根据旅客的日期、航班与酒店，只重新规划指定的那一天行程。只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。'
+
+  const user = JSON.stringify({
+    trip: {
+      destination: input.destination || '巴黎',
+      dayCount: n,
+      nights: input.nights ?? Math.max(0, n - 1),
+      tripStartDate: input.tripStartDate,
+      tripEndDate: input.tripEndDate,
+      itineraryStartDate: input.itineraryStartDate,
+      preferences: input.preferences || null,
+    },
+    regenerate: {
+      dayNumber,
+      calendarDate: input.calendarDate || null,
+      role: isFirst ? 'arrival' : isLast ? 'return' : isDisney ? 'disney' : 'mid',
+    },
+    hotel: {
+      name: input.hotel.name,
+      address: input.hotel.address,
+      area: hotelArea,
+      areaKey: input.hotel.areaKey || null,
+      lat: input.hotel.lat,
+      lng: input.hotel.lng,
+      nearestMetro: input.hotel.nearestMetro || null,
+    },
+    outboundFlight: input.outbound || null,
+    returnFlight: input.returnFlight || null,
+    occupiedElsewhere: {
+      names: occupiedNames,
+      placeIds: occupiedIds,
+      detail: input.occupiedPlaces.slice(0, 80),
+    },
+    hardRules: [
+      `只输出 Day ${dayNumber} 这一天（day 字段必须为 ${dayNumber}），以及 places[] 中当天用到的非特殊地点。`,
+      ...roleRules,
+      '去重（硬规则）：不要使用 occupiedElsewhere 中已出现的景点/地标（同一正式名或同一 placeId）；当天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。',
+      '每天行程开始约 10:00（自然醒）；不要安排 7–8 点观光（机场相关除外）。迪士尼日也尽量 10:00 左右出门。',
+      '动线：同日景点尽量同片区聚类，控制步行（walkLevel 优先 很少走/短步行）；跨区用地铁，少换乘。',
+      '不要安排卢浮宫或凡尔赛作为行程重点。',
+      'places[] 列出所有非特殊地点：key 与 stops.placeKey 对应；name 必须是 Google Maps 可搜到的正式名；附 area（如 玛黑/16区）。',
+      '特殊 placeKey 固定："hotel-selected"（酒店）、"attr-disney"（迪士尼）、"attr-cdg"（戴高乐机场）、"attr-champs"（香榭丽舍大街）、"attr-arc"（凯旋门）——这些可不必重复写在 places[]。',
+      'metroHintFromArea 至少给 custom 一条中文地铁/交通提示。',
+      'time 用 HH:MM；最后一天去机场可用「按航班倒推」。',
+    ],
+    format: {
+      places: [
+        {
+          key: 'cafe-day',
+          name: 'Café Kitsuné Palais Royal',
+          nameLocal: 'string?',
+          type: 'cafe|attraction|restaurant|transport|hotel',
+          area: 'string?',
+          description: 'string',
+          ratingHint: 'string?',
+          durationHint: 'string?',
+        },
+      ],
+      day: {
+        day: dayNumber,
+        title: 'string',
+        theme: 'string',
+        pace: '轻松|适中|乐园日|自驾日',
+        summary: 'string',
+        metroHintFromArea: { custom: 'string' },
+        stops: [
+          {
+            time: 'HH:MM',
+            placeKey: 'string',
+            note: 'string',
+            transport: 'string?',
+            walkLevel: '很少走|短步行|中等步行',
+            duration: 'string?',
+          },
+        ],
+      },
+    },
+  })
+
+  const text = await generateText(system, user, { strict: true })
+  if (!text) {
+    throw new LlmRequestError('大模型没有返回单日行程。')
+  }
+
+  const parsed = extractJsonObject(text)
+  if (!parsed) {
+    throw new LlmRequestError('无法解析单日行程 JSON，请再试一次。')
+  }
+
+  const rawPlaces = Array.isArray(parsed.places) ? (parsed.places as unknown[]) : []
+  const places = parseItineraryPlaces(rawPlaces)
+
+  let dayRow: Record<string, unknown> | null = null
+  if (parsed.day && typeof parsed.day === 'object' && !Array.isArray(parsed.day)) {
+    dayRow = parsed.day as Record<string, unknown>
+  } else if (Array.isArray(parsed.days) && parsed.days[0] && typeof parsed.days[0] === 'object') {
+    dayRow = parsed.days[0] as Record<string, unknown>
+  }
+  if (!dayRow) {
+    throw new LlmRequestError('单日行程为空，请再试一次。')
+  }
+
+  const day = parseItineraryDay(dayRow, dayNumber)
+  if (!day) {
+    throw new LlmRequestError('无法解析单日行程站点，请再试一次。')
+  }
+
+  return {
+    day: { ...day, day: dayNumber },
+    places,
+  }
 }

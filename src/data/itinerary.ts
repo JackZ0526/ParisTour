@@ -7,6 +7,7 @@ const metroHints = {
     boulevards: '地铁 8/9 换 1 号线，或步行至 Opéra 再乘 1 号线（约 15–20 分钟）。',
     saintGermain: '地铁 4 换 1 号线，或 12 号线至 Franklin D. Roosevelt 再步行（约 20–25 分钟）。',
     latin: '地铁 4 换 1 号线至 Étoile（约 25 分钟）。',
+    trocadero: '步行或地铁 1/2/6 号线短程至 Charles de Gaulle–Étoile（约 10–15 分钟）。',
     custom: '请从最近地铁站前往 Charles de Gaulle–Étoile（1 号线）。',
   },
   canal: {
@@ -15,6 +16,7 @@ const metroHints = {
     boulevards: '地铁 8/9 至 République（约 8–12 分钟）。',
     saintGermain: '地铁 4 换 11 或 8 号线至 République（约 20–25 分钟）。',
     latin: '地铁 4 换 République 方向（约 20–25 分钟）。',
+    trocadero: '地铁 9 号线直达 République（约 25–35 分钟）。',
     custom: '导航至 République 或 Goncourt 地铁站，再短步行到运河。',
   },
   left: {
@@ -23,6 +25,7 @@ const metroHints = {
     boulevards: '地铁 8/9 换 4 号线（约 15 分钟）。',
     saintGermain: '步行或地铁 1 站即可（约 5–10 分钟）。',
     latin: '步行或地铁短程（约 5–10 分钟）。',
+    trocadero: '地铁 6 换 4 号线，或 10 号线至 Odéon / Mabillon（约 20–30 分钟）。',
     custom: '导航至 Odéon 或 Saint-Sulpice，再去卢森堡公园。',
   },
   disney: {
@@ -31,6 +34,7 @@ const metroHints = {
     boulevards: '地铁到 Auber / Châtelet 换乘 RER A（约 45–55 分钟）。',
     saintGermain: '地铁到 Châtelet 换乘 RER A（约 50–60 分钟）。',
     latin: '地铁到 Châtelet 换乘 RER A（约 50–60 分钟）。',
+    trocadero: '地铁 1/9 号线至 Châtelet 或 Auber 换乘 RER A（约 55–70 分钟）。',
     custom: '前往 RER A 沿线站点，终点 Marne-la-Vallée–Chessy。',
   },
   airport: {
@@ -39,6 +43,7 @@ const metroHints = {
     boulevards: '地铁至 Gare du Nord 换乘 RER B（约 40–55 分钟）。',
     saintGermain: '地铁至 Châtelet 或 Saint-Michel 换乘 RER B（约 45–60 分钟）。',
     latin: 'RER B 可在 Saint-Michel–Notre-Dame 上车（约 35–50 分钟）。',
+    trocadero: '地铁 1/9 至 Châtelet 换乘 RER B，或直接打车（约 50–75 分钟 + 预留安检）。',
     custom: '优先 RER B 或预留出租车到 CDG，出发前 3–3.5 小时离开酒店。',
   },
 }
@@ -57,11 +62,13 @@ export const itinerary: DayPlan[] = [
       boulevards: 'CDG → RER B 到 Gare du Nord / Châtelet，再短程地铁（约 50–65 分钟）。',
       saintGermain: 'CDG → RER B 到 Saint-Michel，步行/地铁到酒店（约 50–65 分钟）。',
       latin: 'CDG → RER B 到 Saint-Michel–Notre-Dame（约 40–55 分钟）。',
+      trocadero: 'CDG → RER B 到 Châtelet，再地铁 1/9 号线到 Trocadéro / Passy；或出租车直达 16 区（约 55–75 分钟）。',
       custom: 'CDG 推荐 RER B 或出租车到酒店；抵达后先办理入住。',
     },
     stops: [
       {
-        time: '10:30',
+        // Filled at runtime from flight arrival + CDG exit buffer + airport→hotel transit.
+        time: '待定',
         placeId: 'hotel-selected',
         note: '从 CDG 出关后先到酒店办理入住、放下行李，稍作休息再出门。',
         transport: 'RER B / 出租车自戴高乐机场',
@@ -292,6 +299,7 @@ export const itinerary: DayPlan[] = [
       boulevards: '向东到合适租车点，避免穿行市中心。',
       saintGermain: '左岸取车点或东缘取车，导航避开小岛。',
       latin: '优先东缘/东南缘取车点。',
+      trocadero: '西侧/环线边缘取车更顺，避开塞纳河小岛与右岸中心拥堵。',
       custom: '选择酒店附近或环线边缘的租车点，回城还车后再坐地铁。',
     },
     stops: [

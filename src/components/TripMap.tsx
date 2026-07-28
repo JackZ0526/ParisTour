@@ -3,8 +3,19 @@ import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
 import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../types'
-import { getDayOrigin } from '../utils/dayOrigin'
+import {
+  getDayOrigin,
+  isAirportPlace,
+  isHotelPlace,
+  numberedStopIndexes,
+} from '../utils/dayOrigin'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
+import { LoadingIndicator } from './LoadingIndicator'
+import {
+  airportIconUrl,
+  homeIconUrl,
+  numberIconUrl,
+} from './markerIcons'
 
 const mapContainerStyle = { width: '100%', height: '100%' }
 
@@ -21,44 +32,51 @@ const mapOptions: google.maps.MapOptions = {
   gestureHandling: 'cooperative',
 }
 
-function homeIconUrl() {
-  const svg = encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-      <circle cx="20" cy="20" r="18" fill="#b56a3c" stroke="#fff" stroke-width="3"/>
-      <path fill="#fff" d="M20 10.5 29.5 19h-2.2v8.8h-4.6v-5H17.3v5h-4.6V19H10.5L20 10.5z"/>
-    </svg>`,
-  )
-  return `data:image/svg+xml;charset=UTF-8,${svg}`
-}
-
-function airportIconUrl() {
-  const svg = encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-      <circle cx="20" cy="20" r="18" fill="#5f7a78" stroke="#fff" stroke-width="3"/>
-      <path fill="#fff" d="M11 22.5 28 14.5l1.2 2.2-10.2 5.5 3.1 5.4-2.1 1.1-3.4-5.1-4.6 2.5V22.5z"/>
-    </svg>`,
-  )
-  return `data:image/svg+xml;charset=UTF-8,${svg}`
-}
-
-function numberIconUrl(n: number, active: boolean) {
-  const bg = active ? '#b56a3c' : '#4a6356'
-  const svg = encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
-      <circle cx="15" cy="15" r="13" fill="${bg}" stroke="#fff" stroke-width="2"/>
-      <text x="15" y="20" text-anchor="middle" fill="#fff" font-size="13" font-family="Arial,sans-serif" font-weight="700">${n}</text>
-    </svg>`,
-  )
-  return `data:image/svg+xml;charset=UTF-8,${svg}`
-}
-
 function collectNavLegs(navPlan: DayNavPlan): ResolvedDayLeg[] {
   const legs: ResolvedDayLeg[] = []
   if (navPlan.hotelToFirst) legs.push(navPlan.hotelToFirst)
   for (const leg of navPlan.betweenStops) {
     if (leg) legs.push(leg)
   }
+  if (navPlan.lastToDestination) legs.push(navPlan.lastToDestination)
   return legs
+}
+
+/** All coordinates that should stay inside the map viewport (markers + route geometry). */
+function collectViewportPoints(
+  origin: { lat: number; lng: number },
+  stops: Place[],
+  navPlan: DayNavPlan,
+): google.maps.LatLngLiteral[] {
+  const points: google.maps.LatLngLiteral[] = [
+    { lat: origin.lat, lng: origin.lng },
+    ...stops.map((s) => s.location),
+  ]
+
+  const pushPath = (path: google.maps.LatLngLiteral[] | undefined | null) => {
+    if (!path?.length) return
+    for (const p of path) {
+      if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) points.push(p)
+    }
+  }
+
+  pushPath(navPlan.hotelLinkPath)
+  pushPath(navPlan.routePath)
+  for (const leg of collectNavLegs(navPlan)) {
+    pushPath(leg.path)
+    const overview = leg.directionsResult?.routes?.[0]?.overview_path
+    if (overview?.length) {
+      for (const ll of overview) {
+        const lit =
+          typeof ll.lat === 'function'
+            ? { lat: ll.lat(), lng: ll.lng() }
+            : { lat: (ll as google.maps.LatLngLiteral).lat, lng: (ll as google.maps.LatLngLiteral).lng }
+        if (Number.isFinite(lit.lat) && Number.isFinite(lit.lng)) points.push(lit)
+      }
+    }
+  }
+
+  return points
 }
 
 interface Props {
@@ -98,6 +116,8 @@ export function TripMap({
     return list
   }, [day, customPlaces])
 
+  const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
+
   const directionsLegs = useMemo(
     () => collectNavLegs(navPlan).filter((leg) => Boolean(leg.directionsResult)),
     [navPlan],
@@ -109,12 +129,13 @@ export function TripMap({
 
   useEffect(() => {
     if (!map || !isLoaded) return
+    // Wait until nav settles so route geometry is included (cached days are instant).
+    if (navLoading) return
 
-    const points: google.maps.LatLngLiteral[] = [
-      { lat: dayOrigin.lat, lng: dayOrigin.lng },
-      ...stops.map((s) => s.location),
-    ]
-    const padding = { top: 80, right: 80, bottom: 80, left: 80 }
+    const points = collectViewportPoints(dayOrigin, stops, navPlan)
+    if (!points.length) return
+
+    const padding = { top: 72, right: 72, bottom: 72, left: 72 }
 
     if (points.length === 1) {
       map.setCenter(points[0])
@@ -124,11 +145,13 @@ export function TripMap({
 
     const bounds = new google.maps.LatLngBounds()
     for (const p of points) bounds.extend(p)
+    if (bounds.isEmpty()) return
 
     let cancelled = false
     const applyFit = () => {
       if (cancelled) return
       map.fitBounds(bounds, padding)
+      // Avoid over-zooming on short hops; never zoom in past this (keeps path padding).
       google.maps.event.addListenerOnce(map, 'idle', () => {
         if (cancelled) return
         const zoom = map.getZoom()
@@ -144,7 +167,22 @@ export function TripMap({
       cancelled = true
       window.cancelAnimationFrame(raf)
     }
-  }, [map, isLoaded, dayOrigin.lat, dayOrigin.lng, dayOrigin.id, stops, day.day, navPlan.stopsKey])
+  }, [
+    map,
+    isLoaded,
+    navLoading,
+    dayOrigin.lat,
+    dayOrigin.lng,
+    dayOrigin.id,
+    stops,
+    day.day,
+    navPlan.stopsKey,
+    navPlan.routePath,
+    navPlan.hotelLinkPath,
+    navPlan.hotelToFirst,
+    navPlan.betweenStops,
+    navPlan.lastToDestination,
+  ])
 
   if (loadError) {
     return (
@@ -169,7 +207,7 @@ export function TripMap({
   if (!isLoaded) {
     return (
       <div className="flex h-[420px] items-center justify-center rounded-2xl border border-white/70 bg-[var(--card)] md:h-[560px]">
-        <p className="text-sm text-[var(--stone)]">正在加载 Google Maps…</p>
+        <LoadingIndicator variant="block" label="正在加载 Google Maps…" showDots size="md" />
       </div>
     )
   }
@@ -178,13 +216,15 @@ export function TripMap({
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
         <span>Google Maps · 原生导航路线</span>
-        <span>
-          {navLoading
-            ? '正在获取实时导航…'
-            : directionsLegs.length
+        {navLoading ? (
+          <LoadingIndicator label="正在获取实时导航…" size="sm" showDots />
+        ) : (
+          <span>
+            {directionsLegs.length
               ? `实时 Directions · ${directionsLegs.length} 段`
               : '等待导航数据'}
-        </span>
+          </span>
+        )}
       </div>
 
       {navPlan.error && (
@@ -238,21 +278,52 @@ export function TripMap({
             zIndex={1000}
           />
           {stops.map((place, index) => {
-            const n = index + 1
+            const n = stopNumbers[index]
             const active = selectedPlaceId === place.id
+            // Day 1: hotel is a stop (origin is CDG). Mid-trip + last day: hotel is
+            // origin only (house marker above); airport stop uses plane icon.
+            // Hotel/airport markers do not consume sequence numbers.
+            const isHotelStop = isHotelPlace(place)
+            const isAirportStop = isAirportPlace(place)
+            const title =
+              isHotelStop || isAirportStop || n == null
+                ? place.name
+                : `${n}. ${place.name}`
             return (
               <Marker
-                key={`${day.day}-${place.id}-${n}`}
+                key={`${day.day}-${place.id}-${index}`}
                 position={place.location}
-                title={`${n}. ${place.name}`}
+                title={title}
                 onClick={() => onSelectPlace(place.id)}
-                icon={{
-                  url: numberIconUrl(n, active),
-                  scaledSize: new google.maps.Size(30, 30),
-                  anchor: new google.maps.Point(15, 15),
-                }}
-                zIndex={active ? 900 : n * 10}
-                opacity={!selectedPlaceId || active ? 1 : 0.55}
+                icon={
+                  isHotelStop
+                    ? {
+                        url: homeIconUrl(),
+                        scaledSize: new google.maps.Size(40, 40),
+                        anchor: new google.maps.Point(20, 20),
+                      }
+                    : isAirportStop
+                      ? {
+                          url: airportIconUrl(),
+                          scaledSize: new google.maps.Size(40, 40),
+                          anchor: new google.maps.Point(20, 20),
+                        }
+                      : {
+                          url: numberIconUrl(n ?? index + 1, active),
+                          scaledSize: new google.maps.Size(30, 30),
+                          anchor: new google.maps.Point(15, 15),
+                        }
+                }
+                zIndex={
+                  isHotelStop || isAirportStop
+                    ? 1000
+                    : active
+                      ? 900
+                      : (n ?? index + 1) * 10
+                }
+                opacity={
+                  !selectedPlaceId || active || isHotelStop || isAirportStop ? 1 : 0.55
+                }
               />
             )
           })}

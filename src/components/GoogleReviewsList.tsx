@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { GoogleReview } from '../services/googlePlaceDetails'
 import { looksChinese, translateTextsToChinese } from '../services/translate'
 import { isLlmConfigured } from '../services/llm'
+import { LoadingIndicator } from './LoadingIndicator'
 
 interface Props {
   reviews: GoogleReview[]
@@ -56,7 +57,7 @@ export function GoogleReviewsList({ reviews }: Props) {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Google 评论</p>
         {translating && (
-          <p className="text-xs text-[var(--stone)]">正在翻译非中文评论…</p>
+          <LoadingIndicator label="正在翻译非中文评论…" size="sm" showDots />
         )}
       </div>
       <div className="space-y-3">

@@ -3,9 +3,17 @@ import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import { PATH_MODE_COLORS } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../types'
-import { getDayOrigin, SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
+import {
+  getDayOrigin,
+  isAirportPlace,
+  isHotelPlace,
+  numberedStopIndexes,
+  SELECTED_HOTEL_PLACE_ID,
+} from '../utils/dayOrigin'
 import { AddPlaceDialog } from './AddPlaceDialog'
 import { GooglePlacePhoto } from './GooglePlacePhoto'
+import { LoadingIndicator } from './LoadingIndicator'
+import { HouseIcon, PlaneIcon } from './markerIcons'
 
 const typeLabel: Record<string, string> = {
   cafe: '咖啡馆',
@@ -43,10 +51,16 @@ function PinIcon() {
       width="14"
       height="14"
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden
     >
-      <path d="M14.5 3.5a3.5 3.5 0 0 1 3.5 3.5c0 1.7-1.2 3.1-2.8 3.4l.8 4.6H13v5.5l-1 2-1-2V15H8.5l.8-4.6A3.5 3.5 0 0 1 11 7a3.5 3.5 0 0 1 3.5-3.5z" />
+      {/* Classic thumbtack / pushpin */}
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
     </svg>
   )
 }
@@ -54,11 +68,11 @@ function PinIcon() {
 function LegConnector({
   leg,
   fallbackLabel,
-  prefix,
+  calculating,
 }: {
   leg: ResolvedDayLeg | null | undefined
   fallbackLabel?: string
-  prefix?: string
+  calculating?: boolean
 }) {
   const mode = leg?.displayMode
   const tone =
@@ -71,13 +85,17 @@ function LegConnector({
   const lines = leg?.transitLines || []
 
   return (
-    <div className="flex items-start gap-3 px-2 py-1.5">
+    <div className="flex items-start gap-3 px-2 py-1.5" aria-busy={calculating || undefined}>
       <div className="ml-3 mt-1 h-8 w-px bg-[var(--stone)]/25" />
       <div className="min-w-0 flex-1 space-y-1.5">
-        {prefix ? (
-          <p className="text-xs font-medium text-[var(--stone)]">{prefix}</p>
-        ) : null}
-        {lines.length > 0 ? (
+        {calculating && !leg ? (
+          <LoadingIndicator
+            variant="badge"
+            label={fallbackLabel || '正在计算导航…'}
+            size="sm"
+            showDots
+          />
+        ) : lines.length > 0 ? (
           <>
             <div className="flex flex-wrap gap-1.5">
               {lines.map((line) => (
@@ -122,11 +140,19 @@ interface Props {
   navPlan: DayNavPlan
   navLoading: boolean
   copyRefreshing?: boolean
+  /** True while this day's stops are being regenerated via LLM. */
+  dayRegenerating?: boolean
+  dayRegenError?: string | null
+  /** True when this day is the trip's return day (hotel origin-only, no overnight pin). */
+  isLastDay?: boolean
   onSelectPlace: (id: string) => void
   onReorder: (from: number, to: number) => void
   onDelete: (stopId: string) => void
   onAddCustom: (place: Place, mode: 'best' | 'end') => void
   onResetDay: () => void
+  /** Restore this day from the first-generation baseline snapshot. */
+  canRestoreDayDefault?: boolean
+  onRestoreDayDefault?: () => void
   tripPlaceNames: string[]
 }
 
@@ -138,11 +164,16 @@ export function DayTimeline({
   navPlan,
   navLoading,
   copyRefreshing,
+  dayRegenerating = false,
+  dayRegenError = null,
+  isLastDay = false,
   onSelectPlace,
   onReorder,
   onDelete,
   onAddCustom,
   onResetDay,
+  canRestoreDayDefault = false,
+  onRestoreDayDefault,
   tripPlaceNames,
 }: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -154,6 +185,15 @@ export function DayTimeline({
     day.metroHintFromArea[hotel.areaKey] ||
     day.metroHintFromArea.custom ||
     (dayOrigin.kind === 'airport' ? '请根据地图从机场出发。' : '请根据地图从酒店出发。')
+
+  const stopPlaces = day.stops.map((stop) => {
+    try {
+      return getPlace(stop.placeId, customPlaces)
+    } catch {
+      return { id: stop.placeId, type: 'attraction' as const, name: stop.placeId }
+    }
+  })
+  const stopNumbers = numberedStopIndexes(stopPlaces)
 
   return (
     <div className="space-y-4">
@@ -169,35 +209,91 @@ export function DayTimeline({
             <span className="rounded-full bg-[var(--mist)] px-2.5 py-1 text-xs text-[var(--stone)]">
               可拖拽排序 · 可增删
             </span>
-            {copyRefreshing && (
-              <span className="rounded-full bg-[var(--gold)]/20 px-2.5 py-1 text-xs text-[var(--ink)]">
-                标题生成中…
-              </span>
+            {copyRefreshing && !dayRegenerating && (
+              <LoadingIndicator variant="badge" label="标题生成中…" size="sm" showDots />
+            )}
+            {dayRegenerating && (
+              <LoadingIndicator variant="badge" label="正在重新生成今天…" size="sm" showDots />
             )}
           </div>
-          <button
-            type="button"
-            onClick={onResetDay}
-            className="rounded-full border border-[var(--stone)]/30 px-3 py-1 text-xs hover:border-[var(--sage)]"
-          >
-            恢复本日默认
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canRestoreDayDefault && onRestoreDayDefault && (
+              <button
+                type="button"
+                onClick={onRestoreDayDefault}
+                disabled={dayRegenerating}
+                className="rounded-full border border-[var(--stone)]/30 px-3 py-1 text-xs hover:border-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+              >
+                恢复本日默认
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onResetDay}
+              disabled={dayRegenerating}
+              className="rounded-full border border-[var(--stone)]/30 px-3 py-1 text-xs hover:border-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+            >
+              {dayRegenerating ? '生成中…' : '重新生成行程'}
+            </button>
+          </div>
         </div>
         <h3 className="font-display mt-2 text-3xl">{day.title}</h3>
         <p className="text-sm text-[var(--copper)]">{day.theme}</p>
         <p className="mt-2 text-sm text-[var(--stone)]">{day.summary}</p>
+        {dayRegenError && (
+          <p className="mt-2 rounded-xl border border-[var(--copper)]/30 bg-[var(--mist)]/40 px-3 py-2 text-xs text-[var(--copper)]">
+            {dayRegenError}
+          </p>
+        )}
+        {dayRegenerating && (
+          <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-[var(--mist)]/40 px-3 py-3">
+            <LoadingIndicator
+              variant="inline"
+              label="正在重新生成今天的行程…"
+              size="sm"
+              showDots
+            />
+          </div>
+        )}
         <div className="mt-3">
-          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm">
+          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm" aria-busy={navLoading || undefined}>
             <span className="font-medium">今日步行：</span>
-            {navLoading ? '正在根据 Google 步行导航计算…' : navPlan.walkSummaryText}
+            {navLoading ? (
+              <LoadingIndicator
+                className="ml-1 align-middle"
+                label="正在根据 Google 步行导航计算…"
+                size="sm"
+                showDots
+              />
+            ) : (
+              navPlan.walkSummaryText
+            )}
           </p>
         </div>
       </div>
+
+      {/* Day-1 airport origin chip (not an itinerary stop; matches map plane marker). */}
+      {dayOrigin.kind === 'airport' && (
+        <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+          <span
+            className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+            title="机场"
+            aria-label="机场"
+          >
+            <PlaneIcon />
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="text-xs text-[var(--stone)]">出发原点 · 交通</span>
+            <p className="mt-1 font-medium">{dayOrigin.label}</p>
+          </div>
+        </div>
+      )}
 
       {/* Day origin → first stop (airport on day 1, hotel otherwise) */}
       {day.stops.length > 0 && (
         <LegConnector
           leg={navPlan.hotelToFirst}
+          calculating={navLoading && !navPlan.hotelToFirst}
           fallbackLabel={
             navLoading
               ? dayOrigin.kind === 'airport'
@@ -205,7 +301,6 @@ export function DayTimeline({
                 : '计算从酒店出发…'
               : navPlan.hotelToFirstText || metroHint
           }
-          prefix={dayOrigin.prefix}
         />
       )}
 
@@ -213,9 +308,20 @@ export function DayTimeline({
         {day.stops.map((stop, index) => {
           const place = getPlace(stop.placeId, customPlaces)
           const active = selectedPlaceId === place.id
-          const n = index + 1
+          const n = stopNumbers[index]
           const stopKey = stop.id || `${day.day}-${place.id}-${index}`
-          const isFixedHotel = day.day === 1 && place.id === SELECTED_HOTEL_PLACE_ID
+          const isHotelStop = isHotelPlace(place)
+          const isAirportStop = isAirportPlace(place)
+          const isCheckInHotel =
+            day.day === 1 && index === 0 && place.id === SELECTED_HOTEL_PLACE_ID
+          const isOvernightHotel =
+            !isLastDay &&
+            index === day.stops.length - 1 &&
+            place.id === SELECTED_HOTEL_PLACE_ID
+          const isFixedHotel = isCheckInHotel || isOvernightHotel
+          const pinTitle = isCheckInHotel
+            ? '酒店入住点固定为首站'
+            : '回酒店过夜固定为末站'
           const isOver =
             !isFixedHotel && overIndex === index && dragIndex !== null && dragIndex !== index
           const legToNext = navPlan.betweenStops[index]
@@ -271,8 +377,8 @@ export function DayTimeline({
                   {isFixedHotel ? (
                     <span
                       className="mt-1 inline-flex h-7 w-7 select-none items-center justify-center rounded-md bg-[var(--mist)] text-[var(--stone)]"
-                      title="酒店入住点固定为首站"
-                      aria-label="酒店入住点固定为首站"
+                      title={pinTitle}
+                      aria-label={pinTitle}
                     >
                       <PinIcon />
                     </span>
@@ -285,9 +391,27 @@ export function DayTimeline({
                       ⋮⋮
                     </span>
                   )}
-                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
-                    {n}
-                  </span>
+                  {isHotelStop ? (
+                    <span
+                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                      title="酒店"
+                      aria-label="酒店"
+                    >
+                      <HouseIcon />
+                    </span>
+                  ) : isAirportStop ? (
+                    <span
+                      className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                      title="机场"
+                      aria-label="机场"
+                    >
+                      <PlaneIcon />
+                    </span>
+                  ) : (
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
+                      {n}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => onSelectPlace(place.id)}
@@ -347,6 +471,7 @@ export function DayTimeline({
               {index < day.stops.length - 1 && (
                 <LegConnector
                   leg={legToNext}
+                  calculating={navLoading && !legToNext}
                   fallbackLabel={
                     navLoading
                       ? '计算前往方式…'

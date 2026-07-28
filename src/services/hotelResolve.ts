@@ -1,4 +1,4 @@
-import { hotelAreaKeyFromLabel } from '../data/hotels'
+import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../data/hotels'
 import type { HotelCandidate, SelectedHotel } from '../types'
 import { geocodeParisAddress } from './geocode'
 import { fetchGooglePlaceDetails } from './googlePlaceDetails'
@@ -60,7 +60,13 @@ export async function resolveHotelCandidate(input: {
 
   const name = details?.name || input.name
   const hint = ratingHint(details) || input.priceHint || '巴黎酒店'
-  const area = input.area || '巴黎市区'
+  const area = normalizeHotelAreaLabel({
+    area: input.area,
+    address,
+    name,
+    lat,
+    lng,
+  })
 
   return {
     id: `hotel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,

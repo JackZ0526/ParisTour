@@ -11,7 +11,7 @@ import type { HotelCandidate, SelectedHotel } from '../types'
 export function persistHotelState(
   candidates: HotelCandidate[],
   selected: SelectedHotel | null,
-  options?: { lastPreferences?: string | null },
+  options?: { lastPreferences?: string | null; othersCollapsed?: boolean },
 ) {
   const prev = loadHotelCache()
   const lastPreferences =
@@ -25,6 +25,10 @@ export function persistHotelState(
     batch: 1,
     fetchedAt: Date.now(),
     lastPreferences,
+    othersCollapsed:
+      options?.othersCollapsed !== undefined
+        ? options.othersCollapsed
+        : Boolean(prev?.othersCollapsed),
   })
 }
 
@@ -38,6 +42,8 @@ export async function fetchResolvedHotelRecommendations(input?: {
   batch?: number
   excludeNames?: string[]
   preferences?: string
+  /** Itinerary daytime day count when known */
+  dayCount?: number
 }): Promise<HotelCandidate[]> {
   const count = Math.max(1, Math.min(8, input?.count || 5))
   const raw = await recommendHotelsForTrip({
@@ -45,6 +51,7 @@ export async function fetchResolvedHotelRecommendations(input?: {
     batch: input?.batch || 1,
     excludeNames: input?.excludeNames,
     preferences: input?.preferences,
+    dayCount: input?.dayCount,
   })
   const resolved = await resolveHotelCandidates(raw.slice(0, count))
   if (!resolved.length) {
@@ -58,6 +65,7 @@ export async function refreshHotelCandidates(input: {
   current: HotelCandidate[]
   preferences?: string
   keepCustom?: boolean
+  dayCount?: number
 }): Promise<{ candidates: HotelCandidate[]; selected: SelectedHotel }> {
   const keepCustom = input.keepCustom !== false
   const customs = keepCustom
@@ -69,6 +77,7 @@ export async function refreshHotelCandidates(input: {
     batch: 2,
     excludeNames: exclude,
     preferences: input.preferences,
+    dayCount: input.dayCount,
   })
   const best = llmCards.find((h) => h.isBest) || llmCards[0]
   const candidates = [
@@ -101,7 +110,6 @@ export async function replaceOneHotelCandidate(input: {
     replacement = await resolveHotelCandidate({
       name: input.toHotelName.trim(),
       source: 'custom',
-      area: '助手替换',
       reason: `替换「${from.name}」`,
     })
   } else {

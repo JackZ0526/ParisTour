@@ -45,7 +45,7 @@ h1,
 h2,
 h3,
 .font-display {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'Noto Serif SC', 'Noto Serif', Georgia, 'Songti SC', serif;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -103,4 +103,52 @@ select {
 }
 .stagger > *:nth-child(8) {
   animation-delay: 0.32s;
+}
+
+/* Shared wait / progress motion (copper–sage, not generic purple) */
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loading-dot-bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes loading-pulse-soft {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.loading-spinner {
+  animation: loading-spin 0.75s linear infinite;
+}
+
+.loading-dots .loading-dot:nth-child(1) {
+  animation: loading-dot-bounce 1.05s ease-in-out infinite;
+}
+.loading-dots .loading-dot:nth-child(2) {
+  animation: loading-dot-bounce 1.05s ease-in-out 0.15s infinite;
+}
+.loading-dots .loading-dot:nth-child(3) {
+  animation: loading-dot-bounce 1.05s ease-in-out 0.3s infinite;
+}
+
+.loading-pulse-soft {
+  animation: loading-pulse-soft 1.6s ease-in-out infinite;
 }

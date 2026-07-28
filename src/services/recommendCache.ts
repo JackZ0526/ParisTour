@@ -54,3 +54,11 @@ export function clearDayRecommendCache(day: number) {
   delete map[dayKey(day)]
   writeAll(map)
 }
+
+export function clearAllRecommendCache() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
