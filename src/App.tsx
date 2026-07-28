@@ -441,8 +441,8 @@ export default function App() {
       cloudSaveSkipRunsRef.current -= 1
       return
     }
-    // After remount/sync, ignore transient effect noise for a short window.
-    if (Date.now() - cloudHydratedAtRef.current < 1600) return
+    // After remount/sync, ignore transient effect noise (do not defer-upload).
+    if (Date.now() - cloudHydratedAtRef.current < 2000) return
     if (!canEdit) return
     notifyTripChanged()
   }, [
@@ -1412,6 +1412,8 @@ export default function App() {
     setItineraryGenError(null)
     setDayRegenError(null)
     prevStopsKeyRef.current = null
+    // Bypass hydrate skip window — restore must upload even if effect is muted.
+    if (canEdit) notifyTripChanged({ force: true })
   }
 
   function handleRestoreDayDefault() {
@@ -1428,6 +1430,8 @@ export default function App() {
     setSelectedPlaceId(null)
     setDayRegenError(null)
     prevStopsKeyRef.current = null
+    // Bypass hydrate skip window — restore must upload even if effect is muted.
+    if (canEdit) notifyTripChanged({ force: true })
   }
 
   const canRestoreDefault = hasMatchingBaseline(

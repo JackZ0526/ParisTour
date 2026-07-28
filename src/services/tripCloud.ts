@@ -244,13 +244,16 @@ export async function loadTripById(tripId: string): Promise<TripRow | null> {
 export async function saveTripSnapshot(
   tripId: string,
   snapshot: TripSnapshot,
-): Promise<void> {
+): Promise<string | null> {
   const sb = getSupabase()
-  const { error } = await sb
+  const { data, error } = await sb
     .from('trips')
     .update({ snapshot })
     .eq('id', tripId)
+    .select('updated_at')
+    .maybeSingle()
   if (error) throw error
+  return typeof data?.updated_at === 'string' ? data.updated_at : null
 }
 
 /** Debounced cloud writer — only persists when the snapshot actually changed. */
@@ -260,10 +263,24 @@ let saveInFlight = false
 let pendingAfterFlight = false
 /** Ignore mirrored realtime events right after our own save. */
 let suppressRemoteUntil = 0
-/** Last successfully uploaded / applied snapshot JSON, keyed by trip id. */
+let suppressFlushTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * Snapshot JSON currently reconciled on this client (last save or last applied remote).
+ * Used to skip no-op local uploads — not to reject re-applying historical remote states.
+ */
 const lastSavedJsonByTrip = new Map<string, string>()
-/** Snapshots already reconciled locally (handles jsonb / round-trip shape drift). */
-const knownSnapshotJsonByTrip = new Map<string, Set<string>>()
+/** Last trip.updated_at we reconciled (save or remote apply). */
+const lastAppliedUpdatedAtByTrip = new Map<string, string>()
+
+type QueuedRemote = {
+  tripId: string
+  snapshot: TripSnapshot
+  updatedAt: string
+  onApply: () => void
+}
+/** Latest remote update deferred while saving / swallowing our own echo. */
+let queuedRemote: QueuedRemote | null = null
+let realtimeApplyHandler: ((tripId: string) => void) | null = null
 
 export type CloudSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 export type CloudSyncStatus = 'idle' | 'syncing' | 'synced'
@@ -343,50 +360,125 @@ function snapshotJson(snapshot: TripSnapshot): string {
   return JSON.stringify(snapshot)
 }
 
-function markSnapshotKnown(tripId: string, json: string) {
-  let set = knownSnapshotJsonByTrip.get(tripId)
-  if (!set) {
-    set = new Set()
-    knownSnapshotJsonByTrip.set(tripId, set)
+function isNewerUpdatedAt(candidate: string, current: string | undefined): boolean {
+  if (!current) return true
+  const a = Date.parse(candidate)
+  const b = Date.parse(current)
+  if (Number.isFinite(a) && Number.isFinite(b)) return a > b
+  return candidate > current
+}
+
+function armSuppressRemote(ms: number) {
+  suppressRemoteUntil = Date.now() + ms
+  if (suppressFlushTimer) clearTimeout(suppressFlushTimer)
+  suppressFlushTimer = setTimeout(() => {
+    suppressFlushTimer = null
+    flushQueuedRemote()
+  }, ms + 20)
+}
+
+/** After applying a remote snapshot, ignore remount/effect autosave noise. */
+let quietAutosaveUntil = 0
+let quietSettleTimer: ReturnType<typeof setTimeout> | null = null
+
+function beginRemoteQuietPeriod(ms: number) {
+  quietAutosaveUntil = Date.now() + ms
+  if (quietSettleTimer) clearTimeout(quietSettleTimer)
+  // When quiet ends, adopt whatever localStorage settled to (nav/fingerprint
+  // tweaks) as the reconciled baseline — do not upload that drift.
+  quietSettleTimer = setTimeout(() => {
+    quietSettleTimer = null
+    const tripId = saveTripId
+    if (!tripId) return
+    try {
+      lastSavedJsonByTrip.set(tripId, snapshotJson(collectTripSnapshot()))
+    } catch {
+      /* ignore */
+    }
+  }, ms + 30)
+}
+
+function queueRemoteUpdate(next: QueuedRemote) {
+  if (
+    queuedRemote &&
+    queuedRemote.tripId === next.tripId &&
+    !isNewerUpdatedAt(next.updatedAt, queuedRemote.updatedAt)
+  ) {
+    return
   }
-  set.add(json)
-  lastSavedJsonByTrip.set(tripId, json)
+  queuedRemote = next
 }
 
-function isSnapshotKnown(tripId: string, json: string): boolean {
-  if (lastSavedJsonByTrip.get(tripId) === json) return true
-  return knownSnapshotJsonByTrip.get(tripId)?.has(json) ?? false
+function flushQueuedRemote() {
+  if (!queuedRemote) return
+  if (saveInFlight || cloudSaveStatus === 'saving') return
+  if (Date.now() < suppressRemoteUntil) {
+    armSuppressRemote(Math.max(50, suppressRemoteUntil - Date.now()))
+    return
+  }
+  const q = queuedRemote
+  queuedRemote = null
+  const applied = applyRemoteTripSnapshot(q.tripId, q.snapshot, q.updatedAt)
+  if (applied) q.onApply()
 }
 
-export function rememberSavedSnapshot(tripId: string, snapshot: TripSnapshot): void {
+export function rememberSavedSnapshot(
+  tripId: string,
+  snapshot: TripSnapshot,
+  updatedAt?: string | null,
+): void {
   if (!tripId) return
-  markSnapshotKnown(tripId, snapshotJson(snapshot))
-}
-
-function isLocalSaveBusy(): boolean {
-  return (
-    saveInFlight ||
-    cloudSaveStatus === 'pending' ||
-    cloudSaveStatus === 'saving'
-  )
+  lastSavedJsonByTrip.set(tripId, snapshotJson(snapshot))
+  if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
 }
 
 /**
- * Apply a remote trip snapshot if it differs from local.
+ * Apply a remote trip snapshot when cloud updated_at is newer than what we last reconciled.
  * Returns true when applied (caller should remount UI).
  */
 export function applyRemoteTripSnapshot(
   tripId: string,
   snapshot: TripSnapshot,
+  updatedAt?: string | null,
 ): boolean {
   if (!tripId) return false
-  if (Date.now() < suppressRemoteUntil) return false
+
+  const stamp =
+    typeof updatedAt === 'string' && updatedAt.trim() ? updatedAt.trim() : ''
+
+  // Defer while we write or swallow our own echo — never drop the event.
+  if (saveInFlight || cloudSaveStatus === 'saving' || Date.now() < suppressRemoteUntil) {
+    if (stamp) {
+      queueRemoteUpdate({
+        tripId,
+        snapshot,
+        updatedAt: stamp,
+        onApply: () => realtimeApplyHandler?.(tripId),
+      })
+    }
+    return false
+  }
+
+  if (stamp) {
+    const prev = lastAppliedUpdatedAtByTrip.get(tripId)
+    if (prev && !isNewerUpdatedAt(stamp, prev)) return false
+  }
 
   const json = snapshotJson(snapshot)
-  if (isSnapshotKnown(tripId, json)) return false
-  // Don't clobber in-progress local edits; the next remote event after save will catch up.
-  if (isLocalSaveBusy()) return false
+  // Already matches what's on disk — advance cursor, no remount needed.
+  // Do NOT compare against lastSavedJson alone: restoring a previously-seen
+  // snapshot must still remount when updated_at is newer.
+  try {
+    if (snapshotJson(collectTripSnapshot()) === json) {
+      lastSavedJsonByTrip.set(tripId, json)
+      if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
+      return false
+    }
+  } catch {
+    /* ignore */
+  }
 
+  // Remote write wins over a debounced local save that hasn't uploaded yet.
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
@@ -395,16 +487,17 @@ export function applyRemoteTripSnapshot(
 
   setCloudSyncStatus('syncing')
   applyTripSnapshot(snapshot)
-  markSnapshotKnown(tripId, json)
-  // Round-trip through localStorage may change shape — mark that too so we don't re-apply.
+  // Reconcile against *local* round-trip form so remount autosave does not re-upload.
   try {
-    markSnapshotKnown(tripId, snapshotJson(collectTripSnapshot()))
+    lastSavedJsonByTrip.set(tripId, snapshotJson(collectTripSnapshot()))
   } catch {
-    /* ignore */
+    lastSavedJsonByTrip.set(tripId, json)
   }
+  if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
   saveTripId = tripId
   // Block echo / hydration autosave from bouncing back into realtime.
-  suppressRemoteUntil = Date.now() + 2000
+  beginRemoteQuietPeriod(3500)
+  armSuppressRemote(2000)
   window.setTimeout(() => {
     setCloudSyncStatus('synced')
   }, 450)
@@ -424,6 +517,10 @@ export function subscribeTripRealtime(
     realtimeChannel = null
   }
 
+  realtimeApplyHandler = (id) => {
+    if (id === tripId) onRemoteApply()
+  }
+
   const channel = sb
     .channel(`trip-sync:${tripId}`)
     .on(
@@ -438,10 +535,11 @@ export function subscribeTripRealtime(
         const row = payload.new as {
           id?: string
           snapshot?: unknown
+          updated_at?: string
         } | null
         if (!row?.id || row.id !== tripId) return
         const snap = asSnapshot(row.snapshot)
-        const applied = applyRemoteTripSnapshot(tripId, snap)
+        const applied = applyRemoteTripSnapshot(tripId, snap, row.updated_at)
         if (applied) onRemoteApply()
       },
     )
@@ -450,6 +548,8 @@ export function subscribeTripRealtime(
   realtimeChannel = channel
 
   return () => {
+    if (realtimeApplyHandler) realtimeApplyHandler = null
+    if (queuedRemote?.tripId === tripId) queuedRemote = null
     if (realtimeChannel === channel) {
       void sb.removeChannel(channel)
       realtimeChannel = null
@@ -457,9 +557,20 @@ export function subscribeTripRealtime(
   }
 }
 
-export function scheduleTripCloudSave(tripId: string, canEdit: boolean) {
+export function scheduleTripCloudSave(
+  tripId: string,
+  canEdit: boolean,
+  opts?: { force?: boolean },
+) {
   if (!canEdit || !tripId) return
   saveTripId = tripId
+
+  // After live sync, remount effects often look like "changes". Swallow those
+  // unless the caller forces (e.g. restore default).
+  if (!opts?.force && Date.now() < quietAutosaveUntil) {
+    return
+  }
+
   if (saveTimer) clearTimeout(saveTimer)
   setCloudSaveStatus('pending')
   // Coalesce rapid edits into one write ~1.5s after the last change.
@@ -482,20 +593,22 @@ export async function flushTripCloudSave(): Promise<void> {
 
   const snapshot = collectTripSnapshot()
   const json = snapshotJson(snapshot)
-  if (isSnapshotKnown(tripId, json)) {
+  if (lastSavedJsonByTrip.get(tripId) === json) {
     if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
       setCloudSaveStatus('idle')
     }
+    flushQueuedRemote()
     return
   }
 
   saveInFlight = true
   setCloudSaveStatus('saving')
   try {
-    await saveTripSnapshot(tripId, snapshot)
-    markSnapshotKnown(tripId, json)
+    const updatedAt = await saveTripSnapshot(tripId, snapshot)
+    lastSavedJsonByTrip.set(tripId, json)
+    if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
     // Swallow our own realtime echo.
-    suppressRemoteUntil = Date.now() + 3000
+    armSuppressRemote(3000)
     setCloudSaveStatus('saved')
   } catch (err) {
     console.warn('[tripCloud] save failed', err)
@@ -508,20 +621,23 @@ export async function flushTripCloudSave(): Promise<void> {
     if (pendingAfterFlight) {
       pendingAfterFlight = false
       void flushTripCloudSave()
+    } else {
+      flushQueuedRemote()
     }
   }
 }
 
 export function applyAccessibleTripLocally(trip: AccessibleTrip) {
   applyTripSnapshot(trip.snapshot)
-  rememberSavedSnapshot(trip.id, trip.snapshot)
+  rememberSavedSnapshot(trip.id, trip.snapshot, trip.updatedAt)
   try {
-    markSnapshotKnown(trip.id, snapshotJson(collectTripSnapshot()))
+    rememberSavedSnapshot(trip.id, collectTripSnapshot(), trip.updatedAt)
   } catch {
     /* ignore */
   }
   saveTripId = trip.id
-  suppressRemoteUntil = Date.now() + 1500
+  beginRemoteQuietPeriod(2500)
+  armSuppressRemote(1500)
   setCloudSaveStatus('idle')
   setCloudSyncStatus('idle')
 }

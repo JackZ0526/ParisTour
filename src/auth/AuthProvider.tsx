@@ -48,7 +48,7 @@ type AuthContextValue = {
   signOut: () => Promise<void>
   switchTrip: (tripId: string) => Promise<void>
   refreshTrips: () => Promise<void>
-  notifyTripChanged: () => void
+  notifyTripChanged: (opts?: { force?: boolean }) => void
 }
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
@@ -312,9 +312,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, email, canEdit, activeTrip],
   )
 
-  const notifyTripChanged = useCallback(() => {
+  const notifyTripChanged = useCallback((opts?: { force?: boolean }) => {
     if (!activeTrip || !canEdit) return
-    scheduleTripCloudSave(activeTrip.id, true)
+    scheduleTripCloudSave(activeTrip.id, true, opts)
   }, [activeTrip, canEdit])
 
   useEffect(() => {
