@@ -1,125 +1,127 @@
 # Paris Tour
 
-巴黎行程可视化规划器：邀请制登录、按账号云端存档与实时同步，支持按邮箱只读/可编辑共享。地图、时间线与 LLM 推荐一体，帮你把航班、酒店和每日去处排成可走的日程。
+[中文文档](README.zh-CN.md)
 
-## 功能
+Invite-only Paris trip planner with per-account cloud save and realtime sync. Share by email as read-only or editable. Map, timeline, and LLM recommendations in one place—turn flights, hotels, and daily stops into a walkable itinerary.
 
-- **邀请制账号**：白名单邮箱才能注册/登录；未登录无法使用主界面与付费 API
-- **云端存档**：日期、航班、酒店、行程与 baseline 按账号保存；左下角 HUD 显示保存状态
-- **实时同步**：同行程多端 / 协作者通过 Supabase Realtime 同步修改
-- **共享**：主人可按邮箱分享（只读或可编辑）；邀请邮件含登录/注册深链
-- **可编辑时间线（DayTimeline）**：拖拽排序、删除、恢复 baseline；按日浏览
-- **AI 行程生成**：按航班、酒店与偏好生成多日行程；支持单日重排
-- **TripChat**：自然语言改行程（加/换地点、调酒店、切日等）
-- **地点添加**：LLM 推荐或 Google 搜索；地点详情、照片与评论
-- **地图与导航**：Google Maps 展示当日路线；Directions；航班优先 TimeTable Lookup
-- **酒店 / 航班**：酒店区位推荐与选择；航班模板与实时班次查询
+## Features
 
-## 技术栈
+- **Invite-only accounts**: Only allowlisted emails can register/sign in; the main UI and paid APIs require login
+- **Cloud save**: Dates, flights, hotels, itinerary, and baseline persist per account; bottom-left HUD shows save status
+- **Realtime sync**: Multi-device / collaborator edits sync via Supabase Realtime
+- **Sharing**: Owners share by email (read-only or editable); invite emails include login/signup deep links
+- **Editable timeline (DayTimeline)**: Drag to reorder, delete, restore baseline; browse by day
+- **AI itinerary generation**: Multi-day plans from flights, hotels, and preferences; single-day reshuffle supported
+- **TripChat**: Natural-language itinerary edits (add/swap places, change hotels, switch days, etc.)
+- **Place add**: LLM recommendations or Google search; place details, photos, and reviews
+- **Map & navigation**: Google Maps for the day’s route; Directions; flight lookup via TimeTable Lookup first
+- **Hotels / flights**: Hotel area recommendations and selection; flight templates and live schedule lookup
 
-| 层 | 技术 |
-|----|------|
-| 前端 | Vite · React 19 · TypeScript · Tailwind CSS v4 |
-| 地图 | Google Maps（`@react-google-maps/api`）；Leaflet 备用 |
-| 后端 / 数据 | Supabase（Auth · Postgres · Realtime · RLS） |
-| API 代理 | Vercel Serverless（`/api/*`）：OpenAI、Gemini、RapidAPI、分享邮件 |
-| 邮件 | Resend（可选；未配置时可复制邀请链接） |
+## Stack
 
-## 本地运行
+| Layer | Tech |
+|-------|------|
+| Frontend | Vite · React 19 · TypeScript · Tailwind CSS v4 |
+| Maps | Google Maps (`@react-google-maps/api`); Leaflet fallback |
+| Backend / data | Supabase (Auth · Postgres · Realtime · RLS) |
+| API proxy | Vercel Serverless (`/api/*`): OpenAI, Gemini, RapidAPI, share email |
+| Email | Resend (optional; without it you can copy invite links) |
 
-1. 在 [Supabase](https://supabase.com) 新建项目  
-2. SQL Editor 执行 [`supabase/schema.sql`](supabase/schema.sql)  
-3. 把你的邮箱写入白名单：
+## Local setup
+
+1. Create a project on [Supabase](https://supabase.com)
+2. In the SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql)
+3. Allowlist your email:
 
 ```sql
 insert into public.allowlist_emails (email) values ('you@example.com');
 ```
 
-4. Authentication → Providers → Email 开启邮箱密码（本地可关闭「Confirm email」以便立刻登录）  
-5. 复制 Project URL 与 anon key，配置环境变量后启动：
+4. Authentication → Providers → Email: enable email/password (for local use you can turn off “Confirm email” for instant login)
+5. Copy the Project URL and anon key, set env vars, then start:
 
 ```bash
 npm install
 cp .env.example .env
-# 填入下方变量
+# fill in the variables below
 npm run dev
 ```
 
-浏览器打开 `http://127.0.0.1:5173/`。
+Open `http://127.0.0.1:5173/` in the browser.
 
-### 环境变量（`.env`，已 gitignore）
+### Environment variables (`.env`, gitignored)
 
-以 [`.env.example`](.env.example) 为准。**切勿提交密钥。**
+See [`.env.example`](.env.example). **Never commit secrets.**
 
 ```env
-# --- 服务端（不要加 VITE_ 前缀）---
-RAPIDAPI_KEY=              # 航班：TimeTable Lookup / AeroDataBox
-OPENAI_API_KEY=            # 行程生成、聊天、推荐
-# OPENAI_BASE_URL=         # 可选，默认 https://api.openai.com/v1
+# --- Server (no VITE_ prefix) ---
+RAPIDAPI_KEY=              # Flights: TimeTable Lookup / AeroDataBox
+OPENAI_API_KEY=            # Itinerary, chat, recommendations
+# OPENAI_BASE_URL=         # Optional; default https://api.openai.com/v1
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY= # 无 Resend 时用 Auth 发邀请（可选）
-RESEND_API_KEY=            # 分享邀请邮件（可选）
+SUPABASE_SERVICE_ROLE_KEY= # Auth invite emails when Resend is unset (optional)
+RESEND_API_KEY=            # Share invite email (optional)
 RESEND_FROM_EMAIL=Paris Tour <invites@yourdomain.com>
 PUBLIC_APP_URL=https://paristour.vercel.app
 
-# --- 浏览器（VITE_）---
+# --- Browser (VITE_) ---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_GOOGLE_MAPS_API_KEY=
-# VITE_OPENAI_MODEL=gpt-5.6-luna   # 聊天默认模型（可选）
-# VITE_LLM_ENABLED=true            # false 可隐藏 LLM 能力
+# VITE_OPENAI_MODEL=gpt-5.6-luna   # Default chat model (optional)
+# VITE_LLM_ENABLED=true            # false hides LLM features
 ```
 
-Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**。HTTP 引荐来源请同时加入：
+On Google Cloud, enable **Maps JavaScript API**, **Places API (New)**, and **Directions API**. Add these HTTP referrers:
 
 - `http://127.0.0.1:5173/*`
 - `http://localhost:5173/*`
 - `https://paristour.vercel.app/*`
 
-本地若出现 `RefererNotAllowedMapError`，就是缺了上面某一条。
+A local `RefererNotAllowedMapError` usually means one of the above is missing.
 
-Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + 白名单。未配置 `RESEND_API_KEY` 时分享仍可用，界面会提示手动复制邀请链接。
+On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + allowlist. Without `RESEND_API_KEY`, sharing still works—the UI prompts you to copy the invite link manually.
 
-## 脚本
+## Scripts
 
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | 本地开发（Vite） |
-| `npm run build` | 类型检查 + 生产构建 |
-| `npm run preview` | 预览生产构建 |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Local development (Vite) |
+| `npm run build` | Typecheck + production build |
+| `npm run preview` | Preview production build |
 | `npm run lint` | oxlint |
 
-## 项目结构（概览）
+## Project structure (overview)
 
 ```
 src/
-  components/   # DayTimeline、TripMap、TripChat、CloudSave、酒店/航班等
-  services/     # 云存档、LLM、Google、航班查询
-  data/         # 行程模板、地点、酒店区位、航班模板
-  auth/         # Supabase 登录态
-api/            # Vercel 代理（OpenAI / RapidAPI / 分享邀请）
-supabase/       # schema.sql（账号、存档、共享与 RLS）
+  components/   # DayTimeline, TripMap, TripChat, CloudSave, hotels/flights, etc.
+  services/     # Cloud save, LLM, Google, flight lookup
+  data/         # Itinerary templates, places, hotel areas, flight templates
+  auth/         # Supabase auth state
+api/            # Vercel proxies (OpenAI / RapidAPI / share invites)
+supabase/       # schema.sql (accounts, saves, sharing & RLS)
 ```
 
-| 文件 | 内容 |
-|------|------|
-| `src/data/itinerary.ts` | 每日时间线与地铁提示 |
-| `src/data/places.ts` | 地点介绍、坐标、图片 |
-| `src/data/hotels.ts` | 酒店区位映射 |
-| `src/data/flights.ts` | 推荐航班模板 |
-| `supabase/schema.sql` | 账号、行程存档、共享与 RLS |
+| File | Contents |
+|------|----------|
+| `src/data/itinerary.ts` | Daily timeline & metro tips |
+| `src/data/places.ts` | Place blurbs, coordinates, images |
+| `src/data/hotels.ts` | Hotel area mapping |
+| `src/data/flights.ts` | Suggested flight templates |
+| `supabase/schema.sql` | Accounts, trip saves, sharing & RLS |
 
-行程会写入 `localStorage` 作缓存，并 debounce 同步到 Supabase `trips.snapshot`；协作者侧通过 Realtime 拉取更新。
+Itineraries cache in `localStorage` and debounce-sync to Supabase `trips.snapshot`; collaborators pick up updates via Realtime.
 
-## 截图
+## Screenshots
 
-<!-- 可在此放入界面截图，例如： -->
-<!-- ![主界面](docs/screenshot-main.png) -->
+<!-- Add UI screenshots here, e.g.: -->
+<!-- ![Main UI](docs/screenshot-main.png) -->
 
-## 说明
+## Notes
 
-- 不做真实订票 / 订房
-- 航班与营业信息会变动，请以出行当日为准
-- 自驾日请确认 Crit’Air 与租车保险
-- 邀请新用户：分享邮箱会自动入白名单；也可手动 `insert into allowlist_emails`
+- No real flight or hotel booking
+- Flight and opening hours change—verify for your travel dates
+- On driving days, check Crit’Air and rental insurance
+- Inviting users: shared emails are allowlisted automatically; or `insert into allowlist_emails` manually
