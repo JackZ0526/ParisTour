@@ -51,7 +51,13 @@ VITE_SUPABASE_ANON_KEY=
 VITE_GOOGLE_MAPS_API_KEY=
 ```
 
-Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**，并为 Maps Key 限制 `http://127.0.0.1:5173/*` 与生产域名。
+Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**。浏览器 Key 的 HTTP 引荐来源请同时加入：
+
+- `http://127.0.0.1:5173/*`
+- `http://localhost:5173/*`（Cursor / 部分浏览器会用 localhost）
+- `https://paristour.vercel.app/*`
+
+本地若出现 `RefererNotAllowedMapError`，就是缺了上面某一条。
 
 Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + 白名单。未配置 `RESEND_API_KEY` 时分享仍可用，界面会提示手动复制邀请链接。
 

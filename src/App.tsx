@@ -432,14 +432,17 @@ export default function App() {
   const dayRegenRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
-  const cloudSyncReadyRef = useRef(false)
+  /** Skip autosave during hydrate + React Strict Mode double-effect. */
+  const cloudSaveSkipRunsRef = useRef(2)
+  const cloudHydratedAtRef = useRef(Date.now())
 
   useEffect(() => {
-    // Skip the first paint (hydrate from cloud) then debounce-save on changes.
-    if (!cloudSyncReadyRef.current) {
-      cloudSyncReadyRef.current = true
+    if (cloudSaveSkipRunsRef.current > 0) {
+      cloudSaveSkipRunsRef.current -= 1
       return
     }
+    // After remount/sync, ignore transient effect noise for a short window.
+    if (Date.now() - cloudHydratedAtRef.current < 1600) return
     if (!canEdit) return
     notifyTripChanged()
   }, [
@@ -1460,7 +1463,7 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-      {canEdit && <CloudSaveIndicator />}
+      <CloudSaveIndicator />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
           <span className="truncate text-[var(--stone)]">{email}</span>

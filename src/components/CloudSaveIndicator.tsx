@@ -3,11 +3,16 @@ import { createPortal } from 'react-dom'
 import {
   getCloudSaveError,
   getCloudSaveStatus,
+  getCloudSyncStatus,
   subscribeCloudSaveStatus,
+  subscribeCloudSyncStatus,
   type CloudSaveStatus,
+  type CloudSyncStatus,
 } from '../services/tripCloud'
 
-function labelFor(status: CloudSaveStatus, error: string | null): string {
+type ToastKind = 'save' | 'sync'
+
+function saveLabel(status: CloudSaveStatus, error: string | null): string {
   switch (status) {
     case 'pending':
       return '准备写入存档…'
@@ -17,6 +22,17 @@ function labelFor(status: CloudSaveStatus, error: string | null): string {
       return '行程已保存'
     case 'error':
       return error ? `保存失败：${error}` : '保存失败'
+    default:
+      return ''
+  }
+}
+
+function syncLabel(status: CloudSyncStatus): string {
+  switch (status) {
+    case 'syncing':
+      return '正在同步同伴更改…'
+    case 'synced':
+      return '行程已同步'
     default:
       return ''
   }
@@ -41,33 +57,84 @@ function FloppyIcon({ spinning }: { spinning?: boolean }) {
   )
 }
 
+function SyncIcon({ spinning }: { spinning?: boolean }) {
+  return (
+    <svg
+      className={`cloud-sync-orbit ${spinning ? 'is-spinning' : ''}`}
+      width="28"
+      height="28"
+      viewBox="0 0 32 32"
+      fill="none"
+      aria-hidden
+    >
+      <circle cx="16" cy="16" r="11" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
+      <path
+        d="M16 5a11 11 0 0 1 11 11"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16 27A11 11 0 0 1 5 16"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeOpacity="0.55"
+      />
+      <circle cx="16" cy="16" r="3.2" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function CloudSaveIndicator() {
-  const [status, setStatus] = useState<CloudSaveStatus>(() => getCloudSaveStatus())
-  const [error, setError] = useState<string | null>(() => getCloudSaveError())
+  const [saveStatus, setSaveStatus] = useState<CloudSaveStatus>(() => getCloudSaveStatus())
+  const [saveError, setSaveError] = useState<string | null>(() => getCloudSaveError())
+  const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>(() => getCloudSyncStatus())
 
   useEffect(() => {
-    return subscribeCloudSaveStatus(() => {
-      setStatus(getCloudSaveStatus())
-      setError(getCloudSaveError())
+    const unsubSave = subscribeCloudSaveStatus(() => {
+      setSaveStatus(getCloudSaveStatus())
+      setSaveError(getCloudSaveError())
     })
+    const unsubSync = subscribeCloudSyncStatus(() => {
+      setSyncStatus(getCloudSyncStatus())
+    })
+    return () => {
+      unsubSave()
+      unsubSync()
+    }
   }, [])
 
-  if (status === 'idle' || typeof document === 'undefined') return null
+  // Prefer showing local save feedback; otherwise show inbound sync.
+  const kind: ToastKind | null =
+    saveStatus !== 'idle'
+      ? 'save'
+      : syncStatus !== 'idle'
+        ? 'sync'
+        : null
 
-  const label = labelFor(status, error)
+  if (!kind || typeof document === 'undefined') return null
+
+  const isSave = kind === 'save'
+  const label = isSave ? saveLabel(saveStatus, saveError) : syncLabel(syncStatus)
   const tone =
-    status === 'error' ? 'is-error' : status === 'saved' ? 'is-saved' : 'is-busy'
+    isSave && saveStatus === 'error'
+      ? 'is-error'
+      : (isSave && saveStatus === 'saved') || (!isSave && syncStatus === 'synced')
+        ? 'is-saved'
+        : 'is-busy'
+  const busy =
+    (isSave && (saveStatus === 'pending' || saveStatus === 'saving')) ||
+    (!isSave && syncStatus === 'syncing')
+  const done =
+    (isSave && saveStatus === 'saved') || (!isSave && syncStatus === 'synced')
 
   return createPortal(
-    <div
-      role="status"
-      aria-live="polite"
-      className={`cloud-save-toast ${tone}`}
-    >
+    <div role="status" aria-live="polite" className={`cloud-save-toast ${tone}`}>
       <div className="cloud-save-toast-glow" aria-hidden />
       <div className="cloud-save-toast-inner">
         <div className="cloud-save-icon-wrap">
-          {status === 'error' ? (
+          {isSave && saveStatus === 'error' ? (
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
               <path
@@ -77,9 +144,9 @@ export function CloudSaveIndicator() {
                 strokeLinecap="round"
               />
             </svg>
-          ) : status === 'saved' ? (
+          ) : done ? (
             <div className="cloud-save-ok">
-              <FloppyIcon />
+              {isSave ? <FloppyIcon /> : <SyncIcon />}
               <svg
                 className="cloud-save-check-badge"
                 width="14"
@@ -98,15 +165,17 @@ export function CloudSaveIndicator() {
                 />
               </svg>
             </div>
+          ) : isSave ? (
+            <FloppyIcon spinning={busy} />
           ) : (
-            <FloppyIcon spinning={status === 'saving' || status === 'pending'} />
+            <SyncIcon spinning={busy} />
           )}
         </div>
         <div className="cloud-save-copy">
-          <span className="cloud-save-kicker">AUTO SAVE</span>
+          <span className="cloud-save-kicker">{isSave ? 'AUTO SAVE' : 'LIVE SYNC'}</span>
           <span className="cloud-save-label">{label}</span>
         </div>
-        {(status === 'pending' || status === 'saving') && (
+        {busy && (
           <span className="cloud-save-bars" aria-hidden>
             <i />
             <i />

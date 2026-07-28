@@ -5,6 +5,7 @@ import {
   emptyTripSnapshot,
   type TripSnapshot,
 } from './tripSnapshot'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export type TripRole = 'owner' | 'viewer' | 'editor'
 
@@ -257,15 +258,24 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveTripId: string | null = null
 let saveInFlight = false
 let pendingAfterFlight = false
-/** Last successfully uploaded snapshot JSON, keyed by trip id. */
+/** Ignore mirrored realtime events right after our own save. */
+let suppressRemoteUntil = 0
+/** Last successfully uploaded / applied snapshot JSON, keyed by trip id. */
 const lastSavedJsonByTrip = new Map<string, string>()
+/** Snapshots already reconciled locally (handles jsonb / round-trip shape drift). */
+const knownSnapshotJsonByTrip = new Map<string, Set<string>>()
 
 export type CloudSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+export type CloudSyncStatus = 'idle' | 'syncing' | 'synced'
 
 let cloudSaveStatus: CloudSaveStatus = 'idle'
 let cloudSaveError: string | null = null
 let savedHideTimer: ReturnType<typeof setTimeout> | null = null
 const cloudSaveListeners = new Set<() => void>()
+
+let cloudSyncStatus: CloudSyncStatus = 'idle'
+let syncedHideTimer: ReturnType<typeof setTimeout> | null = null
+const cloudSyncListeners = new Set<() => void>()
 
 export function getCloudSaveStatus(): CloudSaveStatus {
   return cloudSaveStatus
@@ -279,6 +289,17 @@ export function subscribeCloudSaveStatus(listener: () => void): () => void {
   cloudSaveListeners.add(listener)
   return () => {
     cloudSaveListeners.delete(listener)
+  }
+}
+
+export function getCloudSyncStatus(): CloudSyncStatus {
+  return cloudSyncStatus
+}
+
+export function subscribeCloudSyncStatus(listener: () => void): () => void {
+  cloudSyncListeners.add(listener)
+  return () => {
+    cloudSyncListeners.delete(listener)
   }
 }
 
@@ -301,13 +322,139 @@ function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) 
   cloudSaveListeners.forEach((l) => l())
 }
 
+function setCloudSyncStatus(next: CloudSyncStatus) {
+  cloudSyncStatus = next
+  if (syncedHideTimer) {
+    clearTimeout(syncedHideTimer)
+    syncedHideTimer = null
+  }
+  if (next === 'synced') {
+    syncedHideTimer = setTimeout(() => {
+      if (cloudSyncStatus === 'synced') {
+        cloudSyncStatus = 'idle'
+        cloudSyncListeners.forEach((l) => l())
+      }
+    }, 2400)
+  }
+  cloudSyncListeners.forEach((l) => l())
+}
+
 function snapshotJson(snapshot: TripSnapshot): string {
   return JSON.stringify(snapshot)
 }
 
+function markSnapshotKnown(tripId: string, json: string) {
+  let set = knownSnapshotJsonByTrip.get(tripId)
+  if (!set) {
+    set = new Set()
+    knownSnapshotJsonByTrip.set(tripId, set)
+  }
+  set.add(json)
+  lastSavedJsonByTrip.set(tripId, json)
+}
+
+function isSnapshotKnown(tripId: string, json: string): boolean {
+  if (lastSavedJsonByTrip.get(tripId) === json) return true
+  return knownSnapshotJsonByTrip.get(tripId)?.has(json) ?? false
+}
+
 export function rememberSavedSnapshot(tripId: string, snapshot: TripSnapshot): void {
   if (!tripId) return
-  lastSavedJsonByTrip.set(tripId, snapshotJson(snapshot))
+  markSnapshotKnown(tripId, snapshotJson(snapshot))
+}
+
+function isLocalSaveBusy(): boolean {
+  return (
+    saveInFlight ||
+    cloudSaveStatus === 'pending' ||
+    cloudSaveStatus === 'saving'
+  )
+}
+
+/**
+ * Apply a remote trip snapshot if it differs from local.
+ * Returns true when applied (caller should remount UI).
+ */
+export function applyRemoteTripSnapshot(
+  tripId: string,
+  snapshot: TripSnapshot,
+): boolean {
+  if (!tripId) return false
+  if (Date.now() < suppressRemoteUntil) return false
+
+  const json = snapshotJson(snapshot)
+  if (isSnapshotKnown(tripId, json)) return false
+  // Don't clobber in-progress local edits; the next remote event after save will catch up.
+  if (isLocalSaveBusy()) return false
+
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (cloudSaveStatus === 'pending') setCloudSaveStatus('idle')
+
+  setCloudSyncStatus('syncing')
+  applyTripSnapshot(snapshot)
+  markSnapshotKnown(tripId, json)
+  // Round-trip through localStorage may change shape — mark that too so we don't re-apply.
+  try {
+    markSnapshotKnown(tripId, snapshotJson(collectTripSnapshot()))
+  } catch {
+    /* ignore */
+  }
+  saveTripId = tripId
+  // Block echo / hydration autosave from bouncing back into realtime.
+  suppressRemoteUntil = Date.now() + 2000
+  window.setTimeout(() => {
+    setCloudSyncStatus('synced')
+  }, 450)
+  return true
+}
+
+let realtimeChannel: RealtimeChannel | null = null
+
+/** Subscribe to live updates for one trip. Returns unsubscribe. */
+export function subscribeTripRealtime(
+  tripId: string,
+  onRemoteApply: () => void,
+): () => void {
+  const sb = getSupabase()
+  if (realtimeChannel) {
+    void sb.removeChannel(realtimeChannel)
+    realtimeChannel = null
+  }
+
+  const channel = sb
+    .channel(`trip-sync:${tripId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'trips',
+        filter: `id=eq.${tripId}`,
+      },
+      (payload) => {
+        const row = payload.new as {
+          id?: string
+          snapshot?: unknown
+        } | null
+        if (!row?.id || row.id !== tripId) return
+        const snap = asSnapshot(row.snapshot)
+        const applied = applyRemoteTripSnapshot(tripId, snap)
+        if (applied) onRemoteApply()
+      },
+    )
+    .subscribe()
+
+  realtimeChannel = channel
+
+  return () => {
+    if (realtimeChannel === channel) {
+      void sb.removeChannel(channel)
+      realtimeChannel = null
+    }
+  }
 }
 
 export function scheduleTripCloudSave(tripId: string, canEdit: boolean) {
@@ -335,7 +482,7 @@ export async function flushTripCloudSave(): Promise<void> {
 
   const snapshot = collectTripSnapshot()
   const json = snapshotJson(snapshot)
-  if (lastSavedJsonByTrip.get(tripId) === json) {
+  if (isSnapshotKnown(tripId, json)) {
     if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
       setCloudSaveStatus('idle')
     }
@@ -346,7 +493,9 @@ export async function flushTripCloudSave(): Promise<void> {
   setCloudSaveStatus('saving')
   try {
     await saveTripSnapshot(tripId, snapshot)
-    lastSavedJsonByTrip.set(tripId, json)
+    markSnapshotKnown(tripId, json)
+    // Swallow our own realtime echo.
+    suppressRemoteUntil = Date.now() + 3000
     setCloudSaveStatus('saved')
   } catch (err) {
     console.warn('[tripCloud] save failed', err)
@@ -366,8 +515,15 @@ export async function flushTripCloudSave(): Promise<void> {
 export function applyAccessibleTripLocally(trip: AccessibleTrip) {
   applyTripSnapshot(trip.snapshot)
   rememberSavedSnapshot(trip.id, trip.snapshot)
+  try {
+    markSnapshotKnown(trip.id, snapshotJson(collectTripSnapshot()))
+  } catch {
+    /* ignore */
+  }
   saveTripId = trip.id
+  suppressRemoteUntil = Date.now() + 1500
   setCloudSaveStatus('idle')
+  setCloudSyncStatus('idle')
 }
 
 

@@ -437,6 +437,20 @@ create trigger on_trip_share_allowlist
   after insert or update or delete on public.trip_shares
   for each row execute function public.trip_share_sync_allowlist();
 
+-- Realtime: collaborators receive trip snapshot updates live.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'trips'
+  ) then
+    alter publication supabase_realtime add table public.trips;
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- Bootstrap: add your email(s) to the allowlist, then sign up.
 -- Example:

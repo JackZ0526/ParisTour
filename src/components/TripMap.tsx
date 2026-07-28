@@ -10,6 +10,7 @@ import {
   numberedStopIndexes,
 } from '../utils/dayOrigin'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
+import { googleMapsLoadErrorHelp } from '../services/googleMapsErrors'
 import { LoadingIndicator } from './LoadingIndicator'
 import {
   airportIconUrl,
@@ -185,11 +186,23 @@ export function TripMap({
   ])
 
   if (loadError) {
+    const help = googleMapsLoadErrorHelp(loadError)
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        <p className="font-medium">Google Maps 主图加载失败：当前 API Key 的项目未启用所需接口。</p>
+        <p className="font-medium">{help.title}</p>
+        <p className="mt-2">{help.detail}</p>
+        {help.refererHint && (
+          <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-[var(--ink)]">
+            需要添加：<strong>{help.refererHint}</strong>
+            <br />
+            建议同时添加：
+            <code className="ml-1">http://127.0.0.1:5173/*</code>、
+            <code className="ml-1">http://localhost:5173/*</code>、
+            <code className="ml-1">https://paristour.vercel.app/*</code>
+          </p>
+        )}
         <p className="mt-2">
-          请启用{' '}
+          另请确认已启用{' '}
           <a
             className="underline"
             href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com"
@@ -197,6 +210,24 @@ export function TripMap({
             rel="noreferrer"
           >
             Maps JavaScript API
+          </a>
+          、
+          <a
+            className="underline"
+            href="https://console.cloud.google.com/apis/library/places.googleapis.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Places API (New)
+          </a>
+          、
+          <a
+            className="underline"
+            href="https://console.cloud.google.com/apis/library/directions-backend.googleapis.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Directions API
           </a>
           。
         </p>

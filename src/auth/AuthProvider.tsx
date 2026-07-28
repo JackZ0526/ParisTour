@@ -18,6 +18,7 @@ import {
   pickPreferredTrip,
   rememberLastTripId,
   scheduleTripCloudSave,
+  subscribeTripRealtime,
   type AccessibleTrip,
   type TripRole,
 } from '../services/tripCloud'
@@ -315,6 +316,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!activeTrip || !canEdit) return
     scheduleTripCloudSave(activeTrip.id, true)
   }, [activeTrip, canEdit])
+
+  useEffect(() => {
+    if (status !== 'ready' || !activeTripId || !tripReady) return
+    return subscribeTripRealtime(activeTripId, () => {
+      setBootKey((k) => k + 1)
+    })
+  }, [status, activeTripId, tripReady])
 
   const value = useMemo<AuthContextValue>(
     () => ({

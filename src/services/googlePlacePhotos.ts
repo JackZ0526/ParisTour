@@ -12,9 +12,9 @@ const cache = new Map<string, PlacePhotoResult>()
 const inflight = new Map<string, Promise<PlacePhotoResult | null>>()
 
 function cacheKey(query: string, location?: Coordinates) {
-  // v2: photo URLs include API key
-  if (!location) return `v2|${query.trim().toLowerCase()}`
-  return `v2|${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
+  // v3: allow clients to cache-bust failed media; key always appended server-side params
+  if (!location) return `v3|${query.trim().toLowerCase()}`
+  return `v3|${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
 }
 
 /**
