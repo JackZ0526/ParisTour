@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from './auth/AuthProvider'
 import { DayTimeline } from './components/DayTimeline'
 import {
   FlightPanel,
@@ -8,6 +9,7 @@ import {
 import { HotelPicker } from './components/HotelPicker'
 import { LoadingIndicator } from './components/LoadingIndicator'
 import { PlacePanel } from './components/PlacePanel'
+import { ShareDialog } from './components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
 import { TripDatesPanel } from './components/TripDatesPanel'
 import { TripMap } from './components/TripMap'
@@ -84,6 +86,7 @@ import {
   wipeGeneratedItinerary,
   type ItineraryInputFingerprint,
 } from './utils/itineraryState'
+import { flushTripCloudSave } from './services/tripCloud'
 
 const ITINERARY_LOADING_LINES = [
   '正在让大模型把巴黎掰成日历块…咖啡因与地铁图同步加载中。',
@@ -369,6 +372,19 @@ function initialFlightsState(): FlightSelection {
 }
 
 export default function App() {
+  const {
+    email,
+    canEdit,
+    role,
+    trips,
+    activeTrip,
+    switchTrip,
+    signOut,
+    notifyTripChanged,
+    refreshTrips,
+  } = useAuth()
+  const readOnly = !canEdit
+  const [shareOpen, setShareOpen] = useState(false)
   const initialHotels = useMemo(() => initialHotelState(), [])
   const initialFlights = useMemo(() => initialFlightsState(), [])
   const initialItinerary = useMemo(() => {
@@ -415,6 +431,36 @@ export default function App() {
   const dayRegenRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
+  const cloudSyncReadyRef = useRef(false)
+
+  useEffect(() => {
+    // Skip the first paint (hydrate from cloud) then debounce-save on changes.
+    if (!cloudSyncReadyRef.current) {
+      cloudSyncReadyRef.current = true
+      return
+    }
+    if (!canEdit) return
+    notifyTripChanged()
+  }, [
+    tripDates,
+    flights,
+    hotel,
+    hotelCandidates,
+    days,
+    customPlaces,
+    itineraryGenerated,
+    itineraryFingerprint,
+    canEdit,
+    notifyTripChanged,
+  ])
+
+  useEffect(() => {
+    const flush = () => {
+      void flushTripCloudSave()
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => window.removeEventListener('beforeunload', flush)
+  }, [])
 
   const handleFlightsChange = useCallback((next: FlightSelection) => {
     setFlights((prev) =>
@@ -724,6 +770,7 @@ export default function App() {
 
   // First expand (dates + flights + hotel ready): generate full itinerary if none saved.
   useEffect(() => {
+    if (readOnly) return
     if (!itineraryReady) return
     if (itineraryStartLoading) return
     if (itineraryGenerating) return
@@ -742,6 +789,7 @@ export default function App() {
 
     void runFullItineraryGeneration()
   }, [
+    readOnly,
     itineraryReady,
     itineraryStartLoading,
     itineraryGenerating,
@@ -1293,6 +1341,7 @@ export default function App() {
 
   /** Wipe dates / flights / hotel / itinerary (+ caches) back to a blank trip. */
   function handleClearAllTripState() {
+    if (readOnly) return
     const ok = window.confirm(
       '清空日期、航班、酒店与行程，回到初始空状态？此操作不可撤销。',
     )
@@ -1410,15 +1459,78 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-      <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={handleClearAllTripState}
-          className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
-        >
-          清空全部
-        </button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+          <span className="truncate text-[var(--stone)]">{email}</span>
+          {role === 'viewer' && (
+            <span className="rounded-full bg-[var(--mist)] px-2.5 py-0.5 text-xs text-[var(--stone)]">
+              只读
+            </span>
+          )}
+          {role === 'editor' && (
+            <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-0.5 text-xs text-[var(--sage)]">
+              可编辑共享
+            </span>
+          )}
+          {trips.length > 1 && (
+            <select
+              className="max-w-[min(100%,320px)] truncate rounded-full border border-[var(--stone)]/30 bg-[var(--card)] px-3 py-1.5 text-sm"
+              value={activeTrip?.id || ''}
+              onChange={(e) => {
+                void switchTrip(e.target.value).catch((err) => {
+                  window.alert(err instanceof Error ? err.message : '切换失败')
+                })
+              }}
+            >
+              {trips.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {role === 'owner' && activeTrip && (
+            <button
+              type="button"
+              onClick={() => {
+                setShareOpen(true)
+                void refreshTrips().catch(() => undefined)
+              }}
+              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
+            >
+              分享
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={handleClearAllTripState}
+              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
+            >
+              清空全部
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              void signOut()
+            }}
+            className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-4 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)]"
+          >
+            退出
+          </button>
+        </div>
       </div>
+
+      {role === 'owner' && activeTrip && (
+        <ShareDialog
+          tripId={activeTrip.id}
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
 
       <header className="relative overflow-hidden rounded-[28px] border border-white/60 bg-[linear-gradient(135deg,rgba(28,36,32,0.92),rgba(74,99,86,0.88))] px-6 py-10 text-[var(--paper)] shadow-[var(--shadow)] sm:px-10 sm:py-14">
         <div
@@ -1452,12 +1564,14 @@ export default function App() {
           key={`dates-${panelResetKey}`}
           value={tripDates}
           onChange={setTripDates}
+          readOnly={readOnly}
         />
         <FlightPanel
           key={`flights-${panelResetKey}`}
           tripDates={tripDates}
           destination={destination}
           onFlightsChange={handleFlightsChange}
+          readOnly={readOnly}
         />
         <HotelPicker
           key={`hotel-${panelResetKey}`}
@@ -1466,6 +1580,7 @@ export default function App() {
           days={days}
           onSelect={setHotel}
           onCandidatesChange={setHotelCandidates}
+          readOnly={readOnly}
         />
 
         <section className="space-y-4">
@@ -1522,7 +1637,7 @@ export default function App() {
                 </div>
               )}
             </div>
-            {itineraryReady && itineraryGenerated && (
+            {itineraryReady && itineraryGenerated && !readOnly && (
               <div className="flex flex-wrap items-center gap-2">
                 {canRestoreDefault && (
                   <button
@@ -1582,16 +1697,18 @@ export default function App() {
                   <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-6 text-center">
                     <p className="font-medium text-[var(--ink)]">行程生成失败</p>
                     <p className="mt-1 text-sm text-[var(--stone)]">{itineraryGenError}</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setItineraryGenError(null)
-                        void runFullItineraryGeneration()
-                      }}
-                      className="mt-4 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper)] hover:opacity-90"
-                    >
-                      再试一次
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItineraryGenError(null)
+                          void runFullItineraryGeneration()
+                        }}
+                        className="mt-4 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper)] hover:opacity-90"
+                      >
+                        再试一次
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1648,6 +1765,7 @@ export default function App() {
                         canRestoreDayDefault={canRestoreDayDefault}
                         onRestoreDayDefault={handleRestoreDayDefault}
                         tripPlaceNames={tripPlaceNames}
+                        readOnly={readOnly}
                       />
                       <div className="space-y-4">
                         <TripMap
@@ -1693,24 +1811,26 @@ export default function App() {
         </footer>
       </main>
 
-      <TripChatPanel
-        key={`chat-${panelResetKey}`}
-        hotel={hotel}
-        hotelCandidates={hotelCandidates}
-        days={days}
-        currentDay={day.day}
-        customPlaces={placesWithHotel}
-        handlers={{
-          switchDay: handleSwitchDay,
-          selectPlace: setSelectedPlaceId,
-          removeStop: handleDeleteOnDay,
-          addPlace: handleAddOnDay,
-          replaceStop: handleReplaceOnDay,
-          reorderStop: handleReorderOnDay,
-          setHotel,
-          setHotelCandidates,
-        }}
-      />
+      {!readOnly && (
+        <TripChatPanel
+          key={`chat-${panelResetKey}`}
+          hotel={hotel}
+          hotelCandidates={hotelCandidates}
+          days={days}
+          currentDay={day.day}
+          customPlaces={placesWithHotel}
+          handlers={{
+            switchDay: handleSwitchDay,
+            selectPlace: setSelectedPlaceId,
+            removeStop: handleDeleteOnDay,
+            addPlace: handleAddOnDay,
+            replaceStop: handleReplaceOnDay,
+            reorderStop: handleReorderOnDay,
+            setHotel,
+            setHotelCandidates,
+          }}
+        />
+      )}
     </div>
   )
 }

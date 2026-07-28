@@ -29,3 +29,22 @@ export function googleMapsEmbedApiUrl(query: string, apiKey: string): string {
   })
   return `https://www.google.com/maps/embed/v1/place?${params}`
 }
+
+/**
+ * Places photo media URLs need the browser API key, and must send a Referer
+ * (do not use referrerPolicy=no-referrer) when the key is HTTP-referrer restricted.
+ */
+export function withGoogleMapsPhotoKey(url: string): string {
+  const key = getGoogleMapsApiKey()
+  if (!url || !key) return url
+  if (!url.includes('places.googleapis.com')) return url
+  try {
+    const u = new URL(url)
+    if (!u.searchParams.get('key')) {
+      u.searchParams.set('key', key)
+    }
+    return u.toString()
+  } catch {
+    return url
+  }
+}

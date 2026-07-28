@@ -66,7 +66,7 @@ export function GooglePlacePhoto({
         alt={alt}
         className="h-full w-full object-cover"
         loading="lazy"
-        referrerPolicy="no-referrer"
+        referrerPolicy="no-referrer-when-downgrade"
       />
       {fromGoogle && showBadge && (
         <span className="absolute bottom-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">

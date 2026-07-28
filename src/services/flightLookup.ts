@@ -498,7 +498,8 @@ async function fetchTimetableXml(
     ...query,
   })
   const path = `/api/timetable-lookup/TimeTable/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${encodeURIComponent(yyyymmdd)}/?${params.toString()}`
-  const res = await fetch(path)
+  const { authFetch } = await import('./authFetch')
+  const res = await authFetch(path)
   const text = await res.text().catch(() => '')
   if (!res.ok) {
     throw new Error(
@@ -685,7 +686,8 @@ async function fetchAeroDataBoxRaw(
   const from = addDaysIso(lookupDate, -1)
   const to = addDaysIso(lookupDate, 1)
   const path = `/api/aerodatabox/flights/Number/${encodeURIComponent(flightNumber)}/${encodeURIComponent(from)}/${encodeURIComponent(to)}?withAircraftImage=false&withLocation=false`
-  const res = await fetch(path)
+  const { authFetch } = await import('./authFetch')
+  const res = await authFetch(path)
   if (res.status === 204 || res.status === 404) {
     return []
   }
@@ -709,7 +711,8 @@ async function fetchAeroDataBoxRaw(
   })
   return onDay.length ? onDay : list
 }
-async function lookupFlightViaAeroDataBox(
+/** Optional RapidAPI fallback (kept for future use; primary path is TimeTable). */
+export async function lookupFlightViaAeroDataBox(
   flightNumber: string,
   lookupDate: string,
   direction?: FlightLookupDirection,
@@ -742,9 +745,7 @@ async function lookupFlightViaAeroDataBox(
   return mapped
 }
 /**
- * Lookup flight schedule by IATA number.
- * Primary: TimeTable Lookup (route+date XML, match flight / codeshare).
- * Fallback: AeroDataBox. No LLM.
+ * Lookup flight schedule by IATA number via TimeTable Lookup only.
  * Same flight+date is served from local cache when times are complete.
  */
 export async function lookupFlight(
@@ -767,17 +768,7 @@ export async function lookupFlight(
     if (cached) return cached
   }
   return withFlightLookupLock(iata, lookupDate, async () => {
-    try {
-      return await lookupFlightViaTimeTable(iata, lookupDate, travel?.direction)
-    } catch (timetableErr) {
-      try {
-        return await lookupFlightViaAeroDataBox(iata, lookupDate, travel?.direction)
-      } catch {
-        const msg =
-          timetableErr instanceof Error ? timetableErr.message : 'TimeTable 查询失败'
-        throw new Error(`${msg}（AeroDataBox 回退亦失败）`)
-      }
-    }
+    return lookupFlightViaTimeTable(iata, lookupDate, travel?.direction)
   })
 }
 /**

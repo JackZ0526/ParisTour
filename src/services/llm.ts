@@ -239,7 +239,8 @@ function friendlyLlmError(status: number, body: string, provider: LlmProvider): 
 async function callGemini(system: string, user: string): Promise<string> {
   // Key injected by /api/gemini (Vite proxy or Vercel) — never send from the browser.
   const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
-  const res = await fetch(url, {
+  const { authFetch } = await import('./authFetch')
+  const res = await authFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -315,8 +316,9 @@ async function callOpenAIMessages(messages: OpenAIChatMessage[]): Promise<string
 
   let body = buildOpenAIChatBody(messages)
 
+  const { authFetch } = await import('./authFetch')
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -434,8 +436,9 @@ export async function openaiResponsesWithWebSearch(input: {
   }
 
   const url = '/api/openai/responses'
+  const { authFetch } = await import('./authFetch')
 
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

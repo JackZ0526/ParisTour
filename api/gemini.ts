@@ -4,6 +4,7 @@ import {
   proxyRequest,
   readEnv,
 } from './_lib/proxy.js'
+import { requireAllowlistedUser } from './_lib/auth.js'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -21,6 +22,9 @@ async function handle(req: Request): Promise<Response> {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return methodNotAllowed(['GET', 'POST'])
   }
+
+  const auth = await requireAllowlistedUser(req)
+  if (auth.ok === false) return auth.response
 
   const key = readEnv('GEMINI_API_KEY')
   const url = new URL(req.url)

@@ -1,4 +1,5 @@
 import type { Coordinates } from '../types'
+import { withGoogleMapsPhotoKey } from './googleMapsKey'
 
 export interface GoogleReview {
   text: string
@@ -28,8 +29,9 @@ const detailsCache = new Map<string, GooglePlaceDetails>()
 const inflight = new Map<string, Promise<GooglePlaceDetails | null>>()
 
 function cacheKey(query: string, location?: Coordinates) {
-  if (!location) return query.trim().toLowerCase()
-  return `${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
+  // v2: photo URLs include API key
+  if (!location) return `v2|${query.trim().toLowerCase()}`
+  return `v2|${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
 }
 
 function displayNameOf(value: unknown): string {
@@ -151,7 +153,7 @@ export async function fetchGooglePlaceDetails(
 
     const photos = (place.photos || [])
       .slice(0, 8)
-      .map((p) => p.getURI({ maxHeight: 1000, maxWidth: 1400 }))
+      .map((p) => withGoogleMapsPhotoKey(p.getURI({ maxHeight: 1000, maxWidth: 1400 })))
       .filter(Boolean)
 
     const reviews: GoogleReview[] = (place.reviews || []).slice(0, 6).map((r) => ({

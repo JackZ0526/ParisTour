@@ -21,6 +21,7 @@ interface Props {
   days: DayPlan[]
   onSelect: (hotel: SelectedHotel) => void
   onCandidatesChange: (candidates: HotelCandidate[]) => void
+  readOnly?: boolean
 }
 
 function isSameHotel(a: HotelCandidate, b: HotelCandidate) {
@@ -97,6 +98,7 @@ export function HotelPicker({
   days,
   onSelect,
   onCandidatesChange,
+  readOnly = false,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
   const [customQuery, setCustomQuery] = useState('')
@@ -164,9 +166,10 @@ export function HotelPicker({
       return
     }
 
+    if (readOnly) return
     void bootstrapRecommendations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded])
+  }, [isLoaded, readOnly])
 
   function selectHotel(
     card: HotelCandidate,
@@ -478,12 +481,14 @@ export function HotelPicker({
   const showEmpty = !candidates.length && !refreshing && !pendingCustom
 
   return (
-    <section className="space-y-4">
+    <section className={`space-y-4 ${readOnly ? '[&_button]:pointer-events-none [&_input]:pointer-events-none [&_textarea]:pointer-events-none' : ''}`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-3xl text-[var(--ink)]">酒店</h2>
           <p className="mt-1 max-w-xl text-sm text-[var(--stone)]">
-            首次打开由大模型推荐候选项。点开酒店后选择「就住这儿了」才会设为当前住宿；日期、往返航班与酒店齐了，下方行程才会掀开帘子。
+            {readOnly
+              ? '当前为只读共享，无法修改酒店。'
+              : '首次打开由大模型推荐候选项。点开酒店后选择「就住这儿了」才会设为当前住宿；日期、往返航班与酒店齐了，下方行程才会掀开帘子。'}
           </p>
         </div>
           <div className="flex flex-wrap items-center gap-2">

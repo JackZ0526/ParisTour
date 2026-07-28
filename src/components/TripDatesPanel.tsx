@@ -10,9 +10,10 @@ import { DateRangePicker } from './DateRangePicker'
 interface Props {
   value: TripDateRange | null
   onChange: (range: TripDateRange | null) => void
+  readOnly?: boolean
 }
 
-export function TripDatesPanel({ value, onChange }: Props) {
+export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
   const startDate = value?.startDate || ''
   const endDate = value?.endDate || ''
 
@@ -28,6 +29,7 @@ export function TripDatesPanel({ value, onChange }: Props) {
   }, [startDate, endDate])
 
   function commit(range: TripDateRange | null) {
+    if (readOnly) return
     onChange(range)
     saveTripDates(range)
   }
@@ -42,10 +44,12 @@ export function TripDatesPanel({ value, onChange }: Props) {
         <div>
           <h2 className="font-display text-3xl">日期</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
-            选择本次巴黎行程的出发与返程日期；去程常因时差次日抵达，正式行程起算日会结合航班再推算。
+            {readOnly
+              ? '当前为只读共享，无法修改日期。'
+              : '选择本次巴黎行程的出发与返程日期；去程常因时差次日抵达，正式行程起算日会结合航班再推算。'}
           </p>
         </div>
-        {value && (
+        {value && !readOnly && (
           <button
             type="button"
             onClick={clearDates}
@@ -56,7 +60,11 @@ export function TripDatesPanel({ value, onChange }: Props) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/70 bg-[var(--card)] p-4 shadow-[var(--shadow)]">
+      <div
+        className={`rounded-2xl border border-white/70 bg-[var(--card)] p-4 shadow-[var(--shadow)] ${
+          readOnly ? 'pointer-events-none opacity-80' : ''
+        }`}
+      >
         <DateRangePicker
           label="行程日期"
           value={value}

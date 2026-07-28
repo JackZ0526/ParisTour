@@ -187,7 +187,7 @@ export function GooglePlacePage({
                   src={activePhoto}
                   alt={details?.name || name}
                   className="h-56 w-full object-cover sm:h-72"
-                  referrerPolicy="no-referrer"
+                  referrerPolicy="no-referrer-when-downgrade"
                   draggable={false}
                 />
                 {photos.length > 1 && (
@@ -229,7 +229,7 @@ export function GooglePlacePage({
                         i === photoIndex ? 'border-[var(--copper)]' : 'border-transparent'
                       }`}
                     >
-                      <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer-when-downgrade" />
                     </button>
                   ))}
                 </div>

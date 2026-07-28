@@ -1,4 +1,5 @@
 import type { Coordinates } from '../types'
+import { withGoogleMapsPhotoKey } from './googleMapsKey'
 
 export interface PlacePhotoResult {
   url: string
@@ -11,8 +12,9 @@ const cache = new Map<string, PlacePhotoResult>()
 const inflight = new Map<string, Promise<PlacePhotoResult | null>>()
 
 function cacheKey(query: string, location?: Coordinates) {
-  if (!location) return query.trim().toLowerCase()
-  return `${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
+  // v2: photo URLs include API key
+  if (!location) return `v2|${query.trim().toLowerCase()}`
+  return `v2|${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
 }
 
 /**
@@ -65,7 +67,7 @@ export async function fetchGooglePlacePhoto(
     const photo = place?.photos?.[0]
     if (!photo) return null
 
-    const url = photo.getURI({ maxHeight: 1000, maxWidth: 1400 })
+    const url = withGoogleMapsPhotoKey(photo.getURI({ maxHeight: 1000, maxWidth: 1400 }))
     const attribution = photo.authorAttributions?.[0]?.displayName
     const result: PlacePhotoResult = {
       url,

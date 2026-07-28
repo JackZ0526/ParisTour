@@ -138,10 +138,12 @@ export function FlightPanel({
   tripDates = null,
   destination = '',
   onFlightsChange,
+  readOnly = false,
 }: {
   tripDates?: TripDateRange | null
   destination?: string
   onFlightsChange?: (flights: FlightSelection) => void
+  readOnly?: boolean
 }) {
   const [seed] = useState(() => loadFlightSelection() ?? emptyFlightSelection())
   const [outboundInput, setOutboundInput] = useState(seed.outboundInput)
@@ -235,10 +237,12 @@ export function FlightPanel({
         <div>
           <h2 className="font-display text-3xl">航班</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
-            输入航班号后按行程日期查计划时刻（同一航班号+日期走本地缓存）。优先 TimeTable Lookup 航线时刻表匹配；票面若是 DL 代码共享，会匹配实际承运的 AF 航班。去程与返程都查成功后才会展开行程。
+            {readOnly
+              ? '当前为只读共享，无法修改航班。'
+              : '输入航班号后按行程日期查计划时刻（同一航班号+日期走本地缓存）。优先 TimeTable Lookup 航线时刻表匹配；票面若是 DL 代码共享，会匹配实际承运的 AF 航班。去程与返程都查成功后才会展开行程。'}
           </p>
         </div>
-        {hasCards && (
+        {hasCards && !readOnly && (
           <button
             type="button"
             disabled={busy !== null || !hasDates || (!outboundInput.trim() && !returnInput.trim())}
@@ -256,10 +260,14 @@ export function FlightPanel({
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/70 bg-[var(--card)] p-4">
+      <div
+        className={`rounded-2xl border border-white/70 bg-[var(--card)] p-4 ${
+          readOnly ? 'pointer-events-none opacity-80' : ''
+        }`}
+      >
         <p className="font-medium">输入我的航班号并查询计划时刻</p>
         <p className="mt-1 text-xs text-[var(--stone)]">
-          使用 TimeTable Lookup 按 YVR↔CDG 航线查询计划起降时间（失败时回退 AeroDataBox；同一航班号+日期读缓存）。订票网站数据源不同，时刻可能略有差异，请以机票为准。
+          使用 TimeTable Lookup 按 YVR↔CDG 航线查询计划起降时间（同一航班号+日期读缓存）。查询失败会直接显示错误，请核对航班号与日期。订票网站数据源不同，时刻可能略有差异，请以机票为准。
           {hasDates
             ? ` 将按行程日期查询：出发 ${tripDates!.startDate} · 返程 ${tripDates!.endDate}${
                 destTrimmed ? ` · 目的地 ${destTrimmed}` : ''

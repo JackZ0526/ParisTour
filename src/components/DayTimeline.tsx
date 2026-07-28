@@ -154,6 +154,7 @@ interface Props {
   canRestoreDayDefault?: boolean
   onRestoreDayDefault?: () => void
   tripPlaceNames: string[]
+  readOnly?: boolean
 }
 
 export function DayTimeline({
@@ -175,6 +176,7 @@ export function DayTimeline({
   canRestoreDayDefault = false,
   onRestoreDayDefault,
   tripPlaceNames,
+  readOnly = false,
 }: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
@@ -207,7 +209,7 @@ export function DayTimeline({
               {day.pace}
             </span>
             <span className="rounded-full bg-[var(--mist)] px-2.5 py-1 text-xs text-[var(--stone)]">
-              可拖拽排序 · 可增删
+              {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
             </span>
             {copyRefreshing && !dayRegenerating && (
               <LoadingIndicator variant="badge" label="标题生成中…" size="sm" showDots />
@@ -216,6 +218,7 @@ export function DayTimeline({
               <LoadingIndicator variant="badge" label="正在重新生成今天…" size="sm" showDots />
             )}
           </div>
+          {!readOnly && (
           <div className="flex flex-wrap items-center gap-2">
             {canRestoreDayDefault && onRestoreDayDefault && (
               <button
@@ -236,6 +239,7 @@ export function DayTimeline({
               {dayRegenerating ? '生成中…' : '重新生成行程'}
             </button>
           </div>
+          )}
         </div>
         <h3 className="font-display mt-2 text-3xl">{day.title}</h3>
         <p className="text-sm text-[var(--copper)]">{day.theme}</p>
@@ -329,9 +333,9 @@ export function DayTimeline({
           return (
             <li key={stopKey}>
               <div
-                draggable={!isFixedHotel}
+                draggable={!readOnly && !isFixedHotel}
                 onDragStart={(e) => {
-                  if (isFixedHotel) {
+                  if (readOnly || isFixedHotel) {
                     e.preventDefault()
                     return
                   }
@@ -349,12 +353,12 @@ export function DayTimeline({
                   setOverIndex(null)
                 }}
                 onDragOver={(e) => {
-                  if (isFixedHotel) return
+                  if (readOnly || isFixedHotel) return
                   e.preventDefault()
                   setOverIndex(index)
                 }}
                 onDrop={(e) => {
-                  if (isFixedHotel) return
+                  if (readOnly || isFixedHotel) return
                   e.preventDefault()
                   const from = dragIndex ?? Number(e.dataTransfer.getData('text/plain'))
                   if (Number.isFinite(from)) onReorder(from, index)
@@ -454,6 +458,8 @@ export function DayTimeline({
                   {isFixedHotel ? (
                     // Keep the same width as the delete button so thumbnails stay aligned.
                     <span className="mt-0.5 inline-flex h-8 w-8 shrink-0" aria-hidden />
+                  ) : readOnly ? (
+                    <span className="mt-0.5 inline-flex h-8 w-8 shrink-0" aria-hidden />
                   ) : (
                     <button
                       type="button"
@@ -486,36 +492,40 @@ export function DayTimeline({
 
       {!day.stops.length && (
         <p className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]">
-          本日还没有地点，点击下方添加。
+          {readOnly ? '本日还没有地点。' : '本日还没有地点，点击下方添加。'}
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => setAddOpen(true)}
-        className="w-full rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10"
-      >
-        + 添加地点
-      </button>
+      {!readOnly && (
+        <>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="w-full rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10"
+          >
+            + 添加地点
+          </button>
 
-      <AddPlaceDialog
-        open={addOpen}
-        dayNumber={day.day}
-        dayTitle={day.title}
-        dayPace={day.pace}
-        dayTheme={day.theme}
-        hotelArea={hotel.areaKey}
-        currentPlaceNames={day.stops.map((s) => {
-          try {
-            return getPlace(s.placeId, customPlaces).name
-          } catch {
-            return s.placeId
-          }
-        })}
-        tripPlaceNames={tripPlaceNames}
-        onClose={() => setAddOpen(false)}
-        onAddCustom={onAddCustom}
-      />
+          <AddPlaceDialog
+            open={addOpen}
+            dayNumber={day.day}
+            dayTitle={day.title}
+            dayPace={day.pace}
+            dayTheme={day.theme}
+            hotelArea={hotel.areaKey}
+            currentPlaceNames={day.stops.map((s) => {
+              try {
+                return getPlace(s.placeId, customPlaces).name
+              } catch {
+                return s.placeId
+              }
+            })}
+            tripPlaceNames={tripPlaceNames}
+            onClose={() => setAddOpen(false)}
+            onAddCustom={onAddCustom}
+          />
+        </>
+      )}
     </div>
   )
 }

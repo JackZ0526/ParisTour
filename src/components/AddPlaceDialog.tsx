@@ -475,7 +475,7 @@ export function AddPlaceDialog({
                                         src={activePhoto}
                                         alt={item.name}
                                         className="h-44 w-full rounded-xl object-cover"
-                                        referrerPolicy="no-referrer"
+                                        referrerPolicy="no-referrer-when-downgrade"
                                       />
                                       {photos.length > 1 && (
                                         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
@@ -499,7 +499,7 @@ export function AddPlaceDialog({
                                                 src={url}
                                                 alt=""
                                                 className="h-full w-full object-cover"
-                                                referrerPolicy="no-referrer"
+                                                referrerPolicy="no-referrer-when-downgrade"
                                               />
                                             </button>
                                           ))}
