@@ -1460,6 +1460,7 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+      {canEdit && <CloudSaveIndicator />}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
           <span className="truncate text-[var(--stone)]">{email}</span>
@@ -1473,7 +1474,6 @@ export default function App() {
               可编辑共享
             </span>
           )}
-          {canEdit && <CloudSaveIndicator />}
           {trips.length > 1 && (
             <select
               className="max-w-[min(100%,320px)] truncate rounded-full border border-[var(--stone)]/30 bg-[var(--card)] px-3 py-1.5 text-sm"
