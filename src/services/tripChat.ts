@@ -22,6 +22,12 @@ export type TripChatAction =
       /** best = 最顺路插入；end = 加到当天最后。默认 best。 */
       mode?: 'best' | 'end'
       note?: string
+      /**
+       * explicit = user named the place → apply immediately;
+       * recommend = model picked a place → detail-page confirm.
+       * Default when omitted: recommend (safer).
+       */
+      source?: 'explicit' | 'recommend'
     }
   | {
       type: 'replace_place'
@@ -30,6 +36,12 @@ export type TripChatAction =
       toPlaceName: string
       placeType?: PlaceType
       note?: string
+      /**
+       * explicit = user named the replacement → apply immediately;
+       * recommend = model picked a replacement → detail-page confirm.
+       * Default when omitted: recommend (safer).
+       */
+      source?: 'explicit' | 'recommend'
     }
   | {
       type: 'reorder_place'
@@ -82,6 +94,8 @@ export interface TripChatResult {
 export interface TripChatTurn {
   role: 'user' | 'assistant'
   content: string
+  /** When true, kept in API history but not shown as a chat bubble. */
+  hidden?: boolean
 }
 
 export interface TripChatContext {
@@ -178,14 +192,19 @@ function systemPrompt(ctx: TripChatContext): string {
     '- replace_hotels：一次替换多家（fromHotelNames 数组 + preferences）',
     '若用户说行程地点「不喜欢A换成B」：必须使用 replace_place（不要拆成 remove+add）。酒店替换用 replace_hotel / replace_hotels，不要用 replace_place。',
     '若是「新增/加上」某地点（不是替换）：使用 add_place，且 mode 必须为 "best"（系统会按当日路线算最顺路：第1天 机场→酒店入住→其他地点，其余天从酒店出发）。不要传 insertAt。仅当用户明确说「加到最后/末尾」时 mode 才用 "end"。第1天酒店入住点不可删除。',
+    'add_place / replace_place 必须带 source 字段（硬规则）：',
+    '- source="explicit"：用户话里已经点名了目标地点（店名/景点名），系统会立刻改行程、不弹确认。例：「加上 Café Kitsuné」「把 Les Ombres 换成 Jules Verne」「加入某某咖啡馆」。',
+    '- source="recommend"：用户只说了类型/槽位、没点名新地点，需要你挑一家推荐，系统会先出详情页让用户确认。例：「换一家」「换个晚餐」「推荐另一家餐厅替换今天的晚餐」「帮我加附近一家咖啡馆」。',
+    '- replace_place：toPlaceName 由用户点名 → explicit；toPlaceName 由你推荐 → recommend（fromPlaceName 可以是用户点的旧点）。',
+    '- remove_place 始终立刻生效，不需要 source。',
     '只输出一个 JSON 对象，不要输出其它说明文字。',
     '格式：{"reply":"给用户看的中文回复","actions":[...]}',
     'actions 可选：',
     '{"type":"switch_day","day":1-7}',
     '{"type":"select_place","placeName":"..."}',
     '{"type":"remove_place","day":1-7?,"placeName":"..."}',
-    '{"type":"add_place","day":1-7?,"placeName":"...","placeType":"attraction|cafe|restaurant","mode":"best|end","note":"..."}',
-    '{"type":"replace_place","day":1-7?,"fromPlaceName":"旧地点","toPlaceName":"新地点","placeType":"attraction|cafe|restaurant","note":"..."}',
+    '{"type":"add_place","day":1-7?,"placeName":"...","placeType":"attraction|cafe|restaurant","mode":"best|end","source":"explicit|recommend","note":"..."}',
+    '{"type":"replace_place","day":1-7?,"fromPlaceName":"旧地点","toPlaceName":"新地点","placeType":"attraction|cafe|restaurant","source":"explicit|recommend","note":"..."}',
     '{"type":"reorder_place","day":1-7?,"placeName":"...","toIndex":0}',
     '{"type":"select_hotel","hotelName":"..."}',
     '{"type":"add_hotel","hotelName":"...","select":true}',
@@ -207,6 +226,18 @@ function normalizePlaceType(raw: unknown): PlaceType | undefined {
   if (v.includes('hotel') || v === '酒店') return 'hotel'
   if (v.includes('transport') || v === '交通') return 'transport'
   return 'attraction'
+}
+
+/** explicit = named by user; recommend = model pick (default when omitted). */
+function parsePlaceActionSource(row: Record<string, unknown>): 'explicit' | 'recommend' {
+  if (row.source != null && String(row.source).trim() !== '') {
+    const v = String(row.source).toLowerCase().trim()
+    if (v === 'explicit' || v === 'named' || v === 'user' || v === 'direct') return 'explicit'
+    return 'recommend'
+  }
+  // Legacy confirm flag: false = apply immediately (no detail-page confirm).
+  if (row.confirm === false || row.confirm === 'false' || row.confirm === 0) return 'explicit'
+  return 'recommend'
 }
 
 function parseActions(raw: unknown): TripChatAction[] {
@@ -254,6 +285,7 @@ function parseActions(raw: unknown): TripChatAction[] {
         placeName,
         placeType: normalizePlaceType(row.placeType || row.typeHint),
         mode,
+        source: parsePlaceActionSource(row),
         note: String(row.note || '').trim() || undefined,
         day: day >= 1 && day <= 7 ? day : undefined,
       })
@@ -270,6 +302,7 @@ function parseActions(raw: unknown): TripChatAction[] {
         fromPlaceName,
         toPlaceName,
         placeType: normalizePlaceType(row.placeType || row.typeHint),
+        source: parsePlaceActionSource(row),
         note: String(row.note || '').trim() || undefined,
         day: day >= 1 && day <= 7 ? day : undefined,
       })

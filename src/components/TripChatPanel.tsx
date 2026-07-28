@@ -22,11 +22,53 @@ import {
   type TripChatTurn,
 } from '../services/tripChat'
 import type { DayPlan, HotelCandidate, Place, PlaceType, SelectedHotel } from '../types'
+import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
+
+type PendingPlaceConfirm = {
+  id: string
+  kind: 'add' | 'replace'
+  dayNum: number
+  place: Place
+  /** add only */
+  mode?: 'best' | 'end'
+  /** replace only */
+  replaceStopId?: string
+  fromPlaceName?: string
+  /** Places already rejected in this confirm chain (for re-recommend). */
+  rejectedNames?: string[]
+  status?: 'ready' | 'rerecommending'
+}
+
+function placeTypeLabel(type: PlaceType): string {
+  if (type === 'cafe') return '咖啡馆'
+  if (type === 'restaurant') return '餐厅'
+  return '景点'
+}
+
+function buildRerecommendMessage(rejected: PendingPlaceConfirm, excluded: string[]): string {
+  const excludeText = excluded.map((n) => `「${n}」`).join('、')
+  if (rejected.kind === 'replace') {
+    return [
+      `刚才推荐的「${rejected.place.name}」我不想用。`,
+      `请再推荐另一个不同的地点，用来替换第 ${rejected.dayNum} 天的「${rejected.fromPlaceName}」。`,
+      `绝对不要再推荐：${excludeText}。`,
+      `请直接输出 replace_place（fromPlaceName 仍为「${rejected.fromPlaceName}」，source 必须为 "recommend"）。`,
+    ].join('')
+  }
+  const typeLabel = placeTypeLabel(rejected.place.type)
+  const modeHint = rejected.mode === 'end' ? '加到当天末尾' : '按最顺路插入'
+  return [
+    `刚才推荐的「${rejected.place.name}」我不喜欢。`,
+    `请再推荐另一家${typeLabel}加入第 ${rejected.dayNum} 天（${modeHint}）。`,
+    `绝对不要再推荐：${excludeText}。`,
+    '请直接输出 add_place（source 必须为 "recommend"）。',
+  ].join('')
+}
 
 export interface TripChatHandlers {
   switchDay: (day: number) => void
@@ -35,9 +77,14 @@ export interface TripChatHandlers {
   addPlace: (
     day: number,
     place: Place,
-    options?: { mode?: 'best' | 'end'; insertAt?: number },
+    options?: { mode?: 'best' | 'end'; insertAt?: number; select?: boolean },
   ) => void
-  replaceStop: (day: number, stopId: string, place: Place) => void
+  replaceStop: (
+    day: number,
+    stopId: string,
+    place: Place,
+    options?: { select?: boolean },
+  ) => void
   reorderStop: (day: number, from: number, to: number) => void
   setHotel: (hotel: SelectedHotel) => void
   setHotelCandidates: (candidates: HotelCandidate[]) => void
@@ -77,8 +124,12 @@ export function TripChatPanel({
   const [actionNotes, setActionNotes] = useState<string[]>([])
   const [panelMounted, setPanelMounted] = useState(false)
   const [panelEntered, setPanelEntered] = useState(false)
+  const [pendingPlaces, setPendingPlaces] = useState<PendingPlaceConfirm[]>([])
+  const [confirmBusy, setConfirmBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
+
+  const activePending = pendingPlaces[0] ?? null
 
   // Keep the panel mounted through the close animation so exit can play.
   useEffect(() => {
@@ -200,7 +251,15 @@ export function TripChatPanel({
     }
   }
 
-  async function resolveAddPlace(action: Extract<TripChatAction, { type: 'add_place' }>) {
+  async function resolveAddPlace(
+    action: Extract<TripChatAction, { type: 'add_place' }>,
+    rejectedNames?: string[],
+  ): Promise<{
+    note: string
+    pending?: PendingPlaceConfirm
+    /** Set when applied immediately (explicit). */
+    appliedPlace?: Place
+  }> {
     const dayNum = action.day || currentDay
     const place = await buildPlaceFromQuery({
       placeName: action.placeName,
@@ -208,19 +267,47 @@ export function TripChatPanel({
       note: action.note,
       dayNum,
     })
-    // Non-replace adds always prefer 最顺路 unless user asked for the end.
     const mode = action.mode === 'end' ? 'end' : 'best'
-    handlers.addPlace(dayNum, place, { mode })
-    return mode === 'end'
-      ? `已将「${place.name}」加到第 ${dayNum} 天末尾`
-      : `已将「${place.name}」按最顺路插入第 ${dayNum} 天`
+    // Re-recommend chains always confirm; otherwise only model picks need confirm.
+    const needsConfirm = action.source !== 'explicit' || Boolean(rejectedNames?.length)
+
+    // User named the place → apply now; model recommendation → confirm UI.
+    if (!needsConfirm) {
+      handlers.addPlace(dayNum, place, { mode, select: false })
+      return {
+        note:
+          mode === 'end'
+            ? `已将「${place.name}」加到第 ${dayNum} 天末尾`
+            : `已将「${place.name}」按最顺路插入第 ${dayNum} 天`,
+        appliedPlace: place,
+      }
+    }
+
+    return {
+      note: `已找到「${place.name}」，请在详情页确认是否加入第 ${dayNum} 天`,
+      pending: {
+        id: `add-${place.id}`,
+        kind: 'add',
+        dayNum,
+        place,
+        mode,
+        rejectedNames,
+        status: 'ready',
+      },
+    }
   }
 
   async function resolveReplacePlace(
     action: Extract<TripChatAction, { type: 'replace_place' }>,
     workingDays: DayPlan[],
     activeDay: number,
-  ) {
+    rejectedNames?: string[],
+  ): Promise<{
+    note: string
+    pending?: PendingPlaceConfirm
+    /** Updated local day snapshot when applied immediately. */
+    nextDays?: DayPlan[]
+  }> {
     const dayNum = action.day || activeDay
     const day = workingDays.find((d) => d.day === dayNum)
     if (!day) throw new Error(`没有第 ${dayNum} 天`)
@@ -235,18 +322,144 @@ export function TripChatPanel({
       dayNum,
     })
 
-    handlers.replaceStop(dayNum, hit.stopId, place)
+    if (action.source === 'explicit' && !rejectedNames?.length) {
+      handlers.replaceStop(dayNum, hit.stopId, place, { select: false })
+      const nextDays = workingDays.map((d) => {
+        if (d.day !== dayNum) return d
+        const stops = [...d.stops]
+        stops[hit.stopIndex] = {
+          ...stops[hit.stopIndex],
+          id: `d${dayNum}-${place.id}-${hit.stopIndex}`,
+          placeId: place.id,
+          note: place.description,
+          duration: place.durationHint || stops[hit.stopIndex].duration,
+        }
+        return { ...d, stops }
+      })
+      return {
+        note: `已将第 ${dayNum} 天的「${hit.place.name}」替换为「${place.name}」`,
+        nextDays,
+      }
+    }
+
     return {
-      note: `已将第 ${dayNum} 天的「${hit.place.name}」替换为「${place.name}」（仍在第 ${hit.stopIndex + 1} 位）`,
-      dayNum,
-      removedIndex: hit.stopIndex,
-      newPlace: place,
-      oldStopId: hit.stopId,
+      note: `已找到「${place.name}」，请在详情页确认是否替换「${hit.place.name}」`,
+      pending: {
+        id: `replace-${hit.stopId}-${place.id}`,
+        kind: 'replace',
+        dayNum,
+        place,
+        replaceStopId: hit.stopId,
+        fromPlaceName: hit.place.name,
+        rejectedNames,
+        status: 'ready',
+      },
     }
   }
 
-  async function applyActions(actions: TripChatAction[]) {
+  /** Backdrop / Esc: cancel without asking the model again. */
+  function cancelPending(rejected: PendingPlaceConfirm) {
+    if (rejected.status === 'rerecommending') return
+    setPendingPlaces((prev) => prev.filter((p) => p.id !== rejected.id))
+    setActionNotes((prev) => [...prev, `已取消「${rejected.place.name}」。`])
+  }
+
+  function confirmPending(pending: PendingPlaceConfirm) {
+    if (confirmBusy || pending.status === 'rerecommending') return
+    setConfirmBusy(true)
+    // Close detail immediately before applying the itinerary mutation.
+    setPendingPlaces((prev) => prev.filter((p) => p.id !== pending.id))
+    try {
+      if (pending.kind === 'add') {
+        const mode = pending.mode === 'end' ? 'end' : 'best'
+        // select: false — same as AddPlaceDialog; avoid reopening PlacePanel overlay.
+        handlers.addPlace(pending.dayNum, pending.place, { mode, select: false })
+        setActionNotes((prev) => [
+          ...prev,
+          mode === 'end'
+            ? `已将「${pending.place.name}」加到第 ${pending.dayNum} 天末尾`
+            : `已将「${pending.place.name}」按最顺路插入第 ${pending.dayNum} 天`,
+        ])
+      } else if (pending.replaceStopId) {
+        handlers.replaceStop(pending.dayNum, pending.replaceStopId, pending.place, {
+          select: false,
+        })
+        setActionNotes((prev) => [
+          ...prev,
+          `已将第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」替换为「${pending.place.name}」`,
+        ])
+      }
+    } finally {
+      setConfirmBusy(false)
+    }
+  }
+
+  async function rerecommendPending(rejected: PendingPlaceConfirm) {
+    if (busy || confirmBusy || rejected.status === 'rerecommending') return
+    if (!isLlmConfigured()) {
+      setError('未配置 OpenAI API Key，无法对话。')
+      return
+    }
+
+    const excluded = [...(rejected.rejectedNames || []), rejected.place.name]
+    const message = buildRerecommendMessage(rejected, excluded)
+
+    setConfirmBusy(true)
+    setPendingPlaces((prev) =>
+      prev.map((p) => (p.id === rejected.id ? { ...p, status: 'rerecommending' } : p)),
+    )
+    setError(null)
+    // Keep exclusion prompt in API history only — never as a visible user bubble.
+    setHistory((prev) => [...prev, { role: 'user', content: message, hidden: true }])
+    setActionNotes(['正在重新推荐…'])
+    setBusy(true)
+
+    try {
+      const result = await sendTripChatMessage({
+        ctx: {
+          hotel,
+          hotelCandidates,
+          days,
+          currentDay,
+          customPlaces,
+        },
+        history,
+        userMessage: message,
+      })
+
+      setHistory((prev) => [...prev, { role: 'assistant', content: result.reply }])
+      const { notes, pending } = await applyActions(result.actions, { rejectedNames: excluded })
+      setActionNotes(notes)
+      setPendingPlaces((prev) => {
+        const rest = prev.filter((p) => p.id !== rejected.id)
+        return pending.length ? [...rest, ...pending] : rest
+      })
+      if (!pending.length) {
+        setActionNotes((prev) => [
+          ...prev,
+          '没有拿到新的地点推荐，请再说一下你想要的风格或区域。',
+        ])
+        setOpen(true)
+      }
+    } catch (err) {
+      setPendingPlaces((prev) =>
+        prev.map((p) => (p.id === rejected.id ? { ...p, status: 'ready' } : p)),
+      )
+      setError(err instanceof Error ? err.message : '重新推荐失败，请稍后再试。')
+      setOpen(true)
+    } finally {
+      setBusy(false)
+      setConfirmBusy(false)
+    }
+  }
+
+  async function applyActions(
+    actions: TripChatAction[],
+    options?: { rejectedNames?: string[] },
+  ): Promise<{ notes: string[]; pending: PendingPlaceConfirm[] }> {
     const notes: string[] = []
+    const pendingBatch: PendingPlaceConfirm[] = []
+    const rejectedNames = options?.rejectedNames
     let workingDays = days.map((d) => ({ ...d, stops: [...d.stops] }))
     let workingCandidates = [...hotelCandidates]
     let workingHotel = hotel
@@ -279,7 +492,7 @@ export function TripChatPanel({
         if (action.type === 'remove_place') {
           const dayNum = action.day || activeDay
           const next = actions[i + 1]
-          // Coalesce remove+add into in-place replace (keeps original slot).
+          // Coalesce remove+add into replace. Explicit add → apply now; recommend → confirm.
           if (
             next?.type === 'add_place' &&
             (next.day || activeDay) === dayNum
@@ -292,23 +505,14 @@ export function TripChatPanel({
                 toPlaceName: next.placeName,
                 placeType: next.placeType,
                 note: next.note,
+                source: next.source === 'explicit' ? 'explicit' : 'recommend',
               },
               workingDays,
               activeDay,
+              rejectedNames,
             )
-            workingDays = workingDays.map((d) => {
-              if (d.day !== result.dayNum) return d
-              const stops = [...d.stops]
-              const idx = result.removedIndex
-              if (idx < 0 || idx >= stops.length) return d
-              stops[idx] = {
-                ...stops[idx],
-                id: `d${d.day}-${result.newPlace.id}-replaced`,
-                placeId: result.newPlace.id,
-                note: result.newPlace.description,
-              }
-              return { ...d, stops }
-            })
+            if (result.nextDays) workingDays = result.nextDays
+            if (result.pending) pendingBatch.push(result.pending)
             notes.push(result.note)
             i += 1
             continue
@@ -335,20 +539,14 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_place') {
-          const result = await resolveReplacePlace(action, workingDays, activeDay)
-          workingDays = workingDays.map((d) => {
-            if (d.day !== result.dayNum) return d
-            const stops = [...d.stops]
-            const idx = result.removedIndex
-            if (idx < 0 || idx >= stops.length) return d
-            stops[idx] = {
-              ...stops[idx],
-              id: `d${d.day}-${result.newPlace.id}-replaced`,
-              placeId: result.newPlace.id,
-              note: result.newPlace.description,
-            }
-            return { ...d, stops }
-          })
+          const result = await resolveReplacePlace(
+            action,
+            workingDays,
+            activeDay,
+            rejectedNames,
+          )
+          if (result.nextDays) workingDays = result.nextDays
+          if (result.pending) pendingBatch.push(result.pending)
           notes.push(result.note)
           continue
         }
@@ -373,11 +571,36 @@ export function TripChatPanel({
 
         if (action.type === 'add_place') {
           const dayNum = action.day || activeDay
-          const note = await resolveAddPlace({
-            ...action,
-            day: dayNum,
-          })
-          notes.push(note)
+          const result = await resolveAddPlace(
+            {
+              ...action,
+              day: dayNum,
+            },
+            rejectedNames,
+          )
+          if (result.appliedPlace) {
+            // Keep a rough local snapshot so later actions in this batch can match.
+            workingDays = workingDays.map((d) =>
+              d.day === dayNum
+                ? {
+                    ...d,
+                    stops: [
+                      ...d.stops,
+                      {
+                        id: `d${dayNum}-${result.appliedPlace!.id}-${d.stops.length}`,
+                        time: '12:00',
+                        placeId: result.appliedPlace!.id,
+                        note: result.appliedPlace!.description,
+                        walkLevel: '短步行',
+                        duration: result.appliedPlace!.durationHint || '60 分钟',
+                      },
+                    ],
+                  }
+                : d,
+            )
+          }
+          if (result.pending) pendingBatch.push(result.pending)
+          notes.push(result.note)
           continue
         }
 
@@ -501,7 +724,7 @@ export function TripChatPanel({
       }
     }
 
-    return notes
+    return { notes, pending: pendingBatch }
   }
 
   async function submit(text: string) {
@@ -533,8 +756,11 @@ export function TripChatPanel({
 
       setHistory((prev) => [...prev, { role: 'assistant', content: result.reply }])
       if (result.actions.length) {
-        const notes = await applyActions(result.actions)
+        const { notes, pending } = await applyActions(result.actions)
         setActionNotes(notes)
+        if (pending.length) {
+          setPendingPlaces((prev) => [...prev, ...pending])
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '对话失败，请稍后再试。')
@@ -603,7 +829,7 @@ export function TripChatPanel({
           </div>
 
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3">
-            {!history.length && (
+            {!history.some((t) => !t.hidden) && (
               <div className="space-y-2">
                 <p className="text-sm text-[var(--stone)]">
                   试试问我：介绍酒店、换一批住宿、介绍今天地点、加咖啡馆，或删改行程。
@@ -624,7 +850,9 @@ export function TripChatPanel({
               </div>
             )}
 
-            {history.map((turn, i) => (
+            {history
+              .filter((t) => !t.hidden)
+              .map((turn, i) => (
               <div
                 key={`${turn.role}-${i}`}
                 className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
@@ -689,6 +917,73 @@ export function TripChatPanel({
           </form>
         </div>
       )}
+
+      <GooglePlacePage
+        open={Boolean(activePending)}
+        name={activePending?.place.name || ''}
+        location={activePending?.place.location}
+        fallbackImage={activePending?.place.image}
+        showMap={false}
+        overlayClassName="z-[2300]"
+        closeOnBackdrop={activePending?.status !== 'rerecommending'}
+        llmNarrative={
+          activePending
+            ? {
+                intro: activePending.place.description,
+                reason:
+                  activePending.kind === 'replace'
+                    ? `用于替换第 ${activePending.dayNum} 天的「${activePending.fromPlaceName || '原地点'}」`
+                    : `计划加入第 ${activePending.dayNum} 天行程`,
+                labels: {
+                  title: '行程顾问点评',
+                  intro: '地点简介',
+                  reason: '为什么推荐',
+                },
+              }
+            : null
+        }
+        footer={
+          activePending ? (
+            <div className="space-y-2">
+              {activePending.status === 'rerecommending' ? (
+                <div className="rounded-xl bg-white/80 px-3 py-2">
+                  <LoadingIndicator label="正在重新推荐…" showDots size="sm" mode="thinking" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-[var(--stone)]">
+                    {activePending.kind === 'replace'
+                      ? `确认用「${activePending.place.name}」替换「${activePending.fromPlaceName}」吗？`
+                      : `确认将「${activePending.place.name}」加入第 ${activePending.dayNum} 天吗？`}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={confirmBusy}
+                      onClick={() => confirmPending(activePending)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
+                    >
+                      {confirmBusy && <ButtonSpinner />}
+                      {activePending.kind === 'replace' ? '确认替换' : '加入行程'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={confirmBusy || busy}
+                      onClick={() => void rerecommendPending(activePending)}
+                      className="rounded-xl border border-[var(--stone)]/30 px-3 py-2.5 text-sm text-[var(--stone)] disabled:opacity-50"
+                    >
+                      返回重新推荐
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null
+        }
+        onClose={() => {
+          if (activePending) cancelPending(activePending)
+        }}
+      />
     </>
   )
 }

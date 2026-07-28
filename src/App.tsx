@@ -433,6 +433,8 @@ export default function App() {
   const [copyRefreshing, setCopyRefreshing] = useState(false)
   const prevStopsKeyRef = useRef<string | null>(null)
   const suppressCopyRef = useRef(false)
+  /** Bumps on each day-copy request so cancelled runs can't leave the HUD stuck. */
+  const copyRequestIdRef = useRef(0)
   const genRequestIdRef = useRef(0)
   const dayRegenRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
@@ -886,6 +888,14 @@ export default function App() {
     }),
     [customPlaces, hotel],
   )
+  const placesWithHotelRef = useRef(placesWithHotel)
+  placesWithHotelRef.current = placesWithHotel
+  const hotelRef = useRef(hotel)
+  hotelRef.current = hotel
+  const dayStopsRef = useRef(day.stops)
+  dayStopsRef.current = day.stops
+  const dayIndexForCopyRef = useRef(dayIndex)
+  dayIndexForCopyRef.current = dayIndex
   const dayPlacesKey = useMemo(
     () => day.stops.map((s) => s.placeId).join(','),
     [day.stops],
@@ -1014,9 +1024,13 @@ export default function App() {
 
   // Auto-generate day title / theme / summary after itinerary edits.
   useEffect(() => {
-    if (!itineraryReady || !itineraryGenerated || itineraryGenerating) return
+    if (!itineraryReady || !itineraryGenerated || itineraryGenerating) {
+      setCopyRefreshing(false)
+      return
+    }
 
-    const key = `${day.day}:${dayPlacesKey}:${dayCalendarDate || ''}`
+    const hotelAreaKey = hotel.areaKey
+    const key = `${day.day}:${dayPlacesKey}:${dayCalendarDate || ''}:${day.pace}:${hotelAreaKey}`
 
     if (prevStopsKeyRef.current === null) {
       prevStopsKeyRef.current = key
@@ -1030,17 +1044,33 @@ export default function App() {
 
     if (suppressCopyRef.current) {
       suppressCopyRef.current = false
+      setCopyRefreshing(false)
       return
     }
 
     // Switching day tabs should not rewrite copy.
-    if (prevDay !== day.day) return
+    if (prevDay !== day.day) {
+      setCopyRefreshing(false)
+      return
+    }
 
     let cancelled = false
+    const requestId = ++copyRequestIdRef.current
+    const dayNum = day.day
+    const pace = day.pace
+    const calendarDate = dayCalendarDate || undefined
+    const totalDays = numberOfDays
+
     const timer = window.setTimeout(() => {
-      const names = day.stops.map((s) => {
+      if (cancelled) return
+      const places = placesWithHotelRef.current
+      const hotelNow = hotelRef.current
+      const areaKey = hotelNow.areaKey
+      const areaLabel =
+        AREA_KEY_CN[areaKey] || hotelAreaShort(hotelNow) || undefined
+      const names = dayStopsRef.current.map((s) => {
         try {
-          return getPlace(s.placeId, placesWithHotel).name
+          return getPlace(s.placeId, places).name
         } catch {
           return s.placeId
         }
@@ -1048,20 +1078,20 @@ export default function App() {
 
       setCopyRefreshing(true)
       void generateDayCopy({
-        day: day.day,
-        pace: day.pace,
+        day: dayNum,
+        pace,
         placeNames: names,
-        hotelArea: hotel.areaKey,
-        hotelAreaLabel: AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || undefined,
-        calendarDate: dayCalendarDate || undefined,
-        totalDays: numberOfDays,
+        hotelArea: areaKey,
+        hotelAreaLabel: areaLabel,
+        calendarDate,
+        totalDays,
       })
         .then((copy) => {
-          if (cancelled || !copy) return
-          const areaKey = hotel.areaKey
+          if (cancelled || copyRequestIdRef.current !== requestId || !copy) return
+          const dayIdx = dayIndexForCopyRef.current
           setDays((prev) =>
             prev.map((d, i) => {
-              if (i !== dayIndex) return d
+              if (i !== dayIdx) return d
               const next = {
                 ...d,
                 title: copy.title,
@@ -1074,23 +1104,27 @@ export default function App() {
           )
         })
         .finally(() => {
-          if (!cancelled) setCopyRefreshing(false)
+          if (!cancelled && copyRequestIdRef.current === requestId) {
+            setCopyRefreshing(false)
+          }
         })
     }, 900)
 
     return () => {
       cancelled = true
       window.clearTimeout(timer)
+      // Must clear here: a same-key re-entry used to cancel the in-flight
+      // request (skipping finally) and then early-return, leaving the HUD stuck.
+      if (copyRequestIdRef.current === requestId) {
+        setCopyRefreshing(false)
+      }
     }
   }, [
     dayPlacesKey,
     day.day,
     day.pace,
-    day.stops,
-    dayIndex,
     dayCalendarDate,
-    placesWithHotel,
-    hotel,
+    hotel.areaKey,
     itineraryReady,
     itineraryGenerated,
     itineraryGenerating,
@@ -1279,8 +1313,21 @@ export default function App() {
   }
 
   /** Atomically replace a stop in-place so the new place keeps the old index. */
-  function handleReplaceOnDay(dayNum: number, stopId: string, place: Place) {
+  function handleReplaceOnDay(
+    dayNum: number,
+    stopId: string,
+    place: Place,
+    options?: { select?: boolean },
+  ) {
     setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
+
+    const dayPlan = days.find((d) => d.day === dayNum)
+    const oldIdx =
+      dayPlan?.stops.findIndex((s, i) => ensureStopId(dayNum, s, i) === stopId) ?? -1
+    const replacedPlaceId =
+      dayPlan && oldIdx >= 0 && !isPinnedHotelStop(dayNum, dayPlan.stops, oldIdx, lastDayNum)
+        ? dayPlan.stops[oldIdx]?.placeId ?? null
+        : null
 
     setDays((prev) =>
       prev.map((d) => {
@@ -1309,7 +1356,11 @@ export default function App() {
 
     const targetIndex = days.findIndex((d) => d.day === dayNum)
     if (targetIndex >= 0) setDayIndex(targetIndex)
-    setSelectedPlaceId(place.id)
+    if (options?.select !== false) {
+      setSelectedPlaceId(place.id)
+    } else if (replacedPlaceId && selectedPlaceId === replacedPlaceId) {
+      setSelectedPlaceId(null)
+    }
   }
 
   async function handleResetDay() {

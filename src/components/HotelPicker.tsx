@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { PENDING_HOTEL, isHotelSelected } from '../data/hotels'
 import { loadHotelCache } from '../services/hotelCache'
 import {
@@ -24,11 +30,68 @@ interface Props {
   readOnly?: boolean
 }
 
+/** Match DayTimeline float settle. */
+const HOTEL_DRAG_SETTLE_MS = 200
+/** Start float after this pointer travel so clicks still open the card. */
+const HOTEL_DRAG_THRESHOLD_PX = 6
+/** Viscous follow — same language as DayTimeline tickFloat. */
+const HOTEL_FLOAT_EASE = 0.22
+
+type HotelDragSession = {
+  hotelId: string
+  grabX: number
+  grabY: number
+  width: number
+  height: number
+  startLeft: number
+  startTop: number
+  overSlot: boolean
+}
+
 function isSameHotel(a: HotelCandidate, b: HotelCandidate) {
   return (
     a.name === b.name &&
     Math.abs(a.lat - b.lat) <= 0.0008 &&
     Math.abs(a.lng - b.lng) <= 0.0008
+  )
+}
+
+function pointInRect(x: number, y: number, rect: DOMRect) {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
+function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
+  return (
+    <>
+      <GooglePlacePhoto
+        name={hotel.name}
+        location={{ lat: hotel.lat, lng: hotel.lng }}
+        fallback={hotel.image}
+        alt={hotel.name}
+        asBackground
+        className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
+      />
+      <div className="space-y-1 p-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
+          {hotel.isBest && (
+            <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
+              最优推荐
+            </span>
+          )}
+          {hotel.source === 'custom' && (
+            <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
+              自定义
+            </span>
+          )}
+        </div>
+        <p className="font-medium leading-snug">{hotel.name}</p>
+        <p className="line-clamp-2 text-xs text-[var(--stone)]">
+          {hotel.reason || hotel.description}
+        </p>
+        <p className="text-xs text-[var(--stone)]">{hotel.priceHint}</p>
+      </div>
+    </>
   )
 }
 
@@ -116,18 +179,33 @@ export function HotelPicker({
   const [othersCollapsed, setOthersCollapsed] = useState(
     () => Boolean(loadHotelCache()?.othersCollapsed),
   )
-  const [dragHotelId, setDragHotelId] = useState<string | null>(null)
-  const [dropActive, setDropActive] = useState(false)
-  const dropDepthRef = useRef(0)
+  const [drag, setDrag] = useState<HotelDragSession | null>(null)
+  const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
+  const [dropping, setDropping] = useState(false)
   const bootstrappedRef = useRef(false)
   const candidatesRef = useRef(candidates)
   const daysRef = useRef(days)
   const selectedRef = useRef(selected)
   const pendingCustomRef = useRef(pendingCustom)
+  const currentSlotRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<HotelDragSession | null>(null)
+  const floatRef = useRef({ x: 0, y: 0 })
+  const pointerRef = useRef({ x: 0, y: 0 })
+  const rafRef = useRef<number | null>(null)
+  const suppressClickRef = useRef(false)
+  const settlingRef = useRef(false)
+  const pendingPointerRef = useRef<{
+    hotelId: string
+    startX: number
+    startY: number
+    cardEl: HTMLElement
+    pointerId: number
+  } | null>(null)
   candidatesRef.current = candidates
   daysRef.current = days
   selectedRef.current = selected
   pendingCustomRef.current = pendingCustom
+  dragRef.current = drag
 
   const popupCandidate = useMemo(() => {
     if (pendingCustom) return pendingCustom
@@ -417,41 +495,206 @@ export function HotelPicker({
     selectHotel(card, false, candidatesRef.current, true)
   }
 
-  function isHotelDrag(e: DragEvent) {
-    return (
-      Array.from(e.dataTransfer.types).includes('text/hotel-id') || Boolean(dragHotelId)
-    )
+  const stopRaf = () => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
   }
 
-  function onCurrentSlotDragEnter(e: DragEvent) {
-    if (!isHotelDrag(e)) return
-    e.preventDefault()
-    dropDepthRef.current += 1
-    setDropActive(true)
+  const isOverCurrentSlot = (x: number, y: number) => {
+    const el = currentSlotRef.current
+    if (!el) return false
+    return pointInRect(x, y, el.getBoundingClientRect())
   }
 
-  function onCurrentSlotDragOver(e: DragEvent) {
-    if (!isHotelDrag(e)) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
+  const tickFloat = () => {
+    const session = dragRef.current
+    if (!session) {
+      rafRef.current = null
+      return
+    }
+    const targetX = pointerRef.current.x - session.grabX
+    const targetY = pointerRef.current.y - session.grabY
+    floatRef.current = {
+      x: floatRef.current.x + (targetX - floatRef.current.x) * HOTEL_FLOAT_EASE,
+      y: floatRef.current.y + (targetY - floatRef.current.y) * HOTEL_FLOAT_EASE,
+    }
+    setFloatPos({ ...floatRef.current })
+
+    const overSlot = isOverCurrentSlot(pointerRef.current.x, pointerRef.current.y)
+    if (overSlot !== session.overSlot) {
+      const next = { ...session, overSlot }
+      dragRef.current = next
+      setDrag(next)
+    }
+
+    rafRef.current = requestAnimationFrame(tickFloat)
   }
 
-  function onCurrentSlotDragLeave() {
-    dropDepthRef.current = Math.max(0, dropDepthRef.current - 1)
-    if (dropDepthRef.current === 0) setDropActive(false)
+  const endDrag = (commit: boolean) => {
+    stopRaf()
+    pendingPointerRef.current = null
+    const session = dragRef.current
+    if (!session || settlingRef.current) return
+    settlingRef.current = true
+
+    const overSlot =
+      commit && isOverCurrentSlot(pointerRef.current.x, pointerRef.current.y)
+    const settled = { ...session, overSlot }
+    dragRef.current = settled
+    setDrag(settled)
+    setDropping(true)
+
+    if (overSlot) {
+      const slot = currentSlotRef.current?.getBoundingClientRect()
+      if (slot) {
+        floatRef.current = {
+          x: slot.left + (slot.width - session.width) / 2,
+          y: slot.top + Math.min(12, Math.max(0, (slot.height - session.height) / 2)),
+        }
+        setFloatPos({ ...floatRef.current })
+      }
+    } else {
+      floatRef.current = { x: session.startLeft, y: session.startTop }
+      setFloatPos({ ...floatRef.current })
+    }
+
+    window.setTimeout(() => {
+      if (overSlot) applyDroppedHotel(session.hotelId)
+      dragRef.current = null
+      setDrag(null)
+      setDropping(false)
+      settlingRef.current = false
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 40)
+    }, HOTEL_DRAG_SETTLE_MS)
   }
 
-  function onCurrentSlotDrop(e: DragEvent) {
-    e.preventDefault()
-    dropDepthRef.current = 0
-    setDropActive(false)
-    const id = e.dataTransfer.getData('text/hotel-id') || dragHotelId
-    setDragHotelId(null)
-    if (id) applyDroppedHotel(id)
+  const beginDrag = (
+    hotelId: string,
+    e: { clientX: number; clientY: number; pointerId: number },
+    cardEl: HTMLElement,
+  ) => {
+    if (readOnly || dragRef.current || settlingRef.current) return
+
+    const rect = cardEl.getBoundingClientRect()
+    const session: HotelDragSession = {
+      hotelId,
+      grabX: e.clientX - rect.left,
+      grabY: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+      startLeft: rect.left,
+      startTop: rect.top,
+      overSlot: isOverCurrentSlot(e.clientX, e.clientY),
+    }
+    pointerRef.current = { x: e.clientX, y: e.clientY }
+    floatRef.current = { x: rect.left, y: rect.top }
+    dragRef.current = session
+    setFloatPos({ x: rect.left, y: rect.top })
+    setDrag(session)
+    setDropping(false)
+    stopRaf()
+    rafRef.current = requestAnimationFrame(tickFloat)
+
+    try {
+      cardEl.setPointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
   }
 
-  const currentSlotHighlight = Boolean(dragHotelId)
-  const currentSlotDropReady = currentSlotHighlight && dropActive
+  const onCandidatePointerDown = (
+    hotelId: string,
+    e: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (readOnly || drag || settlingRef.current) return
+    if ((e.target as HTMLElement).closest('[data-hotel-no-drag]')) return
+    // Left button / primary touch only.
+    if (e.button !== 0) return
+    pendingPointerRef.current = {
+      hotelId,
+      startX: e.clientX,
+      startY: e.clientY,
+      cardEl: e.currentTarget,
+      pointerId: e.pointerId,
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    if (!drag) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.body.classList.add('timeline-dragging')
+    return () => {
+      document.body.style.overflow = prev
+      document.body.classList.remove('timeline-dragging')
+    }
+  }, [drag])
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointerRef.current = { x: e.clientX, y: e.clientY }
+
+      const pending = pendingPointerRef.current
+      if (pending && !dragRef.current && !settlingRef.current) {
+        const dx = e.clientX - pending.startX
+        const dy = e.clientY - pending.startY
+        if (Math.hypot(dx, dy) >= HOTEL_DRAG_THRESHOLD_PX) {
+          const { hotelId, cardEl, pointerId } = pending
+          pendingPointerRef.current = null
+          beginDrag(hotelId, { clientX: e.clientX, clientY: e.clientY, pointerId }, cardEl)
+        }
+      }
+    }
+    const onUp = () => {
+      if (settlingRef.current) {
+        pendingPointerRef.current = null
+        return
+      }
+      if (dragRef.current) {
+        endDrag(true)
+        return
+      }
+      pendingPointerRef.current = null
+    }
+    const onCancel = () => {
+      if (settlingRef.current) {
+        pendingPointerRef.current = null
+        return
+      }
+      if (dragRef.current) {
+        endDrag(false)
+        return
+      }
+      pendingPointerRef.current = null
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly])
+
+  useEffect(() => () => stopRaf(), [])
+
+  const currentSlotHighlight = Boolean(drag)
+  const currentSlotDropReady = Boolean(drag?.overSlot)
+  const dragHotelId = drag?.hotelId ?? null
+  const dragging = Boolean(drag)
 
   /** 这个淘汰 / 删除：从列表移除 */
   function removeHotel(card: HotelCandidate) {
@@ -623,11 +866,8 @@ export function HotelPicker({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {selectedCandidate ? (
               <div
-                onDragEnter={onCurrentSlotDragEnter}
-                onDragOver={onCurrentSlotDragOver}
-                onDragLeave={onCurrentSlotDragLeave}
-                onDrop={onCurrentSlotDrop}
-                className={`group relative overflow-hidden rounded-2xl border text-left shadow-[var(--shadow)] ring-2 transition ${
+                ref={currentSlotRef}
+                className={`group relative overflow-hidden rounded-2xl border text-left shadow-[var(--shadow)] ring-2 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                   currentSlotDropReady
                     ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
                     : currentSlotHighlight
@@ -639,6 +879,7 @@ export function HotelPicker({
                   {selectedCandidate.source === 'custom' && (
                     <button
                       type="button"
+                      data-hotel-no-drag
                       aria-label={`删除 ${selectedCandidate.name}`}
                       title="删除自定义酒店"
                       onClick={(e) => {
@@ -652,6 +893,7 @@ export function HotelPicker({
                   )}
                   <button
                     type="button"
+                    data-hotel-no-drag
                     aria-label="取消当前选择"
                     title="取消当前选择"
                     onClick={(e) => {
@@ -675,43 +917,13 @@ export function HotelPicker({
                   onClick={() => openHotelCard(selectedCandidate)}
                   className="w-full text-left"
                 >
-                  <GooglePlacePhoto
-                    name={selectedCandidate.name}
-                    location={{ lat: selectedCandidate.lat, lng: selectedCandidate.lng }}
-                    fallback={selectedCandidate.image}
-                    alt={selectedCandidate.name}
-                    asBackground
-                    className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
-                  />
-                  <div className="space-y-1 p-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="text-xs text-[var(--copper)]">{selectedCandidate.area}</p>
-                      {selectedCandidate.isBest && (
-                        <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
-                          最优推荐
-                        </span>
-                      )}
-                      {selectedCandidate.source === 'custom' && (
-                        <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
-                          自定义
-                        </span>
-                      )}
-                    </div>
-                    <p className="font-medium leading-snug">{selectedCandidate.name}</p>
-                    <p className="line-clamp-2 text-xs text-[var(--stone)]">
-                      {selectedCandidate.reason || selectedCandidate.description}
-                    </p>
-                    <p className="text-xs text-[var(--stone)]">{selectedCandidate.priceHint}</p>
-                  </div>
+                  <HotelCardFace hotel={selectedCandidate} />
                 </button>
               </div>
             ) : (
               <div
-                onDragEnter={onCurrentSlotDragEnter}
-                onDragOver={onCurrentSlotDragOver}
-                onDragLeave={onCurrentSlotDragLeave}
-                onDrop={onCurrentSlotDrop}
-                className={`rounded-2xl border border-dashed p-4 transition ${
+                ref={currentSlotRef}
+                className={`rounded-2xl border border-dashed p-4 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                   currentSlotDropReady
                     ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
                     : currentSlotHighlight
@@ -800,36 +1012,24 @@ export function HotelPicker({
                     selectedCandidate && othersCollapsed
                       ? 'pointer-events-none -translate-y-2 opacity-0'
                       : 'translate-y-0 opacity-100'
-                  }`}
+                  } ${dragging ? 'select-none' : ''}`}
                 >
                   {(selectedCandidate ? otherCandidates : candidates).map((hotel) => (
                     <div
                       key={hotel.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('text/hotel-id', hotel.id)
-                        e.dataTransfer.effectAllowed = 'copy'
-                        setDragHotelId(hotel.id)
-                        dropDepthRef.current = 0
-                        setDropActive(false)
-                      }}
-                      onDragEnd={() => {
-                        setDragHotelId(null)
-                        setDropActive(false)
-                        dropDepthRef.current = 0
-                      }}
-                      className={`group relative cursor-grab overflow-hidden rounded-2xl border bg-[var(--card)] text-left transition active:cursor-grabbing ${
+                      onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
+                      className={`group relative cursor-grab overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] active:cursor-grabbing ${
                         dragHotelId === hotel.id
-                          ? 'border-[var(--copper)] opacity-60'
+                          ? 'pointer-events-none border-transparent opacity-0'
                           : 'border-white/60 hover:border-[var(--gold)]'
                       }`}
                     >
                       {hotel.source === 'custom' && (
                         <button
                           type="button"
+                          data-hotel-no-drag
                           aria-label={`删除 ${hotel.name}`}
                           title="删除自定义酒店"
-                          draggable={false}
                           onClick={(e) => {
                             e.stopPropagation()
                             removeHotel(hotel)
@@ -842,39 +1042,12 @@ export function HotelPicker({
                       <button
                         type="button"
                         onClick={() => {
-                          if (dragHotelId) return
+                          if (suppressClickRef.current || dragging) return
                           openHotelCard(hotel)
                         }}
-                        className="w-full text-left"
+                        className="w-full cursor-grab text-left active:cursor-grabbing"
                       >
-                        <GooglePlacePhoto
-                          name={hotel.name}
-                          location={{ lat: hotel.lat, lng: hotel.lng }}
-                          fallback={hotel.image}
-                          alt={hotel.name}
-                          asBackground
-                          className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
-                        />
-                        <div className="space-y-1 p-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
-                            {hotel.isBest && (
-                              <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
-                                最优推荐
-                              </span>
-                            )}
-                            {hotel.source === 'custom' && (
-                              <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
-                                自定义
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-medium leading-snug">{hotel.name}</p>
-                          <p className="line-clamp-2 text-xs text-[var(--stone)]">
-                            {hotel.reason || hotel.description}
-                          </p>
-                          <p className="text-xs text-[var(--stone)]">{hotel.priceHint}</p>
-                        </div>
+                        <HotelCardFace hotel={hotel} />
                       </button>
                     </div>
                   ))}
@@ -889,6 +1062,31 @@ export function HotelPicker({
         <p className="text-sm text-[var(--stone)]">暂无候选项。可点「换一批推荐」或自定义地址。</p>
       )}
       {error && <p className="text-sm text-red-700">{error}</p>}
+
+      {drag && (
+        <div
+          className={`timeline-drag-float pointer-events-none fixed z-[80] ${
+            dropping ? 'timeline-drag-float-settle' : 'timeline-drag-float-lifted'
+          }`}
+          style={{
+            left: floatPos.x,
+            top: floatPos.y,
+            width: drag.width,
+          }}
+        >
+          <div className="timeline-drag-float-card overflow-hidden rounded-2xl border border-white/80 bg-[var(--card)] ring-1 ring-[var(--ink)]/5">
+            <div className="timeline-drag-float-content group">
+              {(() => {
+                const hotel =
+                  candidates.find((h) => h.id === drag.hotelId) ||
+                  candidatesRef.current.find((h) => h.id === drag.hotelId)
+                if (!hotel) return null
+                return <HotelCardFace hotel={hotel} />
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       <GooglePlacePage
         open={Boolean(popupCandidate)}

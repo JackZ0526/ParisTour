@@ -68,7 +68,7 @@ export function SyncOrbitIcon({
 
 /**
  * LLM thinking mark — dual orbits + rune ticks + breathing core.
- * Sized for the CloudSave icon slot (28); gold/sage reads on dark HUD chrome.
+ * Scales via `size`; gold reads on dark HUD chrome.
  */
 export function ThinkingOrbitIcon({
   size = 28,
@@ -174,37 +174,37 @@ export function ChargeBars({
   )
 }
 
-/** Dark charcoal HUD pill — same chrome as CloudSaveIndicator toast. */
+/**
+ * Compact LLM status chip for day-header controls — single-line signal,
+ * not a scaled-down CloudSave toast.
+ */
 function ThinkingHudBadge({
   label,
-  kicker = 'AI THINKING',
   className = '',
-  embed = true,
+  size = 'sm',
 }: {
   label: ReactNode
-  kicker?: string
   className?: string
-  /** When true, sits inline (not fixed corner toast). */
-  embed?: boolean
+  /** sm = header chip; md = slightly roomier for block loaders. */
+  size?: Size
 }) {
+  const compact = size === 'sm'
   return (
     <div
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className={`cloud-save-toast is-busy ${embed ? 'llm-think-embed' : ''} ${className}`}
+      className={`llm-think-chip ${compact ? 'llm-think-chip--sm' : 'llm-think-chip--md'} ${className}`}
     >
-      <div className="cloud-save-toast-glow llm-think-toast-glow" aria-hidden />
-      <div className="cloud-save-toast-inner">
-        <div className="cloud-save-icon-wrap">
-          <ThinkingOrbitIcon size={28} />
-        </div>
-        <div className="cloud-save-copy">
-          <span className="cloud-save-kicker">{kicker}</span>
-          <span className="cloud-save-label">{label}</span>
-        </div>
-        <ChargeBars size="md" className="cloud-save-toast-bars" />
-      </div>
+      <span className="llm-think-chip-mark" aria-hidden>
+        <ThinkingOrbitIcon size={compact ? 12 : 14} />
+      </span>
+      <span className="llm-think-chip-label">{label}</span>
+      <span className="llm-think-chip-dots" aria-hidden>
+        <i />
+        <i />
+        <i />
+      </span>
     </div>
   )
 }
@@ -212,7 +212,7 @@ function ThinkingHudBadge({
 /**
  * Shared wait/progress indicator — sync-orbit + equalizer bars (CloudSave style).
  * Pass mode="thinking" for LLM / AI generation.
- * Block / badge thinking → dark AUTO-SAVE-style HUD pill; inline stays compact.
+ * Block / badge thinking → compact chip (not CloudSave toast chrome).
  */
 export function LoadingIndicator({
   label,
@@ -222,7 +222,6 @@ export function LoadingIndicator({
   mode = 'sync',
   showSpinner = true,
   showDots = false,
-  kicker,
   className = '',
   children,
 }: {
@@ -239,7 +238,7 @@ export function LoadingIndicator({
    * orbit + bars so all loaders share one visual language.
    */
   showDots?: boolean
-  /** Eyebrow for thinking HUD (default AI THINKING). */
+  /** Kept for API compat; badge/block thinking chips use a single-line label. */
   kicker?: string
   className?: string
   children?: ReactNode
@@ -249,18 +248,18 @@ export function LoadingIndicator({
   const active = showSpinner || showDots
   const thinking = mode === 'thinking'
 
-  // Block / badge thinking → same dark HUD toast shell as CloudSave.
+  // Block / badge thinking → compact chip suited to day-header controls.
   if (thinking && (variant === 'block' || variant === 'badge')) {
     const hud = (
       <ThinkingHudBadge
         label={text ?? '思考中…'}
-        kicker={kicker ?? 'AI THINKING'}
+        size={size}
         className={variant === 'badge' ? className : undefined}
       />
     )
     if (variant === 'block') {
       return (
-        <div className={`flex items-center justify-center py-6 ${className}`}>{hud}</div>
+        <div className={`flex items-center justify-center py-4 ${className}`}>{hud}</div>
       )
     }
     return hud

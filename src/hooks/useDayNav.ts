@@ -11,7 +11,7 @@ import { useGoogleMapsReady } from '../components/GoogleMapsProvider'
 const emptyPlan = (
   stopsKey = '',
   summary = '正在计算步行距离…',
-  originKind: 'hotel' | 'airport' = 'hotel',
+  _originKind: 'hotel' | 'airport' = 'hotel',
 ): DayNavPlan => ({
   hotelToFirst: null,
   betweenStops: [],
@@ -19,8 +19,8 @@ const emptyPlan = (
   walkDistanceMeters: 0,
   walkDurationSeconds: 0,
   walkSummaryText: summary,
-  hotelToFirstText:
-    originKind === 'airport' ? '正在计算从机场出发的方式…' : '正在计算从酒店出发的方式…',
+  // Origin cue chip carries 「从酒店」/「从机场」 — keep this status cue-free.
+  hotelToFirstText: '正在计算出发方式…',
   lastToDestinationText: '',
   segments: [],
   routePath: [],
@@ -103,10 +103,7 @@ export function useDayNav(
       setLoading((prev) => (prev ? false : prev))
       if (!enabled) {
         const summary = '日期、航班和酒店还没齐，导航先歇着'
-        const hotelToFirstText =
-          origin.kind === 'airport'
-            ? '正在计算从机场出发的方式…'
-            : '正在计算从酒店出发的方式…'
+        const hotelToFirstText = '正在计算出发方式…'
         setPlan((prev) =>
           prev.stopsKey === stopsKey &&
           prev.walkSummaryText === summary &&
@@ -158,10 +155,7 @@ export function useDayNav(
         if (requestId !== requestIdRef.current) return
         setPlan({
           ...emptyPlan(stopsKey, '步行距离暂时无法计算', origin.kind),
-          hotelToFirstText:
-            origin.kind === 'airport'
-              ? '从机场出发的方式暂时无法计算'
-              : '从酒店出发的方式暂时无法计算',
+          hotelToFirstText: '出发方式暂时无法计算',
           error: '导航计算失败',
         })
       })

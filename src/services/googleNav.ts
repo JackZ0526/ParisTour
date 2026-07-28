@@ -665,10 +665,10 @@ function walkingStatsFromLegs(legs: Array<ResolvedDayLeg | null>): {
 
 export function describeHotelToFirst(
   leg: ResolvedDayLeg | null,
-  originKind: 'hotel' | 'airport' = 'hotel',
+  _originKind: 'hotel' | 'airport' = 'hotel',
 ): string {
-  const from = originKind === 'airport' ? '机场' : '酒店'
-  if (!leg) return `请根据地图从${from}出发`
+  // Origin place (酒店/机场) is shown as a LegConnector cue chip — keep text cue-free.
+  if (!leg) return '请根据地图出发'
   const walk = walkingStatsFromLegs([leg])
   const walkBit =
     walk.distanceMeters > 0
@@ -762,7 +762,6 @@ export async function planDayNavigation(
   },
 ): Promise<DayNavPlan> {
   const originKind = options?.originKind || 'hotel'
-  const fromLabel = originKind === 'airport' ? '机场' : '酒店'
   const destination = options?.destination || null
   const destinationLabel = options?.destinationLabel || '酒店'
 
@@ -774,7 +773,7 @@ export async function planDayNavigation(
       walkDistanceMeters: 0,
       walkDurationSeconds: 0,
       walkSummaryText: '今天还没有行程点',
-      hotelToFirstText: `添加地点后显示从${fromLabel}出发的方式`,
+      hotelToFirstText: '添加地点后显示出发方式',
       lastToDestinationText: destination
         ? `添加地点后显示前往${destinationLabel}的方式`
         : '',
@@ -785,8 +784,16 @@ export async function planDayNavigation(
     }
   }
 
-  // Day 1: origin is CDG and first stop is often also CDG — skip a null trip.
-  const originIsFirst = roughlySamePoint(origin, stops[0])
+  // Skip only a true null trip (same pin). Do NOT use the 500m "same place"
+  // threshold here — mid-day first stops are often a café within ~500m of the
+  // hotel, and those must still get walking/transit (otherwise the timeline
+  // shows only「本日出发」with no route).
+  const ORIGIN_NULL_TRIP_METERS = 80
+  const originIsFirst = roughlySamePoint(
+    origin,
+    stops[0],
+    ORIGIN_NULL_TRIP_METERS,
+  )
   const hotelToFirst = originIsFirst
     ? null
     : await resolveTravelLeg(origin, stops[0], pace)
@@ -840,8 +847,9 @@ export async function planDayNavigation(
     walkDistanceMeters: walk.distanceMeters,
     walkDurationSeconds: walk.durationSeconds,
     walkSummaryText: formatWalkSummary(walk.distanceMeters, walk.durationSeconds),
+    // Cue chip carries 「从酒店」/「从机场」 — status text stays cue-free.
     hotelToFirstText: originIsFirst
-      ? `本日从${fromLabel}出发`
+      ? '本日出发'
       : describeHotelToFirst(hotelToFirst, originKind),
     lastToDestinationText: lastIsDestination
       ? `本日终点：${destinationLabel}`
