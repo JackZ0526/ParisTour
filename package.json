@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "seed:test-user": "node scripts/seed-test-user.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

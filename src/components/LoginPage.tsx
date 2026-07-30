@@ -122,7 +122,8 @@ export function LoginPage() {
           <label className="block text-sm">
             <span className="text-[var(--stone)]">邮箱</span>
             <input
-              type="email"
+              type="text"
+              inputMode="email"
               autoComplete="email"
               required
               value={email}
@@ -137,7 +138,7 @@ export function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 required
-                minLength={6}
+                minLength={mode === 'signup' ? 6 : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-xl border border-[var(--stone)]/25 bg-white/70 py-2 pl-3 pr-11 outline-none focus:border-[var(--sage)]"

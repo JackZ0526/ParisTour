@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
+import { normalizeAuthEmail } from './devTestAccount'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import {
   applyAccessibleTripLocally,
@@ -224,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (emailInput: string, password: string) => {
     setError(null)
     setStatus('loading')
-    const normalized = emailInput.trim().toLowerCase()
+    const normalized = normalizeAuthEmail(emailInput)
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
@@ -247,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(async (emailInput: string, password: string) => {
     setError(null)
-    const normalized = emailInput.trim().toLowerCase()
+    const normalized = normalizeAuthEmail(emailInput)
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')

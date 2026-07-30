@@ -455,5 +455,6 @@ end $$;
 -- Bootstrap: add your email(s) to the allowlist, then sign up.
 -- Example:
 --   insert into public.allowlist_emails (email) values ('you@example.com');
+-- Dev test account: run `npm run seed:test-user` (see supabase/seed-test-user.sql).
 -- Sharing also auto-allowlists invitees.
 -- ---------------------------------------------------------------------------
