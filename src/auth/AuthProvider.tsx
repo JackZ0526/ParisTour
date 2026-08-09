@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -121,6 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const role = activeTrip?.role ?? null
   const canEdit = role === 'owner' || role === 'editor'
 
+  const statusRef = useRef(status)
+  const tripReadyRef = useRef(tripReady)
+  const sessionUserIdRef = useRef<string | null>(session?.user?.id ?? null)
+  statusRef.current = status
+  tripReadyRef.current = tripReady
+  sessionUserIdRef.current = session?.user?.id ?? null
+
   const bootstrapSession = useCallback(async (next: Session | null) => {
     setTripReady(false)
     setSession(next)
@@ -209,7 +217,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = sb.auth.onAuthStateChange((event, nextSession) => {
       // Initial session handled above; avoid double-bootstrap on TOKEN_REFRESHED.
       if (event === 'INITIAL_SESSION') return
-      if (event === 'TOKEN_REFRESHED') {
+      // Tab focus runs Supabase _recoverAndRefresh → SIGNED_IN with the same user.
+      // Treat like TOKEN_REFRESHED so AuthGate/App don't remount.
+      const resumeSignedIn =
+        event === 'SIGNED_IN' &&
+        nextSession?.user?.id &&
+        statusRef.current === 'ready' &&
+        tripReadyRef.current &&
+        sessionUserIdRef.current === nextSession.user.id
+      if (event === 'TOKEN_REFRESHED' || resumeSignedIn) {
         setSession(nextSession)
         return
       }
