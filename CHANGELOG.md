@@ -15,6 +15,14 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.3.0] - 2026-08-09
+
+### Added
+
 - DeepSeek as a first-class LLM backend (`/api/deepseek`) with V4 Flash / Pro models and thinking / reasoning-effort controls
 - Global LLM model picker (DeepSeek + OpenAI GPT-5.6 variants) wired into TripChat and related flows
 - Brand assets for DeepSeek / OpenAI in the model picker UI
@@ -25,6 +33,7 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 - Default LLM preference shifted toward DeepSeek when no explicit model env is set
 - Expanded TripChat / itinerary LLM tooling and loading HUD polish around multi-provider calls
 - Vite / Vercel proxy routes updated for the DeepSeek path alongside OpenAI
+
 
 ## [0.2.0] - 2026-07-30
 
@@ -74,6 +83,7 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/620c6a8...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...HEAD
+- [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
 - [0.2.0]: https://github.com/JackZ0526/ParisTour/compare/e48cfb8...620c6a8
 - [0.1.0]: https://github.com/JackZ0526/ParisTour/compare/36ed361...e48cfb8

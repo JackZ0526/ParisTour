@@ -14,6 +14,14 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
+### 变更
+
+### 修复
+
+## [0.3.0] - 2026-08-09
+
+### 新增
+
 - DeepSeek 作为一等 LLM 后端（`/api/deepseek`），支持 V4 Flash / Pro 与 thinking / reasoning-effort
 - 全局 LLM 模型选择器（DeepSeek + OpenAI GPT-5.6），接入 TripChat 等相关流程
 - 模型选择器使用的 DeepSeek / OpenAI 品牌资源
@@ -24,6 +32,7 @@ Paris Tour 的重要变更记录于此。
 - 未显式设置模型环境变量时，默认 LLM 优先 DeepSeek
 - 扩展 TripChat / 行程 LLM 工具与多厂商调用下的加载 HUD
 - Vite / Vercel 代理增加 DeepSeek 路径（与 OpenAI 并列）
+
 
 ## [0.2.0] - 2026-07-30
 
@@ -73,6 +82,7 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/620c6a8...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...HEAD
+- [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
 - [0.2.0]: https://github.com/JackZ0526/ParisTour/compare/e48cfb8...620c6a8
 - [0.1.0]: https://github.com/JackZ0526/ParisTour/compare/36ed361...e48cfb8
