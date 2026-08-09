@@ -1,6 +1,6 @@
 # Paris Tour
 
-[English](README.md)
+[English](README.md) · [更新日志](CHANGELOG.zh-CN.md)
 
 巴黎行程可视化规划器：邀请制登录、按账号云端存档与实时同步，支持按邮箱只读/可编辑共享。地图、时间线与 LLM 推荐一体，帮你把航班、酒店和每日去处排成可走的日程。
 
@@ -56,7 +56,9 @@ npm run dev
 ```env
 # --- 服务端（不要加 VITE_ 前缀）---
 RAPIDAPI_KEY=              # 航班：TimeTable Lookup / AeroDataBox
-OPENAI_API_KEY=            # 行程生成、聊天、推荐
+DEEPSEEK_API_KEY=          # 默认优先的大模型（行程、聊天、推荐）
+# DEEPSEEK_BASE_URL=       # 可选，默认 https://api.deepseek.com/v1
+OPENAI_API_KEY=            # 可选，模型选择器中的 OpenAI 模型
 # OPENAI_BASE_URL=         # 可选，默认 https://api.openai.com/v1
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
@@ -69,8 +71,9 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_GOOGLE_MAPS_API_KEY=
-# VITE_OPENAI_MODEL=gpt-5.6-luna   # 聊天默认模型（可选）
-# VITE_LLM_ENABLED=true            # false 可隐藏 LLM 能力
+# VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # 默认 DeepSeek 模型（或 deepseek-v4-pro）
+# VITE_OPENAI_MODEL=gpt-5.6-luna     # 覆盖为 OpenAI 模型
+# VITE_LLM_ENABLED=true              # false 可隐藏 LLM 能力
 ```
 
 Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**。HTTP 引荐来源请同时加入：
@@ -91,6 +94,42 @@ Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + �
 | `npm run build` | 类型检查 + 生产构建 |
 | `npm run preview` | 预览生产构建 |
 | `npm run lint` | oxlint |
+| `npm run release:patch` | patch 升版、更新日志、提交并打 `v*` 标签（不推送） |
+| `npm run release:minor` | minor 升版（同上） |
+| `npm run release:major` | major 升版（同上） |
+
+## 发版
+
+版本历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md) / [CHANGELOG.md](CHANGELOG.md)。
+
+1. 功能提交先合入 `main`（推荐 Conventional Commits：`feat:`、`fix:` 等）。可选：在两份更新日志的 `## [Unreleased]` 下写草稿条目。
+2. 若还没有 `v*` 标签，先打一次基线：
+
+```bash
+git tag -a v0.2.0 -m v0.2.0 620c6a8
+git push origin v0.2.0
+```
+
+3. 本地切下一版（写更新日志与 `package.json`、提交、附注标签 — **不推送**）：
+
+```bash
+npm run release:patch   # 或 release:minor / release:major
+# 仅预览：npm run release -- patch --dry-run
+# 只改文件：npm run release -- patch --no-git
+git push origin HEAD && git push origin vX.Y.Z
+```
+
+4. 推送 `v*` 后，[`.github/workflows/release.yml`](.github/workflows/release.yml) 会创建 GitHub Release，正文取自 `CHANGELOG.md` 对应版本小节。
+
+**自动生成内容**
+
+| 产物 | 来源 |
+|------|------|
+| `CHANGELOG.md` 版本节 | 上一 `v*` 标签以来的提交说明（`feat`→Added，`fix`→Fixed，其余→Changed）**加上** `Unreleased` 条目 |
+| `CHANGELOG.zh-CN.md` 版本节 | 中文标题；若有中文 `Unreleased` 则用之，否则条目与英文相同（无翻译 API） |
+| `package.json` `version` | 语义化版本递增 |
+| git 标签 `vX.Y.Z` | 打在发版提交上的附注标签 |
+| GitHub Release | Workflow 复制该版本的英文更新日志小节 |
 
 ## 项目结构（概览）
 

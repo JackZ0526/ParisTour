@@ -1,0 +1,62 @@
+# Create a GitHub Release when a version tag is pushed (v*).
+# Notes are taken from the matching section in CHANGELOG.md.
+#
+# Cut a release locally (preferred):
+#   npm run release:patch   # or release:minor / release:major
+#   git push origin HEAD && git push origin vX.Y.Z
+#
+# Or tag an already-bumped commit:
+#   git tag -a v0.3.0 -m v0.3.0 && git push origin v0.3.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract changelog and publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Skipping non-semver tag: $TAG"
+            exit 0
+          fi
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+
+          const tag = process.env.TAG
+          const version = tag.replace(/^v/, '')
+          const md = readFileSync('CHANGELOG.md', 'utf8')
+          const re = new RegExp(
+            `## \\[${version.replace(/\./g, '\\.')}\\][\\s\\S]*?(?=\\n## \\[|\\n## Links|\\n## 链接|$)`,
+          )
+          const match = md.match(re)
+          let body = match
+            ? `${match[0].trim()}\n`
+            : `## ${version}\n\nSee [CHANGELOG.md](./CHANGELOG.md).\n`
+          body += `\n---\n\n中文：[CHANGELOG.zh-CN.md](./CHANGELOG.zh-CN.md)\n`
+          writeFileSync('release-notes.md', body)
+          console.log(body)
+          NODE
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            --verify-tag

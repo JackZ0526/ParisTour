@@ -1,10 +1,25 @@
-import type { ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
+import {
+  getThinkingMode,
+  llmBusyDefaultLabel,
+  resolveLlmBusyVisual,
+  subscribeThinking,
+  type LlmBusyVisual,
+  type LlmTaskKind,
+} from '../services/llm'
 
 type Tone = 'sage' | 'copper' | 'ink' | 'paper'
 type Size = 'sm' | 'md'
 type Variant = 'inline' | 'block' | 'badge'
-/** sync = CloudSave family; thinking = LLM / AI “casting” HUD */
-type Mode = 'sync' | 'thinking'
+/**
+ * sync = CloudSave family;
+ * thinking = LLM call (auto-resolves to thinking vs generating visual);
+ * generating = force non-thinking LLM busy visual.
+ */
+type Mode = 'sync' | 'thinking' | 'generating'
+
+export { llmBusyDefaultLabel, llmBusyLabel, resolveLlmBusyVisual } from '../services/llm'
+export type { LlmBusyVisual } from '../services/llm'
 
 const toneClass: Record<Tone, string> = {
   sage: 'text-[var(--sage)]',
@@ -26,6 +41,24 @@ const sizeClass: Record<Size, { gap: string; text: string; orbit: number; bars: 
     orbit: 20,
     bars: 'load-bars--md',
   },
+}
+
+function useResolvedLlmVisual(options: {
+  mode: Mode
+  task?: LlmTaskKind
+  userText?: string
+  thinkingEnabled?: boolean
+}): 'sync' | LlmBusyVisual {
+  // Re-render when user toggles thinking in the FAB picker.
+  useSyncExternalStore(subscribeThinking, getThinkingMode, getThinkingMode)
+
+  if (options.mode === 'sync') return 'sync'
+  if (options.mode === 'generating') return 'generating'
+  return resolveLlmBusyVisual({
+    task: options.task,
+    userText: options.userText,
+    thinkingEnabled: options.thinkingEnabled,
+  })
 }
 
 /** Sync-orbit mark — same motion language as CloudSaveIndicator. */
@@ -178,29 +211,44 @@ export function ChargeBars({
  * Compact LLM status chip for day-header controls — single-line signal,
  * not a scaled-down CloudSave toast.
  */
-function ThinkingHudBadge({
+function LlmHudBadge({
   label,
+  visual,
   className = '',
   size = 'sm',
 }: {
   label: ReactNode
+  visual: LlmBusyVisual
   className?: string
   /** sm = header chip; md = slightly roomier for block loaders. */
   size?: Size
 }) {
   const compact = size === 'sm'
+  const thinking = visual === 'thinking'
   return (
     <div
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className={`llm-think-chip ${compact ? 'llm-think-chip--sm' : 'llm-think-chip--md'} ${className}`}
+      className={`${thinking ? 'llm-think-chip' : 'llm-gen-chip'} ${
+        compact
+          ? thinking
+            ? 'llm-think-chip--sm'
+            : 'llm-gen-chip--sm'
+          : thinking
+            ? 'llm-think-chip--md'
+            : 'llm-gen-chip--md'
+      } ${className}`}
     >
-      <span className="llm-think-chip-mark" aria-hidden>
-        <ThinkingOrbitIcon size={compact ? 12 : 14} />
+      <span className={thinking ? 'llm-think-chip-mark' : 'llm-gen-chip-mark'} aria-hidden>
+        {thinking ? (
+          <ThinkingOrbitIcon size={compact ? 12 : 14} />
+        ) : (
+          <SyncOrbitIcon size={compact ? 12 : 14} />
+        )}
       </span>
-      <span className="llm-think-chip-label">{label}</span>
-      <span className="llm-think-chip-dots" aria-hidden>
+      <span className={thinking ? 'llm-think-chip-label' : 'llm-gen-chip-label'}>{label}</span>
+      <span className={thinking ? 'llm-think-chip-dots' : 'llm-gen-chip-dots'} aria-hidden>
         <i />
         <i />
         <i />
@@ -211,26 +259,40 @@ function ThinkingHudBadge({
 
 /**
  * Shared wait/progress indicator — sync-orbit + equalizer bars (CloudSave style).
- * Pass mode="thinking" for LLM / AI generation.
- * Block / badge thinking → compact chip (not CloudSave toast chrome).
+ * Pass mode="thinking" for LLM calls (auto-distinguishes thinking vs generating).
+ * Pass mode="generating" to force the lighter non-thinking LLM busy look.
+ * Block / badge LLM → compact chip (not CloudSave toast chrome).
  */
 export function LoadingIndicator({
   label,
+  thinkingLabel,
+  generatingLabel,
   variant = 'inline',
   size = 'sm',
   tone = 'sage',
   mode = 'sync',
+  task,
+  userText,
+  thinkingEnabled,
   showSpinner = true,
   showDots = false,
   className = '',
   children,
 }: {
   label?: ReactNode
+  /** When set with generatingLabel, picked by resolved LLM visual. */
+  thinkingLabel?: ReactNode
+  generatingLabel?: ReactNode
   variant?: Variant
   size?: Size
   tone?: Tone
-  /** sync = save/sync family; thinking = game-style LLM casting HUD */
+  /** sync = save/sync; thinking = LLM (auto-resolves); generating = force non-thinking LLM */
   mode?: Mode
+  /** Prefer resolved thinking for this call site when mode is thinking. */
+  task?: LlmTaskKind
+  userText?: string
+  /** Explicit override for whether thinking is on for this in-flight call. */
+  thinkingEnabled?: boolean
   /** Orbit spinner (default on). Kept for API compat with older call sites. */
   showSpinner?: boolean
   /**
@@ -243,16 +305,28 @@ export function LoadingIndicator({
   className?: string
   children?: ReactNode
 }) {
+  const visual = useResolvedLlmVisual({ mode, task, userText, thinkingEnabled })
   const s = sizeClass[size]
-  const text = children ?? label
+  const llmVisual: LlmBusyVisual | null = visual === 'sync' ? null : visual
+  const text =
+    children ??
+    (llmVisual && thinkingLabel != null && generatingLabel != null
+      ? llmVisual === 'thinking'
+        ? thinkingLabel
+        : generatingLabel
+      : label)
   const active = showSpinner || showDots
-  const thinking = mode === 'thinking'
+  const thinking = visual === 'thinking'
+  const generating = visual === 'generating'
+  const llmBusy = thinking || generating
 
-  // Block / badge thinking → compact chip suited to day-header controls.
-  if (thinking && (variant === 'block' || variant === 'badge')) {
+  // Block / badge LLM → compact chip suited to day-header controls.
+  if (llmBusy && (variant === 'block' || variant === 'badge')) {
+    const hudVisual: LlmBusyVisual = thinking ? 'thinking' : 'generating'
     const hud = (
-      <ThinkingHudBadge
-        label={text ?? '思考中…'}
+      <LlmHudBadge
+        visual={hudVisual}
+        label={text ?? llmBusyDefaultLabel(hudVisual)}
         size={size}
         className={variant === 'badge' ? className : undefined}
       />
@@ -267,9 +341,17 @@ export function LoadingIndicator({
 
   const Orbit = thinking ? ThinkingOrbitIcon : SyncOrbitIcon
   const Bars = thinking ? ChargeBars : ActivityBars
-  const pulseClass = thinking ? 'llm-think-pulse' : 'loading-pulse-soft'
-  const orbitExtra = thinking ? 'text-[var(--gold)]' : ''
-  const barsExtra = thinking ? 'text-[var(--gold)]' : ''
+  const pulseClass = thinking ? 'llm-think-pulse' : generating ? 'llm-gen-pulse' : 'loading-pulse-soft'
+  const orbitExtra = thinking
+    ? 'text-[var(--gold)]'
+    : generating
+      ? 'text-[var(--sage)]'
+      : ''
+  const barsExtra = thinking
+    ? 'text-[var(--gold)]'
+    : generating
+      ? 'text-[var(--sage)]'
+      : ''
 
   if (variant === 'badge') {
     return (
@@ -312,11 +394,20 @@ export function LoadingIndicator({
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className={`${thinking ? pulseClass : ''} inline-flex items-center ${s.gap} ${s.text} ${
-        thinking ? 'text-[var(--ink)]' : toneClass[tone]
+      className={`${llmBusy ? pulseClass : ''} inline-flex items-center ${s.gap} ${s.text} ${
+        thinking
+          ? 'text-[var(--ink)]'
+          : generating
+            ? 'text-[var(--sage)]'
+            : toneClass[tone]
       } ${className}`}
     >
-      {active && <Orbit size={thinking ? 16 : s.orbit} className={`shrink-0 ${orbitExtra}`} />}
+      {active && (
+        <Orbit
+          size={thinking ? 16 : s.orbit}
+          className={`shrink-0 ${orbitExtra}`}
+        />
+      )}
       {active && <Bars size={size} className={barsExtra} />}
       {text != null && text !== '' && <span>{text}</span>}
     </span>
@@ -327,12 +418,22 @@ export function LoadingIndicator({
 export function ButtonSpinner({
   className = '',
   mode = 'sync',
+  task,
+  userText,
+  thinkingEnabled,
 }: {
   className?: string
   mode?: Mode
+  task?: LlmTaskKind
+  userText?: string
+  thinkingEnabled?: boolean
 }) {
-  if (mode === 'thinking') {
+  const visual = useResolvedLlmVisual({ mode, task, userText, thinkingEnabled })
+  if (visual === 'thinking') {
     return <ThinkingOrbitIcon size={16} className={`shrink-0 text-[var(--gold)] ${className}`} />
+  }
+  if (visual === 'generating') {
+    return <SyncOrbitIcon size={14} className={`shrink-0 text-[var(--sage)] ${className}`} />
   }
   return <SyncOrbitIcon size={14} className={`shrink-0 ${className}`} />
 }

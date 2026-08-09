@@ -26,6 +26,10 @@
       "destination": "/api/openai?rest=$1"
     },
     {
+      "source": "/api/deepseek/(.*)",
+      "destination": "/api/deepseek?rest=$1"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

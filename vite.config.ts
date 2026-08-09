@@ -6,6 +6,7 @@ import path from 'node:path'
 
 const PAID_API_PREFIXES = [
   '/api/openai',
+  '/api/deepseek',
   '/api/gemini',
   '/api/aerodatabox',
   '/api/timetable-lookup',
@@ -168,8 +169,10 @@ export default defineConfig(({ mode }) => {
   }
   const rapidApiKey = env.RAPIDAPI_KEY || env.AERODATABOX_RAPIDAPI_KEY || ''
   const openaiKey = env.OPENAI_API_KEY || ''
+  const deepseekKey = env.DEEPSEEK_API_KEY || ''
   const geminiKey = env.GEMINI_API_KEY || ''
   const openaiBase = (env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
+  const deepseekBase = (env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/$/, '')
   const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || ''
   const supabaseAnon = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''
 
@@ -179,6 +182,16 @@ export default defineConfig(({ mode }) => {
     const u = new URL(openaiBase)
     openaiTarget = u.origin
     openaiPrefix = u.pathname.replace(/\/$/, '') || ''
+  } catch {
+    /* keep defaults */
+  }
+
+  let deepseekTarget = 'https://api.deepseek.com'
+  let deepseekPrefix = '/v1'
+  try {
+    const u = new URL(deepseekBase)
+    deepseekTarget = u.origin
+    deepseekPrefix = u.pathname.replace(/\/$/, '') || ''
   } catch {
     /* keep defaults */
   }
@@ -258,11 +271,33 @@ export default defineConfig(({ mode }) => {
             return `${openaiPrefix}${rest}`
           },
           configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
               if (openaiKey) {
                 proxyReq.setHeader('Authorization', `Bearer ${openaiKey}`)
               }
-              proxyReq.setHeader('Accept', 'application/json')
+              // Preserve client Accept (e.g. text/event-stream for chat streaming).
+              const accept = req.headers.accept
+              if (accept) proxyReq.setHeader('Accept', accept)
+              else proxyReq.setHeader('Accept', 'application/json')
+            })
+          },
+        },
+        // DeepSeek (OpenAI-compatible) — key injected server-side from DEEPSEEK_API_KEY
+        '/api/deepseek': {
+          target: deepseekTarget,
+          changeOrigin: true,
+          rewrite: (path) => {
+            const rest = path.replace(/^\/api\/deepseek/, '')
+            return `${deepseekPrefix}${rest}`
+          },
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              if (deepseekKey) {
+                proxyReq.setHeader('Authorization', `Bearer ${deepseekKey}`)
+              }
+              const accept = req.headers.accept
+              if (accept) proxyReq.setHeader('Accept', accept)
+              else proxyReq.setHeader('Accept', 'application/json')
             })
           },
         },

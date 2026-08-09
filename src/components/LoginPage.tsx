@@ -77,12 +77,12 @@ export function LoginPage() {
         <p className="text-xs uppercase tracking-[0.28em] text-[var(--sage)]">Paris Tour</p>
         <h1 className="font-display mt-2 text-3xl text-[var(--ink)] sm:text-4xl">邀请制登录</h1>
         <p className="mt-3 text-sm text-[var(--stone)]">
-          仅白名单邮箱可注册与使用。登录后加载你的行程存档；也可查看他人分享给你的行程。
+          需受邀邮箱才能注册与使用。登录后可打开你的行程，也可查看他人分享给你的行程。
         </p>
 
         {status === 'not_allowlisted' && (
           <p className="mt-4 rounded-xl border border-[var(--copper)]/40 bg-[var(--copper)]/10 px-3 py-2 text-sm text-[var(--ink)]">
-            该邮箱未获邀请。请联系行程主人把你的邮箱加入白名单。
+            该邮箱尚未获邀请。请联系行程主人邀请你。
           </p>
         )}
 

@@ -1299,19 +1299,23 @@ export function DayTimeline({
             {copyRefreshing && !dayRegenerating && (
               <LoadingIndicator
                 variant="badge"
-                label="文案更新中"
+                thinkingLabel="文案思考中"
+                generatingLabel="文案更新中"
                 size="sm"
                 showDots
                 mode="thinking"
+                task="dayCopy"
               />
             )}
             {dayRegenerating && (
               <LoadingIndicator
                 variant="badge"
-                label="正在重新生成今天…"
+                thinkingLabel="正在思考今天的行程…"
+                generatingLabel="正在重新生成今天…"
                 size="sm"
                 showDots
                 mode="thinking"
+                task="itineraryDayGenerate"
               />
             )}
           </div>
@@ -1350,10 +1354,12 @@ export function DayTimeline({
           <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-[var(--mist)]/40 px-3 py-3">
             <LoadingIndicator
               variant="inline"
-              label="正在重新生成今天的行程…"
+              thinkingLabel="正在仔细规划今天的行程…"
+              generatingLabel="正在重新生成今天的行程…"
               size="sm"
               showDots
               mode="thinking"
+              task="itineraryDayGenerate"
             />
           </div>
         )}
@@ -1363,7 +1369,7 @@ export function DayTimeline({
             {navLoading ? (
               <LoadingIndicator
                 className="ml-1 align-middle"
-                label="正在根据 Google 步行导航计算…"
+                label="正在计算步行路线…"
                 size="sm"
                 showDots
               />
@@ -1385,7 +1391,7 @@ export function DayTimeline({
             <PlaneIcon />
           </span>
           <div className="min-w-0 flex-1">
-            <span className="text-xs text-[var(--stone)]">出发原点 · 交通</span>
+            <span className="text-xs text-[var(--stone)]">今日起点</span>
             <p className="mt-1 font-medium">{dayOrigin.label}</p>
           </div>
         </div>

@@ -42,6 +42,12 @@ interface Props {
   closeOnBackdrop?: boolean
   /** Overlay stacking class; default sits under AddPlaceDialog (z-2100). */
   overlayClassName?: string
+  /**
+   * Explicit stacking order (inline style). Prefer this when the overlay must
+   * reliably sit above fixed chat/sheets — Tailwind arbitrary z-* on props can
+   * be easy to miss visually when another fixed layer shares the viewport.
+   */
+  overlayZIndex?: number
   onClose: () => void
 }
 
@@ -56,6 +62,7 @@ export function GooglePlacePage({
   footer,
   closeOnBackdrop = true,
   overlayClassName = 'z-[2000]',
+  overlayZIndex,
   onClose,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
@@ -116,7 +123,7 @@ export function GooglePlacePage({
         }
       })
       .catch(() => {
-        if (!cancelled) setError('加载 Google 地点详情失败。请确认已启用 Places API (New)。')
+        if (!cancelled) setError('加载地点详情失败，请稍后再试。')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -128,10 +135,16 @@ export function GooglePlacePage({
   }, [open, isLoaded, query, location?.lat, location?.lng])
 
   if (!open) return null
+  // Empty name still mounts the portal shell so callers can surface errors;
+  // title falls back so the overlay is never a blank no-op.
+  const title = (details?.name || name || '地点详情').trim() || '地点详情'
 
   return createPortal(
     <div
+      data-google-place-page="1"
+      data-pending-place-confirm={footer ? '1' : undefined}
       className={`fixed inset-0 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${overlayClassName}`}
+      style={{ zIndex: overlayZIndex ?? 2000 }}
     >
       <button
         type="button"
@@ -144,12 +157,12 @@ export function GooglePlacePage({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`${name} Google 地点页`}
+        aria-label={`${title} Google 地点页`}
         className="relative z-10 flex max-h-[min(92vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
           <div>
-            <h3 className="font-display text-2xl leading-tight">{details?.name || name}</h3>
+            <h3 className="font-display text-2xl leading-tight">{title}</h3>
             {nameLocal && (
               <p className="text-sm text-[var(--stone)]">{nameLocal}</p>
             )}
@@ -270,10 +283,14 @@ export function GooglePlacePage({
                 </p>
                 {llmNarrative.loading && !llmNarrative.intro && !llmNarrative.reason && (
                   <LoadingIndicator
-                    label={llmNarrative.labels?.loadingText || '正在生成简介与推荐理由…'}
+                    thinkingLabel="正在思考简介与推荐理由…"
+                    generatingLabel={
+                      llmNarrative.labels?.loadingText || '正在生成简介与推荐理由…'
+                    }
                     showDots
                     size="sm"
                     mode="thinking"
+                    task="placeDetail"
                   />
                 )}
                 {llmNarrative.intro && (
@@ -283,6 +300,14 @@ export function GooglePlacePage({
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
                       {llmNarrative.intro}
+                      {llmNarrative.loading &&
+                      !llmNarrative.reason &&
+                      !llmNarrative.labels?.tripFit ? (
+                        <span
+                          className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+                          aria-hidden
+                        />
+                      ) : null}
                     </p>
                   </div>
                 )}
@@ -293,6 +318,12 @@ export function GooglePlacePage({
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
                       {llmNarrative.reason}
+                      {llmNarrative.loading && !llmNarrative.labels?.tripFit ? (
+                        <span
+                          className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+                          aria-hidden
+                        />
+                      ) : null}
                     </p>
                   </div>
                 )}
@@ -309,12 +340,15 @@ export function GooglePlacePage({
                 {llmNarrative.loading &&
                   (llmNarrative.intro || llmNarrative.reason) &&
                   !llmNarrative.tripFit &&
+                  llmNarrative.labels?.tripFit &&
                   llmNarrative.labels?.loadingMoreText && (
                     <LoadingIndicator
-                      label={llmNarrative.labels.loadingMoreText}
+                      thinkingLabel={llmNarrative.labels.loadingMoreText}
+                      generatingLabel={llmNarrative.labels.loadingMoreText}
                       showDots
                       size="sm"
                       mode="thinking"
+                      task="placeDetail"
                     />
                   )}
               </div>

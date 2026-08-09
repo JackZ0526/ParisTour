@@ -1,6 +1,6 @@
 # Paris Tour
 
-[中文文档](README.zh-CN.md)
+[中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
 Invite-only Paris trip planner with per-account cloud save and realtime sync. Share by email as read-only or editable. Map, timeline, and LLM recommendations in one place—turn flights, hotels, and daily stops into a walkable itinerary.
 
@@ -56,7 +56,9 @@ See [`.env.example`](.env.example). **Never commit secrets.**
 ```env
 # --- Server (no VITE_ prefix) ---
 RAPIDAPI_KEY=              # Flights: TimeTable Lookup / AeroDataBox
-OPENAI_API_KEY=            # Itinerary, chat, recommendations
+DEEPSEEK_API_KEY=          # Preferred default LLM (itinerary, chat, recommendations)
+# DEEPSEEK_BASE_URL=       # Optional; default https://api.deepseek.com/v1
+OPENAI_API_KEY=            # Optional OpenAI models in the picker
 # OPENAI_BASE_URL=         # Optional; default https://api.openai.com/v1
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
@@ -69,8 +71,9 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_GOOGLE_MAPS_API_KEY=
-# VITE_OPENAI_MODEL=gpt-5.6-luna   # Default chat model (optional)
-# VITE_LLM_ENABLED=true            # false hides LLM features
+# VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # Default DeepSeek model (or deepseek-v4-pro)
+# VITE_OPENAI_MODEL=gpt-5.6-luna     # Override default to an OpenAI model
+# VITE_LLM_ENABLED=true              # false hides LLM features
 ```
 
 On Google Cloud, enable **Maps JavaScript API**, **Places API (New)**, and **Directions API**. Add these HTTP referrers:
@@ -91,6 +94,42 @@ On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + all
 | `npm run build` | Typecheck + production build |
 | `npm run preview` | Preview production build |
 | `npm run lint` | oxlint |
+| `npm run release:patch` | Bump patch, update changelogs, commit + tag `v*` (no push) |
+| `npm run release:minor` | Same for a minor bump |
+| `npm run release:major` | Same for a major bump |
+
+## Releases
+
+Version history lives in [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md).
+
+1. Land your feature commits on `main` (Conventional Commits help: `feat:`, `fix:`, …). Optional: keep draft notes under `## [Unreleased]` in both changelogs.
+2. One-time baseline (if no `v*` tags exist yet):
+
+```bash
+git tag -a v0.2.0 -m v0.2.0 620c6a8
+git push origin v0.2.0
+```
+
+3. Cut the next release locally (writes changelogs + `package.json`, commits, annotated tag — **does not push**):
+
+```bash
+npm run release:patch   # or release:minor / release:major
+# preview only: npm run release -- patch --dry-run
+# files only:   npm run release -- patch --no-git
+git push origin HEAD && git push origin vX.Y.Z
+```
+
+4. Pushing `v*` runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which opens a GitHub Release whose body is that version’s section from `CHANGELOG.md`.
+
+**What gets auto-generated**
+
+| Artifact | Source |
+|----------|--------|
+| `CHANGELOG.md` section | Commit subjects since previous `v*` tag (`feat`→Added, `fix`→Fixed, else Changed) **plus** any `Unreleased` bullets |
+| `CHANGELOG.zh-CN.md` section | Chinese headings; ZH `Unreleased` bullets if present, otherwise same bullets as EN (no translation API) |
+| `package.json` `version` | Semver bump |
+| git tag `vX.Y.Z` | Annotated tag on the release commit |
+| GitHub Release | Workflow copies that version’s EN changelog section |
 
 ## Project structure (overview)
 

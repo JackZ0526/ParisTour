@@ -150,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAllowlisted(false)
       setTrips([])
       setActiveTripId(null)
-      setError('该邮箱未在邀请白名单中，无法使用本应用。')
+      setError('该邮箱尚未获邀请，暂时无法使用。')
       setStatus('not_allowlisted')
       try {
         await getSupabase().auth.signOut({ scope: 'local' })
@@ -229,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
-      const msg = '该邮箱未在邀请白名单中，无法登录。'
+      const msg = '该邮箱尚未获邀请，无法登录。'
       setError(msg)
       throw new Error(msg)
     }
@@ -252,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
-      const msg = '该邮箱未在邀请白名单中，无法注册。'
+      const msg = '该邮箱尚未获邀请，无法注册。'
       setError(msg)
       throw new Error(msg)
     }

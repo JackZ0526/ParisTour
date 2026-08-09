@@ -278,30 +278,21 @@ export function TripMap({
   return (
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
-        <span>Google Maps · 原生导航路线</span>
+        <span>Google Maps · 当日路线</span>
         {navLoading ? (
           <LoadingIndicator label="正在获取实时导航…" size="sm" showDots />
         ) : (
           <span>
             {directionsLegs.length
-              ? `实时 Directions · ${directionsLegs.length} 段`
-              : '等待导航数据'}
+              ? `实时路线 · ${directionsLegs.length} 段`
+              : '等待路线数据'}
           </span>
         )}
       </div>
 
       {navPlan.error && (
         <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          {navPlan.error} 请启用{' '}
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/directions-backend.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Directions API
-          </a>
-          ，然后刷新页面。
+          {navPlan.error} 请稍后刷新页面重试。
         </div>
       )}
 

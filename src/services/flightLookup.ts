@@ -476,7 +476,7 @@ function mapTimetableLeg(leg: TimetableLeg, displayFlightNumber: string): Flight
     aircraft: leg.aircraft ? cleanAircraftName(leg.aircraft) : undefined,
     source: 'timetable',
     rawNote: [
-      '计划时刻来自 TimeTable Lookup（可能与 Expedia 等订票站不完全一致）',
+      '计划时刻仅供参考，可能与订票网站略有差异',
       operatedNote,
       '请以机票为准',
     ]
@@ -598,7 +598,7 @@ function mapAeroDataBoxFlight(
     aircraft: aircraftFromFlight(flight),
     source: 'aerodatabox',
     rawNote: [
-      '计划时刻来自 AeroDataBox（可能与 Expedia 等订票站不完全一致）',
+      '计划时刻仅供参考，可能与订票网站略有差异',
       operatedNote,
       '请以机票为准',
     ]

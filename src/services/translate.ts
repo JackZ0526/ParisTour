@@ -89,17 +89,20 @@ export async function translateTextsToChinese(
   const batchKey = `translate:${needTranslate.slice().sort().join('\n')}`
 
   const translatedBatch = await memoizeLlmCall(batchKey, async () => {
-    const raw = await openaiChat([
-      {
-        role: 'system',
-        content:
-          '你是翻译助手。把用户给出的 Google 评论译成简洁通顺的简体中文。只输出 JSON：{"translations":["..."]}，数组顺序与输入 texts 一致，长度必须相同。不要解释。',
-      },
-      {
-        role: 'user',
-        content: JSON.stringify({ texts: needTranslate }),
-      },
-    ])
+    const raw = await openaiChat(
+      [
+        {
+          role: 'system',
+          content:
+            '你是翻译助手。把用户给出的 Google 评论译成简洁通顺的简体中文。只输出 JSON：{"translations":["..."]}，数组顺序与输入 texts 一致，长度必须相同。不要解释。',
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({ texts: needTranslate }),
+        },
+      ],
+      { task: 'translate', userText: needTranslate[0] },
+    )
 
     const parsed = extractLlmJsonObject(raw)
     const list = (parsed?.translations as unknown[]) || []

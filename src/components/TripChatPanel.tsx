@@ -4,9 +4,17 @@ import {
 } from '../services/googlePlaceDetails'
 import {
   generatePlaceDescription,
-  getOpenAIModelLabel,
+  generatePlaceDetailCopy,
+  getActiveLlmLabel,
   isLlmConfigured,
+  resolveThinkingForTask,
+  type HotelDetailCopy,
 } from '../services/llm'
+import {
+  memoizePlaceDetailCopy,
+  peekPlaceDetailCopy,
+  placeDetailKeysFromPlace,
+} from '../services/placeDetailMemo'
 import {
   persistHotelState,
   refreshHotelCandidates,
@@ -15,25 +23,53 @@ import {
 } from '../services/hotelRecommend'
 import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
 import {
+  extractQuotedPlaceNames,
+  findReplaceTargetInDay,
+  inferPlaceTypeFromText,
+  isReplacePlaceIntent,
   matchHotelCandidate,
   matchPlaceInDay,
-  sendTripChatMessage,
+  replyClaimsDetailConfirm,
+  replyClaimsItineraryApplied,
+  sendTripChatMessageStream,
+  stripDetailConfirmClaim,
   type TripChatAction,
+  type TripChatContext,
+  type TripChatDestination,
   type TripChatTurn,
+  type TripChatWorkStep,
 } from '../services/tripChat'
-import type { DayPlan, HotelCandidate, Place, PlaceType, SelectedHotel } from '../types'
+import type {
+  DayPlan,
+  FlightInfo,
+  HotelCandidate,
+  Place,
+  PlaceType,
+  SelectedHotel,
+} from '../types'
+import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
+import { LlmModelPicker } from './LlmModelPicker'
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
+
+const PENDING_PLACE_LABELS = {
+  title: '行程顾问点评',
+  intro: '地点简介',
+  reason: '为什么推荐',
+  loadingText: '正在生成地点简介与推荐理由…',
+}
 
 type PendingPlaceConfirm = {
   id: string
   kind: 'add' | 'replace'
   dayNum: number
   place: Place
+  /** Chat-action note for advisor context only; never use as card note if operational. */
+  note?: string
   /** add only */
   mode?: 'best' | 'end'
   /** replace only */
@@ -44,10 +80,310 @@ type PendingPlaceConfirm = {
   status?: 'ready' | 'rerecommending'
 }
 
+function pendingFallbackReason(pending: PendingPlaceConfirm): string {
+  if (pending.kind === 'replace') {
+    return `用于替换第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」`
+  }
+  return `计划加入第 ${pending.dayNum} 天行程`
+}
+
+/** Chat-model action.note often describes insertion logistics, not the place. */
+function isOperationalStopNote(note: string | undefined | null): boolean {
+  const t = String(note || '').trim()
+  if (!t) return true
+  if (
+    /顺路插入|按行程路线|加到.*末尾|加到当天|用于替换|计划加入第|按最顺路|按当天节奏/.test(
+      t,
+    )
+  ) {
+    return true
+  }
+  // e.g. 「作为第1天晚餐，…插入/加入/安排」
+  if (/作为第\s*\d+\s*天/.test(t) && /插入|加入|安排|替换/.test(t)) return true
+  return false
+}
+
+/** Prefer traveler-facing blurbs over operational chat-action notes. */
+function pickTravelerStopNote(opts: {
+  storyIntro?: string | null
+  placeDescription?: string | null
+  actionNote?: string | null
+}): string {
+  const candidates = [opts.storyIntro, opts.placeDescription, opts.actionNote]
+  for (const c of candidates) {
+    const t = String(c || '').trim()
+    if (t.length >= 8 && !isOperationalStopNote(t)) return t
+  }
+  for (const c of candidates) {
+    const t = String(c || '').trim()
+    if (t) return t
+  }
+  return ''
+}
+
 function placeTypeLabel(type: PlaceType): string {
   if (type === 'cafe') return '咖啡馆'
   if (type === 'restaurant') return '餐厅'
   return '景点'
+}
+
+/** Soften false “already added” copy when confirm UI is still required. */
+function clarifyReplyForPending(
+  reply: string,
+  pending: PendingPlaceConfirm[],
+): string {
+  if (!pending.length) return reply
+  const names = pending.map((p) => `「${p.place.name}」`).join('、')
+  const confirmHint =
+    pending[0].kind === 'replace'
+      ? `行程尚未改动——请在详情页确认是否用${names}替换「${pending[0].fromPlaceName || '原地点'}」。`
+      : `行程尚未改动——请在详情页确认是否将${names}加入行程。`
+  if (replyClaimsItineraryApplied(reply) || !/详情|确认是否/.test(reply)) {
+    const cleaned = reply
+      .replace(
+        /已(经)?(正式)?加入[了]?|已经加[入进][了]?|已加到行程[了]?|已添加到行程[了]?|已帮你加[入了]?|已经帮你加[入了]?|已(经)?替换[了]?|已经换[成好][了]?/g,
+        '已为你找到候选',
+      )
+      .trim()
+    if (!cleaned || replyClaimsItineraryApplied(cleaned)) {
+      return `已为你找到${names}。${confirmHint}`
+    }
+    if (/详情|确认是否|尚未改动/.test(cleaned)) return cleaned
+    return `${cleaned}\n\n${confirmHint}`
+  }
+  return reply
+}
+
+const NO_ACTION_APPLIED_NOTE =
+  '这次没有可执行的操作，行程未改动。若要加地点，请再说一次（或点名具体店名）。'
+
+const DETAIL_CONFIRM_MISSING_NOTE =
+  '未能打开地点确认页：没有可用的推荐地点。请再说一次店名，或换个说法重试。'
+
+function notesIndicateItineraryApplied(notes: string[]): boolean {
+  return notes.some(
+    (n) =>
+      /已将|已从第|已选中|已切换到|已添加酒店|已重新推荐|已移除/.test(n) &&
+      !/请在详情页确认/.test(n),
+  )
+}
+
+function notesClaimDetailConfirm(notes: string[]): boolean {
+  return notes.some((n) => /请在详情页确认|详情页确认是否/.test(n))
+}
+
+/** Client-side pipeline steps shown while the assistant works (Cursor-ish). */
+type ChatWorkStepId =
+  | 'understand'
+  | 'generate'
+  | 'parse'
+  | 'resolvePlaces'
+  | 'apply'
+
+type ChatWorkStep = TripChatWorkStep & { id: ChatWorkStepId }
+
+const CHAT_WORK_STEP_LABELS: Record<ChatWorkStepId, string> = {
+  understand: '理解你的需求…',
+  generate: '生成回复…',
+  parse: '解析行程操作…',
+  resolvePlaces: '查找地点详情…',
+  apply: '应用改动…',
+}
+
+function initialChatWorkSteps(): ChatWorkStep[] {
+  return (['understand', 'generate', 'parse'] as const).map((id, i) => ({
+    id,
+    label: CHAT_WORK_STEP_LABELS[id],
+    status: i === 0 ? 'active' : 'pending',
+  }))
+}
+
+function activateChatWorkStep(
+  steps: ChatWorkStep[],
+  activeId: ChatWorkStepId,
+  extras?: {
+    labels?: Partial<Record<ChatWorkStepId, string>>
+    insert?: ChatWorkStep[]
+  },
+): ChatWorkStep[] {
+
+  let list = steps
+  if (extras?.insert?.length) {
+    const existing = new Set(list.map((s) => s.id))
+    const toAdd = extras.insert.filter((s) => !existing.has(s.id))
+    if (toAdd.length) {
+      const parseIdx = list.findIndex((s) => s.id === 'parse')
+      const at = parseIdx >= 0 ? parseIdx + 1 : list.length
+      list = [...list.slice(0, at), ...toAdd, ...list.slice(at)]
+    }
+  }
+  const activeIdx = list.findIndex((s) => s.id === activeId)
+  return list.map((s, i) => {
+    const label = extras?.labels?.[s.id] ?? s.label
+    if (activeIdx < 0) return { ...s, label }
+    if (i < activeIdx) {
+      return {
+        ...s,
+        label,
+        status: s.status === 'skipped' ? 'skipped' : 'done',
+      }
+    }
+    if (i === activeIdx) return { ...s, label, status: 'active' }
+    return {
+      ...s,
+      label,
+      status: s.status === 'skipped' || s.status === 'done' ? s.status : 'pending',
+    }
+  })
+}
+
+function finishChatWorkSteps(steps: ChatWorkStep[]): ChatWorkStep[] {
+  return steps.map((s) => ({
+    ...s,
+    status: s.status === 'skipped' ? 'skipped' : 'done',
+  }))
+}
+
+function actionsNeedPlaceLookup(actions: TripChatAction[]): boolean {
+  return actions.some(
+    (a) =>
+      a.type === 'add_place' ||
+      a.type === 'replace_place' ||
+      a.type === 'add_hotel' ||
+      a.type === 'refresh_hotels' ||
+      a.type === 'replace_hotel' ||
+      a.type === 'replace_hotels',
+  )
+}
+
+function ChatWorkStepsPanel({
+  steps,
+  open,
+  onToggle,
+  completed = false,
+}: {
+  steps: TripChatWorkStep[]
+  open: boolean
+  onToggle: () => void
+  completed?: boolean
+}) {
+  const visible = steps.filter((s) => s.status !== 'skipped')
+  if (!visible.length) return null
+  const active = visible.find((s) => s.status === 'active')
+  const lastDone = [...visible].reverse().find((s) => s.status === 'done')
+  const summary = completed
+    ? lastDone?.label || '步骤'
+    : active?.label || '处理中…'
+  const expandable = completed ? visible.length >= 1 : visible.length > 1
+  const collapsedLabel =
+    completed && !open && visible.length > 1 ? '步骤' : summary
+
+  return (
+    <div className="mb-1.5 text-xs leading-snug">
+      {expandable ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="group flex w-full items-center gap-1.5 text-left text-[var(--stone)]/65 transition hover:text-[var(--stone)]"
+          aria-expanded={open}
+        >
+          <span className="min-w-0 truncate">{collapsedLabel}</span>
+          <span
+            className="shrink-0 text-[10px] text-[var(--stone)]/40 transition group-hover:text-[var(--stone)]/60"
+            aria-hidden
+          >
+            {open ? '▾' : '▸'}
+          </span>
+        </button>
+      ) : (
+        <p className="truncate text-[var(--stone)]/65">{summary}</p>
+      )}
+      {open && expandable && (
+        <ol className="mt-1 space-y-0.5 pl-0.5">
+          {visible.map((step) => {
+            const done = step.status === 'done'
+            const activeStep = step.status === 'active'
+            return (
+              <li
+                key={step.id}
+                className={`flex items-center gap-1.5 ${
+                  activeStep
+                    ? 'text-[var(--stone)]/80'
+                    : done
+                      ? 'text-[var(--stone)]/45'
+                      : 'text-[var(--stone)]/30'
+                }`}
+              >
+                <span className="w-2.5 shrink-0 text-center text-[10px] leading-none" aria-hidden>
+                  {done ? '✓' : activeStep ? '·' : ''}
+                </span>
+                <span className="truncate">{step.label}</span>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+    </div>
+  )
+}
+
+function StoredChatWorkStepsPanel({ steps }: { steps: TripChatWorkStep[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <ChatWorkStepsPanel
+      steps={steps}
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+      completed
+    />
+  )
+}
+
+function StoredChatReasoningDisclosure({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <ChatReasoningDisclosure
+      text={text}
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
+    />
+  )
+}
+
+function ChatReasoningDisclosure({
+  text,
+  open,
+  onToggle,
+}: {
+  text: string
+  open: boolean
+  onToggle: () => void
+}) {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  return (
+    <div className="mb-1.5 text-xs leading-snug">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="group flex items-center gap-1 text-[var(--stone)]/50 transition hover:text-[var(--stone)]/75"
+        aria-expanded={open}
+      >
+        <span>思考过程</span>
+        <span
+          className="text-[10px] text-[var(--stone)]/35 transition group-hover:text-[var(--stone)]/55"
+          aria-hidden
+        >
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open && (
+        <div className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap text-[var(--stone)]/55">
+          {trimmed}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function buildRerecommendMessage(rejected: PendingPlaceConfirm, excluded: string[]): string {
@@ -96,6 +432,15 @@ interface Props {
   days: DayPlan[]
   currentDay: number
   customPlaces: Record<string, Place>
+  /** Destination from DestinationPanel / trip meta (string or structured). */
+  destination?: TripChatDestination | string | null
+  /** Optional free-text preferences when collected by the app. */
+  preferences?: string | null
+  tripStartDate?: string | null
+  tripEndDate?: string | null
+  itineraryStartDate?: string | null
+  outbound?: FlightInfo | null
+  returnFlight?: FlightInfo | null
   handlers: TripChatHandlers
 }
 
@@ -113,23 +458,208 @@ export function TripChatPanel({
   days,
   currentDay,
   customPlaces,
+  destination = null,
+  preferences = null,
+  tripStartDate = null,
+  tripEndDate = null,
+  itineraryStartDate = null,
+  outbound = null,
+  returnFlight = null,
   handlers,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [streamingReply, setStreamingReply] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<TripChatTurn[]>([])
   const [actionNotes, setActionNotes] = useState<string[]>([])
   const [panelMounted, setPanelMounted] = useState(false)
   const [panelEntered, setPanelEntered] = useState(false)
   const [pendingPlaces, setPendingPlaces] = useState<PendingPlaceConfirm[]>([])
+  /** Bumps GooglePlacePage remount when confirm overlay must be forced visible. */
+  const [confirmEpoch, setConfirmEpoch] = useState(0)
+  const [pendingStory, setPendingStory] = useState<HotelDetailCopy | null>(null)
+  const [pendingStoryLoading, setPendingStoryLoading] = useState(false)
   const [confirmBusy, setConfirmBusy] = useState(false)
+  const [busyUserText, setBusyUserText] = useState('')
+  const [workSteps, setWorkSteps] = useState<ChatWorkStep[]>([])
+  const [workStepsOpen, setWorkStepsOpen] = useState(false)
+  const [reasoningText, setReasoningText] = useState('')
+  const [reasoningOpen, setReasoningOpen] = useState(false)
+  const [showReasoningUi, setShowReasoningUi] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const workStepsRef = useRef<ChatWorkStep[]>([])
+  const reasoningTextRef = useRef('')
+  const chatBusy = useLlmBusyMode({ task: 'tripChat', userText: busyUserText || input })
+  // Snapshot day/hotel context so itinerary edits don't re-fire LLM mid-confirm.
+  const pendingCtxRef = useRef({ hotel, days })
+  pendingCtxRef.current = { hotel, days }
+  workStepsRef.current = workSteps
+  reasoningTextRef.current = reasoningText
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  function beginChatRequest(): AbortController {
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
+    return ac
+  }
+
+  function buildChatContext(): TripChatContext {
+    return {
+      hotel,
+      hotelCandidates,
+      days,
+      currentDay,
+      customPlaces,
+      destination,
+      preferences,
+      tripStartDate,
+      tripEndDate,
+      itineraryStartDate,
+      outbound,
+      returnFlight,
+    }
+  }
+
+  function isAbortError(err: unknown): boolean {
+    return (
+      (err instanceof DOMException && err.name === 'AbortError') ||
+      (err instanceof Error && err.name === 'AbortError')
+    )
+  }
+
+  function updateLastAssistantContent(content: string) {
+    setHistory((prev) => {
+      if (!prev.length) return prev
+      const last = prev[prev.length - 1]
+      if (!last || last.role !== 'assistant') return prev
+      if (last.content === content) return prev
+      return [...prev.slice(0, -1), { ...last, content }]
+    })
+  }
 
   const activePending = pendingPlaces[0] ?? null
+
+  // If pending exists but the portaled detail page never painted, force remount.
+  useEffect(() => {
+    if (!pendingPlaces.length) return
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (cancelled) return
+      const visible = document.querySelector('[data-pending-place-confirm="1"]')
+      if (!visible) {
+        setOpen(false)
+        setConfirmEpoch((e) => e + 1)
+      }
+    }, 80)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [pendingPlaces, confirmEpoch])
+
+  // Generate intro + 推荐理由 when pending confirm opens (same memo as PlacePanel).
+  useEffect(() => {
+    if (!activePending) {
+      setPendingStory(null)
+      setPendingStoryLoading(false)
+      return
+    }
+
+    const pending = activePending
+    const place = pending.place
+    const fallbackReason = pendingFallbackReason(pending)
+    const stopNote =
+      pending.note ||
+      (pending.kind === 'replace'
+        ? `用于替换「${pending.fromPlaceName || '原地点'}」`
+        : '')
+    const detailKeys = placeDetailKeysFromPlace(place)
+    const memoHit = peekPlaceDetailCopy(...detailKeys)
+    if (memoHit) {
+      setPendingStory({ ...memoHit, tripFit: '' })
+      setPendingStoryLoading(false)
+      return
+    }
+
+    if (!isLlmConfigured()) {
+      setPendingStory({
+        intro: place.description,
+        reason: fallbackReason,
+        tripFit: '',
+      })
+      setPendingStoryLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setPendingStory({ intro: '', reason: '', tripFit: '' })
+    setPendingStoryLoading(true)
+
+    const ctx = pendingCtxRef.current
+    const day = ctx.days.find((d) => d.day === pending.dayNum)
+
+    void memoizePlaceDetailCopy(detailKeys, () =>
+      generatePlaceDetailCopy({
+        name: place.name,
+        nameLocal: place.nameLocal,
+        type: place.type,
+        existingDescription: place.description,
+        stopNote,
+        day: pending.dayNum,
+        dayTitle: day?.title,
+        dayTheme: day?.theme,
+        dayPace: day?.pace,
+        hotelArea: ctx.hotel.areaKey,
+        tripDays: ctx.days.map((d) => ({
+          day: d.day,
+          title: d.title,
+          pace: d.pace,
+          theme: d.theme,
+        })),
+        onPartial: (partial) => {
+          if (cancelled) return
+          setPendingStory((prev) => ({
+            intro: partial.intro ?? prev?.intro ?? '',
+            reason: partial.reason ?? prev?.reason ?? '',
+            tripFit: '',
+          }))
+        },
+      }).then((copy) => {
+        if (!copy) {
+          return {
+            intro: place.description,
+            reason: fallbackReason,
+            tripFit: '',
+          }
+        }
+        return { ...copy, tripFit: '' }
+      }),
+    )
+      .then((copy) => {
+        if (cancelled || !copy) return
+        setPendingStory(copy)
+      })
+      .finally(() => {
+        if (!cancelled) setPendingStoryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // Only re-run when the pending confirm target changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePending?.id])
 
   // Keep the panel mounted through the close animation so exit can play.
   useEffect(() => {
@@ -157,11 +687,52 @@ export function TripChatPanel({
     const behavior: ScrollBehavior = wasOpenRef.current ? 'smooth' : 'auto'
     wasOpenRef.current = true
     bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
-  }, [history, actionNotes, busy, open])
+  }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open])
+
+  function beginWorkPipeline(userText: string) {
+    const thinkingOn = resolveThinkingForTask('tripChat', userText).enabled
+    setWorkSteps(initialChatWorkSteps())
+    setWorkStepsOpen(false)
+    setReasoningText('')
+    setReasoningOpen(false)
+    setShowReasoningUi(thinkingOn)
+  }
+
+  function clearWorkPipeline() {
+    setWorkSteps([])
+    setWorkStepsOpen(false)
+    setReasoningText('')
+    setShowReasoningUi(false)
+    setReasoningOpen(false)
+  }
+
+  function persistWorkOnLastAssistant(
+    steps: ChatWorkStep[],
+    reasoning: string,
+    content?: string,
+  ) {
+    const finished = finishChatWorkSteps(steps)
+    const reasoningTrimmed = reasoning.trim()
+    setHistory((prev) => {
+      const last = prev[prev.length - 1]
+      if (!last || last.role !== 'assistant') return prev
+      return [
+        ...prev.slice(0, -1),
+        {
+          ...last,
+          ...(content !== undefined ? { content } : {}),
+          steps: finished,
+          ...(reasoningTrimmed ? { reasoning: reasoningTrimmed } : {}),
+        },
+      ]
+    })
+    clearWorkPipeline()
+  }
 
   async function buildPlaceFromQuery(input: {
     placeName: string
     placeType?: PlaceType
+    /** Optional chat-action note — only used when traveler-facing, never operational. */
     note?: string
     dayNum: number
   }): Promise<Place> {
@@ -173,12 +744,16 @@ export function TripChatPanel({
     }
 
     const placeType: PlaceType = input.placeType || 'attraction'
+    // Never seed place.description from operational action.note
+    // (e.g. 「作为第1天晚餐，按行程路线顺路插入。」) — that becomes the DayTimeline card.
+    const travelerNote = !isOperationalStopNote(input.note) ? input.note?.trim() : undefined
+    const hasUsefulNote = Boolean(travelerNote && travelerNote.length >= 12)
     let description =
-      input.note ||
+      (hasUsefulNote ? travelerNote : undefined) ||
       details.summary ||
       `${details.name}，适合安排进第 ${input.dayNum} 天行程。`
 
-    if (isLlmConfigured() && !input.note) {
+    if (isLlmConfigured() && !hasUsefulNote) {
       const blurb = await generatePlaceDescription({
         name: details.name,
         type: placeType,
@@ -290,6 +865,7 @@ export function TripChatPanel({
         kind: 'add',
         dayNum,
         place,
+        note: action.note,
         mode,
         rejectedNames,
         status: 'ready',
@@ -302,6 +878,7 @@ export function TripChatPanel({
     workingDays: DayPlan[],
     activeDay: number,
     rejectedNames?: string[],
+    userMessage?: string,
   ): Promise<{
     note: string
     pending?: PendingPlaceConfirm
@@ -312,8 +889,20 @@ export function TripChatPanel({
     const day = workingDays.find((d) => d.day === dayNum)
     if (!day) throw new Error(`没有第 ${dayNum} 天`)
 
-    const hit = matchPlaceInDay(day, customPlaces, action.fromPlaceName)
-    if (!hit) throw new Error(`第 ${dayNum} 天没有「${action.fromPlaceName}」`)
+    const hit =
+      (action.fromPlaceName
+        ? matchPlaceInDay(day, customPlaces, action.fromPlaceName)
+        : null) ||
+      findReplaceTargetInDay(day, customPlaces, {
+        fromPlaceName: action.fromPlaceName,
+        placeType: action.placeType,
+        userMessage,
+        excludePlaceName: action.toPlaceName,
+      })
+    if (!hit) {
+      const label = action.fromPlaceName?.trim() || action.placeType || '地点'
+      throw new Error(`第 ${dayNum} 天没有可替换的「${label}」`)
+    }
 
     const place = await buildPlaceFromQuery({
       placeName: action.toPlaceName,
@@ -349,11 +938,166 @@ export function TripChatPanel({
         kind: 'replace',
         dayNum,
         place,
+        note: action.note,
         replaceStopId: hit.stopId,
         fromPlaceName: hit.place.name,
         rejectedNames,
         status: 'ready',
       },
+    }
+  }
+
+  /**
+   * Enqueue recommend confirms. Detail uses createPortal(document.body) + inline
+   * z-index; still close the chat sheet on mobile so it cannot trap focus.
+   */
+  function enqueuePendingPlaces(next: PendingPlaceConfirm[]) {
+    if (!next.length) return
+    setOpen(false)
+    setPendingPlaces((prev) => [...prev, ...next])
+    setConfirmEpoch((e) => e + 1)
+  }
+
+  /** When the model claims a detail confirm but apply produced none, rebuild pending. */
+  async function recoverPendingConfirm(input: {
+    reply: string
+    actions: TripChatAction[]
+    userMessage: string
+    rejectedNames?: string[]
+  }): Promise<PendingPlaceConfirm | null> {
+    const { reply, actions, userMessage, rejectedNames } = input
+    const workingDays = days.map((d) => ({ ...d, stops: [...d.stops] }))
+    const placeActions = actions.filter(
+      (a): a is Extract<TripChatAction, { type: 'add_place' | 'replace_place' }> =>
+        a.type === 'add_place' || a.type === 'replace_place',
+    )
+
+    for (const action of placeActions) {
+      try {
+        if (action.type === 'replace_place') {
+          const result = await resolveReplacePlace(
+            { ...action, source: 'recommend' },
+            workingDays,
+            currentDay,
+            rejectedNames,
+            userMessage,
+          )
+          if (result.pending) return result.pending
+        } else {
+          const result = await resolveAddPlace(
+            { ...action, source: 'recommend' },
+            rejectedNames,
+          )
+          if (result.pending) return result.pending
+        }
+      } catch {
+        /* try next candidate */
+      }
+    }
+
+    const names = extractQuotedPlaceNames(reply)
+    const replaceIntent = isReplacePlaceIntent(userMessage)
+    const placeType =
+      inferPlaceTypeFromText(userMessage) || inferPlaceTypeFromText(reply) || undefined
+
+    for (const name of names) {
+      try {
+        if (replaceIntent) {
+          const result = await resolveReplacePlace(
+            {
+              type: 'replace_place',
+              toPlaceName: name,
+              placeType,
+              source: 'recommend',
+            },
+            workingDays,
+            currentDay,
+            rejectedNames,
+            userMessage,
+          )
+          if (result.pending) return result.pending
+        } else {
+          const result = await resolveAddPlace(
+            {
+              type: 'add_place',
+              placeName: name,
+              placeType,
+              mode: 'best',
+              source: 'recommend',
+            },
+            rejectedNames,
+          )
+          if (result.pending) return result.pending
+        }
+      } catch {
+        /* try next quoted name */
+      }
+    }
+    return null
+  }
+
+  /**
+   * Guarantee: if reply/notes say「请在详情页确认」, either pending opens or we
+   * surface a hard error (never a dangling confirm promise).
+   */
+  async function ensurePendingFromTurn(input: {
+    reply: string
+    actions: TripChatAction[]
+    userMessage: string
+    notes: string[]
+    pending: PendingPlaceConfirm[]
+    rejectedNames?: string[]
+  }): Promise<{ reply: string; notes: string[]; pending: PendingPlaceConfirm[] }> {
+    let { reply, notes, pending } = input
+    if (pending.length) {
+      return {
+        reply: clarifyReplyForPending(reply, pending),
+        notes,
+        pending,
+      }
+    }
+
+    const wantsConfirm =
+      replyClaimsDetailConfirm(reply) || notesClaimDetailConfirm(notes)
+    if (!wantsConfirm) {
+      return { reply, notes, pending }
+    }
+
+    // Model said confirm but apply already mutated — strip the false confirm claim.
+    if (notesIndicateItineraryApplied(notes)) {
+      return {
+        reply: stripDetailConfirmClaim(reply) || reply,
+        notes,
+        pending: [],
+      }
+    }
+
+    const recovered = await recoverPendingConfirm({
+      reply,
+      actions: input.actions,
+      userMessage: input.userMessage,
+      rejectedNames: input.rejectedNames,
+    })
+    if (recovered) {
+      const confirmNote =
+        recovered.kind === 'replace'
+          ? `已找到「${recovered.place.name}」，请在详情页确认是否替换「${recovered.fromPlaceName || '原地点'}」`
+          : `已找到「${recovered.place.name}」，请在详情页确认是否加入第 ${recovered.dayNum} 天`
+      return {
+        reply: clarifyReplyForPending(reply, [recovered]),
+        notes: [...notes.filter((n) => !/请在详情页确认/.test(n)), confirmNote],
+        pending: [recovered],
+      }
+    }
+
+    const cleaned = stripDetailConfirmClaim(reply)
+    const keepNotes = notes.filter((n) => !/请在详情页确认/.test(n))
+    return {
+      reply: cleaned
+        ? `${cleaned}\n\n（${DETAIL_CONFIRM_MISSING_NOTE}）`
+        : DETAIL_CONFIRM_MISSING_NOTE,
+      notes: [...keepNotes, DETAIL_CONFIRM_MISSING_NOTE],
+      pending: [],
     }
   }
 
@@ -370,25 +1114,45 @@ export function TripChatPanel({
     // Close detail immediately before applying the itinerary mutation.
     setPendingPlaces((prev) => prev.filter((p) => p.id !== pending.id))
     try {
-      if (pending.kind === 'add') {
-        const mode = pending.mode === 'end' ? 'end' : 'best'
-        // select: false — same as AddPlaceDialog; avoid reopening PlacePanel overlay.
-        handlers.addPlace(pending.dayNum, pending.place, { mode, select: false })
-        setActionNotes((prev) => [
-          ...prev,
-          mode === 'end'
-            ? `已将「${pending.place.name}」加到第 ${pending.dayNum} 天末尾`
-            : `已将「${pending.place.name}」按最顺路插入第 ${pending.dayNum} 天`,
-        ])
-      } else if (pending.replaceStopId) {
-        handlers.replaceStop(pending.dayNum, pending.replaceStopId, pending.place, {
+      // Prefer advisor intro / place blurb; never persist operational action.note on the card.
+      const description =
+        pickTravelerStopNote({
+          storyIntro: pendingStory?.intro,
+          placeDescription: pending.place.description,
+          actionNote: pending.note,
+        }) || pending.place.description
+      const place =
+        description !== pending.place.description
+          ? { ...pending.place, description }
+          : pending.place
+
+      if (pending.kind === 'replace') {
+        if (!pending.replaceStopId) {
+          setActionNotes((prev) => [
+            ...prev,
+            `无法替换「${pending.fromPlaceName || '原地点'}」：缺少行程停点信息，请再说一次。`,
+          ])
+          return
+        }
+        handlers.replaceStop(pending.dayNum, pending.replaceStopId, place, {
           select: false,
         })
         setActionNotes((prev) => [
           ...prev,
-          `已将第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」替换为「${pending.place.name}」`,
+          `已将第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」替换为「${place.name}」`,
         ])
+        return
       }
+
+      const mode = pending.mode === 'end' ? 'end' : 'best'
+      // select: false — same as AddPlaceDialog; avoid reopening PlacePanel overlay.
+      handlers.addPlace(pending.dayNum, place, { mode, select: false })
+      setActionNotes((prev) => [
+        ...prev,
+        mode === 'end'
+          ? `已将「${place.name}」加到第 ${pending.dayNum} 天末尾`
+          : `已将「${place.name}」按最顺路插入第 ${pending.dayNum} 天`,
+      ])
     } finally {
       setConfirmBusy(false)
     }
@@ -397,7 +1161,7 @@ export function TripChatPanel({
   async function rerecommendPending(rejected: PendingPlaceConfirm) {
     if (busy || confirmBusy || rejected.status === 'rerecommending') return
     if (!isLlmConfigured()) {
-      setError('未配置 OpenAI API Key，无法对话。')
+      setError('对话助手暂不可用，请稍后再试。')
       return
     }
 
@@ -410,60 +1174,182 @@ export function TripChatPanel({
     )
     setError(null)
     // Keep exclusion prompt in API history only — never as a visible user bubble.
-    setHistory((prev) => [...prev, { role: 'user', content: message, hidden: true }])
+    setBusyUserText(message)
+    beginWorkPipeline(message)
+    setHistory((prev) => [
+      ...prev,
+      { role: 'user', content: message, hidden: true },
+      { role: 'assistant', content: '' },
+    ])
     setActionNotes(['正在重新推荐…'])
     setBusy(true)
+    setStreamingReply(false)
+    const ac = beginChatRequest()
+
+    // Brief beat so「理解你的需求」is visible before stream starts.
+    setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
 
     try {
-      const result = await sendTripChatMessage({
-        ctx: {
-          hotel,
-          hotelCandidates,
-          days,
-          currentDay,
-          customPlaces,
-        },
+      const result = await sendTripChatMessageStream({
+        ctx: buildChatContext(),
         history,
         userMessage: message,
+        signal: ac.signal,
+        onReplyDelta: (reply) => {
+          setStreamingReply(true)
+          setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+          updateLastAssistantContent(reply)
+        },
+        onReasoningDelta: (_delta, full) => {
+          if (!resolveThinkingForTask('tripChat', message).enabled) return
+          setShowReasoningUi(true)
+          setReasoningText(full)
+        },
       })
+      if (abortRef.current !== ac) return
+      setStreamingReply(false)
+      setWorkSteps((prev) => activateChatWorkStep(prev, 'parse'))
 
-      setHistory((prev) => [...prev, { role: 'assistant', content: result.reply }])
-      const { notes, pending } = await applyActions(result.actions, { rejectedNames: excluded })
-      setActionNotes(notes)
+      let notes: string[] = []
+      let pending: PendingPlaceConfirm[] = []
+      if (result.actions.length) {
+        const applied = await applyActions(result.actions, {
+          rejectedNames: excluded,
+          userMessage: message,
+          onProgress: (phase, detail) => {
+            if (phase === 'resolvePlaces') {
+              setWorkSteps((prev) =>
+                activateChatWorkStep(prev, 'resolvePlaces', {
+                  insert: [
+                    {
+                      id: 'resolvePlaces',
+                      label: CHAT_WORK_STEP_LABELS.resolvePlaces,
+                      status: 'pending',
+                    },
+                    {
+                      id: 'apply',
+                      label: '打开确认页…',
+                      status: 'pending',
+                    },
+                  ],
+                }),
+              )
+              return
+            }
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'apply', {
+                insert: [
+                  {
+                    id: 'apply',
+                    label: detail?.pending ? '打开确认页…' : '应用改动…',
+                    status: 'pending',
+                  },
+                ],
+                labels: {
+                  apply: detail?.pending ? '打开确认页…' : '应用改动…',
+                },
+              }),
+            )
+          },
+        })
+        notes = applied.notes
+        pending = applied.pending
+      }
+
+      if (abortRef.current !== ac) return
+
+      const ensured = await ensurePendingFromTurn({
+        reply: result.reply,
+        actions: result.actions,
+        userMessage: message,
+        notes,
+        pending,
+        rejectedNames: excluded,
+      })
+      if (abortRef.current !== ac) return
+
+      notes = ensured.notes
+      pending = ensured.pending
+      const displayReply = ensured.reply
+      setActionNotes(
+        notes.length
+          ? notes
+          : pending.length
+            ? []
+            : ['没有拿到新的地点推荐，请再说一下你想要的风格或区域。'],
+      )
       setPendingPlaces((prev) => {
         const rest = prev.filter((p) => p.id !== rejected.id)
         return pending.length ? [...rest, ...pending] : rest
       })
-      if (!pending.length) {
-        setActionNotes((prev) => [
-          ...prev,
-          '没有拿到新的地点推荐，请再说一下你想要的风格或区域。',
-        ])
+      if (pending.length) {
+        setConfirmEpoch((e) => e + 1)
+        setOpen(false)
+      } else {
         setOpen(true)
       }
+      persistWorkOnLastAssistant(
+        workStepsRef.current,
+        reasoningTextRef.current,
+        displayReply,
+      )
     } catch (err) {
+      if (isAbortError(err) || abortRef.current !== ac) return
       setPendingPlaces((prev) =>
         prev.map((p) => (p.id === rejected.id ? { ...p, status: 'ready' } : p)),
       )
+      setHistory((prev) => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant' && last.content.trim()) {
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...last,
+              content: `${last.content.trim()}\n\n（重新推荐中断：${
+                err instanceof Error ? err.message : '请稍后再试'
+              }）`,
+            },
+          ]
+        }
+        return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
+      })
       setError(err instanceof Error ? err.message : '重新推荐失败，请稍后再试。')
       setOpen(true)
+      clearWorkPipeline()
     } finally {
-      setBusy(false)
-      setConfirmBusy(false)
+      if (abortRef.current === ac) {
+        abortRef.current = null
+        setBusy(false)
+        setStreamingReply(false)
+        setBusyUserText('')
+        setConfirmBusy(false)
+      }
     }
   }
 
   async function applyActions(
     actions: TripChatAction[],
-    options?: { rejectedNames?: string[] },
+    options?: {
+      rejectedNames?: string[]
+      userMessage?: string
+      onProgress?: (phase: 'resolvePlaces' | 'apply', detail?: { pending?: boolean }) => void
+    },
   ): Promise<{ notes: string[]; pending: PendingPlaceConfirm[] }> {
     const notes: string[] = []
     const pendingBatch: PendingPlaceConfirm[] = []
     const rejectedNames = options?.rejectedNames
+    const userMessage = options?.userMessage || ''
+    const replaceIntent = Boolean(userMessage) && isReplacePlaceIntent(userMessage)
     let workingDays = days.map((d) => ({ ...d, stops: [...d.stops] }))
     let workingCandidates = [...hotelCandidates]
     let workingHotel = hotel
     let activeDay = currentDay
+    const needLookup = actionsNeedPlaceLookup(actions)
+    if (needLookup) {
+      options?.onProgress?.('resolvePlaces')
+    } else {
+      options?.onProgress?.('apply', { pending: false })
+    }
 
     for (let i = 0; i < actions.length; i++) {
       const action = actions[i]
@@ -510,6 +1396,7 @@ export function TripChatPanel({
               workingDays,
               activeDay,
               rejectedNames,
+              userMessage,
             )
             if (result.nextDays) workingDays = result.nextDays
             if (result.pending) pendingBatch.push(result.pending)
@@ -544,6 +1431,7 @@ export function TripChatPanel({
             workingDays,
             activeDay,
             rejectedNames,
+            userMessage,
           )
           if (result.nextDays) workingDays = result.nextDays
           if (result.pending) pendingBatch.push(result.pending)
@@ -571,6 +1459,39 @@ export function TripChatPanel({
 
         if (action.type === 'add_place') {
           const dayNum = action.day || activeDay
+          // 「换一家」often arrives as add_place — coerce to in-place replace.
+          if (replaceIntent) {
+            const day = workingDays.find((d) => d.day === dayNum)
+            const target = day
+              ? findReplaceTargetInDay(day, customPlaces, {
+                  placeType: action.placeType,
+                  userMessage,
+                  excludePlaceName: action.placeName,
+                })
+              : null
+            if (target) {
+              const result = await resolveReplacePlace(
+                {
+                  type: 'replace_place',
+                  day: dayNum,
+                  fromPlaceName: target.place.name,
+                  toPlaceName: action.placeName,
+                  placeType: action.placeType || target.place.type,
+                  note: action.note,
+                  source: action.source === 'explicit' ? 'explicit' : 'recommend',
+                },
+                workingDays,
+                activeDay,
+                rejectedNames,
+                userMessage,
+              )
+              if (result.nextDays) workingDays = result.nextDays
+              if (result.pending) pendingBatch.push(result.pending)
+              notes.push(result.note)
+              continue
+            }
+          }
+
           const result = await resolveAddPlace(
             {
               ...action,
@@ -724,6 +1645,10 @@ export function TripChatPanel({
       }
     }
 
+    if (needLookup || pendingBatch.length || notes.length) {
+      options?.onProgress?.('apply', { pending: pendingBatch.length > 0 })
+    }
+
     return { notes, pending: pendingBatch }
   }
 
@@ -731,54 +1656,161 @@ export function TripChatPanel({
     const message = text.trim()
     if (!message || busy) return
     if (!isLlmConfigured()) {
-      setError('未配置 OpenAI API Key，无法对话。')
+      setError('对话助手暂不可用，请稍后再试。')
       return
     }
 
     setBusy(true)
+    setStreamingReply(false)
     setError(null)
     setActionNotes([])
+    // New user turn supersedes any lingering recommend-confirm sheet.
+    setPendingPlaces([])
+    setBusyUserText(message)
+    beginWorkPipeline(message)
     setInput('')
-    setHistory((prev) => [...prev, { role: 'user', content: message }])
+    setHistory((prev) => [
+      ...prev,
+      { role: 'user', content: message },
+      { role: 'assistant', content: '' },
+    ])
+    const ac = beginChatRequest()
+    setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
 
     try {
-      const result = await sendTripChatMessage({
-        ctx: {
-          hotel,
-          hotelCandidates,
-          days,
-          currentDay,
-          customPlaces,
-        },
+      const result = await sendTripChatMessageStream({
+        ctx: buildChatContext(),
         history,
         userMessage: message,
+        signal: ac.signal,
+        onReplyDelta: (reply) => {
+          setStreamingReply(true)
+          setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+          updateLastAssistantContent(reply)
+        },
+        onReasoningDelta: (_delta, full) => {
+          if (!resolveThinkingForTask('tripChat', message).enabled) return
+          setShowReasoningUi(true)
+          setReasoningText(full)
+        },
       })
+      if (abortRef.current !== ac) return
+      setStreamingReply(false)
+      setWorkSteps((prev) => activateChatWorkStep(prev, 'parse'))
 
-      setHistory((prev) => [...prev, { role: 'assistant', content: result.reply }])
+      let notes: string[] = []
+      let pending: PendingPlaceConfirm[] = []
       if (result.actions.length) {
-        const { notes, pending } = await applyActions(result.actions)
-        setActionNotes(notes)
-        if (pending.length) {
-          setPendingPlaces((prev) => [...prev, ...pending])
-        }
+        const applied = await applyActions(result.actions, {
+          userMessage: message,
+          onProgress: (phase, detail) => {
+            if (phase === 'resolvePlaces') {
+              setWorkSteps((prev) =>
+                activateChatWorkStep(prev, 'resolvePlaces', {
+                  insert: [
+                    {
+                      id: 'resolvePlaces',
+                      label: CHAT_WORK_STEP_LABELS.resolvePlaces,
+                      status: 'pending',
+                    },
+                    {
+                      id: 'apply',
+                      label: '打开确认页…',
+                      status: 'pending',
+                    },
+                  ],
+                }),
+              )
+              return
+            }
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'apply', {
+                insert: [
+                  {
+                    id: 'apply',
+                    label: detail?.pending ? '打开确认页…' : '应用改动…',
+                    status: 'pending',
+                  },
+                ],
+                labels: {
+                  apply: detail?.pending ? '打开确认页…' : '应用改动…',
+                },
+              }),
+            )
+          },
+        })
+        notes = applied.notes
+        pending = applied.pending
+      } else if (replyClaimsItineraryApplied(result.reply)) {
+        notes = [NO_ACTION_APPLIED_NOTE]
       }
+
+      // Guard again after long applyActions (Google Places) in case a newer turn started.
+      if (abortRef.current !== ac) return
+
+      const ensured = await ensurePendingFromTurn({
+        reply: result.reply,
+        actions: result.actions,
+        userMessage: message,
+        notes,
+        pending,
+      })
+      if (abortRef.current !== ac) return
+
+      setActionNotes(ensured.notes)
+      enqueuePendingPlaces(ensured.pending)
+      persistWorkOnLastAssistant(
+        workStepsRef.current,
+        reasoningTextRef.current,
+        ensured.reply,
+      )
     } catch (err) {
+      if (isAbortError(err) || abortRef.current !== ac) return
+      setHistory((prev) => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant' && last.content.trim()) {
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...last,
+              content: `${last.content.trim()}\n\n（回答中断：${
+                err instanceof Error ? err.message : '请稍后再试'
+              }）`,
+            },
+          ]
+        }
+        // Drop empty assistant placeholder when nothing streamed.
+        return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
+      })
       setError(err instanceof Error ? err.message : '对话失败，请稍后再试。')
+      clearWorkPipeline()
     } finally {
-      setBusy(false)
+      if (abortRef.current === ac) {
+        abortRef.current = null
+        setBusy(false)
+        setStreamingReply(false)
+        setBusyUserText('')
+      }
     }
   }
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2000] rounded-full bg-[var(--ink)] px-3.5 py-3 text-sm font-medium text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)] sm:bottom-5 sm:right-5 sm:px-4"
+      <div
+        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2001] flex flex-col-reverse items-end gap-2 sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
+          open ? 'max-sm:pointer-events-none max-sm:invisible' : ''
+        }`}
       >
-        <span className="sm:hidden">{open ? '关闭' : '助手'}</span>
-        <span className="hidden sm:inline">{open ? '关闭助手' : '行程助手'}</span>
-      </button>
+        <LlmModelPicker />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="rounded-full bg-[var(--ink)] px-3.5 py-3 text-sm font-medium text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)] sm:px-4"
+        >
+          <span className="sm:hidden">{open ? '关闭' : '助手'}</span>
+          <span className="hidden sm:inline">{open ? '关闭助手' : '行程助手'}</span>
+        </button>
+      </div>
 
       {panelMounted && (
         <button
@@ -814,7 +1846,7 @@ export function TripChatPanel({
               <div className="min-w-0">
                 <h3 className="font-display text-xl leading-tight">行程助手</h3>
                 <p className="mt-0.5 text-xs text-[var(--stone)]">
-                  当前第 {currentDay} 天 · {getOpenAIModelLabel()}
+                  当前第 {currentDay} 天 · {getActiveLlmLabel()}
                 </p>
               </div>
               <button
@@ -852,7 +1884,29 @@ export function TripChatPanel({
 
             {history
               .filter((t) => !t.hidden)
-              .map((turn, i) => (
+              .map((turn, i, visible) => {
+                const isLastVisible = i === visible.length - 1
+                const isStreamingAssistant =
+                  busy &&
+                  turn.role === 'assistant' &&
+                  isLastVisible
+                const showLiveSteps =
+                  isStreamingAssistant && workSteps.length > 0
+                const showStoredSteps =
+                  turn.role === 'assistant' &&
+                  !showLiveSteps &&
+                  Boolean(turn.steps?.length)
+                const showLiveReasoning =
+                  isStreamingAssistant &&
+                  showReasoningUi &&
+                  Boolean(reasoningText.trim())
+                const showStoredReasoning =
+                  turn.role === 'assistant' &&
+                  !showLiveReasoning &&
+                  Boolean(turn.reasoning?.trim())
+                const showThinking =
+                  isStreamingAssistant && !turn.content && !streamingReply
+                return (
               <div
                 key={`${turn.role}-${i}`}
                 className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
@@ -861,9 +1915,48 @@ export function TripChatPanel({
                     : 'bg-white/80 text-[var(--ink)]'
                 }`}
               >
-                {turn.content}
+                {showLiveSteps ? (
+                  <ChatWorkStepsPanel
+                    steps={workSteps}
+                    open={workStepsOpen}
+                    onToggle={() => setWorkStepsOpen((v) => !v)}
+                  />
+                ) : showStoredSteps ? (
+                  <StoredChatWorkStepsPanel steps={turn.steps!} />
+                ) : null}
+                {showLiveReasoning ? (
+                  <ChatReasoningDisclosure
+                    text={reasoningText}
+                    open={reasoningOpen}
+                    onToggle={() => setReasoningOpen((v) => !v)}
+                  />
+                ) : showStoredReasoning ? (
+                  <StoredChatReasoningDisclosure text={turn.reasoning!} />
+                ) : null}
+                {showThinking ? (
+                  <LoadingIndicator
+                    thinkingLabel="助手思考中…"
+                    generatingLabel="助手回答中…"
+                    showDots
+                    size="sm"
+                    mode="thinking"
+                    task="tripChat"
+                    userText={busyUserText}
+                  />
+                ) : (
+                  <>
+                    {turn.content}
+                    {isStreamingAssistant && streamingReply ? (
+                      <span
+                        className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+                        aria-hidden
+                      />
+                    ) : null}
+                  </>
+                )}
               </div>
-            ))}
+                )
+              })}
 
             {!!actionNotes.length && (
               <ul className="space-y-1 rounded-xl bg-[var(--sage)]/10 px-3 py-2 text-xs text-[var(--sage)]">
@@ -873,11 +1966,6 @@ export function TripChatPanel({
               </ul>
             )}
 
-            {busy && (
-              <div className="rounded-2xl bg-white/80 px-3 py-2">
-                <LoadingIndicator label="助手思考中…" showDots size="sm" mode="thinking" />
-              </div>
-            )}
             {error && <p className="text-xs text-red-700">{error}</p>}
             <div ref={bottomRef} />
           </div>
@@ -907,8 +1995,8 @@ export function TripChatPanel({
             >
               {busy ? (
                 <>
-                  <ButtonSpinner mode="thinking" />
-                  思考中
+                  <ButtonSpinner mode="thinking" task="tripChat" userText={busyUserText || input} />
+                  {chatBusy.label({ thinking: '思考中', generating: '回答中' })}
                 </>
               ) : (
                 '发送'
@@ -919,26 +2007,30 @@ export function TripChatPanel({
       )}
 
       <GooglePlacePage
+        key={`${activePending?.id || 'pending-place'}-${confirmEpoch}`}
         open={Boolean(activePending)}
         name={activePending?.place.name || ''}
         location={activePending?.place.location}
         fallbackImage={activePending?.place.image}
         showMap={false}
         overlayClassName="z-[2300]"
+        overlayZIndex={2500}
         closeOnBackdrop={activePending?.status !== 'rerecommending'}
         llmNarrative={
           activePending
             ? {
-                intro: activePending.place.description,
+                intro:
+                  pendingStory?.intro ||
+                  (!pendingStoryLoading
+                    ? activePending.place.description || undefined
+                    : undefined),
                 reason:
-                  activePending.kind === 'replace'
-                    ? `用于替换第 ${activePending.dayNum} 天的「${activePending.fromPlaceName || '原地点'}」`
-                    : `计划加入第 ${activePending.dayNum} 天行程`,
-                labels: {
-                  title: '行程顾问点评',
-                  intro: '地点简介',
-                  reason: '为什么推荐',
-                },
+                  pendingStory?.reason ||
+                  (!pendingStoryLoading
+                    ? pendingFallbackReason(activePending)
+                    : undefined),
+                loading: pendingStoryLoading,
+                labels: PENDING_PLACE_LABELS,
               }
             : null
         }
@@ -947,7 +2039,14 @@ export function TripChatPanel({
             <div className="space-y-2">
               {activePending.status === 'rerecommending' ? (
                 <div className="rounded-xl bg-white/80 px-3 py-2">
-                  <LoadingIndicator label="正在重新推荐…" showDots size="sm" mode="thinking" />
+                  <LoadingIndicator
+                    thinkingLabel="正在重新思考推荐…"
+                    generatingLabel="正在重新推荐…"
+                    showDots
+                    size="sm"
+                    mode="thinking"
+                    task="placeRecommend"
+                  />
                 </div>
               ) : (
                 <>

@@ -46,7 +46,7 @@ export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
           <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
             {readOnly
               ? '当前为只读共享，无法修改日期。'
-              : '选择本次巴黎行程的出发与返程日期；去程常因时差次日抵达，正式行程起算日会结合航班再推算。'}
+              : '选择出发与返程日期。若航班次日抵达，行程开始日会按实际到达日调整。'}
           </p>
         </div>
         {value && !readOnly && (

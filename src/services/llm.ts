@@ -4,12 +4,21 @@ import { memoizeLlmCall } from './llmMemo'
 /**
  * Lightweight LLM helpers for place blurbs and day titles.
  *
- * API keys NEVER ship to the browser. All OpenAI / Gemini calls go through
- * `/api/openai` and `/api/gemini` (Vite dev proxy or Vercel serverless), which
- * inject OPENAI_API_KEY / GEMINI_API_KEY server-side.
+ * API keys NEVER ship to the browser. Chat calls go through
+ * `/api/openai`, `/api/deepseek`, and `/api/gemini` (Vite dev proxy or Vercel),
+ * which inject OPENAI_API_KEY / DEEPSEEK_API_KEY / GEMINI_API_KEY server-side.
  *
- * Provider switching (OpenAI ↔ Gemini) is temporarily disabled.
- * Flip ENABLE_LLM_PROVIDER_SWITCH to true to restore it.
+ * Global picker: DeepSeek V4 Flash/Pro (+ thinking) and three GPT-5.6 variants.
+ * Gemini failover switch remains behind ENABLE_LLM_PROVIDER_SWITCH.
+ *
+ * Thinking / reasoning effort (UI: 思考 on/off → nested 自动 → 低/中/高 slider):
+ * Store modes remain auto|off|low|medium|high; 思考 on restores lastActiveMode.
+ * - DeepSeek V4: `thinking: { type }` + `reasoning_effort: low|high|max`
+ *   (UI 低/中/高 → API low/high/max; no native "medium").
+ * - GPT-5.6: `reasoning_effort: none|low|medium|high`.
+ * - 「自动」: task-type baseline + light keyword/length heuristics only (no
+ *   second LLM). A future optional classifier could use DeepSeek V4 Flash
+ *   with thinking off — not used in v1.
  */
 
 export type LlmProvider = 'openai' | 'gemini'
@@ -18,48 +27,425 @@ export type LlmProvider = 'openai' | 'gemini'
 export const ENABLE_LLM_PROVIDER_SWITCH = false
 
 const PROVIDER_STORAGE_KEY = 'paris-tour-llm-provider'
-const OPENAI_MODEL_STORAGE_KEY = 'paris-tour-openai-model-v2'
+/** Bumped so DeepSeek becomes the fresh default when no explicit env model is set. */
+const OPENAI_MODEL_STORAGE_KEY = 'paris-tour-openai-model-v3'
+/** v2: single ThinkingMode (auto|off|low|medium|high); migrates v1 {enabled,effort}. */
+const THINKING_STORAGE_KEY = 'paris-tour-llm-thinking-v2'
+const THINKING_STORAGE_KEY_LEGACY = 'paris-tour-llm-thinking-v1'
 const GEMINI_MODEL = 'gemini-2.0-flash'
 
-/** Selectable OpenAI chat models shown in the UI dropdown (latest only). */
+/** DeepSeek V4 models shown in the global picker. */
+export const DEEPSEEK_MODEL_OPTIONS = [
+  {
+    id: 'deepseek-v4-flash',
+    label: 'DeepSeek V4 Flash',
+    shortLabel: 'V4 Flash',
+    provider: 'deepseek' as const,
+  },
+  {
+    id: 'deepseek-v4-pro',
+    label: 'DeepSeek V4 Pro',
+    shortLabel: 'V4 Pro',
+    provider: 'deepseek' as const,
+  },
+] as const
+
+/** GPT-5.6 variants kept in the picker (older GPT-5.5/5.4 dropped). */
+export const OPENAI_ONLY_MODEL_OPTIONS = [
+  { id: 'gpt-5.6-luna', label: 'GPT-5.6 luna', shortLabel: '5.6 luna', provider: 'openai' as const },
+  { id: 'gpt-5.6-sol', label: 'GPT-5.6 sol', shortLabel: '5.6 sol', provider: 'openai' as const },
+  { id: 'gpt-5.6-terra', label: 'GPT-5.6 terra', shortLabel: '5.6 terra', provider: 'openai' as const },
+] as const
+
+/** Selectable chat models for the FAB picker. */
 export const OPENAI_MODEL_OPTIONS = [
-  { id: 'gpt-5.6-luna', label: 'GPT-5.6 luna（推荐）' },
-  { id: 'gpt-5.6-sol', label: 'GPT-5.6 sol' },
-  { id: 'gpt-5.6-terra', label: 'GPT-5.6 terra' },
-  { id: 'gpt-5.5', label: 'GPT-5.5' },
-  { id: 'gpt-5.5-pro', label: 'GPT-5.5 pro' },
-  { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano' },
-  { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
-  { id: 'gpt-5.4', label: 'GPT-5.4' },
+  ...DEEPSEEK_MODEL_OPTIONS,
+  ...OPENAI_ONLY_MODEL_OPTIONS,
 ] as const
 
 export type OpenAIModelId = (typeof OPENAI_MODEL_OPTIONS)[number]['id']
 
-const OPENAI_MODEL_IDS = new Set<string>(OPENAI_MODEL_OPTIONS.map((m) => m.id))
+/**
+ * User-selected thinking mode (persisted).
+ * `off` = thinking disabled; `auto` = resolve per task + heuristics.
+ */
+export type ThinkingMode = 'auto' | 'off' | 'low' | 'medium' | 'high'
 
-/** Public (non-secret) model id for the UI — not an API key. */
-function defaultOpenAIModel(): string {
-  const fromEnv = (import.meta.env.VITE_OPENAI_MODEL as string | undefined)?.trim()
-  if (fromEnv && OPENAI_MODEL_IDS.has(fromEnv)) return fromEnv
-  return 'gpt-5.6-luna'
+/** Fixed effort tiers used after resolving `auto` (and as locked modes). */
+export type ThinkingEffortUi = 'low' | 'medium' | 'high'
+
+/** Resolved effort including "off" (thinking disabled). */
+export type ResolvedThinkingEffort = 'off' | ThinkingEffortUi
+
+/** Values accepted by DeepSeek Chat Completions `reasoning_effort`. */
+export type DeepSeekReasoningEffort = 'low' | 'high' | 'max'
+
+/** Values for GPT-5.6 Chat Completions `reasoning_effort`. */
+export type OpenAIReasoningEffort = 'none' | 'low' | 'medium' | 'high'
+
+/**
+ * Call-site task kinds for 「自动」 baselines.
+ * Annotate major LLM entry points so auto mode can pick a sensible default.
+ */
+export type LlmTaskKind =
+  | 'tripChat'
+  | 'dayCopy'
+  | 'placeRecommend'
+  | 'placeDescription'
+  | 'placeDetail'
+  | 'hotelRecommend'
+  | 'hotelDetail'
+  | 'translate'
+  | 'itineraryGenerate'
+  | 'itineraryDayGenerate'
+  | 'itineraryStart'
+  | 'destinationSuggest'
+  | 'default'
+
+export type ResolvedThinking = {
+  enabled: boolean
+  /** Meaningful when enabled; ignored when off. */
+  effort: ThinkingEffortUi
 }
 
+const EFFORT_ORDER: ResolvedThinkingEffort[] = ['off', 'low', 'medium', 'high']
 
-function readStoredOpenAIModel(): string | null {
+type TaskThinkingBounds = {
+  baseline: ResolvedThinkingEffort
+  min: ResolvedThinkingEffort
+  max: ResolvedThinkingEffort
+}
+
+/** Baseline + clamp bounds per task (auto mode only). */
+const TASK_THINKING: Record<LlmTaskKind, TaskThinkingBounds> = {
+  tripChat: { baseline: 'medium', min: 'low', max: 'high' },
+  placeRecommend: { baseline: 'medium', min: 'low', max: 'high' },
+  hotelRecommend: { baseline: 'medium', min: 'low', max: 'high' },
+  placeDescription: { baseline: 'off', min: 'off', max: 'low' },
+  placeDetail: { baseline: 'low', min: 'off', max: 'low' },
+  hotelDetail: { baseline: 'low', min: 'off', max: 'low' },
+  dayCopy: { baseline: 'off', min: 'off', max: 'low' },
+  translate: { baseline: 'off', min: 'off', max: 'low' },
+  itineraryGenerate: { baseline: 'high', min: 'medium', max: 'high' },
+  itineraryDayGenerate: { baseline: 'high', min: 'medium', max: 'high' },
+  itineraryStart: { baseline: 'low', min: 'off', max: 'medium' },
+  destinationSuggest: { baseline: 'low', min: 'off', max: 'medium' },
+  default: { baseline: 'low', min: 'off', max: 'medium' },
+}
+
+/**
+ * UI → DeepSeek API effort (no native "medium"):
+ * low → low, medium → high, high → max.
+ */
+export function uiEffortToApi(effort: ThinkingEffortUi): DeepSeekReasoningEffort {
+  if (effort === 'low') return 'low'
+  if (effort === 'high') return 'max'
+  return 'high'
+}
+
+/** UI → OpenAI GPT-5.6 `reasoning_effort`. */
+export function uiEffortToOpenAI(effort: ThinkingEffortUi | 'off'): OpenAIReasoningEffort {
+  if (effort === 'off') return 'none'
+  return effort
+}
+
+export const THINKING_MODE_OPTIONS: Array<{
+  id: ThinkingMode
+  label: string
+  hint: string
+}> = [
+  { id: 'auto', label: '自动', hint: '按当前操作自动选择思考强度' },
+  { id: 'off', label: '关', hint: '不额外思考，回答更快' },
+  { id: 'low', label: '低', hint: '轻量思考，适合简单问题' },
+  { id: 'medium', label: '中', hint: '一般强度，日常够用' },
+  { id: 'high', label: '高', hint: '更仔细思考，适合复杂安排' },
+]
+
+/** @deprecated Prefer THINKING_MODE_OPTIONS; kept for DeepSeek API labels. */
+export const THINKING_EFFORT_OPTIONS: Array<{
+  id: ThinkingEffortUi
+  label: string
+  api: DeepSeekReasoningEffort
+}> = [
+  { id: 'low', label: '低', api: 'low' },
+  { id: 'medium', label: '中', api: 'high' },
+  { id: 'high', label: '高', api: 'max' },
+]
+
+function effortIndex(effort: ResolvedThinkingEffort): number {
+  return EFFORT_ORDER.indexOf(effort)
+}
+
+function clampEffort(
+  effort: ResolvedThinkingEffort,
+  min: ResolvedThinkingEffort,
+  max: ResolvedThinkingEffort,
+): ResolvedThinkingEffort {
+  const i = effortIndex(effort)
+  const lo = effortIndex(min)
+  const hi = effortIndex(max)
+  return EFFORT_ORDER[Math.max(lo, Math.min(hi, i))]!
+}
+
+function toResolvedThinking(effort: ResolvedThinkingEffort): ResolvedThinking {
+  if (effort === 'off') return { enabled: false, effort: 'low' }
+  return { enabled: true, effort }
+}
+
+/**
+ * Light content heuristic (±1 tier). Pure JS — no network / no second model.
+ * v1 only: length + keywords. Future: optional DeepSeek V4 Flash classifier
+ * with thinking off could refine this without changing the public API.
+ */
+export function thinkingHeuristicDelta(userText?: string): -1 | 0 | 1 {
+  const t = (userText || '').trim()
+  if (!t) return 0
+
+  const complex =
+    /为什么|为甚么|为何|对比|比较|重新规划|怎么安排|如何安排|权衡|取舍|分析|优化|全面|仔细|详细说明|利弊/.test(
+      t,
+    )
+  const shortCommand =
+    t.length <= 48 &&
+    /删掉|删除|去掉|移除|取消|换成|改成|移到/.test(t) &&
+    !complex
+
+  if (shortCommand) return -1
+  if (complex || t.length >= 120) return 1
+  return 0
+}
+
+/**
+ * Resolve enabled + effort for a call site.
+ * Manual 关/低/中/高 lock the choice; 自动 uses task baseline ± heuristic
+ * within that task's min/max bounds.
+ */
+export function resolveThinkingForTask(
+  task: LlmTaskKind = 'default',
+  userText?: string,
+): ResolvedThinking {
+  const mode = getThinkingMode()
+  if (mode === 'off') return { enabled: false, effort: 'low' }
+  if (mode === 'low' || mode === 'medium' || mode === 'high') {
+    return { enabled: true, effort: mode }
+  }
+
+  // mode === 'auto'
+  const bounds = TASK_THINKING[task] || TASK_THINKING.default
+  const delta = thinkingHeuristicDelta(userText)
+  const baseIdx = effortIndex(bounds.baseline)
+  const bumped = EFFORT_ORDER[Math.max(0, Math.min(EFFORT_ORDER.length - 1, baseIdx + delta))]!
+  return toResolvedThinking(clampEffort(bumped, bounds.min, bounds.max))
+}
+
+/** Busy UI visual for an in-flight LLM call (thinking HUD vs lighter generating). */
+export type LlmBusyVisual = 'thinking' | 'generating'
+
+/** Resolve whether an in-flight LLM call should show thinking vs generating UI. */
+export function resolveLlmBusyVisual(options?: {
+  task?: LlmTaskKind
+  userText?: string
+  thinkingEnabled?: boolean
+}): LlmBusyVisual {
+  if (typeof options?.thinkingEnabled === 'boolean') {
+    return options.thinkingEnabled ? 'thinking' : 'generating'
+  }
+  if (options?.task) {
+    return resolveThinkingForTask(options.task, options.userText).enabled
+      ? 'thinking'
+      : 'generating'
+  }
+  // No task: user mode off → generating; auto/low/medium/high → thinking chrome.
+  return getThinkingMode() === 'off' ? 'generating' : 'thinking'
+}
+
+/** Default Chinese busy copy for LLM calls. */
+export function llmBusyDefaultLabel(visual: LlmBusyVisual): string {
+  return visual === 'thinking' ? '思考中…' : '生成中…'
+}
+
+/** Pick Chinese label by resolved busy visual. */
+export function llmBusyLabel(
+  visual: LlmBusyVisual,
+  labels: { thinking: string; generating: string },
+): string {
+  return visual === 'thinking' ? labels.thinking : labels.generating
+}
+
+const OPENAI_MODEL_IDS = new Set<string>(OPENAI_MODEL_OPTIONS.map((m) => m.id))
+const DEEPSEEK_MODEL_IDS = new Set<string>(DEEPSEEK_MODEL_OPTIONS.map((m) => m.id))
+
+export function isDeepSeekModel(modelId: string): boolean {
+  const id = modelId.trim()
+  return DEEPSEEK_MODEL_IDS.has(id) || /^deepseek/i.test(id)
+}
+
+/** Public (non-secret) model id for the UI — not an API key. Prefers DeepSeek. */
+function defaultOpenAIModel(): string {
+  const fromDeepseekEnv = (import.meta.env.VITE_DEEPSEEK_MODEL as string | undefined)?.trim()
+  if (fromDeepseekEnv && OPENAI_MODEL_IDS.has(fromDeepseekEnv)) return fromDeepseekEnv
+  const fromOpenAiEnv = (import.meta.env.VITE_OPENAI_MODEL as string | undefined)?.trim()
+  if (fromOpenAiEnv && OPENAI_MODEL_IDS.has(fromOpenAiEnv)) return fromOpenAiEnv
+  return 'deepseek-v4-flash'
+}
+
+/**
+ * Migrate legacy stored ids:
+ * - deepseek-chat → v4-flash (non-thinking default)
+ * - deepseek-reasoner → v4-flash + thinking medium
+ * - legacy GPT-5.5/5.4 → gpt-5.6-luna
+ * - unknown → default
+ */
+function migrateStoredModel(raw: string): {
+  model: string
+  thinkingMode?: ThinkingMode
+} {
+  const id = raw.trim()
+  if (OPENAI_MODEL_IDS.has(id)) return { model: id }
+  if (id === 'deepseek-reasoner') return { model: 'deepseek-v4-flash', thinkingMode: 'medium' }
+  if (id === 'deepseek-chat' || /^deepseek/i.test(id)) {
+    return { model: 'deepseek-v4-flash' }
+  }
+  if (/^gpt-5\.6/i.test(id)) return { model: 'gpt-5.6-luna' }
+  if (/^gpt-/i.test(id)) return { model: 'gpt-5.6-luna' }
+  return { model: defaultOpenAIModel() }
+}
+
+function readStoredOpenAIModel(): { model: string | null; thinkingMode?: ThinkingMode } {
   try {
     const v = localStorage.getItem(OPENAI_MODEL_STORAGE_KEY)?.trim()
-    if (v && OPENAI_MODEL_IDS.has(v)) return v
+    if (!v) return { model: null }
+    const migrated = migrateStoredModel(v)
+    if (migrated.model !== v) {
+      try {
+        localStorage.setItem(OPENAI_MODEL_STORAGE_KEY, migrated.model)
+      } catch {
+        /* ignore */
+      }
+    }
+    return migrated
   } catch {
     /* ignore */
+  }
+  return { model: null }
+}
+
+type ThinkingActiveMode = 'auto' | ThinkingEffortUi
+
+type ThinkingStore = {
+  mode: ThinkingMode
+  /** Last locked effort (低/中/高); restored when 自动 turns off. */
+  lastEffort: ThinkingEffortUi
+  /** Mode restored when master 思考 turns back on (auto or locked effort). */
+  lastActiveMode: ThinkingActiveMode
+}
+
+function defaultThinkingStore(): ThinkingStore {
+  return { mode: 'auto', lastEffort: 'medium', lastActiveMode: 'auto' }
+}
+
+function normalizeThinkingMode(raw: unknown): ThinkingMode | null {
+  if (raw === 'auto' || raw === 'off' || raw === 'low' || raw === 'medium' || raw === 'high') {
+    return raw
   }
   return null
 }
 
-let activeOpenAIModel = readStoredOpenAIModel() || defaultOpenAIModel()
+function normalizeEffort(raw: unknown): ThinkingEffortUi {
+  if (raw === 'low' || raw === 'medium' || raw === 'high') return raw
+  return 'medium'
+}
+
+function normalizeActiveMode(raw: unknown, fallback: ThinkingActiveMode): ThinkingActiveMode {
+  if (raw === 'auto' || raw === 'low' || raw === 'medium' || raw === 'high') return raw
+  return fallback
+}
+
+function storeFromMode(
+  mode: ThinkingMode,
+  lastEffort?: ThinkingEffortUi,
+  lastActiveMode?: ThinkingActiveMode,
+): ThinkingStore {
+  const effort =
+    mode === 'low' || mode === 'medium' || mode === 'high'
+      ? mode
+      : normalizeEffort(lastEffort)
+  const active: ThinkingActiveMode =
+    mode === 'off'
+      ? normalizeActiveMode(lastActiveMode, effort)
+      : mode === 'auto'
+        ? 'auto'
+        : effort
+  return { mode, lastEffort: effort, lastActiveMode: active }
+}
+
+/** Migrate v1 `{enabled,effort}` → v2 `{mode,lastEffort}`. */
+function migrateLegacyThinking(raw: string, preferMode?: ThinkingMode): ThinkingStore {
+  const base = defaultThinkingStore()
+  if (preferMode) return storeFromMode(preferMode)
+  try {
+    const parsed = JSON.parse(raw) as { enabled?: boolean; effort?: unknown; mode?: unknown }
+    const fromMode = normalizeThinkingMode(parsed.mode)
+    if (fromMode) return storeFromMode(fromMode, normalizeEffort(parsed.effort))
+    if (typeof parsed.enabled === 'boolean') {
+      if (!parsed.enabled) return storeFromMode('off', normalizeEffort(parsed.effort))
+      return storeFromMode(normalizeEffort(parsed.effort))
+    }
+  } catch {
+    /* ignore */
+  }
+  return base
+}
+
+function readStoredThinking(preferMode?: ThinkingMode): ThinkingStore {
+  if (preferMode) {
+    const store = storeFromMode(preferMode)
+    persistThinking(store)
+    return store
+  }
+  try {
+    const raw = localStorage.getItem(THINKING_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { mode?: unknown; lastEffort?: unknown }
+      const mode = normalizeThinkingMode(parsed.mode)
+      if (mode) return storeFromMode(mode, normalizeEffort(parsed.lastEffort))
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const legacy = localStorage.getItem(THINKING_STORAGE_KEY_LEGACY)
+    if (legacy) {
+      const migrated = migrateLegacyThinking(legacy)
+      persistThinking(migrated)
+      return migrated
+    }
+  } catch {
+    /* ignore */
+  }
+  return defaultThinkingStore()
+}
+
+function persistThinking(store: ThinkingStore) {
+  try {
+    localStorage.setItem(THINKING_STORAGE_KEY, JSON.stringify(store))
+  } catch {
+    /* ignore */
+  }
+}
+
+const storedModelBoot = readStoredOpenAIModel()
+let activeOpenAIModel = storedModelBoot.model || defaultOpenAIModel()
+let activeThinking = readStoredThinking(storedModelBoot.thinkingMode)
 const openaiModelListeners = new Set<() => void>()
+const thinkingListeners = new Set<() => void>()
 
 function notifyOpenAIModelListeners() {
   for (const cb of openaiModelListeners) cb()
+}
+
+function notifyThinkingListeners() {
+  for (const cb of thinkingListeners) cb()
 }
 
 function openaiModel() {
@@ -70,14 +456,90 @@ export function getOpenAIModel(): string {
   return openaiModel()
 }
 
+/** Thinking / effort controls for DeepSeek V4 and GPT-5.6. */
+export function supportsThinkingControls(modelId?: string): boolean {
+  const id = (modelId && modelId.trim()) || openaiModel()
+  return isDeepSeekModel(id) || /^gpt-5\.6/i.test(id) || /^gpt-/i.test(id)
+}
+
 export function getOpenAIModelLabel(modelId = getOpenAIModel()): string {
   const found = OPENAI_MODEL_OPTIONS.find((m) => m.id === modelId)
   return found?.label || modelId
 }
 
+export function getOpenAIModelShortLabel(modelId = getOpenAIModel()): string {
+  const found = OPENAI_MODEL_OPTIONS.find((m) => m.id === modelId)
+  return found?.shortLabel || getOpenAIModelLabel(modelId)
+}
+
+export function getThinkingMode(): ThinkingMode {
+  return activeThinking.mode
+}
+
+/** True when mode is not `off` (includes `auto` and locked low/medium/high). */
+export function getThinkingEnabled(): boolean {
+  return activeThinking.mode !== 'off'
+}
+
+/**
+ * Locked effort when mode is low/medium/high;
+ * otherwise the last manual effort (for restoring 开).
+ */
+export function getThinkingEffort(): ThinkingEffortUi {
+  const mode = activeThinking.mode
+  if (mode === 'low' || mode === 'medium' || mode === 'high') return mode
+  return activeThinking.lastEffort || 'medium'
+}
+
+export function getThinkingModeLabel(mode = getThinkingMode()): string {
+  return THINKING_MODE_OPTIONS.find((o) => o.id === mode)?.label || '自动'
+}
+
+export function getThinkingEffortLabel(effort: ThinkingEffortUi | ThinkingMode = getThinkingMode()): string {
+  if (effort === 'auto' || effort === 'off') return getThinkingModeLabel(effort)
+  return THINKING_EFFORT_OPTIONS.find((o) => o.id === effort)?.label || '中'
+}
+
+/** Compact FAB chip label — model short name only (thinking mode lives in the popover / title). */
+export function getLlmChipSummary(modelId = getOpenAIModel(), _mode?: ThinkingMode): string {
+  return getOpenAIModelShortLabel(modelId)
+}
+
+/** UI top-level toggle: 自动 | 关 | 开 (开 maps to locked low/medium/high). */
+export type ThinkingToggle = 'auto' | 'off' | 'on'
+
+export function thinkingModeToToggle(mode: ThinkingMode): ThinkingToggle {
+  if (mode === 'auto') return 'auto'
+  if (mode === 'off') return 'off'
+  return 'on'
+}
+
+export function isLockedThinkingMode(mode: ThinkingMode): mode is ThinkingEffortUi {
+  return mode === 'low' || mode === 'medium' || mode === 'high'
+}
+
+/** UI chip / panel label. */
+export function getActiveLlmLabel(modelId = getOpenAIModel()): string {
+  const label = getOpenAIModelLabel(modelId)
+  const mode = getThinkingMode()
+  const think =
+    supportsThinkingControls(modelId) && mode !== 'off'
+      ? ` · 思考${getThinkingModeLabel(mode)}`
+      : ''
+  if (isDeepSeekModel(modelId)) {
+    const base = label.startsWith('DeepSeek') ? label : `DeepSeek · ${label}`
+    return `${base}${think}`
+  }
+  return `OpenAI · ${label}${think}`
+}
+
 export function setOpenAIModel(modelId: string) {
-  const next = modelId.trim()
-  if (!next || next === activeOpenAIModel) return
+  const migrated = migrateStoredModel(modelId)
+  const next = migrated.model
+  if (!next || next === activeOpenAIModel) {
+    if (migrated.thinkingMode) setThinkingMode(migrated.thinkingMode)
+    return
+  }
   activeOpenAIModel = next
   try {
     localStorage.setItem(OPENAI_MODEL_STORAGE_KEY, next)
@@ -85,12 +547,66 @@ export function setOpenAIModel(modelId: string) {
     /* ignore */
   }
   notifyOpenAIModelListeners()
+  if (migrated.thinkingMode) setThinkingMode(migrated.thinkingMode)
+}
+
+export function setThinkingMode(mode: ThinkingMode) {
+  const next = normalizeThinkingMode(mode) || 'auto'
+  const store = storeFromMode(next, activeThinking.lastEffort, activeThinking.lastActiveMode)
+  if (
+    activeThinking.mode === store.mode &&
+    activeThinking.lastEffort === store.lastEffort &&
+    activeThinking.lastActiveMode === store.lastActiveMode
+  ) {
+    return
+  }
+  activeThinking = store
+  persistThinking(activeThinking)
+  notifyThinkingListeners()
+}
+
+/**
+ * Top-level toggle: 自动 / 关 / 开.
+ * 开 restores last locked effort (default medium).
+ */
+export function setThinkingToggle(toggle: ThinkingToggle) {
+  if (toggle === 'auto') {
+    setThinkingMode('auto')
+    return
+  }
+  if (toggle === 'off') {
+    setThinkingMode('off')
+    return
+  }
+  setThinkingMode(getThinkingEffort())
+}
+
+/** Master 思考 toggle: off ↔ restore lastActiveMode (自动 or last manual 低/中/高). */
+export function setThinkingEnabled(enabled: boolean) {
+  if (enabled) {
+    if (activeThinking.mode !== 'off') return
+    const restore = activeThinking.lastActiveMode
+    setThinkingMode(restore === 'auto' ? 'auto' : restore)
+    return
+  }
+  setThinkingMode('off')
+}
+
+export function setThinkingEffort(effort: ThinkingEffortUi) {
+  setThinkingMode(normalizeEffort(effort))
 }
 
 export function subscribeOpenAIModel(listener: () => void): () => void {
   openaiModelListeners.add(listener)
   return () => {
     openaiModelListeners.delete(listener)
+  }
+}
+
+export function subscribeThinking(listener: () => void): () => void {
+  thinkingListeners.add(listener)
+  return () => {
+    thinkingListeners.delete(listener)
   }
 }
 
@@ -203,7 +719,23 @@ export class LlmRequestError extends Error {
   }
 }
 
-function friendlyLlmError(status: number, body: string, provider: LlmProvider): LlmRequestError {
+type ChatBackend = 'openai' | 'deepseek' | 'gemini'
+
+function chatBackendForModel(modelId = openaiModel()): ChatBackend {
+  return isDeepSeekModel(modelId) ? 'deepseek' : 'openai'
+}
+
+function chatCompletionsUrl(modelId = openaiModel()): string {
+  return chatBackendForModel(modelId) === 'deepseek'
+    ? '/api/deepseek/chat/completions'
+    : '/api/openai/chat/completions'
+}
+
+function friendlyLlmError(
+  status: number,
+  body: string,
+  provider: LlmProvider | ChatBackend,
+): LlmRequestError {
   let code = ''
   let apiMessage = ''
   try {
@@ -216,7 +748,17 @@ function friendlyLlmError(status: number, body: string, provider: LlmProvider): 
     /* ignore */
   }
 
+  const label =
+    provider === 'deepseek'
+      ? getActiveLlmLabel()
+      : provider === 'openai' || provider === 'gemini'
+        ? getProviderLabel(provider)
+        : String(provider)
+
   if (status === 429 || code === 'insufficient_quota' || /quota|rate limit/i.test(apiMessage)) {
+    if (provider === 'deepseek') {
+      return new LlmRequestError('DeepSeek 额度不足或触发限流（429）。', code || 'insufficient_quota')
+    }
     if (provider === 'openai') {
       return new LlmRequestError(
         'OpenAI 额度不足或触发限流（429）。',
@@ -226,14 +768,17 @@ function friendlyLlmError(status: number, body: string, provider: LlmProvider): 
     return new LlmRequestError('Gemini 额度不足或触发限流。', code || 'rate_limit')
   }
   if (status === 401 || status === 403 || /invalid.?key|incorrect api key/i.test(apiMessage)) {
-    return new LlmRequestError(
-      provider === 'openai' ? 'OpenAI API Key 无效。' : 'Gemini API Key 无效。',
-      code || 'auth_error',
-    )
+    const keyHint =
+      provider === 'deepseek'
+        ? 'DeepSeek API Key 无效（检查 DEEPSEEK_API_KEY）。'
+        : provider === 'openai'
+          ? 'OpenAI API Key 无效。'
+          : 'Gemini API Key 无效。'
+    return new LlmRequestError(keyHint, code || 'auth_error')
   }
 
   const detail = apiMessage || body.slice(0, 160) || `HTTP ${status}`
-  return new LlmRequestError(`${getProviderLabel(provider)} 请求失败：${detail}`, code || String(status))
+  return new LlmRequestError(`${label} 请求失败：${detail}`, code || String(status))
 }
 
 async function callGemini(system: string, user: string): Promise<string> {
@@ -273,17 +818,57 @@ export type OpenAIChatMessage = {
   content: string
 }
 
-function buildOpenAIChatBody(messages: OpenAIChatMessage[]): Record<string, unknown> {
+export type ChatCallOptions = {
+  task?: LlmTaskKind
+  /** Optional user text for auto-mode heuristics (trip chat message, prefs, etc.). */
+  userText?: string
+  /** Abort an in-flight request (including mid-stream). */
+  signal?: AbortSignal
+}
+
+export type ChatStreamOptions = ChatCallOptions & {
+  /** Called for each content token/chunk; `fullText` is the accumulated buffer. */
+  onDelta?: (delta: string, fullText: string) => void
+  /**
+   * Optional: model reasoning / CoT tokens (`reasoning_content`, `delta.reasoning`, etc.).
+   * Only emitted when the API sends them (typically thinking mode on).
+   * Does not affect the content buffer used for JSON parsing.
+   */
+  onReasoningDelta?: (delta: string, fullReasoning: string) => void
+}
+
+function buildOpenAIChatBody(
+  messages: OpenAIChatMessage[],
+  thinking: ResolvedThinking,
+): Record<string, unknown> {
   const model = openaiModel()
+  const backend = chatBackendForModel(model)
+  const thinkingOn = thinking.enabled
   const body: Record<string, unknown> = {
     model,
     // Reasoning models spend tokens before visible content; keep headroom for JSON replies.
-    max_completion_tokens: 8192,
+    max_completion_tokens: thinkingOn ? 16384 : 8192,
     messages,
   }
-  if (!openaiUsesRestrictedSampling(model)) {
-    body.temperature = 0.7
+
+  if (backend === 'deepseek') {
+    // DeepSeek V4: thinking.type + optional reasoning_effort (see api-docs.deepseek.com/guides/thinking_mode).
+    body.thinking = { type: thinkingOn ? 'enabled' : 'disabled' }
+    if (thinkingOn) {
+      body.reasoning_effort = uiEffortToApi(thinking.effort)
+    }
+    // Thinking mode ignores temperature/top_p/penalties; omit so we don't pretend they apply.
+    if (!thinkingOn && !openaiUsesRestrictedSampling(model)) {
+      body.temperature = 0.7
+    }
+  } else {
+    // GPT-5.6: reasoning_effort none|low|medium|high (same resolver as DeepSeek when auto).
+    body.reasoning_effort = thinkingOn ? uiEffortToOpenAI(thinking.effort) : 'none'
+    if (!thinkingOn && !openaiUsesRestrictedSampling(model)) {
+      body.temperature = 0.7
+    }
   }
+
   return body
 }
 
@@ -307,14 +892,208 @@ function extractOpenAIMessageText(data: {
   return ''
 }
 
-async function callOpenAIMessages(messages: OpenAIChatMessage[]): Promise<string> {
-  // Key injected by /api/openai — never send Authorization from the browser.
-  const url = '/api/openai/chat/completions'
+function prepareOpenAIChatBody(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+  stream = false,
+): { body: Record<string, unknown>; backend: ChatBackend; url: string } {
+  const model = openaiModel()
+  const backend = chatBackendForModel(model)
+  const url = chatCompletionsUrl(model)
+  const thinking = resolveThinkingForTask(options?.task || 'default', options?.userText)
+  const body = buildOpenAIChatBody(messages, thinking)
+
+  // DeepSeek chat uses max_tokens (OpenAI-compatible); thinking needs more headroom for CoT.
+  if (backend === 'deepseek') {
+    delete body.max_completion_tokens
+    body.max_tokens = thinking.enabled ? 16384 : 8192
+  }
+  if (stream) body.stream = true
+
+  return { body, backend, url }
+}
+
+function adaptOpenAIBodyForError(body: Record<string, unknown>, errText: string): boolean {
+  const lower = errText.toLowerCase()
+  if (lower.includes('temperature') && 'temperature' in body) {
+    delete body.temperature
+    return true
+  }
+  if (lower.includes('max_tokens') && 'max_tokens' in body) {
+    delete body.max_tokens
+    body.max_completion_tokens = body.max_completion_tokens || 8192
+    return true
+  }
+  if (
+    lower.includes('max_completion_tokens') &&
+    lower.includes('max_tokens') &&
+    !('max_tokens' in body)
+  ) {
+    delete body.max_completion_tokens
+    body.max_tokens = 8192
+    return true
+  }
+  return false
+}
+
+function joinDeltaTextParts(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content
+    .map((part) => {
+      if (typeof part === 'string') return part
+      if (part && typeof part === 'object' && typeof (part as { text?: string }).text === 'string') {
+        return (part as { text: string }).text
+      }
+      return ''
+    })
+    .join('')
+}
+
+/** Pull visible assistant text from an OpenAI/DeepSeek SSE chunk. */
+function extractStreamDeltaContent(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return ''
+  const choice = (payload as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]
+  const delta = choice?.delta
+  if (!delta) return ''
+  return joinDeltaTextParts(delta.content)
+}
+
+/**
+ * Pull model reasoning / CoT from an SSE chunk when present.
+ * DeepSeek: `delta.reasoning_content`; some OpenAI-compatible APIs: `delta.reasoning`.
+ * Never mixed into the content buffer used for JSON reply parsing.
+ */
+function extractStreamDeltaReasoning(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return ''
+  const choice = (payload as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]
+  const delta = choice?.delta
+  if (!delta) return ''
+
+  const fromField = (key: string): string => {
+    const v = delta[key]
+    if (typeof v === 'string') return v
+    return joinDeltaTextParts(v)
+  }
+
+  return (
+    fromField('reasoning_content') ||
+    fromField('reasoning') ||
+    fromField('reasoning_text') ||
+    ''
+  )
+}
+
+/**
+ * Read OpenAI-compatible SSE (`data: {...}` / `data: [DONE]`) and accumulate
+ * assistant content deltas. Reasoning tokens are optional via onReasoningDelta
+ * and never appended to the content buffer.
+ */
+async function readOpenAIChatSse(
+  res: Response,
+  options?: {
+    signal?: AbortSignal
+    onDelta?: (delta: string, fullText: string) => void
+    onReasoningDelta?: (delta: string, fullReasoning: string) => void
+  },
+): Promise<string> {
+  if (!res.body) {
+    throw new LlmRequestError('流式响应没有正文。', 'empty')
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let carry = ''
+  let fullText = ''
+  let fullReasoning = ''
+  let sawDone = false
+
+  const abort = () => {
+    void reader.cancel().catch(() => undefined)
+  }
+  options?.signal?.addEventListener('abort', abort, { once: true })
+
+  const applyPayload = (payload: unknown) => {
+    const reasoning = extractStreamDeltaReasoning(payload)
+    if (reasoning) {
+      fullReasoning += reasoning
+      options?.onReasoningDelta?.(reasoning, fullReasoning)
+    }
+    const delta = extractStreamDeltaContent(payload)
+    if (!delta) return
+    fullText += delta
+    options?.onDelta?.(delta, fullText)
+  }
+
+  try {
+    while (!sawDone) {
+      if (options?.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
+      const { done, value } = await reader.read()
+      if (done) break
+
+      carry += decoder.decode(value, { stream: true })
+      const lines = carry.split(/\r?\n/)
+      carry = lines.pop() || ''
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim()
+        if (!line || line.startsWith(':')) continue
+        if (!line.startsWith('data:')) continue
+        const data = line.slice(5).trim()
+        if (!data) continue
+        if (data === '[DONE]') {
+          sawDone = true
+          break
+        }
+
+        let payload: unknown
+        try {
+          payload = JSON.parse(data)
+        } catch {
+          continue
+        }
+
+        const errMsg =
+          payload &&
+          typeof payload === 'object' &&
+          (payload as { error?: { message?: string } }).error?.message
+        if (errMsg) {
+          throw new LlmRequestError(String(errMsg), 'stream_error')
+        }
+
+        applyPayload(payload)
+      }
+    }
+
+    // Flush a trailing line without newline (rare).
+    if (!sawDone && carry.trim().startsWith('data:')) {
+      const data = carry.trim().slice(5).trim()
+      if (data && data !== '[DONE]') {
+        try {
+          applyPayload(JSON.parse(data) as unknown)
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } finally {
+    options?.signal?.removeEventListener('abort', abort)
+  }
+
+  return fullText
+}
+
+async function callOpenAIMessages(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+): Promise<string> {
+  // Key injected by /api/openai or /api/deepseek — never send Authorization from the browser.
+  const { body, backend, url } = prepareOpenAIChatBody(messages, options, false)
   const headers = {
     'Content-Type': 'application/json',
   }
-
-  let body = buildOpenAIChatBody(messages)
 
   const { authFetch } = await import('./authFetch')
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -322,34 +1101,13 @@ async function callOpenAIMessages(messages: OpenAIChatMessage[]): Promise<string
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal: options?.signal,
     })
 
     if (!res.ok) {
       const errText = await res.text()
-      const lower = errText.toLowerCase()
-
-      // Auto-adapt to model parameter restrictions, then retry.
-      if (attempt < 2 && lower.includes('temperature') && 'temperature' in body) {
-        delete body.temperature
-        continue
-      }
-      if (attempt < 2 && lower.includes('max_tokens') && 'max_tokens' in body) {
-        delete body.max_tokens
-        body.max_completion_tokens = body.max_completion_tokens || 8192
-        continue
-      }
-      if (
-        attempt < 2 &&
-        lower.includes('max_completion_tokens') &&
-        lower.includes('max_tokens') &&
-        !('max_tokens' in body)
-      ) {
-        delete body.max_completion_tokens
-        body.max_tokens = 8192
-        continue
-      }
-
-      throw friendlyLlmError(res.status, errText, 'openai')
+      if (attempt < 2 && adaptOpenAIBodyForError(body, errText)) continue
+      throw friendlyLlmError(res.status, errText, backend)
     }
 
     const data = (await res.json()) as {
@@ -369,33 +1127,192 @@ async function callOpenAIMessages(messages: OpenAIChatMessage[]): Promise<string
     const finish = data.choices?.[0]?.finish_reason || ''
     if (finish === 'length') {
       throw new LlmRequestError(
-        '模型输出被截断（可能把额度用在了内部推理上）。请换 gpt-5.4-nano，或稍后再试。',
+        backend === 'deepseek'
+          ? '模型输出被截断。请换 deepseek-v4-flash，或稍后再试。'
+          : '模型输出被截断（可能把额度用在了内部推理上）。请换 gpt-5.4-nano，或稍后再试。',
         'truncated',
       )
     }
-    throw new LlmRequestError('OpenAI 没有返回内容。', 'empty')
+    throw new LlmRequestError(
+      backend === 'deepseek' ? 'DeepSeek 没有返回内容。' : 'OpenAI 没有返回内容。',
+      'empty',
+    )
   }
 
-  throw new LlmRequestError('OpenAI 请求失败。')
+  throw new LlmRequestError(backend === 'deepseek' ? 'DeepSeek 请求失败。' : 'OpenAI 请求失败。')
 }
 
-async function callOpenAI(system: string, user: string): Promise<string> {
-  return callOpenAIMessages([
-    { role: 'system', content: system },
-    { role: 'user', content: user },
-  ])
+async function callOpenAIMessagesStream(
+  messages: OpenAIChatMessage[],
+  options?: ChatStreamOptions,
+): Promise<string> {
+  const { body, backend, url } = prepareOpenAIChatBody(messages, options, true)
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  }
+
+  const { authFetch } = await import('./authFetch')
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await authFetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      if (attempt < 2 && adaptOpenAIBodyForError(body, errText)) continue
+      throw friendlyLlmError(res.status, errText, backend)
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+    // Some gateways may fall back to a non-stream JSON body.
+    if (!contentType.includes('text/event-stream') && !contentType.includes('octet-stream')) {
+      const data = (await res.json()) as {
+        choices?: Array<{
+          finish_reason?: string
+          message?: { content?: string | Array<{ type?: string; text?: string }>; refusal?: string }
+        }>
+      }
+      const refusal = data.choices?.[0]?.message?.refusal?.trim()
+      if (refusal) throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
+      const text = extractOpenAIMessageText(data)
+      if (text) {
+        options?.onDelta?.(text, text)
+        return text
+      }
+      throw new LlmRequestError(
+        backend === 'deepseek' ? 'DeepSeek 没有返回内容。' : 'OpenAI 没有返回内容。',
+        'empty',
+      )
+    }
+
+    const text = await readOpenAIChatSse(res, {
+      signal: options?.signal,
+      onDelta: options?.onDelta,
+      onReasoningDelta: options?.onReasoningDelta,
+    })
+    if (text.trim()) return text
+    throw new LlmRequestError(
+      backend === 'deepseek' ? 'DeepSeek 没有返回内容。' : 'OpenAI 没有返回内容。',
+      'empty',
+    )
+  }
+
+  throw new LlmRequestError(backend === 'deepseek' ? 'DeepSeek 请求失败。' : 'OpenAI 请求失败。')
 }
 
-async function callProvider(provider: LlmProvider, system: string, user: string): Promise<string> {
-  return provider === 'openai' ? callOpenAI(system, user) : callGemini(system, user)
+async function callOpenAI(
+  system: string,
+  user: string,
+  options?: ChatCallOptions,
+): Promise<string> {
+  return callOpenAIMessages(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    options,
+  )
 }
 
-/** Multi-turn chat completion (OpenAI). Throws on failure. */
-export async function openaiChat(messages: OpenAIChatMessage[]): Promise<string> {
+async function callProvider(
+  provider: LlmProvider,
+  system: string,
+  user: string,
+  options?: ChatCallOptions,
+): Promise<string> {
+  return provider === 'openai' ? callOpenAI(system, user, options) : callGemini(system, user)
+}
+
+/** Multi-turn chat completion (OpenAI / DeepSeek). Throws on failure. */
+export async function openaiChat(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+): Promise<string> {
   if (!isLlmConfigured()) {
     throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
   }
-  return callOpenAIMessages(messages)
+  return callOpenAIMessages(messages, options)
+}
+
+/**
+ * Streaming multi-turn chat (OpenAI / DeepSeek `stream: true` SSE).
+ * Invokes `onDelta` for each content chunk; returns the full assistant text.
+ * Optional `onReasoningDelta` receives CoT tokens when the API emits them
+ * (kept separate from content so JSON reply parsing stays intact).
+ * Non-chat helpers should keep using `openaiChat` / `generateText`.
+ */
+export async function openaiChatStream(
+  messages: OpenAIChatMessage[],
+  options?: ChatStreamOptions,
+): Promise<string> {
+  if (!isLlmConfigured()) {
+    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+  }
+  return callOpenAIMessagesStream(messages, options)
+}
+
+/**
+ * Extract a (possibly incomplete) JSON string field while tokens stream in.
+ * Returns null until the field's opening quote is seen.
+ */
+export function extractPartialJsonStringField(text: string, field: string): string | null {
+  const key = `"${field}"`
+  let searchFrom = 0
+  while (searchFrom < text.length) {
+    const keyAt = text.indexOf(key, searchFrom)
+    if (keyAt < 0) return null
+    let i = keyAt + key.length
+    while (i < text.length && /\s/.test(text[i]!)) i++
+    if (text[i] !== ':') {
+      searchFrom = keyAt + 1
+      continue
+    }
+    i++
+    while (i < text.length && /\s/.test(text[i]!)) i++
+    if (i >= text.length) return null
+    if (text[i] !== '"') {
+      searchFrom = keyAt + 1
+      continue
+    }
+    i++
+    let out = ''
+    while (i < text.length) {
+      const c = text[i]!
+      if (c === '\\') {
+        if (i + 1 >= text.length) return out
+        const n = text[i + 1]!
+        if (n === 'n') out += '\n'
+        else if (n === 'r') out += '\r'
+        else if (n === 't') out += '\t'
+        else if (n === '"' || n === '\\' || n === '/') out += n
+        else if (n === 'u') {
+          const hex = text.slice(i + 2, i + 6)
+          if (hex.length < 4) return out
+          if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
+            out += n
+            i += 2
+            continue
+          }
+          out += String.fromCharCode(parseInt(hex, 16))
+          i += 6
+          continue
+        } else {
+          out += n
+        }
+        i += 2
+        continue
+      }
+      if (c === '"') return out
+      out += c
+      i++
+    }
+    return out
+  }
+  return null
 }
 
 type OpenAIResponsesPayload = {
@@ -481,9 +1398,13 @@ function providerOrder(preferred: LlmProvider): LlmProvider[] {
 async function generateText(
   system: string,
   user: string,
-  options?: { strict?: boolean },
+  options?: { strict?: boolean; task?: LlmTaskKind; userText?: string },
 ): Promise<string | null> {
   const strict = Boolean(options?.strict)
+  const chatOpts: ChatCallOptions = {
+    task: options?.task || 'default',
+    userText: options?.userText ?? user,
+  }
   const preferred = ENABLE_LLM_PROVIDER_SWITCH ? getLlmProvider() : 'openai'
   const order = providerOrder(preferred)
 
@@ -492,7 +1413,7 @@ async function generateText(
       throw new LlmRequestError(
         ENABLE_LLM_PROVIDER_SWITCH
           ? '未配置可用的大模型 API Key（OpenAI / Gemini）。'
-          : '未配置服务端 OPENAI_API_KEY（请写在 .env / Vercel，不要用 VITE_ 前缀）。',
+          : '未配置服务端 DEEPSEEK_API_KEY 或 OPENAI_API_KEY（请写在 .env / Vercel，不要用 VITE_ 前缀）。',
       )
     }
     return null
@@ -502,7 +1423,7 @@ async function generateText(
 
   for (const provider of order) {
     try {
-      const text = await callProvider(provider, system, user)
+      const text = await callProvider(provider, system, user, chatOpts)
       if (ENABLE_LLM_PROVIDER_SWITCH && provider !== preferred) {
         const reason =
           lastError instanceof Error ? lastError.message.replace(/。$/, '') : '上一个模型请求失败'
@@ -557,7 +1478,7 @@ export async function generatePlaceDescription(input: {
       .filter(Boolean)
       .join('\n')
 
-    return generateText(system, user)
+    return generateText(system, user, { task: 'placeDescription', userText: input.name })
   })
 }
 
@@ -606,7 +1527,10 @@ export async function generateHotelDetailCopy(input: {
     format: { intro: 'string', reason: 'string', tripFit: 'string' },
   })
 
-  const text = await generateText(system, user)
+  const text = await generateText(system, user, {
+    task: 'hotelDetail',
+    userText: input.userPreferences || input.name,
+  })
   if (!text) return null
   const parsed = extractJsonObject(text)
   if (!parsed) return null
@@ -639,6 +1563,9 @@ export async function generatePlaceDetailCopy(input: {
   dayPace?: string
   hotelArea?: string
   tripDays?: Array<{ day: number; title: string; pace: string; theme: string }>
+  /** Progressive `intro` / `reason` while JSON streams (omit on cache hits). */
+  onPartial?: (partial: { intro?: string; reason?: string }) => void
+  signal?: AbortSignal
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
@@ -666,11 +1593,51 @@ export async function generatePlaceDetailCopy(input: {
       'reason：1–2 句说明为何值得放进行程 / 为何出现在当天；可参考 stopNote',
       'tripFit：固定输出空字符串（地点详情页不展示此项）',
       '不要推荐卢浮宫或凡尔赛；不要编造营业时间与价格',
+      '为便于流式展示：先写 intro 字段（用户可见简介），再写 reason；不要先输出 reason。',
     ],
     format: { intro: 'string', reason: 'string', tripFit: '' },
   })
 
-  const text = await generateText(system, user)
+  let lastIntro = ''
+  let lastReason = ''
+  let text: string
+  try {
+    text = await openaiChatStream(
+      [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      {
+        task: 'placeDetail',
+        userText: input.name,
+        signal: input.signal,
+        onDelta: (_delta, fullText) => {
+          if (!input.onPartial) return
+          const intro =
+            extractPartialJsonStringField(fullText, 'intro') ??
+            extractPartialJsonStringField(fullText, 'description')
+          const reason = extractPartialJsonStringField(fullText, 'reason')
+          let changed = false
+          if (intro != null && intro !== lastIntro) {
+            lastIntro = intro
+            changed = true
+          }
+          if (reason != null && reason !== lastReason) {
+            lastReason = reason
+            changed = true
+          }
+          if (!changed) return
+          input.onPartial({
+            intro: lastIntro || undefined,
+            reason: lastReason || undefined,
+          })
+        },
+      },
+    )
+  } catch {
+    return null
+  }
+
   if (!text) return null
   const parsed = extractJsonObject(text)
   if (!parsed) return null
@@ -679,11 +1646,18 @@ export async function generatePlaceDetailCopy(input: {
   const reason = String(parsed.reason || '').trim()
   if (!intro && !reason) return null
 
-  return {
+  const result: HotelDetailCopy = {
     intro: intro || input.existingDescription || `${input.name}，适合安排进巴黎行程。`,
     reason: reason || input.stopNote || '适合补充进今天的行程节奏。',
     tripFit: '',
   }
+  if (
+    input.onPartial &&
+    (result.intro !== lastIntro || result.reason !== lastReason)
+  ) {
+    input.onPartial({ intro: result.intro, reason: result.reason })
+  }
+  return result
 }
 
 export async function generateDayCopy(input: {
@@ -727,7 +1701,10 @@ export async function generateDayCopy(input: {
       format: { title: 'string', theme: 'string', summary: 'string' },
     })
 
-    const text = await generateText(system, user)
+    const text = await generateText(system, user, {
+      task: 'dayCopy',
+      userText: input.placeNames.join('、'),
+    })
     if (!text) return fallbackDayCopy(input)
 
     const parsed = extractJsonObject(text)
@@ -842,7 +1819,10 @@ export async function resolveItineraryStart(
       },
     })
 
-    const text = await generateText(system, user)
+    const text = await generateText(system, user, {
+      task: 'itineraryStart',
+      userText: out.flightNumber,
+    })
     if (!text) return fallbackItineraryStart(start, out, input.tripEndDate)
 
     const parsed = extractJsonObject(text)
@@ -1052,7 +2032,11 @@ export async function recommendPlacesForDay(input: {
     },
   })
 
-  const text = await generateText(system, user, { strict: true })
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'placeRecommend',
+    userText: [input.title, input.theme, input.pace].filter(Boolean).join(' '),
+  })
   if (!text) {
     throw new LlmRequestError('大模型没有返回内容，请再试一次。')
   }
@@ -1164,7 +2148,11 @@ export async function recommendHotelsForTrip(input?: {
     },
   })
 
-  const text = await generateText(system, user, { strict: true })
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'hotelRecommend',
+    userText: preferences || undefined,
+  })
   if (!text) {
     throw new LlmRequestError('大模型没有返回酒店推荐。')
   }
@@ -1271,7 +2259,10 @@ export async function suggestPopularDestinations(options?: {
     },
   })
 
-  const text = await generateText(system, user, { strict: true })
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'destinationSuggest',
+  })
   if (!text) {
     throw new LlmRequestError('大模型没有返回热门目的地。')
   }
@@ -1485,7 +2476,11 @@ export async function generateFullItinerary(
     },
   })
 
-  const text = await generateText(system, user, { strict: true })
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'itineraryGenerate',
+    userText: input.preferences || input.destination,
+  })
   if (!text) {
     throw new LlmRequestError('大模型没有返回行程。')
   }
@@ -1829,7 +2824,11 @@ export async function generateSingleDayItinerary(
     },
   })
 
-  const text = await generateText(system, user, { strict: true })
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'itineraryDayGenerate',
+    userText: input.preferences || input.destination,
+  })
   if (!text) {
     throw new LlmRequestError('大模型没有返回单日行程。')
   }

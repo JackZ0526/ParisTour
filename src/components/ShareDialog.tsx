@@ -194,7 +194,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                 分享行程
               </h2>
               <p className="mt-2 max-w-sm text-sm leading-relaxed text-[var(--stone)]">
-                发送邀请后对方会收到邮件：未注册打开注册页，已注册打开登录页；邮箱会自动加入白名单。
+                输入同伴邮箱并发送邀请后，对方会收到邮件，按提示注册或登录后即可查看行程。
               </p>
             </div>
             <button

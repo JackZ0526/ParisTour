@@ -57,7 +57,14 @@ export function GoogleReviewsList({ reviews }: Props) {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Google 评论</p>
         {translating && (
-          <LoadingIndicator label="正在翻译非中文评论…" size="sm" showDots mode="thinking" />
+          <LoadingIndicator
+            thinkingLabel="正在翻译非中文评论…"
+            generatingLabel="正在翻译非中文评论…"
+            size="sm"
+            showDots
+            mode="thinking"
+            task="translate"
+          />
         )}
       </div>
       <div className="space-y-3">

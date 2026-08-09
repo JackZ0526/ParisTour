@@ -16,7 +16,7 @@ type ToastKind = 'save' | 'sync'
 function saveLabel(status: CloudSaveStatus, error: string | null): string {
   switch (status) {
     case 'pending':
-      return '准备写入存档…'
+      return '即将保存…'
     case 'saving':
       return '正在保存…'
     case 'saved':

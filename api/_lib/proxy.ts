@@ -82,6 +82,18 @@ export async function proxyRequest(
     if (v) outHeaders.set(key, v)
   }
 
+  const upstreamType = (upstream.headers.get('content-type') || '').toLowerCase()
+  const isEventStream = upstreamType.includes('text/event-stream')
+  if (isEventStream) {
+    // Keep SSE chunks flowing through Vercel / reverse proxies without buffering.
+    outHeaders.set('cache-control', 'no-cache, no-transform')
+    outHeaders.set('connection', 'keep-alive')
+    outHeaders.set('x-accel-buffering', 'no')
+    if (!outHeaders.has('content-type')) {
+      outHeaders.set('content-type', 'text/event-stream; charset=utf-8')
+    }
+  }
+
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,

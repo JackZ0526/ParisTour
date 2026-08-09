@@ -90,7 +90,7 @@ import {
 import { flushTripCloudSave } from './services/tripCloud'
 
 const ITINERARY_LOADING_LINES = [
-  '正在让大模型把巴黎掰成日历块…咖啡因与地铁图同步加载中。',
+  '正在把巴黎掰成日历块…咖啡因与地铁图同步加载中。',
   '按航班、酒店与「想睡到自然醒」三条戒律排日程，请稍候。',
   '迪士尼已预留倒数第二天席位，其余天正在顺路拼图…',
   '拒绝 7 点观光闹钟——行程约 10 点开场，生成中。',
@@ -767,7 +767,7 @@ export default function App() {
   const runFullItineraryGeneration = useCallback(async () => {
     if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
     if (!isLlmConfigured()) {
-      setItineraryGenError('未配置服务端 OPENAI_API_KEY，无法生成行程。')
+      setItineraryGenError('暂时无法生成行程，请稍后再试。')
       return
     }
 
@@ -1368,7 +1368,7 @@ export default function App() {
     if (!itineraryGenerated || !days.length) return
     if (dayRegenerating || itineraryGenerating) return
     if (!isLlmConfigured()) {
-      setDayRegenError('未配置服务端 OPENAI_API_KEY，无法重新生成当天行程。')
+      setDayRegenError('暂时无法重新生成当天行程，请稍后再试。')
       return
     }
 
@@ -1737,8 +1737,8 @@ export default function App() {
               </h2>
               <p className="mt-1 text-sm text-[var(--stone)]">
                 {itineraryReady
-                  ? '拖拽排序、增删地点；步行距离与标题会随行程自动更新。'
-                  : '日期、往返航班和枕头都还没就位——先把上面几项点亮，行程才肯从幕后现身。'}
+                  ? '可拖拽排序、增删地点；步行距离与当日标题会随调整自动更新。'
+                  : '先选好日期、往返航班和酒店，下方行程才会展开。'}
               </p>
               {datesReady && (
                 <p className="mt-1.5 text-sm text-[var(--copper)]">
@@ -1756,10 +1756,12 @@ export default function App() {
                 <div className="mt-2 text-sm text-[var(--ink)]/85">
                   {itineraryStartLoading && !itineraryStart ? (
                     <LoadingIndicator
-                      label="正在根据航班与时差推算行程起算日…"
+                      thinkingLabel="正在判断行程开始日…"
+                      generatingLabel="正在根据航班与时差确定行程开始日…"
                       showDots
                       size="sm"
                       mode="thinking"
+                      task="itineraryStart"
                     />
                   ) : itineraryStartDate ? (
                     <p>
@@ -1774,10 +1776,12 @@ export default function App() {
                       ) : itineraryStartLoading ? (
                         <LoadingIndicator
                           className="ml-1 align-middle"
-                          label="正在核对抵达时间…"
+                          thinkingLabel="正在核对抵达时间…"
+                          generatingLabel="正在核对抵达时间…"
                           showDots
                           size="sm"
                           mode="thinking"
+                          task="itineraryStart"
                         />
                       ) : null}
                     </p>
@@ -1825,6 +1829,7 @@ export default function App() {
                     <LoadingIndicator
                       variant="block"
                       mode="thinking"
+                      task="itineraryGenerate"
                       label={
                         <span
                           key={itineraryLoadingLineIndex}
@@ -1996,9 +2001,9 @@ export default function App() {
 
           {!itineraryReady && (
             <div className="rounded-2xl border border-dashed border-[var(--copper)]/35 bg-[var(--card)] px-4 py-5 text-center">
-              <p className="font-medium text-[var(--ink)]">前面都没选好怎么看行程</p>
+              <p className="font-medium text-[var(--ink)]">还差几项才能看行程</p>
               <p className="mt-1 text-sm text-[var(--stone)]">
-                还卡在：{missingForItinerary.join(' · ')}——挑完再掀帘子。
+                请先完成：{missingForItinerary.join(' · ')}
               </p>
             </div>
           )}
@@ -2019,6 +2024,12 @@ export default function App() {
           days={days}
           currentDay={day.day}
           customPlaces={placesWithHotel}
+          destination={destination}
+          tripStartDate={tripDates?.startDate}
+          tripEndDate={tripDates?.endDate}
+          itineraryStartDate={itineraryStartDate}
+          outbound={flights.outbound}
+          returnFlight={flights.returnFlight}
           handlers={{
             switchDay: handleSwitchDay,
             selectPlace: setSelectedPlaceId,

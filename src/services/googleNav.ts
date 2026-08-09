@@ -551,12 +551,12 @@ export async function fetchGoogleNavPath(
     if (leg?.path?.length) return { path: leg.path }
     return {
       path: null,
-      error: '无法获取 Google 导航路线。请在 Google Cloud 启用 Routes API 或 Directions API。',
+      error: '暂时无法获取导航路线。',
     }
   } catch {
     return {
       path: null,
-      error: '无法获取 Google 导航路线。请在 Google Cloud 启用 Routes API 或 Directions API。',
+      error: '暂时无法获取导航路线。',
     }
   }
 }
@@ -861,7 +861,7 @@ export async function planDayNavigation(
     error:
       anyLeg || originIsFirst || lastIsDestination
         ? undefined
-        : '无法获取 Google 导航路线。请启用 Directions API。',
+        : '暂时无法获取导航路线。',
   }
 }
 

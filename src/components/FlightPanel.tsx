@@ -27,17 +27,17 @@ function formatEndpointTime(raw: string | undefined, endpoint?: FlightEndpoint):
   })
 }
 
-/** Concrete API / origin label for the flight-card badge. */
+/** Origin label for the flight-card badge. */
 function flightSourceLabel(source: FlightInfo['source']): string {
   switch (source) {
     case 'timetable':
-      return '时刻表 · TimeTable Lookup'
+      return '计划时刻'
     case 'aerodatabox':
-      return 'AeroDataBox'
+      return '在线时刻'
     case 'recommended':
       return '推荐班次'
     case 'live':
-      return '实时数据'
+      return '实时动态'
     case 'manual':
       return '手动录入'
     case 'llm':
@@ -239,7 +239,7 @@ export function FlightPanel({
           <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
             {readOnly
               ? '当前为只读共享，无法修改航班。'
-              : '输入航班号后按行程日期查计划时刻（同一航班号+日期走本地缓存）。优先 TimeTable Lookup 航线时刻表匹配；票面若是 DL 代码共享，会匹配实际承运的 AF 航班。去程与返程都查成功后才会展开行程。'}
+              : '填写去程与返程航班号并查询，查看计划起降时间。代码共享航班会显示实际承运航司。两边都查到后，下方行程才会展开。'}
           </p>
         </div>
         {hasCards && !readOnly && (
@@ -267,7 +267,7 @@ export function FlightPanel({
       >
         <p className="font-medium">输入我的航班号并查询计划时刻</p>
         <p className="mt-1 text-xs text-[var(--stone)]">
-          使用 TimeTable Lookup 按 YVR↔CDG 航线查询计划起降时间（同一航班号+日期读缓存）。查询失败会直接显示错误，请核对航班号与日期。订票网站数据源不同，时刻可能略有差异，请以机票为准。
+          按行程日期查询计划起降时间。查不到时请核对航班号与日期；时刻可能与订票网站略有差异，请以机票为准。
           {hasDates
             ? ` 将按行程日期查询：出发 ${tripDates!.startDate} · 返程 ${tripDates!.endDate}${
                 destTrimmed ? ` · 目的地 ${destTrimmed}` : ''
@@ -276,7 +276,7 @@ export function FlightPanel({
         </p>
         {!hasDates && (
           <p className="mt-2 text-sm text-[var(--stone)]">
-            先选好行程日期再查航班（查询需要日期）
+            请先选好行程日期，再查询航班。
           </p>
         )}
 

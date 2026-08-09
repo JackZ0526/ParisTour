@@ -7,12 +7,8 @@ import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
   getOpenAIModel,
-  getOpenAIModelLabel,
   isLlmConfigured,
-  OPENAI_MODEL_OPTIONS,
   recommendPlacesForDay,
-  setOpenAIModel,
-  subscribeOpenAIModel,
   type HotelDetailCopy,
   type PlaceRecommendation,
   type RecommendPlaceType,
@@ -66,7 +62,6 @@ const GOOGLE_PLACE_LABELS = {
   intro: '地点简介',
   reason: '为什么推荐',
   loadingText: '正在生成地点简介与推荐理由…',
-  loadingMoreText: '正在生成推荐理由…',
 }
 
 export function AddPlaceDialog({
@@ -102,17 +97,10 @@ export function AddPlaceDialog({
   const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
   const [loadingDetailsKey, setLoadingDetailsKey] = useState<string | null>(null)
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
-  const [openaiModel, setOpenaiModelState] = useState(() => getOpenAIModel())
   const chromeRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
-
-  useEffect(() => {
-    return subscribeOpenAIModel(() => {
-      setOpenaiModelState(getOpenAIModel())
-    })
-  }, [])
 
   // Reset height animation gate when the sheet closes so reopen doesn't tween from stale size.
   useEffect(() => {
@@ -189,8 +177,8 @@ export function AddPlaceDialog({
       if (!list.length) {
         setError(
           isLlmConfigured()
-            ? '大模型这次没有返回可用推荐，请再点「换一批」或改用 Google 搜索。'
-            : '未配置大模型。请在服务端设置 OPENAI_API_KEY（不要用 VITE_ 前缀）。',
+            ? '这次没有可用推荐，请再点「换一批」或改用 Google 搜索。'
+            : '推荐助手暂不可用，请改用 Google 搜索。',
         )
         return
       }
@@ -416,16 +404,18 @@ export function AddPlaceDialog({
       return
     }
 
-    // First load only: show Google summary while LLM narrative generates.
-    setGoogleStory({
-      intro: details.summary || '',
-      reason: '',
-      tripFit: '',
-    })
-
-    if (!isLlmConfigured()) return
+    if (!isLlmConfigured()) {
+      setGoogleStory({
+        intro: details.summary || '',
+        reason: '',
+        tripFit: '',
+      })
+      setGoogleStoryLoading(false)
+      return
+    }
 
     let cancelled = false
+    setGoogleStory({ intro: '', reason: '', tripFit: '' })
     setGoogleStoryLoading(true)
     void memoizePlaceDetailCopy(detailKeys, () =>
       generatePlaceDetailCopy({
@@ -438,6 +428,14 @@ export function AddPlaceDialog({
         dayTheme,
         dayPace,
         hotelArea,
+        onPartial: (partial) => {
+          if (cancelled) return
+          setGoogleStory((prev) => ({
+            intro: partial.intro ?? prev?.intro ?? '',
+            reason: partial.reason ?? prev?.reason ?? '',
+            tripFit: '',
+          }))
+        },
       }).then((copy) => {
         if (!copy) {
           return {
@@ -540,42 +538,8 @@ export function AddPlaceDialog({
           {mainTab === 'ai' ? (
             <div className="space-y-3">
               <p className="text-xs text-[var(--stone)]">
-                根据今天「{dayTitle}」生成推荐
-                {isLlmConfigured() ? '（大模型）' : '（未配置模型）'}
-                。首次打开或点「换一批」时才会请求模型；已加入行程的地点会暂时隐藏，移出后再显示。
+                根据今天「{dayTitle}」给出推荐。点「换一批」可刷新列表；已加入行程的地点会暂时隐藏。
               </p>
-
-              {isLlmConfigured() && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--mist)]/70 px-3 py-2 text-xs">
-                  <span className="text-[var(--stone)]">当前模型</span>
-                  <span className="font-medium text-[var(--ink)]">
-                    OpenAI · {getOpenAIModelLabel(openaiModel)}
-                  </span>
-                  <label className="ml-auto flex items-center gap-1.5 text-[var(--stone)]">
-                    <span className="sr-only">选择 OpenAI 模型</span>
-                    <select
-                      value={openaiModel}
-                      onChange={(e) => {
-                        const next = e.target.value
-                        setOpenAIModel(next)
-                        setOpenaiModelState(next)
-                        // Model choice applies to the next fetch (first load / 换一批).
-                      }}
-                      disabled={loadingRecs || searching}
-                      className="max-w-[11rem] rounded-full border border-[var(--ink)]/15 bg-[var(--paper)] px-2.5 py-1 text-[var(--ink)] outline-none transition hover:border-[var(--ink)]/40 disabled:opacity-50"
-                    >
-                      {!OPENAI_MODEL_OPTIONS.some((m) => m.id === openaiModel) && (
-                        <option value={openaiModel}>{openaiModel}</option>
-                      )}
-                      {OPENAI_MODEL_OPTIONS.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
 
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {recommendTabs.map((tab) => (
@@ -601,10 +565,12 @@ export function AddPlaceDialog({
               {loadingRecs ? (
                 <LoadingIndicator
                   variant="block"
-                  label="AI 正在根据行程推荐…"
+                  thinkingLabel="AI 正在思考推荐…"
+                  generatingLabel="AI 正在根据行程推荐…"
                   showDots
                   size="md"
                   mode="thinking"
+                  task="placeRecommend"
                 />
               ) : (
                 <ul className="space-y-2">
@@ -754,7 +720,7 @@ export function AddPlaceDialog({
                                       aria-busy={busyBest || undefined}
                                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                                     >
-                                      {busyBest && <ButtonSpinner mode="thinking" />}
+                                      {busyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
                                       {busyBest ? '加入中…' : '最顺路'}
                                     </button>
                                     <button
@@ -772,12 +738,12 @@ export function AddPlaceDialog({
                                       aria-busy={busyEnd || undefined}
                                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
                                     >
-                                      {busyEnd && <ButtonSpinner mode="thinking" />}
+                                      {busyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
                                       {busyEnd ? '加入中…' : '加到最后'}
                                     </button>
                                   </div>
                                   <p className="text-xs text-[var(--stone)]">
-                                    「最顺路」按当日路线插入最佳位置（第1天：机场→酒店→其他地点；其余天从酒店出发）；「加到最后」追加到当天末尾。
+                                    「最顺路」会插到当天更合适的位置；「加到最后」追加到当天末尾。
                                   </p>
                                 </>
                               )}
@@ -802,7 +768,7 @@ export function AddPlaceDialog({
                 aria-busy={loadingRecs || undefined}
                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
               >
-                {loadingRecs && <ButtonSpinner mode="thinking" />}
+                {loadingRecs && <ButtonSpinner mode="thinking" task="placeRecommend" />}
                 {loadingRecs ? '正在换一批…' : '换一批'}
               </button>
 
@@ -866,8 +832,9 @@ export function AddPlaceDialog({
             ? {
                 intro:
                   googleStory?.intro ||
-                  googleDetail.details.summary ||
-                  undefined,
+                  (!googleStoryLoading
+                    ? googleDetail.details.summary || undefined
+                    : undefined),
                 reason: googleStory?.reason || undefined,
                 loading: googleStoryLoading,
                 labels: GOOGLE_PLACE_LABELS,
@@ -893,7 +860,7 @@ export function AddPlaceDialog({
                   aria-busy={googleBusyBest || undefined}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                 >
-                  {googleBusyBest && <ButtonSpinner mode="thinking" />}
+                  {googleBusyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
                   {googleBusyBest ? '加入中…' : '最顺路'}
                 </button>
                 <button
@@ -911,7 +878,7 @@ export function AddPlaceDialog({
                   aria-busy={googleBusyEnd || undefined}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
                 >
-                  {googleBusyEnd && <ButtonSpinner mode="thinking" />}
+                  {googleBusyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
                   {googleBusyEnd ? '加入中…' : '加到最后'}
                 </button>
               </div>

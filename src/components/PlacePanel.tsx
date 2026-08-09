@@ -73,15 +73,18 @@ export function PlacePanel({
       return
     }
 
-    setStory({
-      intro: place.description,
-      reason: stopNote || '',
-      tripFit: '',
-    })
-
-    if (!isLlmConfigured()) return
+    if (!isLlmConfigured()) {
+      setStory({
+        intro: place.description,
+        reason: stopNote || '',
+        tripFit: '',
+      })
+      setStoryLoading(false)
+      return
+    }
 
     let cancelled = false
+    setStory({ intro: '', reason: '', tripFit: '' })
     setStoryLoading(true)
 
     const ctx = ctxRef.current
@@ -106,6 +109,14 @@ export function PlacePanel({
           pace: d.pace,
           theme: d.theme,
         })),
+        onPartial: (partial) => {
+          if (cancelled) return
+          setStory((prev) => ({
+            intro: partial.intro ?? prev?.intro ?? '',
+            reason: partial.reason ?? prev?.reason ?? '',
+            tripFit: '',
+          }))
+        },
       }).then((copy) => {
         if (!copy) return { intro: p.description, reason: ctx.stopNote || '', tripFit: '' }
         return { ...copy, tripFit: '' }
@@ -131,7 +142,7 @@ export function PlacePanel({
       <aside className="rounded-2xl border border-dashed border-[var(--stone)]/30 bg-[var(--card)] px-4 py-6 text-center text-sm text-[var(--stone)]">
         {place
           ? `已选中「${place.name}」，详情以弹层展示。`
-          : '点击地图标记或行程地点，打开与酒店相同的 Google 详情页'}
+          : '点击地图标记或行程地点，查看地点详情'}
       </aside>
 
       <GooglePlacePage
@@ -144,8 +155,12 @@ export function PlacePanel({
         llmNarrative={
           place
             ? {
-                intro: story?.intro || place.description,
-                reason: story?.reason || stopNote || undefined,
+                intro:
+                  story?.intro ||
+                  (!storyLoading ? place.description : undefined),
+                reason:
+                  story?.reason ||
+                  (!storyLoading ? stopNote || undefined : undefined),
                 loading: storyLoading,
                 labels: PLACE_LABELS,
               }

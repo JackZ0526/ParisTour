@@ -348,7 +348,7 @@ export function HotelPicker({
 
   async function bootstrapRecommendations() {
     if (!isLlmConfigured()) {
-      setError('未配置 OpenAI API Key，无法生成酒店推荐。请使用下方自定义地址。')
+      setError('暂时无法生成酒店推荐，请使用下方自定义地址。')
       return
     }
 
@@ -374,14 +374,14 @@ export function HotelPicker({
 
   async function runFreshRecommendations(preferences?: string) {
     if (!isLlmConfigured()) {
-      setError('未配置 OpenAI API Key，无法生成酒店推荐。请使用下方自定义地址。')
+      setError('暂时无法生成酒店推荐，请使用下方自定义地址。')
       return
     }
 
     const prefs = preferences?.trim() || undefined
     setRefreshPanel(null)
     setRefreshing(true)
-    setRefreshHint(prefs ? '正在按你的喜好重新推荐酒店…' : '交给命运：正在让模型自由挑选一批新酒店…')
+    setRefreshHint(prefs ? '正在按你的喜好重新推荐酒店…' : '交给命运：正在挑选一批新酒店…')
     setError(null)
     try {
       const result = await refreshHotelCandidates({
@@ -731,7 +731,7 @@ export function HotelPicker({
           <p className="mt-1 max-w-xl text-sm text-[var(--stone)]">
             {readOnly
               ? '当前为只读共享，无法修改酒店。'
-              : '首次打开由大模型推荐候选项。点开酒店后选择「就住这儿了」才会设为当前住宿；日期、往返航班与酒店齐了，下方行程才会掀开帘子。'}
+              : '打开后会先给出几家酒店候选。点开详情并选「就住这儿了」才会定为当前住宿；日期、往返航班和酒店都选好后，下方行程才会展开。'}
           </p>
         </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -748,7 +748,7 @@ export function HotelPicker({
             aria-busy={refreshing || undefined}
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)] disabled:opacity-50"
           >
-            {refreshing && <ButtonSpinner mode="thinking" />}
+            {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
             {refreshing ? '推荐中…' : '换一批推荐'}
           </button>
         </div>
@@ -762,7 +762,7 @@ export function HotelPicker({
                 <div>
                   <p className="font-medium">换一批推荐</p>
                   <p className="mt-1 text-sm text-[var(--stone)]">
-                    按你的喜好定制，或交给模型自由发挥。
+                    按你的喜好定制，或直接再换一批。
                   </p>
                 </div>
                 <button
@@ -794,7 +794,7 @@ export function HotelPicker({
                 >
                   <p className="font-medium">交给命运</p>
                   <p className="mt-1 text-xs text-[var(--stone)]">
-                    不设条件，让模型自行挑一批新酒店
+                    不设条件，随机再挑一批新酒店
                   </p>
                 </button>
               </div>
@@ -840,7 +840,7 @@ export function HotelPicker({
                   aria-busy={refreshing || undefined}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] disabled:opacity-50"
                 >
-                  {refreshing && <ButtonSpinner mode="thinking" />}
+                  {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
                   {refreshing ? '推荐中…' : '按喜好推荐'}
                 </button>
               </div>
@@ -852,10 +852,12 @@ export function HotelPicker({
       {refreshing && (
         <LoadingIndicator
           variant="block"
-          label={refreshHint || '正在请大模型推荐巴黎酒店，并核对 Google 地点信息…'}
+          thinkingLabel={refreshHint || '正在思考酒店推荐…'}
+          generatingLabel={refreshHint || '正在推荐酒店并核对地点信息…'}
           showDots
           size="sm"
           mode="thinking"
+          task="hotelRecommend"
           className="py-3"
         />
       )}
