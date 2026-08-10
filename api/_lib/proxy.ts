@@ -92,9 +92,35 @@ export async function proxyRequest(
     if (!outHeaders.has('content-type')) {
       outHeaders.set('content-type', 'text/event-stream; charset=utf-8')
     }
+
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: outHeaders,
+    })
   }
 
-  return new Response(upstream.body, {
+  // Buffer ordinary JSON/binary responses inside the function. Returning the
+  // upstream ReadableStream directly is fine in local Node, but a serverless
+  // runtime can finalize the invocation before the borrowed stream is fully
+  // forwarded, producing an HTTP 200 with an empty body in the browser.
+  const body = await upstream.arrayBuffer()
+  if (upstream.ok && body.byteLength === 0) {
+    return new Response(
+      JSON.stringify({
+        error: {
+          message: 'Upstream returned an empty response body',
+          code: 'empty_upstream_body',
+        },
+      }),
+      {
+        status: 502,
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      },
+    )
+  }
+
+  return new Response(body, {
     status: upstream.status,
     statusText: upstream.statusText,
     headers: outHeaders,

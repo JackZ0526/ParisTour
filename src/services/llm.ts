@@ -119,9 +119,10 @@ type TaskThinkingBounds = {
 /** Baseline + clamp bounds per task (auto mode only). */
 const TASK_THINKING: Record<LlmTaskKind, TaskThinkingBounds> = {
   tripChat: { baseline: 'medium', min: 'low', max: 'high' },
-  // Structured JSON batches — keep thinking light so CoT does not eat the
-  // completion budget / hit proxy timeouts (empty body → JSON parse errors).
-  placeRecommend: { baseline: 'low', min: 'off', max: 'medium' },
+  // Structured JSON batches are latency-sensitive in the 60s serverless
+  // proxy. DeepSeek V4 maps low/medium to high, so auto mode keeps thinking
+  // off here; a user's manually locked thinking mode still takes precedence.
+  placeRecommend: { baseline: 'off', min: 'off', max: 'off' },
   hotelRecommend: { baseline: 'medium', min: 'low', max: 'high' },
   placeDescription: { baseline: 'off', min: 'off', max: 'low' },
   placeDetail: { baseline: 'low', min: 'off', max: 'low' },
@@ -980,10 +981,14 @@ async function resolveModelCallPreflight(
     if (options?.signal?.aborted) throw error
   }
 
+  const taskBounds = TASK_THINKING[options?.task || 'default'] || TASK_THINKING.default
+  const classifiedForTask = classifiedEffort
+    ? clampEffort(classifiedEffort, taskBounds.min, taskBounds.max)
+    : null
   const thinking =
     options?.thinking ||
-    (getThinkingMode() === 'auto' && classifiedEffort
-      ? thinkingFromEffort(classifiedEffort)
+    (getThinkingMode() === 'auto' && classifiedForTask
+      ? thinkingFromEffort(classifiedForTask)
       : fallback)
   const needsWeb = forbiddenWeb
     ? false
@@ -1298,6 +1303,15 @@ async function callOpenAIMessages(
   const headers = {
     'Content-Type': 'application/json',
   }
+  type ChatCompletionPayload = {
+    choices?: Array<{
+      finish_reason?: string
+      message?: {
+        content?: string | Array<{ type?: string; text?: string }>
+        refusal?: string
+      }
+    }>
+  }
 
   const { authFetch } = await import('./authFetch')
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -1311,15 +1325,32 @@ async function callOpenAIMessages(
     if (!res.ok) {
       const errText = await res.text()
       if (attempt < 2 && adaptOpenAIBodyForError(body, errText)) continue
+      if (
+        attempt < 2 &&
+        (res.status === 408 ||
+          res.status === 425 ||
+          res.status === 502 ||
+          res.status === 503 ||
+          res.status === 504)
+      ) {
+        continue
+      }
       throw friendlyLlmError(res.status, errText, backend)
     }
 
-    const data = await readResponseJson<{
-      choices?: Array<{
-        finish_reason?: string
-        message?: { content?: string | Array<{ type?: string; text?: string }>; refusal?: string }
-      }>
-    }>(res, backend)
+    let data: ChatCompletionPayload
+    try {
+      data = await readResponseJson<ChatCompletionPayload>(res, backend)
+    } catch (error) {
+      if (
+        attempt < 2 &&
+        error instanceof LlmRequestError &&
+        (error.code === 'empty_body' || error.code === 'invalid_json')
+      ) {
+        continue
+      }
+      throw error
+    }
     const refusal = data.choices?.[0]?.message?.refusal?.trim()
     if (refusal) {
       throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
@@ -1337,6 +1368,7 @@ async function callOpenAIMessages(
         'truncated',
       )
     }
+    if (attempt < 2) continue
     throw new LlmRequestError(
       backend === 'deepseek' ? 'DeepSeek 没有返回内容。' : 'OpenAI 没有返回内容。',
       'empty',
