@@ -2249,10 +2249,23 @@ export async function recommendPlacesForDay(input: {
   excludeNames?: string[]
   /** Bump to ask for a fresh batch */
   batch?: number
+  /** Generate only these tabs. Defaults to all three for backwards compatibility. */
+  types?: RecommendPlaceType[]
+  /** Number requested for each selected tab. */
+  countPerType?: number
 }): Promise<PlaceRecommendation[]> {
   if (!isLlmConfigured()) return []
 
   const batch = Math.max(1, input.batch || 1)
+  const requestedTypes = Array.from(
+    new Set(
+      (input.types?.length ? input.types : RECOMMEND_TYPES).filter((type) =>
+        RECOMMEND_TYPES.includes(type),
+      ),
+    ),
+  )
+  const countPerType = Math.max(1, Math.min(6, input.countPerType || 4))
+  if (!requestedTypes.length) return []
   const itineraryExclude = toExcludeSet([
     ...input.currentPlaceNames,
     ...(input.tripPlaceNames || []),
@@ -2270,8 +2283,12 @@ export async function recommendPlacesForDay(input: {
     alreadyOnTrip: input.tripPlaceNames || [],
     avoidAlso: input.excludeNames || [],
     batch,
+    requestedTypes,
+    countPerType,
     rules: [
-      '共推荐至少 12 个地点：attraction / cafe / restaurant 每类至少 4 个',
+      `只推荐 requestedTypes 中的类别；每个类别严格给出 ${countPerType} 个地点，共 ${
+        requestedTypes.length * countPerType
+      } 个`,
       CAFE_VS_RESTAURANT_RULE,
       'cafe 类：优先 Google 高分 specialty coffee、烘焙店可坐位、brunch/早午餐小店；不要推荐以正餐为主的 brasserie / café-restaurant',
       'restaurant 类：正餐（午餐/晚餐），可含 bistro、brasserie、各国菜；不要用咖啡店/纯甜品店凑数',
@@ -2319,6 +2336,11 @@ export async function recommendPlacesForDay(input: {
 
   const out: PlaceRecommendation[] = []
   const seen = new Set<string>()
+  const typeCounts: Record<RecommendPlaceType, number> = {
+    attraction: 0,
+    cafe: 0,
+    restaurant: 0,
+  }
 
   for (const item of list) {
     if (!item || typeof item !== 'object') continue
@@ -2328,7 +2350,7 @@ export async function recommendPlacesForDay(input: {
     const key = name.toLowerCase()
     if (itineraryExclude.has(key) || seen.has(key)) continue
     const type = normalizeRecommendType(row.type)
-    if (!RECOMMEND_TYPES.includes(type)) continue
+    if (!requestedTypes.includes(type) || typeCounts[type] >= countPerType) continue
     const reason = String(row.reason || '适合补充进今天的行程').trim()
     const intro = String(row.intro || row.description || reason).trim()
     out.push({
@@ -2340,6 +2362,7 @@ export async function recommendPlacesForDay(input: {
       area: String(row.area || '').trim() || undefined,
     })
     seen.add(key)
+    typeCounts[type] += 1
   }
 
   return out

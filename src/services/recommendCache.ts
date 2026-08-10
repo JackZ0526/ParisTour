@@ -1,4 +1,7 @@
-import type { PlaceRecommendation } from './llm'
+import type {
+  PlaceRecommendation,
+  RecommendPlaceType,
+} from './llm'
 import {
   getLlmArtifact,
   removeLlmArtifact,
@@ -8,7 +11,10 @@ import {
 
 export interface DayRecommendCache {
   day: number
+  /** Highest batch retained for backwards compatibility with older snapshots. */
   batch: number
+  /** Each recommendation tab advances independently. */
+  batches?: Partial<Record<RecommendPlaceType, number>>
   model: string
   recommendations: PlaceRecommendation[]
   fetchedAt: number

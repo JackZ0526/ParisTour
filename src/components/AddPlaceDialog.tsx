@@ -95,10 +95,15 @@ export function AddPlaceDialog({
   const [searching, setSearching] = useState(false)
   const [addingName, setAddingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [loadingRecs, setLoadingRecs] = useState(false)
-  const [refreshingRecs, setRefreshingRecs] = useState(false)
   const [recommendations, setRecommendations] = useState<PlaceRecommendation[]>([])
-  const [recBatch, setRecBatch] = useState(1)
+  const [loadingByCategory, setLoadingByCategory] = useState<
+    Record<RecommendPlaceType, boolean>
+  >({ attraction: false, cafe: false, restaurant: false })
+  const [refreshingCategory, setRefreshingCategory] =
+    useState<RecommendPlaceType | null>(null)
+  const [recErrors, setRecErrors] = useState<
+    Partial<Record<RecommendPlaceType, string>>
+  >({})
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
   const [loadingDetailsKey, setLoadingDetailsKey] = useState<string | null>(null)
@@ -107,6 +112,14 @@ export function AddPlaceDialog({
   const measureRef = useRef<HTMLDivElement>(null)
   const photoSwipeStartX = useRef<number | null>(null)
   const thumbRefsByKey = useRef<Record<string, (HTMLButtonElement | null)[]>>({})
+  const recommendationsRef = useRef<PlaceRecommendation[]>([])
+  const recBatchesRef = useRef<Record<RecommendPlaceType, number>>({
+    attraction: 1,
+    cafe: 1,
+    restaurant: 1,
+  })
+  const loadingCategoriesRef = useRef(new Set<RecommendPlaceType>())
+  const recommendationEpochRef = useRef(0)
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
 
@@ -160,25 +173,77 @@ export function AddPlaceDialog({
     }
   }, [open, mainTab, googleDetail])
 
-  function applyCachedRecommendations(list: PlaceRecommendation[], batch: number) {
+  function updateCategoryLoading(types: RecommendPlaceType[], loading: boolean) {
+    for (const type of types) {
+      if (loading) loadingCategoriesRef.current.add(type)
+      else loadingCategoriesRef.current.delete(type)
+    }
+    setLoadingByCategory({
+      attraction: loadingCategoriesRef.current.has('attraction'),
+      cafe: loadingCategoriesRef.current.has('cafe'),
+      restaurant: loadingCategoriesRef.current.has('restaurant'),
+    })
+  }
+
+  function applyCachedRecommendations(
+    list: PlaceRecommendation[],
+    batches?: Partial<Record<RecommendPlaceType, number>>,
+    legacyBatch = 1,
+  ) {
+    const nextBatches: Record<RecommendPlaceType, number> = {
+      attraction: batches?.attraction || legacyBatch,
+      cafe: batches?.cafe || legacyBatch,
+      restaurant: batches?.restaurant || legacyBatch,
+    }
+    recommendationsRef.current = list
+    recBatchesRef.current = nextBatches
     setRecommendations(list)
-    setRecBatch(batch)
+    setRecErrors({})
     setError(null)
     setExpandedKey(null)
     setDetailsByKey({})
     setPhotoIndexByKey({})
   }
 
-  async function fetchRecommendations(options?: {
+  function persistRecommendations() {
+    const batches = recBatchesRef.current
+    setDayRecommendCache({
+      day: dayNumber,
+      batch: Math.max(batches.attraction, batches.cafe, batches.restaurant),
+      batches,
+      model: getOpenAIModel(),
+      recommendations: recommendationsRef.current,
+      fetchedAt: Date.now(),
+    })
+  }
+
+  async function fetchRecommendations(options: {
+    types: RecommendPlaceType[]
     batch?: number
     excludeNames?: string[]
-  }) {
-    const batch = options?.batch ?? 1
-    setLoadingRecs(true)
+    resetDetails?: boolean
+    epoch?: number
+  }): Promise<boolean> {
+    const epoch = options.epoch ?? recommendationEpochRef.current
+    const types = Array.from(new Set(options.types)).filter(
+      (type) => !loadingCategoriesRef.current.has(type),
+    )
+    if (!types.length) return false
+
+    const batch = options.batch ?? 1
+    updateCategoryLoading(types, true)
+    setRecErrors((prev) => {
+      const next = { ...prev }
+      for (const type of types) delete next[type]
+      return next
+    })
     setError(null)
-    setExpandedKey(null)
-    setDetailsByKey({})
-    setPhotoIndexByKey({})
+    if (options.resetDetails) {
+      setExpandedKey(null)
+      setDetailsByKey({})
+      setPhotoIndexByKey({})
+    }
+
     try {
       const list = await recommendPlacesForDay({
         day: dayNumber,
@@ -188,43 +253,71 @@ export function AddPlaceDialog({
         hotelArea,
         currentPlaceNames,
         tripPlaceNames,
-        excludeNames: options?.excludeNames,
+        excludeNames: options.excludeNames,
         batch,
+        types,
+        countPerType: 4,
       })
+      if (epoch !== recommendationEpochRef.current) return false
+
+      const returnedTypes = new Set(list.map((item) => item.type))
       if (!list.length) {
-        setError(
-          isLlmConfigured()
-            ? '这次没有可用推荐，请再点「换一批」或改用 Google 搜索。'
-            : '推荐助手暂不可用，请改用 Google 搜索。',
-        )
-        return
+        const message = isLlmConfigured()
+          ? '这次没有可用推荐，请再点「换一批」或改用 Google 搜索。'
+          : '推荐助手暂不可用，请改用 Google 搜索。'
+        setRecErrors((prev) => ({
+          ...prev,
+          ...Object.fromEntries(types.map((type) => [type, message])),
+        }))
+        return false
       }
-      applyCachedRecommendations(list, batch)
-      setDayRecommendCache({
-        day: dayNumber,
-        batch,
-        model: getOpenAIModel(),
-        recommendations: list,
-        fetchedAt: Date.now(),
-      })
+
+      const next = [
+        ...recommendationsRef.current.filter(
+          (item) => !returnedTypes.has(item.type),
+        ),
+        ...list,
+      ]
+      const nextBatches = { ...recBatchesRef.current }
+      for (const type of returnedTypes) nextBatches[type] = batch
+      recommendationsRef.current = next
+      recBatchesRef.current = nextBatches
+      setRecommendations(next)
+      persistRecommendations()
+      return true
     } catch (err) {
-      // Bare JSON.parse / res.json() SyntaxError must not surface as English noise.
-      if (err instanceof SyntaxError) {
-        setError('推荐结果解析失败，请再试一次。')
-      } else {
-        setError(err instanceof Error ? err.message : '推荐加载失败，请稍后再试。')
-      }
+      if (epoch !== recommendationEpochRef.current) return false
+      const message =
+        err instanceof SyntaxError
+          ? '推荐结果解析失败，请再试一次。'
+          : err instanceof Error
+            ? err.message
+            : '推荐加载失败，请稍后再试。'
+      setRecErrors((prev) => ({
+        ...prev,
+        ...Object.fromEntries(types.map((type) => [type, message])),
+      }))
+      return false
     } finally {
-      setLoadingRecs(false)
+      if (epoch === recommendationEpochRef.current) {
+        updateCategoryLoading(types, false)
+      }
     }
   }
 
-  // Only hit the model on first open for this day (no cache) — not every reopen.
+  // First paint only the selected tab, then fill the two remaining tabs in one
+  // background request. Reopening uses the persisted per-day cache.
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      recommendationEpochRef.current += 1
+      return
+    }
 
+    const epoch = ++recommendationEpochRef.current
+    loadingCategoriesRef.current.clear()
+    setLoadingByCategory({ attraction: false, cafe: false, restaurant: false })
+    setRefreshingCategory(null)
     setMainTab('ai')
-    setCategory('attraction')
     setError(null)
     setGoogleDetail(null)
     setGoogleStory(null)
@@ -232,25 +325,84 @@ export function AddPlaceDialog({
 
     const cached = getDayRecommendCache(dayNumber)
     if (cached) {
-      applyCachedRecommendations(cached.recommendations, cached.batch)
-      return
+      applyCachedRecommendations(
+        cached.recommendations,
+        cached.batches,
+        cached.batch,
+      )
+    } else {
+      applyCachedRecommendations([], undefined, 1)
     }
 
-    void fetchRecommendations({ batch: 1 })
+    const hasType = (type: RecommendPlaceType) =>
+      recommendationsRef.current.some((item) => item.type === type)
+    const primaryType = category
+
+    void (async () => {
+      if (!hasType(primaryType)) {
+        await fetchRecommendations({
+          types: [primaryType],
+          batch: recBatchesRef.current[primaryType],
+          epoch,
+        })
+      }
+      if (epoch !== recommendationEpochRef.current) return
+
+      const remaining = recommendTabs
+        .map((tab) => tab.id)
+        .filter((type) => type !== primaryType && !hasType(type))
+      if (remaining.length) {
+        await fetchRecommendations({
+          types: remaining,
+          batch: Math.max(...remaining.map((type) => recBatchesRef.current[type])),
+          excludeNames: recommendationsRef.current.map((item) => item.name),
+          epoch,
+        })
+      }
+    })()
+
+    return () => {
+      if (recommendationEpochRef.current === epoch) {
+        recommendationEpochRef.current += 1
+      }
+    }
+    // Intentionally capture the tab selected when the dialog opens; switching
+    // tabs later must not restart the whole progressive-loading sequence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, dayNumber])
 
+  async function ensureRecommendationCategory(type: RecommendPlaceType) {
+    if (
+      recommendationsRef.current.some((item) => item.type === type) ||
+      loadingCategoriesRef.current.has(type)
+    ) {
+      return
+    }
+    await fetchRecommendations({
+      types: [type],
+      batch: recBatchesRef.current[type],
+      excludeNames: recommendationsRef.current.map((item) => item.name),
+      epoch: recommendationEpochRef.current,
+    })
+  }
+
   async function refreshRecommendations() {
-    if (loadingRecs || searching) return
-    const previousNames = recommendations.map((r) => r.name)
-    setRefreshingRecs(true)
+    if (loadingCategoriesRef.current.has(category) || searching) return
+    const type = category
+    const previousNames = recommendationsRef.current
+      .filter((item) => item.type === type)
+      .map((item) => item.name)
+    setRefreshingCategory(type)
     try {
       await fetchRecommendations({
-        batch: recBatch + 1,
+        types: [type],
+        batch: recBatchesRef.current[type] + 1,
         excludeNames: previousNames,
+        resetDetails: true,
+        epoch: recommendationEpochRef.current,
       })
     } finally {
-      setRefreshingRecs(false)
+      setRefreshingCategory((current) => (current === type ? null : current))
     }
   }
 
@@ -275,6 +427,9 @@ export function AddPlaceDialog({
   }, [availableRecommendations])
 
   const visible = grouped[category]
+  const loadingRecs = loadingByCategory[category]
+  const refreshingRecs = refreshingCategory === category
+  const recommendationError = recErrors[category] || error
 
   function itemKey(item: PlaceRecommendation) {
     return `${item.type}:${item.name}`
@@ -591,6 +746,7 @@ export function AddPlaceDialog({
                     onClick={() => {
                       setCategory(tab.id)
                       setExpandedKey(null)
+                      void ensureRecommendationCategory(tab.id)
                     }}
                     className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${
                       category === tab.id
@@ -599,7 +755,11 @@ export function AddPlaceDialog({
                     }`}
                   >
                     {tab.label}
-                    <span className="ml-1 opacity-70">({grouped[tab.id].length})</span>
+                    <span className="ml-1 opacity-70">
+                      {loadingByCategory[tab.id] && !grouped[tab.id].length
+                        ? '(…)'
+                        : `(${grouped[tab.id].length})`}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -888,7 +1048,9 @@ export function AddPlaceDialog({
                 </button>
               )}
 
-              {error && mainTab === 'ai' && <p className="text-sm text-red-700">{error}</p>}
+              {recommendationError && mainTab === 'ai' && (
+                <p className="text-sm text-red-700">{recommendationError}</p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
