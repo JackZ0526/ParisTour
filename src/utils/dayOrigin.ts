@@ -37,8 +37,13 @@ export interface DayOrigin extends Coordinates {
   label: string
 }
 
-/** Day 1 starts at CDG; mid-trip and last day start at the selected hotel. */
-export function getDayOrigin(dayNumber: number, hotel: SelectedHotel): DayOrigin {
+export function getDayOriginFromHotelFields(
+  dayNumber: number,
+  hotelId: string,
+  hotelName: string,
+  hotelLat: number,
+  hotelLng: number,
+): DayOrigin {
   if (dayNumber === 1) {
     return {
       ...CDG_LOCATION,
@@ -49,12 +54,23 @@ export function getDayOrigin(dayNumber: number, hotel: SelectedHotel): DayOrigin
   }
 
   return {
-    lat: hotel.lat,
-    lng: hotel.lng,
+    lat: hotelLat,
+    lng: hotelLng,
     kind: 'hotel',
-    id: hotel.id,
-    label: hotel.name,
+    id: hotelId,
+    label: hotelName,
   }
+}
+
+/** Day 1 starts at CDG; mid-trip and last day start at the selected hotel. */
+export function getDayOrigin(dayNumber: number, hotel: SelectedHotel): DayOrigin {
+  return getDayOriginFromHotelFields(
+    dayNumber,
+    hotel.id,
+    hotel.name,
+    hotel.lat,
+    hotel.lng,
+  )
 }
 
 export function isSamePoint(

@@ -5,6 +5,7 @@ import {
   type RecommendationPreferences,
 } from '../services/recommendationPreferences'
 import { CloseIconButton } from './CloseIconButton'
+import { TimePicker } from './TimePicker'
 
 interface Props {
   open: boolean
@@ -118,15 +119,11 @@ export function RecommendationPreferencesDialog({
         </div>
 
         <div className="max-h-[68vh] space-y-5 overflow-y-auto px-5 py-4">
-          <label className="block">
-            <span className="text-sm font-medium text-[var(--ink)]">通常开始时间</span>
-            <input
-              type="time"
-              value={draft.dayStartTime}
-              onChange={(event) => setDraft((prev) => ({ ...prev, dayStartTime: event.target.value }))}
-              className="mt-2 w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-sm"
-            />
-          </label>
+          <TimePicker
+            label="通常开始时间"
+            value={draft.dayStartTime}
+            onChange={(dayStartTime) => setDraft((prev) => ({ ...prev, dayStartTime }))}
+          />
 
           <div className="space-y-2">
             {options.map((option) => (

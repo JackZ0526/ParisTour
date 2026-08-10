@@ -752,17 +752,19 @@ export default function App() {
 
   // When hotel areaKey is confirmed / re-derived (e.g. 16区 no longer → saintGermain),
   // rewrite stale LLM day blurbs that still name the wrong 落脚点.
+  const hotelSelectedForCopySync = isHotelSelected(hotel)
+  const hotelAreaKeyForCopySync = hotel.areaKey
   useEffect(() => {
-    if (!isHotelSelected(hotel)) return
+    if (!hotelSelectedForCopySync) return
     if (!itineraryGenerated || !days.length) return
-    const areaKey = hotel.areaKey
+    const areaKey = hotelAreaKeyForCopySync
     if (!AREA_KEY_CN[areaKey]) return
 
     setDays((prev) => {
       const next = syncDaysCopyToHotelArea(prev, areaKey)
       return next === prev ? prev : next
     })
-  }, [hotel.id, hotel.areaKey, itineraryGenerated, days.length])
+  }, [hotelSelectedForCopySync, hotelAreaKeyForCopySync, itineraryGenerated, days.length])
 
   // Keep day tabs in sync with computed itinerary length (only after a plan exists).
   useEffect(() => {

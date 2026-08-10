@@ -40,6 +40,8 @@ export function GooglePlacePhoto({
   const [attribution, setAttribution] = useState<string | undefined>()
   const [fromGoogle, setFromGoogle] = useState(false)
   const [retried, setRetried] = useState(false)
+  const locationLat = location?.lat
+  const locationLng = location?.lng
 
   useEffect(() => {
     if (!isLoaded) return
@@ -49,8 +51,12 @@ export function GooglePlacePhoto({
     setAttribution(undefined)
     setRetried(false)
     const query = placePhotoQuery(name, nameLocal)
+    const queryLocation =
+      locationLat != null && locationLng != null
+        ? { lat: locationLat, lng: locationLng }
+        : undefined
 
-    void fetchGooglePlacePhoto(query, location).then((result) => {
+    void fetchGooglePlacePhoto(query, queryLocation).then((result) => {
       if (cancelled || !result?.url) return
       setSrc(result.url)
       setAttribution(result.attribution)
@@ -60,7 +66,7 @@ export function GooglePlacePhoto({
     return () => {
       cancelled = true
     }
-  }, [isLoaded, name, nameLocal, location?.lat, location?.lng, fallback])
+  }, [isLoaded, name, nameLocal, locationLat, locationLng, fallback])
 
   function handleImgError() {
     if (fromGoogle && !retried && src !== fallback) {

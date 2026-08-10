@@ -4,7 +4,7 @@ import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../types'
 import {
-  getDayOrigin,
+  getDayOriginFromHotelFields,
   isAirportPlace,
   isHotelPlace,
   numberedStopIndexes,
@@ -104,7 +104,14 @@ export function TripMap({
   const { isLoaded, loadError } = useGoogleMapsReady()
   // Depend on hotel primitives so other-day edits (new hotel object, same coords) do not churn.
   const dayOrigin = useMemo(
-    () => getDayOrigin(day.day, hotel),
+    () =>
+      getDayOriginFromHotelFields(
+        day.day,
+        hotel.id,
+        hotel.name,
+        hotel.lat,
+        hotel.lng,
+      ),
     [day.day, hotel.id, hotel.lat, hotel.lng, hotel.name],
   )
 

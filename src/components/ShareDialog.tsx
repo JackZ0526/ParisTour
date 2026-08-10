@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   listTripShares,
@@ -73,7 +73,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
-  async function reload() {
+  const reload = useCallback(async () => {
     setLoadingList(true)
     try {
       const rows = await listTripShares(tripId)
@@ -81,7 +81,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     } finally {
       setLoadingList(false)
     }
-  }
+  }, [tripId])
 
   useEffect(() => {
     if (!open) return
@@ -90,7 +90,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     void reload().catch((err) => {
       setError(err instanceof Error ? err.message : '加载共享列表失败')
     })
-  }, [open, tripId])
+  }, [open, reload])
 
   useEffect(() => {
     if (!open) return

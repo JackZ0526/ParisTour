@@ -20,6 +20,8 @@ import {
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ActivityBars } from './LoadingIndicator'
 
+const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
+
 function hasCjk(text: string) {
   return /[\u3400-\u9fff]/.test(text)
 }
@@ -104,7 +106,9 @@ export function PlaceName({
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
   const excludePropCjk = zhIsLlmTranslated
-  const chineseOpts = excludePropCjk ? { excludePropCjk: true } : undefined
+  const chineseOpts = excludePropCjk ? EXCLUDE_PROP_CJK_OPTIONS : undefined
+  const locationLat = location?.lat
+  const locationLng = location?.lng
   const cached = peekGooglePlaceDetails(name, nameLocal, location)
   const [enriched, setEnriched] = useState<{
     name?: string
@@ -168,12 +172,16 @@ export function PlaceName({
   useEffect(() => {
     if (!needsEnrich || !isLoaded) return
     let cancelled = false
-    const peek = peekGooglePlaceDetails(name, nameLocal, location)
+    const queryLocation =
+      locationLat != null && locationLng != null
+        ? { lat: locationLat, lng: locationLng }
+        : undefined
+    const peek = peekGooglePlaceDetails(name, nameLocal, queryLocation)
     if (peek?.nameOriginal || peek?.name) {
       setEnriched({ name: peek.name, original: peek.nameOriginal })
       return
     }
-    void fetchGooglePlaceDetails(placeDetailsQuery(name, nameLocal), location).then(
+    void fetchGooglePlaceDetails(placeDetailsQuery(name, nameLocal), queryLocation).then(
       (details) => {
         if (cancelled) return
         // Mark attempted even when null so we can fall through to LLM translate.
@@ -187,7 +195,7 @@ export function PlaceName({
     return () => {
       cancelled = true
     }
-  }, [needsEnrich, isLoaded, name, nameLocal, location?.lat, location?.lng])
+  }, [needsEnrich, isLoaded, name, nameLocal, locationLat, locationLng])
 
   const resolvedName = googleName || enriched?.name
   const resolvedOriginal = googleOriginal || enriched?.original
@@ -264,7 +272,7 @@ export function PlaceName({
     resolvedName,
     resolvedOriginal,
     googleReady,
-    excludePropCjk,
+    chineseOpts,
   ])
 
   if (mode === 'original') {

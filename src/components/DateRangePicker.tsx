@@ -93,7 +93,7 @@ export function DateRangePicker({
     }
     const next =
       parseIso(value?.startDate || '') ??
-      parseIso(today)!
+      parseIso(todayIso())!
     setViewY(next.y)
     setViewM(next.m)
     setDraftStart(value?.startDate || '')

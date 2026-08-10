@@ -7,7 +7,7 @@ import {
 } from '../services/googleNav'
 import { getLlmArtifact, setLlmArtifact } from '../services/llmArtifactStore'
 import type { DayPlan, Place, SelectedHotel } from '../types'
-import { getDayOrigin } from '../utils/dayOrigin'
+import { getDayOriginFromHotelFields } from '../utils/dayOrigin'
 import { useGoogleMapsReady } from '../components/GoogleMapsProvider'
 
 const emptyPlan = (
@@ -93,7 +93,14 @@ export function useDayNav(
 ) {
   const { isLoaded } = useGoogleMapsReady()
   const origin = useMemo(
-    () => getDayOrigin(day.day, hotel),
+    () =>
+      getDayOriginFromHotelFields(
+        day.day,
+        hotel.id,
+        hotel.name,
+        hotel.lat,
+        hotel.lng,
+      ),
     [day.day, hotel.id, hotel.lat, hotel.lng, hotel.name],
   )
   const [plan, setPlan] = useState<DayNavPlan>(() => emptyPlan('', undefined, origin.kind))

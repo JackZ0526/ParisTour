@@ -60,7 +60,7 @@ export function DatePicker({
 
   useEffect(() => {
     if (!open) return
-    const next = selected ?? parseIso(today)!
+    const next = parseIso(value) ?? parseIso(todayIso())!
     setViewY(next.y)
     setViewM(next.m)
   }, [open, value])
