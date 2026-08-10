@@ -19,7 +19,20 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.3.1] - 2026-08-10
+
+### Changed
+
+- Use icons for close and regenerate chrome buttons.
+- Persist LLM-generated content in the trip cloud snapshot.
+- Simplify mobile trip-assistant and model FABs to icon-only circles.
+- Make trip chat answer live facts and contextual detail views, and stop place recommendations from surfacing raw JSON parse errors.
+- Avoid remounting the app when Supabase re-emits SIGNED_IN on tab focus.
+
+### Fixed
+
 - Persist LLM-generated place/hotel narratives, day recommends, review translations, and destination chips in the trip cloud snapshot so they are reused across devices until the user regenerates
+
 
 ## [0.3.0] - 2026-08-09
 
@@ -85,7 +98,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...HEAD
+- [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
 - [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
 - [0.2.0]: https://github.com/JackZ0526/ParisTour/compare/e48cfb8...620c6a8
 - [0.1.0]: https://github.com/JackZ0526/ParisTour/compare/36ed361...e48cfb8

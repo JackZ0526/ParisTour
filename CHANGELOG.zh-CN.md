@@ -18,7 +18,20 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.3.1] - 2026-08-10
+
+### 变更
+
+- Use icons for close and regenerate chrome buttons.
+- Persist LLM-generated content in the trip cloud snapshot.
+- Simplify mobile trip-assistant and model FABs to icon-only circles.
+- Make trip chat answer live facts and contextual detail views, and stop place recommendations from surfacing raw JSON parse errors.
+- Avoid remounting the app when Supabase re-emits SIGNED_IN on tab focus.
+
+### 修复
+
 - 大模型生成的地点/酒店点评、每日推荐、评论翻译、目的地芯片写入行程云端快照：跨设备复用，仅在用户点「重新生成」或换一批时再调用模型
+
 
 ## [0.3.0] - 2026-08-09
 
@@ -84,7 +97,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...HEAD
+- [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
 - [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
 - [0.2.0]: https://github.com/JackZ0526/ParisTour/compare/e48cfb8...620c6a8
 - [0.1.0]: https://github.com/JackZ0526/ParisTour/compare/36ed361...e48cfb8
