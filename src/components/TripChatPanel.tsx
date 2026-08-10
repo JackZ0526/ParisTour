@@ -1967,10 +1967,13 @@ export function TripChatPanel({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-full px-2.5 py-1 text-sm text-[var(--stone)] hover:bg-[var(--mist)] hover:text-[var(--ink)] sm:hidden"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition hover:bg-[var(--mist)] hover:text-[var(--ink)] sm:hidden"
                 aria-label="关闭助手"
+                title="关闭助手"
               >
-                关闭
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
               </button>
             </div>
           </div>

@@ -173,9 +173,13 @@ export function GooglePlacePage({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)]"
+            aria-label="关闭"
+            title="关闭"
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mist)] bg-white/70 text-[var(--ink)] transition hover:border-[var(--sage)] hover:bg-white"
           >
-            关闭
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -286,15 +290,37 @@ export function GooglePlacePage({
                     {llmNarrative.labels?.title || '行程顾问点评'}
                   </p>
                   {llmNarrative.onRegenerate &&
-                    !llmNarrative.loading &&
-                    (llmNarrative.intro || llmNarrative.reason || llmNarrative.tripFit) && (
+                    (llmNarrative.intro ||
+                      llmNarrative.reason ||
+                      llmNarrative.tripFit ||
+                      llmNarrative.regenerating) && (
                       <button
                         type="button"
-                        className="shrink-0 rounded-full border border-[var(--sage)]/30 bg-white/70 px-2.5 py-0.5 text-[11px] text-[var(--sage)] transition hover:bg-white disabled:opacity-60"
-                        disabled={llmNarrative.regenerating}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--sage)]/30 bg-white/70 text-[var(--sage)] transition hover:bg-white disabled:opacity-60"
+                        disabled={Boolean(llmNarrative.loading || llmNarrative.regenerating)}
+                        aria-label={llmNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
+                        title={llmNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
                         onClick={llmNarrative.onRegenerate}
                       >
-                        {llmNarrative.regenerating ? '生成中…' : '重新生成'}
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className={
+                            llmNarrative.regenerating || llmNarrative.loading
+                              ? 'animate-spin'
+                              : undefined
+                          }
+                          aria-hidden
+                        >
+                          <path d="M21 12a9 9 0 1 1-2.6-6.3" />
+                          <path d="M21 3v6h-6" />
+                        </svg>
                       </button>
                     )}
                 </div>
