@@ -13,8 +13,9 @@ import { memoizeLlmCall } from './llmMemo'
  *
  * Thinking / reasoning effort (UI: 思考 on/off → nested 自动 → 低/中/高 slider):
  * Store modes remain auto|off|low|medium|high; 思考 on restores lastActiveMode.
- * - DeepSeek V4: `thinking: { type }` + `reasoning_effort: low|high|max`
- *   (UI 低/中/高 → API low/high/max; no native "medium").
+ * - DeepSeek V4: `thinking: { type }` + `reasoning_effort: low|high|max`.
+ *   Manual UI 低/中/高 → API low/high/max; automatic classifier
+ *   低/中/高 → API low/low/high.
  * - GPT-5.6: `reasoning_effort: none|low|medium|high`.
  * - 「自动」: every uncached model call first runs a compact semantic
  *   classifier with thinking disabled, then selects off/low/medium/high.
@@ -106,6 +107,8 @@ export type ResolvedThinking = {
   enabled: boolean
   /** Meaningful when enabled; ignored when off. */
   effort: ThinkingEffortUi
+  /** Keeps DeepSeek's manual and automatic API mappings distinct. */
+  source?: 'manual' | 'auto'
 }
 
 const EFFORT_ORDER: ResolvedThinkingEffort[] = ['off', 'low', 'medium', 'high']
@@ -119,10 +122,9 @@ type TaskThinkingBounds = {
 /** Baseline + clamp bounds per task (auto mode only). */
 const TASK_THINKING: Record<LlmTaskKind, TaskThinkingBounds> = {
   tripChat: { baseline: 'medium', min: 'low', max: 'high' },
-  // Structured JSON batches are latency-sensitive in the 60s serverless
-  // proxy. DeepSeek V4 maps low/medium to high, so auto mode keeps thinking
-  // off here; a user's manually locked thinking mode still takes precedence.
-  placeRecommend: { baseline: 'off', min: 'off', max: 'off' },
+  // Let the semantic preflight choose the full off/low/medium/high range.
+  // Low is only the deterministic fallback when classification is unavailable.
+  placeRecommend: { baseline: 'low', min: 'off', max: 'high' },
   hotelRecommend: { baseline: 'medium', min: 'low', max: 'high' },
   placeDescription: { baseline: 'off', min: 'off', max: 'low' },
   placeDetail: { baseline: 'low', min: 'off', max: 'low' },
@@ -144,6 +146,34 @@ export function uiEffortToApi(effort: ThinkingEffortUi): DeepSeekReasoningEffort
   if (effort === 'low') return 'low'
   if (effort === 'high') return 'max'
   return 'high'
+}
+
+/** Automatic classifier → DeepSeek API: low/medium → low, high → high. */
+export function autoEffortToDeepSeekApi(
+  effort: ThinkingEffortUi,
+): DeepSeekReasoningEffort {
+  return effort === 'high' ? 'high' : 'low'
+}
+
+/** Resolve the DeepSeek effort while preserving how the choice was made. */
+export function resolvedThinkingToDeepSeekApi(
+  thinking: ResolvedThinking,
+): DeepSeekReasoningEffort {
+  return thinking.source === 'auto'
+    ? autoEffortToDeepSeekApi(thinking.effort)
+    : uiEffortToApi(thinking.effort)
+}
+
+/** Exact DeepSeek thinking fields placed on the Chat Completions request. */
+export function deepSeekThinkingParams(thinking: ResolvedThinking): {
+  thinking: { type: 'enabled' | 'disabled' }
+  reasoning_effort?: DeepSeekReasoningEffort
+} {
+  if (!thinking.enabled) return { thinking: { type: 'disabled' } }
+  return {
+    thinking: { type: 'enabled' },
+    reasoning_effort: resolvedThinkingToDeepSeekApi(thinking),
+  }
 }
 
 /** UI → OpenAI GPT-5.6 `reasoning_effort`. */
@@ -190,9 +220,12 @@ function clampEffort(
   return EFFORT_ORDER[Math.max(lo, Math.min(hi, i))]!
 }
 
-function toResolvedThinking(effort: ResolvedThinkingEffort): ResolvedThinking {
-  if (effort === 'off') return { enabled: false, effort: 'low' }
-  return { enabled: true, effort }
+function toResolvedThinking(
+  effort: ResolvedThinkingEffort,
+  source: NonNullable<ResolvedThinking['source']>,
+): ResolvedThinking {
+  if (effort === 'off') return { enabled: false, effort: 'low', source }
+  return { enabled: true, effort, source }
 }
 
 /**
@@ -228,9 +261,9 @@ export function resolveThinkingForTask(
   userText?: string,
 ): ResolvedThinking {
   const mode = getThinkingMode()
-  if (mode === 'off') return { enabled: false, effort: 'low' }
+  if (mode === 'off') return { enabled: false, effort: 'low', source: 'manual' }
   if (mode === 'low' || mode === 'medium' || mode === 'high') {
-    return { enabled: true, effort: mode }
+    return { enabled: true, effort: mode, source: 'manual' }
   }
 
   // mode === 'auto'
@@ -238,7 +271,7 @@ export function resolveThinkingForTask(
   const delta = thinkingHeuristicDelta(userText)
   const baseIdx = effortIndex(bounds.baseline)
   const bumped = EFFORT_ORDER[Math.max(0, Math.min(EFFORT_ORDER.length - 1, baseIdx + delta))]!
-  return toResolvedThinking(clampEffort(bumped, bounds.min, bounds.max))
+  return toResolvedThinking(clampEffort(bumped, bounds.min, bounds.max), 'auto')
 }
 
 /** Busy UI visual for an in-flight LLM call (thinking HUD vs lighter generating). */
@@ -918,8 +951,8 @@ function fallbackGenericNeedsWeb(text: string): boolean {
 
 function thinkingFromEffort(effort: ResolvedThinkingEffort): ResolvedThinking {
   return effort === 'off'
-    ? { enabled: false, effort: 'low' }
-    : { enabled: true, effort }
+    ? { enabled: false, effort: 'low', source: 'auto' }
+    : { enabled: true, effort, source: 'auto' }
 }
 
 /**
@@ -1058,16 +1091,13 @@ function buildOpenAIChatBody(
 
   if (backend === 'deepseek') {
     // DeepSeek V4: thinking.type + optional reasoning_effort (see api-docs.deepseek.com/guides/thinking_mode).
-    body.thinking = { type: thinkingOn ? 'enabled' : 'disabled' }
-    if (thinkingOn) {
-      body.reasoning_effort = uiEffortToApi(thinking.effort)
-    }
+    Object.assign(body, deepSeekThinkingParams(thinking))
     // Thinking mode ignores temperature/top_p/penalties; omit so we don't pretend they apply.
     if (!thinkingOn && !openaiUsesRestrictedSampling(model)) {
       body.temperature = 0.7
     }
   } else {
-    // GPT-5.6: reasoning_effort none|low|medium|high (same resolver as DeepSeek when auto).
+    // GPT-5.6 keeps the classifier's native none|low|medium|high tiers.
     body.reasoning_effort = thinkingOn ? uiEffortToOpenAI(thinking.effort) : 'none'
     if (!thinkingOn && !openaiUsesRestrictedSampling(model)) {
       body.temperature = 0.7

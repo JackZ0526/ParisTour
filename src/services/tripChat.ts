@@ -1135,8 +1135,8 @@ export async function planTripChatRequest(input: {
   const thinking =
     thinkingMode === 'auto'
       ? recommendedEffort === 'off'
-        ? { enabled: false, effort: 'low' as ThinkingEffortUi }
-        : { enabled: true, effort: recommendedEffort }
+        ? { enabled: false, effort: 'low' as ThinkingEffortUi, source: 'auto' as const }
+        : { enabled: true, effort: recommendedEffort, source: 'auto' as const }
       : resolveThinkingForTask('tripChat', input.userMessage)
 
   return {
