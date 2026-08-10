@@ -18,6 +18,8 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+- DeepSeek V4 行程助手联网检索：改走 DeepSeek Responses `web_search`（Flash），不再依赖 OpenAI
+
 ## [0.3.0] - 2026-08-09
 
 ### 新增

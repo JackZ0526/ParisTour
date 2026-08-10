@@ -19,6 +19,10 @@ import { memoizeLlmCall } from './llmMemo'
  * - 「自动」: task-type baseline + light keyword/length heuristics only (no
  *   second LLM). A future optional classifier could use DeepSeek V4 Flash
  *   with thinking off — not used in v1.
+ *
+ * Trip-chat live facts (prices/hours/weather): Responses API `web_search`.
+ * DeepSeek picker → `/api/deepseek/responses` with `deepseek-v4-flash`
+ * (Pro lacks Responses support yet). OpenAI picker → `/api/openai/responses`.
  */
 
 export type LlmProvider = 'openai' | 'gemini'
@@ -1374,26 +1378,52 @@ function extractResponsesText(data: OpenAIResponsesPayload): string {
 }
 
 /**
- * Model id for OpenAI Responses + web_search.
- * Always an OpenAI GPT model — DeepSeek chat Completions cannot use this tool.
+ * Model + proxy path for Responses API web_search.
+ *
+ * - DeepSeek picker → DeepSeek Responses (`deepseek-v4-flash` only; Pro does not
+ *   support Responses/`web_search` yet — Flash is used for the research step).
+ * - OpenAI picker → OpenAI Responses with the selected GPT model.
  */
+export function resolveWebSearchBackend(modelId = openaiModel()): {
+  backend: ChatBackend
+  model: string
+  url: string
+} {
+  if (isDeepSeekModel(modelId)) {
+    return {
+      backend: 'deepseek',
+      model: 'deepseek-v4-flash',
+      url: '/api/deepseek/responses',
+    }
+  }
+  const openaiId =
+    modelId.trim() && !isDeepSeekModel(modelId)
+      ? modelId.trim()
+      : OPENAI_ONLY_MODEL_OPTIONS[0]?.id || 'gpt-5.6-luna'
+  return {
+    backend: 'openai',
+    model: openaiId,
+    url: '/api/openai/responses',
+  }
+}
+
+/** @deprecated Prefer resolveWebSearchBackend().model — kept for callers. */
 export function openaiWebSearchModel(): string {
-  const current = openaiModel()
-  if (!isDeepSeekModel(current)) return current
-  return OPENAI_ONLY_MODEL_OPTIONS[0]?.id || 'gpt-5.6-luna'
+  return resolveWebSearchBackend().model
 }
 
 /**
- * OpenAI Responses API with built-in web_search tool.
+ * Responses API with built-in web_search tool.
  * Used for fresher public web data (prices, hours, weather detail, etc.).
- * Always routes through `/api/openai/responses` with an OpenAI model, even when
- * the global picker is on DeepSeek (DeepSeek has no first-party web_search on
- * the OpenAI-compatible chat Completions path used by this app).
+ *
+ * Routes by the active global model: DeepSeek → `/api/deepseek/responses`
+ * (Flash), OpenAI → `/api/openai/responses`. Chat Completions cannot use
+ * server-side web_search on either provider.
  */
 export async function openaiResponsesWithWebSearch(input: {
   instructions: string
   user: string
-  /** Override model; defaults to current OpenAI pick or gpt-5.6-luna. */
+  /** Override model; defaults from the global picker (DeepSeek → Flash). */
   model?: string
   signal?: AbortSignal
 }): Promise<string> {
@@ -1401,14 +1431,21 @@ export async function openaiResponsesWithWebSearch(input: {
     throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
   }
 
-  const url = '/api/openai/responses'
   const { authFetch } = await import('./authFetch')
-  const model = (input.model && input.model.trim()) || openaiWebSearchModel()
-  if (isDeepSeekModel(model)) {
-    throw new LlmRequestError(
-      '联网检索仅支持 OpenAI Responses（web_search），请配置 OPENAI_API_KEY。',
-      'unsupported_model',
-    )
+  const preferred = (input.model && input.model.trim()) || openaiModel()
+  const { backend, model, url } = resolveWebSearchBackend(preferred)
+
+  const body: Record<string, unknown> = {
+    model,
+    tools: [{ type: 'web_search' }],
+    // Force a search; DeepSeek also accepts {"type":"web_search"}.
+    tool_choice: backend === 'deepseek' ? { type: 'web_search' } : 'required',
+    instructions: input.instructions,
+    input: input.user,
+  }
+  // Research summaries don't need CoT — DeepSeek Responses defaults thinking on.
+  if (backend === 'deepseek') {
+    body.reasoning = { effort: 'none' }
   }
 
   const res = await authFetch(url, {
@@ -1416,27 +1453,24 @@ export async function openaiResponsesWithWebSearch(input: {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model,
-      tools: [{ type: 'web_search' }],
-      tool_choice: 'required',
-      instructions: input.instructions,
-      input: input.user,
-    }),
+    body: JSON.stringify(body),
     signal: input.signal,
   })
 
   if (!res.ok) {
-    throw friendlyLlmError(res.status, await res.text(), 'openai')
+    throw friendlyLlmError(res.status, await res.text(), backend)
   }
 
-  const data = await readResponseJson<OpenAIResponsesPayload>(res, 'openai')
+  const data = await readResponseJson<OpenAIResponsesPayload>(res, backend)
   if (data.error?.message) {
     throw new LlmRequestError(data.error.message, data.error.code || data.error.type)
   }
 
   const text = extractResponsesText(data)
-  if (!text) throw new LlmRequestError('OpenAI 联网查询没有返回内容。', 'empty')
+  if (!text) {
+    const emptyLabel = backend === 'deepseek' ? 'DeepSeek' : 'OpenAI'
+    throw new LlmRequestError(`${emptyLabel} 联网查询没有返回内容。`, 'empty')
+  }
   return text
 }
 

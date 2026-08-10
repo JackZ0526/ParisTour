@@ -588,7 +588,8 @@ function webResearchInstructions(ctx: TripChatContext): string {
 }
 
 /**
- * OpenAI Responses + web_search research step for trip chat.
+ * Responses API + web_search research step for trip chat.
+ * Uses DeepSeek Flash or OpenAI depending on the global model picker.
  * Returns null when search is unavailable or fails (chat continues without it).
  */
 export async function fetchTripChatWebResearch(input: {
@@ -923,7 +924,7 @@ export async function sendTripChatMessage(input: {
   history: TripChatTurn[]
   userMessage: string
   signal?: AbortSignal
-  /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
+  /** auto (default) = heuristic; true/false force on/off. Uses Responses web_search. */
   webSearch?: boolean | 'auto'
   onWebSearch?: (phase: TripChatWebSearchPhase) => void
 }): Promise<TripChatResult> {
@@ -949,15 +950,16 @@ export async function sendTripChatMessage(input: {
  * (thinking mode); never mixed into reply parsing.
  *
  * When the question needs live facts (prices/hours/weather/…), optionally runs
- * OpenAI Responses `web_search` first and injects a research summary into
- * context — streaming + action JSON parsing stay on the normal chat path.
+ * Responses `web_search` (DeepSeek Flash or OpenAI) first and injects a
+ * research summary into context — streaming + action JSON parsing stay on
+ * the normal chat path.
  */
 export async function sendTripChatMessageStream(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
   signal?: AbortSignal
-  /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
+  /** auto (default) = heuristic; true/false force on/off. Uses Responses web_search. */
   webSearch?: boolean | 'auto'
   onWebSearch?: (phase: TripChatWebSearchPhase) => void
   /** Progressive user-visible reply extracted from the streaming JSON buffer. */

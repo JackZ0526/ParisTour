@@ -19,6 +19,8 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+- Trip chat web search on DeepSeek V4 now uses DeepSeek Responses `web_search` (Flash) instead of requiring OpenAI
+
 ## [0.3.0] - 2026-08-09
 
 ### Added
