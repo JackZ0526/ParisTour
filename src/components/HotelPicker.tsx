@@ -241,7 +241,7 @@ export function HotelPicker({
     bootstrappedRef.current = true
 
     const cached = loadHotelCache()
-    if (cached?.candidates.length) {
+    if (cached && (cached.candidates.length || isHotelSelected(cached.selected))) {
       onCandidatesChange(cached.candidates)
       if (cached.selected && isHotelSelected(cached.selected)) {
         onSelect(cached.selected)

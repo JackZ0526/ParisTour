@@ -74,10 +74,11 @@ export function RecommendationPreferencesButton({ onClick }: { onClick: () => vo
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)]"
+      aria-label="推荐偏好"
+      title="推荐偏好"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
     >
       <SlidersIcon />
-      推荐偏好
     </button>
   )
 }

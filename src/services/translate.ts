@@ -7,6 +7,7 @@ import {
 } from './llm'
 import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
 import { memoizeLlmCall } from './llmMemo'
+import { buildPrompt, jsonContract } from './llm/prompts'
 
 const MEMORY_CACHE = new Map<string, string>()
 const TRANSLATIONS_ARTIFACT_KEY = 'translations:zh'
@@ -99,8 +100,15 @@ export async function translateTextsToChinese(
       [
         {
           role: 'system',
-          content:
-            '你是翻译助手。把用户给出的 Google 评论译成简洁通顺的简体中文。只输出 JSON：{"translations":["..."]}，数组顺序与输入 texts 一致，长度必须相同。不要解释。',
+          content: buildPrompt(
+            '翻译助手。把用户给出的 Google 评论译成简洁通顺的简体中文。',
+            null,
+            jsonContract(
+              '{ translations: ["..."] }',
+              '{ "translations": ["这家咖啡馆的拿铁口感非常顺滑，店员也很热情。", "位置便利，出门就是地铁站。"] }',
+            ),
+            '<output_format>数组顺序与输入 texts 一致，长度必须相同。不要解释。</output_format>',
+          ),
         },
         {
           role: 'user',
@@ -174,8 +182,16 @@ export async function translatePlaceNameToChinese(
         [
           {
             role: 'system',
-            content:
-              '你是旅行应用的地名翻译助手。把巴黎等地的店名/景点名译成简洁自然的简体中文显示名。只输出 JSON：{"zh":"..."}。专有品牌可音译或意译；不要解释；不要保留整句英文；若无法翻译则 zh 原样返回。为便于流式展示：尽快开始输出 zh 字段。',
+            content: buildPrompt(
+              '旅行应用的地名翻译助手。把巴黎等地的店名/景点名译成简洁自然的简体中文显示名。',
+              null,
+              jsonContract('{ zh: "..." }', '{ "zh": "卢浮宫" }'),
+              `<output_format>
+- 专有品牌可音译或意译；不要解释；不要保留整句英文。
+- 若无法翻译则 zh 原样返回。
+- 为便于流式展示：尽快开始输出 zh 字段。
+</output_format>`,
+            ),
           },
           {
             role: 'user',

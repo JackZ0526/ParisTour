@@ -424,6 +424,7 @@ type QueuedRemote = {
   tripId: string
   snapshot: TripSnapshot
   updatedAt: string
+  trustSnapshot: boolean
   onApply: () => void
 }
 /** Latest remote update deferred while saving / swallowing our own echo. */
@@ -603,6 +604,11 @@ function beginRemoteQuietPeriod(ms: number) {
   }, ms + 30)
 }
 
+/** True while App should not wipe a just-applied remote itinerary. */
+export function isRemoteQuietPeriodActive(): boolean {
+  return Date.now() < quietAutosaveUntil
+}
+
 function queueRemoteUpdate(next: QueuedRemote) {
   if (
     queuedRemote &&
@@ -623,7 +629,9 @@ function flushQueuedRemote() {
   }
   const q = queuedRemote
   queuedRemote = null
-  const applied = applyRemoteTripSnapshot(q.tripId, q.snapshot, q.updatedAt)
+  const applied = applyRemoteTripSnapshot(q.tripId, q.snapshot, q.updatedAt, {
+    trustSnapshot: q.trustSnapshot,
+  })
   if (applied) q.onApply()
 }
 
@@ -641,16 +649,21 @@ export function rememberSavedSnapshot(
 /**
  * Apply a remote trip snapshot when cloud updated_at is newer than what we last reconciled.
  * Returns true when applied (caller should rehydrate its React state).
+ *
+ * Pass `trustSnapshot: true` for REST-fetched rows. Untrusted realtime payloads that look
+ * like an empty trip are refused so TOAST-omitted jsonb cannot blank the UI.
  */
 export function applyRemoteTripSnapshot(
   tripId: string,
   snapshot: TripSnapshot,
   updatedAt?: string | null,
+  opts?: { trustSnapshot?: boolean },
 ): boolean {
   if (!tripId) return false
 
   const stamp =
     typeof updatedAt === 'string' && updatedAt.trim() ? updatedAt.trim() : ''
+  const trustSnapshot = Boolean(opts?.trustSnapshot)
 
   // Defer while we write or swallow our own echo — never drop the event.
   if (saveInFlight || cloudSaveStatus === 'saving' || Date.now() < suppressRemoteUntil) {
@@ -659,6 +672,7 @@ export function applyRemoteTripSnapshot(
         tripId,
         snapshot,
         updatedAt: stamp,
+        trustSnapshot,
         onApply: () => realtimeApplyHandler?.(tripId),
       })
     }
@@ -668,6 +682,19 @@ export function applyRemoteTripSnapshot(
   if (stamp) {
     const prev = lastAppliedUpdatedAtByTrip.get(tripId)
     if (prev && !isNewerUpdatedAt(stamp, prev)) return false
+  }
+
+  // Incomplete realtime payloads (TOAST / missing jsonb) often look like an empty
+  // trip. Never wipe a known generated itinerary with that — refetch via REST instead.
+  if (!trustSnapshot) {
+    const safetyBaseline =
+      generatedBaselineSnapshot(tripId) || baselineSnapshot(tripId)
+    if (isUnexpectedEmptyRegression(safetyBaseline, snapshot)) {
+      console.warn(
+        '[tripCloud] refused empty remote snapshot (likely incomplete realtime payload)',
+      )
+      return false
+    }
   }
 
   const json = snapshotJson(snapshot)
@@ -722,6 +749,26 @@ export function applyRemoteTripSnapshot(
 
 let realtimeChannel: RealtimeChannel | null = null
 
+/**
+ * Apply a remote row after fetching the authoritative snapshot from REST.
+ * Realtime UPDATE payloads often omit large jsonb (TOAST) or arrive partial —
+ * treating that as emptyTripSnapshot blanks collaborator UIs until refresh.
+ */
+async function applyRemoteTripFromServer(
+  tripId: string,
+  hintUpdatedAt?: string | null,
+): Promise<boolean> {
+  const full = await loadTripById(tripId)
+  if (!full) return false
+  const stamp =
+    (typeof full.updated_at === 'string' && full.updated_at.trim()) ||
+    (typeof hintUpdatedAt === 'string' && hintUpdatedAt.trim()) ||
+    null
+  return applyRemoteTripSnapshot(tripId, full.snapshot, stamp, {
+    trustSnapshot: true,
+  })
+}
+
 /** Subscribe to live updates for one trip. Returns unsubscribe. */
 export function subscribeTripRealtime(
   tripId: string,
@@ -736,6 +783,8 @@ export function subscribeTripRealtime(
   realtimeApplyHandler = (id) => {
     if (id === tripId) onRemoteApply()
   }
+
+  let applySeq = 0
 
   const channel = sb
     .channel(`trip-sync:${tripId}`)
@@ -754,9 +803,21 @@ export function subscribeTripRealtime(
           updated_at?: string
         } | null
         if (!row?.id || row.id !== tripId) return
-        const snap = asSnapshot(row.snapshot)
-        const applied = applyRemoteTripSnapshot(tripId, snap, row.updated_at)
-        if (applied) onRemoteApply()
+
+        const seq = ++applySeq
+        void (async () => {
+          try {
+            // Always refetch: payload.snapshot is not reliable for large jsonb.
+            const applied = await applyRemoteTripFromServer(
+              tripId,
+              row.updated_at,
+            )
+            if (seq !== applySeq) return
+            if (applied) onRemoteApply()
+          } catch (err) {
+            console.warn('[tripCloud] realtime sync fetch failed', err)
+          }
+        })()
       },
     )
     .subscribe()
@@ -764,6 +825,7 @@ export function subscribeTripRealtime(
   realtimeChannel = channel
 
   return () => {
+    applySeq += 1
     if (realtimeApplyHandler) realtimeApplyHandler = null
     if (queuedRemote?.tripId === tripId) queuedRemote = null
     if (realtimeChannel === channel) {

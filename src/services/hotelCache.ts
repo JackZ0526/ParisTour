@@ -1,4 +1,4 @@
-import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../data/hotels'
+import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel, isHotelSelected } from '../data/hotels'
 import type { HotelCandidate, SelectedHotel } from '../types'
 
 const STORAGE_KEY = 'paris-tour-hotel-cache-v1'
@@ -57,11 +57,19 @@ function readRaw(): HotelCacheState | null {
 
 export function loadHotelCache(): HotelCacheState | null {
   const state = readRaw()
-  if (!state?.candidates.length) return null
+  if (!state) return null
+  const selected = normalizeSelected(state.selected)
+  const candidates = Array.isArray(state.candidates)
+    ? state.candidates.map(normalizeCandidate)
+    : []
+  // Keep a confirmed stay even when the candidate list was stripped from a snapshot.
+  if (!candidates.length && !isHotelSelected(selected)) {
+    return null
+  }
   return {
     ...state,
-    candidates: state.candidates.map(normalizeCandidate),
-    selected: normalizeSelected(state.selected),
+    candidates,
+    selected,
   }
 }
 

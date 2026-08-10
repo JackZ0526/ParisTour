@@ -663,8 +663,9 @@ export function DayTimeline({
     ghostTimersRef.current.set(stopKey, dissolveTimer)
   }
 
-  // Detect any stop add/remove (manual, sync, restore, regen…) and play enter/exit.
-  // Skip only: first mount for a day, and day switches.
+  // Detect any stop add/remove/reorder (manual, sync, restore, regen…) and play
+  // the same structural animation regardless of where the change originated.
+  // Skip only the first mount for a day and explicit day switches.
   useLayoutEffect(() => {
     const keys = day.stops.map((s, i) => stopKeyOf(s, i))
     const snap = day.stops.map((s, i) => ({ key: stopKeyOf(s, i), stop: s }))
@@ -684,6 +685,9 @@ export function DayTimeline({
       clearExitTimers()
       skipExternalExitRef.current.clear()
       skipNextFlipRef.current = false
+      dragRef.current = null
+      setDrag(null)
+      setDropping(false)
       return
     }
 

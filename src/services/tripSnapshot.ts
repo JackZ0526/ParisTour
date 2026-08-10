@@ -111,8 +111,19 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
     clearFlightSelection()
   }
 
-  if (snap.hotel?.candidates?.length) {
-    saveHotelCache(snap.hotel)
+  if (
+    snap.hotel &&
+    (snap.hotel.candidates?.length || snap.hotel.selected)
+  ) {
+    saveHotelCache({
+      candidates: snap.hotel.candidates || [],
+      selected: snap.hotel.selected ?? null,
+      model: snap.hotel.model ?? '',
+      batch: snap.hotel.batch ?? 0,
+      fetchedAt: snap.hotel.fetchedAt ?? Date.now(),
+      lastPreferences: snap.hotel.lastPreferences,
+      othersCollapsed: snap.hotel.othersCollapsed,
+    })
   } else {
     clearHotelCache()
   }

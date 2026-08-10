@@ -451,6 +451,10 @@ begin
   end if;
 end $$;
 
+-- Include full row (incl. large jsonb snapshot) in UPDATE payloads.
+-- Without FULL, TOAST'd snapshot columns are often omitted from realtime events.
+alter table public.trips replica identity full;
+
 -- ---------------------------------------------------------------------------
 -- Trip backups (server-side history — last N kept by app after each full save)
 -- ---------------------------------------------------------------------------

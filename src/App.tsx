@@ -25,6 +25,7 @@ import { TripChatPanel } from './components/TripChatPanel'
 import type { TripChatViewingTarget } from './services/tripChat'
 import { TripDatesPanel } from './components/TripDatesPanel'
 import { TripMap } from './components/TripMap'
+import { MapErrorBoundary } from './components/MapErrorBoundary'
 import {
   PENDING_HOTEL,
   inferParisAreaLabel,
@@ -99,7 +100,7 @@ import {
   wipeGeneratedItinerary,
   type ItineraryInputFingerprint,
 } from './utils/itineraryState'
-import { flushTripCloudSave } from './services/tripCloud'
+import { flushTripCloudSave, isRemoteQuietPeriodActive } from './services/tripCloud'
 import {
   loadRecommendationPreferences,
   recommendationPreferencesPrompt,
@@ -454,7 +455,11 @@ export default function App() {
     () => Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
   )
   const [panelResetKey, setPanelResetKey] = useState(0)
-  /** Remount stateful trip children after a remote snapshot is reconciled. */
+  /**
+   * Remount input panels / chat after a remote snapshot is reconciled.
+   * Do NOT put this on DayTimeline — it owns gommage / swap / enter / FLIP
+   * state; remounting on every soft-sync kills in-flight and future anims.
+   */
   const [syncRenderKey, setSyncRenderKey] = useState(0)
   const [copyRefreshing, setCopyRefreshing] = useState(false)
   const prevStopsKeyRef = useRef<string | null>(null)
@@ -511,7 +516,10 @@ export default function App() {
       dayRestoreTimerRef.current = null
     }
     clearDayNavCache()
-    tripInputsHydratedRef.current = false
+    // Trust the remote snapshot already written to localStorage. Resetting this
+    // to false re-enters the first-hydration wipe path and can clear a valid
+    // synced itinerary when FlightPanel/HotelPicker remount mid-settle.
+    tripInputsHydratedRef.current = true
     suppressCloudSaveRef.current = false
 
     setHotel(nextHotels.hotel)
@@ -695,6 +703,9 @@ export default function App() {
   // null-flights / provisional-startDate window after refresh.
   useEffect(() => {
     if (!itineraryReady || itineraryStartLoading || !currentFingerprint) return
+    // Remote soft-sync remounts panels and briefly churns inputs; do not wipe the
+    // itinerary we just applied from the cloud.
+    if (isRemoteQuietPeriodActive()) return
 
     const wipePlan = () => {
       genRequestIdRef.current += 1
@@ -1850,15 +1861,15 @@ export default function App() {
               onClick={() => setBackupOpen(true)}
               aria-label="存档"
               title="存档"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
               <svg
-                width="15"
-                height="15"
+                width="17"
+                height="17"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
@@ -1878,15 +1889,15 @@ export default function App() {
               }}
               aria-label="分享"
               title="分享"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
               <svg
-                width="15"
-                height="15"
+                width="17"
+                height="17"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
@@ -1904,15 +1915,15 @@ export default function App() {
               onClick={handleClearAllTripState}
               aria-label="清空全部"
               title="清空全部"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
               <svg
-                width="15"
-                height="15"
+                width="17"
+                height="17"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
@@ -1931,15 +1942,15 @@ export default function App() {
             }}
             aria-label="退出"
             title="退出"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
           >
             <svg
-              width="15"
-              height="15"
+              width="17"
+              height="17"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden
@@ -2099,17 +2110,52 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleRestoreDefault}
-                    className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)]"
+                    aria-label="恢复默认推荐"
+                    title="恢复默认推荐"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
                   >
-                    恢复默认推荐
+                    <svg
+                      width="17"
+                      height="17"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                      <path d="M3 3v5h5" />
+                      <path d="M12 7v5l3 2" />
+                    </svg>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={handleResetAll}
-                  className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)]"
+                  aria-label="重新生成全部"
+                  title="重新生成全部"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
                 >
-                  重新生成全部
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="m14.5 4.5 5 5L8 21H3v-5L14.5 4.5Z" />
+                    <path d="m11.5 7.5 5 5" />
+                    <path d="M5 3v4" />
+                    <path d="M3 5h4" />
+                    <path d="M19 16v4" />
+                    <path d="M17 18h4" />
+                  </svg>
                 </button>
                   </>
                 )}
@@ -2248,7 +2294,7 @@ export default function App() {
                         }
                       >
                         <DayTimeline
-                          key={`timeline-${syncRenderKey}-${day.day}-${hotel.id}`}
+                          key={`timeline-${day.day}-${hotel.id}`}
                           day={day}
                           hotel={hotel}
                           customPlaces={placesWithHotel}
@@ -2281,18 +2327,21 @@ export default function App() {
                             : 'hidden lg:block'
                         }`}
                       >
-                        <TripMap
-                          key={`map-${syncRenderKey}-${day.day}-${hotel.id}`}
-                          hotel={hotel}
-                          day={day}
-                          customPlaces={placesWithHotel}
-                          navPlan={navPlan}
-                          navLoading={navLoading}
-                          selectedPlaceId={selectedPlaceId}
-                          onSelectPlace={setSelectedPlaceId}
-                        />
+                        <MapErrorBoundary
+                          key={`map-boundary-${day.day}-${hotel.id}`}
+                        >
+                          <TripMap
+                            hotel={hotel}
+                            day={day}
+                            customPlaces={placesWithHotel}
+                            navPlan={navPlan}
+                            navLoading={navLoading}
+                            selectedPlaceId={selectedPlaceId}
+                            onSelectPlace={setSelectedPlaceId}
+                          />
+                        </MapErrorBoundary>
                         <PlacePanel
-                          key={`place-panel-${syncRenderKey}-${day.day}-${hotel.id}`}
+                          key={`place-panel-${day.day}-${hotel.id}`}
                           placeId={selectedPlaceId}
                           customPlaces={placesWithHotel}
                           day={day}

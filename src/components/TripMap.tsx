@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DirectionsRenderer, GoogleMap, Marker, Polyline } from '@react-google-maps/api'
+import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
 import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../types'
@@ -175,6 +175,40 @@ export function TripMap({
   const onLoad = useCallback((m: google.maps.Map) => setMap(m), [])
   const onUnmount = useCallback(() => setMap(null), [])
 
+  // The wrapper's <Polyline> calls setPath on a stale Google instance when a
+  // realtime snapshot replaces the route array. Manage cached paths directly
+  // on the persistent map so sync updates cannot escape React as a commit error.
+  useEffect(() => {
+    if (!map || !isLoaded || !cachedPathLegs.length) return
+
+    const polylines: google.maps.Polyline[] = []
+    for (const leg of cachedPathLegs) {
+      try {
+        polylines.push(
+          new google.maps.Polyline({
+            map,
+            path: leg.path,
+            strokeColor: GOOGLE_ROUTE_BLUE,
+            strokeOpacity: 0.9,
+            strokeWeight: 6,
+          }),
+        )
+      } catch (error) {
+        console.warn('[TripMap] cached route overlay could not be drawn', error)
+      }
+    }
+
+    return () => {
+      for (const polyline of polylines) {
+        try {
+          polyline.setMap(null)
+        } catch {
+          /* Google may already have disposed the overlay with the map. */
+        }
+      }
+    }
+  }, [map, isLoaded, cachedPathLegs])
+
   /** Only refit when this day's route/places change — not when other days' data updates. */
   const viewportKey = useMemo(
     () => `${day.day}|${dayOrigin.id}|${stopsFingerprint}|${navPlan.stopsKey || ''}`,
@@ -337,18 +371,6 @@ export function TripMap({
               }}
             />
           ))}
-          {cachedPathLegs.map((leg, i) => (
-            <Polyline
-              key={`${navPlan.stopsKey || 'nav'}-cached-${i}-${leg.displayMode}-${leg.durationSeconds}-${leg.distanceMeters}`}
-              path={leg.path}
-              options={{
-                strokeColor: GOOGLE_ROUTE_BLUE,
-                strokeOpacity: 0.9,
-                strokeWeight: 6,
-              }}
-            />
-          ))}
-
           <Marker
             position={{ lat: dayOrigin.lat, lng: dayOrigin.lng }}
             title={dayOrigin.label}

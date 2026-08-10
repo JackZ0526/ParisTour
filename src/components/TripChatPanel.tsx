@@ -54,6 +54,7 @@ import type {
 } from '../types'
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from './CloseIconButton'
+import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
@@ -219,6 +220,36 @@ function searchStepLabel(detail: TripChatWebSearchDetail | undefined, userText: 
   const raw = detail?.query?.trim() || userText.trim()
   const query = raw.length > 42 ? `${raw.slice(0, 42)}…` : raw
   return query ? `正在搜索${source}：${query}` : `正在搜索${source}`
+}
+
+/**
+ * Translate a raw provider error into something a user can act on. We try not
+ * to expose internal model/vendor names like "DeepSeek 没有返回内容。" — those
+ * are debug strings, not user guidance.
+ */
+function friendlyChatError(err: unknown): string {
+  if (!(err instanceof Error)) return '对话失败，请稍后再试。'
+  const msg = err.message || ''
+  if (
+    msg.includes('没有返回内容') ||
+    msg.startsWith('DeepSeek') ||
+    msg.startsWith('OpenAI') ||
+    msg.startsWith('Gemini') ||
+    msg.includes('上游')
+  ) {
+    return '模型这次没回应，请再说一次或换个问法。'
+  }
+  if (msg.includes('被截断') || msg.includes('截断')) {
+    return '回答太长被截断了，可以问得更具体一些再试。'
+  }
+  if (msg.includes('拒绝回答') || msg.includes('refusal')) {
+    return '模型拒绝回答这个请求，可以换个问法。'
+  }
+  if (msg.includes('timeout') || msg.includes('超时') || msg.includes('aborted')) {
+    return '请求超时了，可以再试一次。'
+  }
+  // Fallback: keep the original message but trim the most common prefixes.
+  return msg || '对话失败，请稍后再试。'
 }
 
 function requestPlanStepLabel(plan: TripChatRequestPlan) {
@@ -917,11 +948,15 @@ export function TripChatPanel({
       wasOpenRef.current = false
       return
     }
+    // Wait for the panel's enter animation to finish so bottomRef is mounted
+    // and the scroll container has its final height — otherwise scrollIntoView
+    // runs on a still-transforming, possibly detached panel (reopen case).
+    if (!panelEntered) return
     // Jump instantly when opening so we don't animate through the whole history.
     const behavior: ScrollBehavior = wasOpenRef.current ? 'smooth' : 'auto'
     wasOpenRef.current = true
     bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
-  }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open])
+  }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open, panelEntered])
 
   function beginWorkPipeline(userText: string) {
     setWorkSteps(initialChatWorkSteps(userText))
@@ -2141,7 +2176,7 @@ export function TripChatPanel({
         // Drop empty assistant placeholder when nothing streamed.
         return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
       })
-      setError(err instanceof Error ? err.message : '对话失败，请稍后再试。')
+      setError(friendlyChatError(err))
       clearWorkPipeline()
     } finally {
       if (abortRef.current === ac) {
@@ -2332,7 +2367,10 @@ export function TripChatPanel({
                           />
                         ) : (
                           <>
-                            {turn.content}
+                            <InlineMarkdown
+                              text={turn.content}
+                              className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
+                            />
                             {isStreamingAssistant && streamingReply ? (
                               <span
                                 className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"

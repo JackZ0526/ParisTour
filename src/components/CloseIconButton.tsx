@@ -8,7 +8,7 @@ type Props = {
 }
 
 const BASE =
-  'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mist)] bg-white/70 text-[var(--ink)] transition hover:border-[var(--sage)] hover:bg-white'
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]'
 
 export function CloseIconButton({
   onClick,
@@ -25,13 +25,14 @@ export function CloseIconButton({
       className={className ? `${BASE} ${className}` : BASE}
     >
       <svg
-        width="14"
-        height="14"
+        width="17"
+        height="17"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.8"
         strokeLinecap="round"
+        strokeLinejoin="round"
         aria-hidden
       >
         <path d="M18 6L6 18M6 6l12 12" />
