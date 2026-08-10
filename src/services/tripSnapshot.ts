@@ -2,6 +2,7 @@ import type { PersistedBaselineState, PersistedItineraryState } from '../utils/i
 import type { PersistedFlightSelection } from './flightSelection'
 import type { HotelCacheState } from './hotelCache'
 import type { TripDateRange } from './tripDates'
+import type { LlmArtifactMap } from './llmArtifactStore'
 import {
   clearBaselineItinerary,
   clearItineraryState,
@@ -18,6 +19,12 @@ import {
 import { clearHotelCache, loadHotelCache, saveHotelCache } from './hotelCache'
 import { loadDestination, saveDestination } from './destination'
 import { loadTripDates, saveTripDates } from './tripDates'
+import {
+  clearLlmArtifacts,
+  loadLlmArtifacts,
+  saveLlmArtifacts,
+} from './llmArtifactStore'
+import { clearLlmMemo, seedLlmMemo } from './llmMemo'
 
 export const TRIP_SNAPSHOT_VERSION = 1 as const
 
@@ -30,6 +37,11 @@ export type TripSnapshot = {
   hotel: HotelCacheState | null
   itinerary: PersistedItineraryState | null
   baseline: PersistedBaselineState | null
+  /**
+   * Durable LLM outputs (place narratives, day recommends, translations, …).
+   * Generated once, reused until the user regenerates or the trip is wiped.
+   */
+  llmArtifacts?: LlmArtifactMap | null
 }
 
 export function emptyTripSnapshot(): TripSnapshot {
@@ -41,6 +53,14 @@ export function emptyTripSnapshot(): TripSnapshot {
     hotel: null,
     itinerary: null,
     baseline: null,
+    llmArtifacts: {},
+  }
+}
+
+function seedMemoFromArtifacts(map: LlmArtifactMap) {
+  clearLlmMemo()
+  for (const [key, entry] of Object.entries(map)) {
+    seedLlmMemo(key, entry.value)
   }
 }
 
@@ -48,6 +68,7 @@ export function emptyTripSnapshot(): TripSnapshot {
 export function collectTripSnapshot(): TripSnapshot {
   const itinerary = loadItineraryState()
   const baseline = loadBaselineItinerary()
+  const llmArtifacts = loadLlmArtifacts()
   return {
     version: TRIP_SNAPSHOT_VERSION,
     dates: loadTripDates(),
@@ -59,6 +80,7 @@ export function collectTripSnapshot(): TripSnapshot {
         ? itinerary
         : null,
     baseline,
+    llmArtifacts: Object.keys(llmArtifacts).length ? llmArtifacts : {},
   }
 }
 
@@ -102,8 +124,20 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
       snap.baseline.fingerprint,
     )
   }
+
+  const artifacts = snap.llmArtifacts
+  if (artifacts && typeof artifacts === 'object') {
+    // Present in snapshot (including explicit empty) — replace local durable store.
+    saveLlmArtifacts(artifacts, { silent: true })
+    seedMemoFromArtifacts(artifacts)
+  } else {
+    // Legacy snapshot without llmArtifacts — keep whatever is already local.
+    seedMemoFromArtifacts(loadLlmArtifacts())
+  }
 }
 
 export function clearLocalTripStorage() {
   applyTripSnapshot(emptyTripSnapshot())
+  clearLlmArtifacts({ silent: true })
+  clearLlmMemo()
 }

@@ -1,5 +1,6 @@
 import { getOpenAIModel, recommendHotelsForTrip } from './llm'
 import { clearLlmMemo } from './llmMemo'
+import { removeLlmArtifactsByPrefix } from './llmArtifactStore'
 import { loadHotelCache, saveHotelCache } from './hotelCache'
 import {
   candidateToSelected,
@@ -87,6 +88,7 @@ export async function refreshHotelCandidates(input: {
   const selected = candidateToSelected(best)
   // New batch → allow detail enrichment for new hotel ids; clear only hotel-detail memos.
   clearLlmMemo('hotel-detail:')
+  removeLlmArtifactsByPrefix('hotel-detail:')
   persistHotelState(candidates, selected, {
     lastPreferences: input.preferences?.trim() || null,
   })

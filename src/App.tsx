@@ -30,6 +30,7 @@ import {
 } from './services/flightSelection'
 import { clearHotelCache, loadHotelCache } from './services/hotelCache'
 import { clearLlmMemo } from './services/llmMemo'
+import { clearLlmArtifacts } from './services/llmArtifactStore'
 import { clearAllRecommendCache } from './services/recommendCache'
 import {
   buildGeneratedItinerary,
@@ -1535,12 +1536,15 @@ export default function App() {
     clearAllFlightCache()
     clearAllRecommendCache()
     clearLlmMemo()
+    clearLlmArtifacts()
     clearDayNavCache()
     navTimesAppliedKeyRef.current = ''
     try {
+      // Legacy keys from older clients (now stored in llmArtifacts).
       sessionStorage.removeItem('paris-tour-popular-destinations-v1')
       localStorage.removeItem('paris-tour-popular-destinations-v1')
       sessionStorage.removeItem('paris-tour-review-translations-v1')
+      localStorage.removeItem('paris-tour-rec-cache-v1')
     } catch {
       /* ignore */
     }

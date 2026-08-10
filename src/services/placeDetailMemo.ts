@@ -1,4 +1,8 @@
 import type { HotelDetailCopy } from './llm'
+import {
+  getLlmArtifact,
+  setLlmArtifactsForKeys,
+} from './llmArtifactStore'
 import { memoizeLlmCall, peekLlmMemo, seedLlmMemo } from './llmMemo'
 
 /** PlacePanel / itinerary placeId key (catalog id or `custom-*`). */
@@ -40,8 +44,13 @@ export function peekPlaceDetailCopy(
 ): HotelDetailCopy | undefined {
   for (const key of keys) {
     if (!key) continue
-    const hit = peekLlmMemo<HotelDetailCopy>(key)
-    if (hit) return hit
+    const mem = peekLlmMemo<HotelDetailCopy>(key)
+    if (mem) return mem
+    const durable = getLlmArtifact<HotelDetailCopy>(key)
+    if (durable) {
+      seedLlmMemo(key, durable)
+      return durable
+    }
   }
   return undefined
 }
@@ -49,22 +58,29 @@ export function peekPlaceDetailCopy(
 /**
  * Memoize under the primary key and seed every alias so PlacePanel /
  * AddPlaceDialog share cache for the same real-world place.
+ * Persists into the trip LLM artifact store (cloud-synced).
  */
 export async function memoizePlaceDetailCopy(
   keys: string[],
   fn: () => Promise<HotelDetailCopy>,
+  options?: { bypass?: boolean },
 ): Promise<HotelDetailCopy> {
   const uniqueKeys = [...new Set(keys.filter(Boolean))]
-  const existing = peekPlaceDetailCopy(...uniqueKeys)
-  if (existing) {
-    for (const k of uniqueKeys) seedLlmMemo(k, existing)
-    return existing
+  if (!options?.bypass) {
+    const existing = peekPlaceDetailCopy(...uniqueKeys)
+    if (existing) {
+      for (const k of uniqueKeys) seedLlmMemo(k, existing)
+      return existing
+    }
   }
 
   const primary = uniqueKeys[0]
   if (!primary) return fn()
 
-  const value = await memoizeLlmCall(primary, fn)
-  for (const k of uniqueKeys.slice(1)) seedLlmMemo(k, value)
+  const value = await memoizeLlmCall(primary, fn, {
+    bypass: options?.bypass,
+  })
+  for (const k of uniqueKeys) seedLlmMemo(k, value)
+  setLlmArtifactsForKeys(uniqueKeys, value)
   return value
 }

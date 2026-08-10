@@ -25,6 +25,9 @@ export interface LlmPlaceNarrative {
     loadingText?: string
     loadingMoreText?: string
   }
+  /** When set, show a control to regenerate the saved LLM narrative. */
+  onRegenerate?: () => void
+  regenerating?: boolean
 }
 
 interface Props {
@@ -278,9 +281,23 @@ export function GooglePlacePage({
               llmNarrative.reason ||
               llmNarrative.tripFit) && (
               <div className="space-y-3 rounded-2xl border border-[var(--sage)]/25 bg-[var(--sage)]/8 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-[var(--sage)]">
-                  {llmNarrative.labels?.title || '行程顾问点评'}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--sage)]">
+                    {llmNarrative.labels?.title || '行程顾问点评'}
+                  </p>
+                  {llmNarrative.onRegenerate &&
+                    !llmNarrative.loading &&
+                    (llmNarrative.intro || llmNarrative.reason || llmNarrative.tripFit) && (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-full border border-[var(--sage)]/30 bg-white/70 px-2.5 py-0.5 text-[11px] text-[var(--sage)] transition hover:bg-white disabled:opacity-60"
+                        disabled={llmNarrative.regenerating}
+                        onClick={llmNarrative.onRegenerate}
+                      >
+                        {llmNarrative.regenerating ? '生成中…' : '重新生成'}
+                      </button>
+                    )}
+                </div>
                 {llmNarrative.loading && !llmNarrative.intro && !llmNarrative.reason && (
                   <LoadingIndicator
                     thinkingLabel="正在思考简介与推荐理由…"

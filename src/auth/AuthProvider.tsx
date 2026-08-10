@@ -24,6 +24,7 @@ import {
   type AccessibleTrip,
   type TripRole,
 } from '../services/tripCloud'
+import { subscribeLlmArtifacts } from '../services/llmArtifactStore'
 
 type AuthStatus =
   | 'loading'
@@ -339,6 +340,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!activeTrip || !canEdit) return
     scheduleTripCloudSave(activeTrip.id, true, opts)
   }, [activeTrip, canEdit])
+
+  // Durable LLM artifacts live in the trip snapshot — autosave when they change.
+  useEffect(() => {
+    return subscribeLlmArtifacts(() => {
+      notifyTripChanged()
+    })
+  }, [notifyTripChanged])
 
   useEffect(() => {
     if (status !== 'ready' || !activeTripId || !tripReady) return

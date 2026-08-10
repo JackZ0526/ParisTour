@@ -175,6 +175,7 @@ export function HotelPicker({
   /** Custom hotel awaiting stay / consider / cancel decision. */
   const [pendingCustom, setPendingCustom] = useState<HotelCandidate | null>(null)
   const [storyLoadingId, setStoryLoadingId] = useState<string | null>(null)
+  const [hotelStoryRegenToken, setHotelStoryRegenToken] = useState(0)
   /** null = closed; choose = pick mode; prefer = type preferences */
   const [refreshPanel, setRefreshPanel] = useState<'choose' | 'prefer' | null>(null)
   const [preferText, setPreferText] = useState('')
@@ -286,8 +287,9 @@ export function HotelPicker({
   useEffect(() => {
     if (!popupCandidate) return
     const card = popupCandidate
-    // Already enriched — do not call the model again.
-    if (card.tripFit?.trim() || !isLlmConfigured()) return
+    const bypass = hotelStoryRegenToken > 0
+    // Already enriched on the candidate — do not call the model again.
+    if ((!bypass && card.tripFit?.trim()) || !isLlmConfigured()) return
 
     let cancelled = false
     setStoryLoadingId(card.id)
@@ -299,20 +301,24 @@ export function HotelPicker({
       pace: d.pace,
       theme: d.theme,
     }))
+    const artifactKey = `hotel-detail:${card.id}`
 
-    void memoizeLlmCall(`hotel-detail:${card.id}`, () =>
-      generateHotelDetailCopy({
-        name: card.name,
-        area: card.area,
-        address: card.address,
-        nearestMetro: card.nearestMetro,
-        ratingHint: card.priceHint,
-        existingDescription: card.description,
-        existingReason: card.reason,
-        isBest: card.isBest,
-        userPreferences: prefs,
-        tripDays,
-      }),
+    void memoizeLlmCall(
+      artifactKey,
+      () =>
+        generateHotelDetailCopy({
+          name: card.name,
+          area: card.area,
+          address: card.address,
+          nearestMetro: card.nearestMetro,
+          ratingHint: card.priceHint,
+          existingDescription: card.description,
+          existingReason: card.reason,
+          isBest: card.isBest,
+          userPreferences: prefs,
+          tripDays,
+        }),
+      { durable: true, bypass },
     )
       .then((copy) => {
         if (cancelled || !copy) return
@@ -333,7 +339,7 @@ export function HotelPicker({
         }
 
         const current = candidatesRef.current.find((h) => h.id === card.id)
-        if (current?.tripFit?.trim()) return
+        if (!bypass && current?.tripFit?.trim()) return
 
         const next = candidatesRef.current.map(enrich)
         onCandidatesChange(next)
@@ -351,6 +357,10 @@ export function HotelPicker({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popupCandidate?.id, hotelStoryRegenToken])
+
+  useEffect(() => {
+    setHotelStoryRegenToken(0)
   }, [popupCandidate?.id])
 
   async function bootstrapRecommendations() {
@@ -1122,6 +1132,11 @@ export function HotelPicker({
                   loadingText: '正在生成酒店简介与推荐理由…',
                   loadingMoreText: '正在补充与行程的匹配说明…',
                 },
+                onRegenerate: isLlmConfigured()
+                  ? () => setHotelStoryRegenToken((n) => n + 1)
+                  : undefined,
+                regenerating:
+                  storyLoadingId === popupCandidate.id && hotelStoryRegenToken > 0,
               }
             : null
         }

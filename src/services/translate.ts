@@ -1,44 +1,37 @@
 import { extractLlmJsonObject, isLlmConfigured, openaiChat } from './llm'
+import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
 import { memoizeLlmCall } from './llmMemo'
 
 const MEMORY_CACHE = new Map<string, string>()
-const SESSION_KEY = 'paris-tour-review-translations-v1'
+const TRANSLATIONS_ARTIFACT_KEY = 'translations:zh'
 
-function readSessionCache(): Record<string, string> {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
+type TranslationMap = Record<string, string>
+
+function readDurableCache(): TranslationMap {
+  const stored = getLlmArtifact<TranslationMap>(TRANSLATIONS_ARTIFACT_KEY)
+  return stored && typeof stored === 'object' ? stored : {}
 }
 
-function writeSessionCache(map: Record<string, string>) {
-  try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(map))
-  } catch {
-    /* ignore quota */
-  }
+function writeDurableCache(map: TranslationMap) {
+  setLlmArtifact(TRANSLATIONS_ARTIFACT_KEY, map)
 }
 
 function cacheGet(text: string): string | undefined {
   const mem = MEMORY_CACHE.get(text)
   if (mem) return mem
-  const session = readSessionCache()[text]
-  if (session) {
-    MEMORY_CACHE.set(text, session)
-    return session
+  const durable = readDurableCache()[text]
+  if (durable) {
+    MEMORY_CACHE.set(text, durable)
+    return durable
   }
   return undefined
 }
 
 function cacheSet(original: string, translated: string) {
   MEMORY_CACHE.set(original, translated)
-  const session = readSessionCache()
-  session[original] = translated
-  writeSessionCache(session)
+  const map = readDurableCache()
+  map[original] = translated
+  writeDurableCache(map)
 }
 
 /** True when the text is already mostly Chinese (or has no Latin letters to translate). */
@@ -56,7 +49,7 @@ export function looksChinese(text: string): boolean {
 
 /**
  * Translate non-Chinese texts to Simplified Chinese.
- * Dedupes in-flight batches and caches results in memory + sessionStorage.
+ * Dedupes in-flight batches and caches results in memory + durable trip artifacts.
  */
 export async function translateTextsToChinese(
   texts: string[],

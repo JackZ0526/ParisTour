@@ -1,7 +1,7 @@
 import { isLlmConfigured, suggestPopularDestinations, type DestinationSuggestion } from './llm'
+import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
 
-const CACHE_KEY = 'paris-tour-popular-destinations-v1'
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
+const ARTIFACT_KEY = 'destinations:popular'
 
 export const FALLBACK_DESTINATIONS: DestinationSuggestion[] = [
   { name: '巴黎', subtitle: 'Paris' },
@@ -21,11 +21,8 @@ interface CachePayload {
 
 function readCache(): DestinationSuggestion[] | null {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY) || localStorage.getItem(CACHE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as CachePayload
+    const parsed = getLlmArtifact<CachePayload>(ARTIFACT_KEY)
     if (!parsed?.fetchedAt || !Array.isArray(parsed.destinations)) return null
-    if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null
     const cleaned = parsed.destinations
       .filter((d) => d && typeof d.name === 'string' && d.name.trim())
       .map((d) => ({
@@ -40,17 +37,7 @@ function readCache(): DestinationSuggestion[] | null {
 
 function writeCache(destinations: DestinationSuggestion[]) {
   const payload: CachePayload = { fetchedAt: Date.now(), destinations }
-  const raw = JSON.stringify(payload)
-  try {
-    sessionStorage.setItem(CACHE_KEY, raw)
-  } catch {
-    /* ignore */
-  }
-  try {
-    localStorage.setItem(CACHE_KEY, raw)
-  } catch {
-    /* ignore */
-  }
+  setLlmArtifact(ARTIFACT_KEY, payload)
 }
 
 function excludeNamesFrom(destinations: DestinationSuggestion[]): string[] {
@@ -63,8 +50,9 @@ function excludeNamesFrom(destinations: DestinationSuggestion[]): string[] {
 }
 
 /**
- * Load popular destination chips once per session / TTL.
- * Never returns empty — falls back to a static list if LLM fails.
+ * Load popular destination chips once. Reuses durable store until the user
+ * explicitly refreshes (「再给我来一批」). Never returns empty — falls back
+ * to a static list if LLM fails.
  */
 export async function loadPopularDestinations(): Promise<{
   destinations: DestinationSuggestion[]
@@ -91,7 +79,7 @@ export async function loadPopularDestinations(): Promise<{
 }
 
 /**
- * Ask the LLM for a fresh chip batch, bypassing the TTL cache.
+ * Ask the LLM for a fresh chip batch, bypassing the durable cache.
  * Passes the current batch (and optional selection) so the model avoids repeats.
  * On success, replaces the cache. On failure, throws and leaves cache + chips unchanged.
  */
@@ -107,7 +95,6 @@ export async function refreshPopularDestinations(options: {
     throw new Error('未配置 OpenAI API Key，无法重新推荐目的地。')
   }
 
-  // Bypass TTL cache: always hit the LLM. Old cache kept until success.
   const list = await suggestPopularDestinations({
     excludeNames: excludeNamesFrom(options.currentDestinations),
     currentDestination: options.selectedDestination,

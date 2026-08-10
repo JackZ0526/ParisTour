@@ -39,6 +39,7 @@ export function PlacePanel({
 }: Props) {
   const [story, setStory] = useState<HotelDetailCopy | null>(null)
   const [storyLoading, setStoryLoading] = useState(false)
+  const [regenToken, setRegenToken] = useState(0)
 
   const place = useMemo(() => {
     if (!placeId) return null
@@ -66,11 +67,14 @@ export function PlacePanel({
     }
 
     const detailKeys = placeDetailKeysFromPlace(place)
-    const memoHit = peekPlaceDetailCopy(...detailKeys)
-    if (memoHit) {
-      setStory({ ...memoHit, tripFit: '' })
-      setStoryLoading(false)
-      return
+    const bypass = regenToken > 0
+    if (!bypass) {
+      const memoHit = peekPlaceDetailCopy(...detailKeys)
+      if (memoHit) {
+        setStory({ ...memoHit, tripFit: '' })
+        setStoryLoading(false)
+        return
+      }
     }
 
     if (!isLlmConfigured()) {
@@ -91,36 +95,39 @@ export function PlacePanel({
     const p = ctx.place
     if (!p) return
 
-    void memoizePlaceDetailCopy(detailKeys, () =>
-      generatePlaceDetailCopy({
-        name: p.name,
-        nameLocal: p.nameLocal,
-        type: p.type,
-        existingDescription: p.description,
-        stopNote: ctx.stopNote,
-        day: ctx.day.day,
-        dayTitle: ctx.day.title,
-        dayTheme: ctx.day.theme,
-        dayPace: ctx.day.pace,
-        hotelArea: ctx.hotel.areaKey,
-        tripDays: ctx.days.map((d) => ({
-          day: d.day,
-          title: d.title,
-          pace: d.pace,
-          theme: d.theme,
-        })),
-        onPartial: (partial) => {
-          if (cancelled) return
-          setStory((prev) => ({
-            intro: partial.intro ?? prev?.intro ?? '',
-            reason: partial.reason ?? prev?.reason ?? '',
-            tripFit: '',
-          }))
-        },
-      }).then((copy) => {
-        if (!copy) return { intro: p.description, reason: ctx.stopNote || '', tripFit: '' }
-        return { ...copy, tripFit: '' }
-      }),
+    void memoizePlaceDetailCopy(
+      detailKeys,
+      () =>
+        generatePlaceDetailCopy({
+          name: p.name,
+          nameLocal: p.nameLocal,
+          type: p.type,
+          existingDescription: p.description,
+          stopNote: ctx.stopNote,
+          day: ctx.day.day,
+          dayTitle: ctx.day.title,
+          dayTheme: ctx.day.theme,
+          dayPace: ctx.day.pace,
+          hotelArea: ctx.hotel.areaKey,
+          tripDays: ctx.days.map((d) => ({
+            day: d.day,
+            title: d.title,
+            pace: d.pace,
+            theme: d.theme,
+          })),
+          onPartial: (partial) => {
+            if (cancelled) return
+            setStory((prev) => ({
+              intro: partial.intro ?? prev?.intro ?? '',
+              reason: partial.reason ?? prev?.reason ?? '',
+              tripFit: '',
+            }))
+          },
+        }).then((copy) => {
+          if (!copy) return { intro: p.description, reason: ctx.stopNote || '', tripFit: '' }
+          return { ...copy, tripFit: '' }
+        }),
+      { bypass },
     )
       .then((copy) => {
         if (cancelled || !copy) return
@@ -133,8 +140,12 @@ export function PlacePanel({
     return () => {
       cancelled = true
     }
-    // Only re-run when the selected place changes — not when day copy / days array updates.
+    // Only re-run when the selected place changes or the user asks to regenerate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeId, regenToken])
+
+  useEffect(() => {
+    setRegenToken(0)
   }, [placeId])
 
   return (
@@ -163,6 +174,10 @@ export function PlacePanel({
                   (!storyLoading ? stopNote || undefined : undefined),
                 loading: storyLoading,
                 labels: PLACE_LABELS,
+                onRegenerate: isLlmConfigured()
+                  ? () => setRegenToken((n) => n + 1)
+                  : undefined,
+                regenerating: storyLoading && regenToken > 0,
               }
             : null
         }

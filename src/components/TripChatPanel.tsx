@@ -534,6 +534,7 @@ export function TripChatPanel({
   const [confirmEpoch, setConfirmEpoch] = useState(0)
   const [pendingStory, setPendingStory] = useState<HotelDetailCopy | null>(null)
   const [pendingStoryLoading, setPendingStoryLoading] = useState(false)
+  const [pendingStoryRegenToken, setPendingStoryRegenToken] = useState(0)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [busyUserText, setBusyUserText] = useState('')
   const [workSteps, setWorkSteps] = useState<ChatWorkStep[]>([])
@@ -638,11 +639,14 @@ export function TripChatPanel({
         ? `用于替换「${pending.fromPlaceName || '原地点'}」`
         : '')
     const detailKeys = placeDetailKeysFromPlace(place)
-    const memoHit = peekPlaceDetailCopy(...detailKeys)
-    if (memoHit) {
-      setPendingStory({ ...memoHit, tripFit: '' })
-      setPendingStoryLoading(false)
-      return
+    const bypass = pendingStoryRegenToken > 0
+    if (!bypass) {
+      const memoHit = peekPlaceDetailCopy(...detailKeys)
+      if (memoHit) {
+        setPendingStory({ ...memoHit, tripFit: '' })
+        setPendingStoryLoading(false)
+        return
+      }
     }
 
     if (!isLlmConfigured()) {
@@ -662,42 +666,45 @@ export function TripChatPanel({
     const ctx = pendingCtxRef.current
     const day = ctx.days.find((d) => d.day === pending.dayNum)
 
-    void memoizePlaceDetailCopy(detailKeys, () =>
-      generatePlaceDetailCopy({
-        name: place.name,
-        nameLocal: place.nameLocal,
-        type: place.type,
-        existingDescription: place.description,
-        stopNote,
-        day: pending.dayNum,
-        dayTitle: day?.title,
-        dayTheme: day?.theme,
-        dayPace: day?.pace,
-        hotelArea: ctx.hotel.areaKey,
-        tripDays: ctx.days.map((d) => ({
-          day: d.day,
-          title: d.title,
-          pace: d.pace,
-          theme: d.theme,
-        })),
-        onPartial: (partial) => {
-          if (cancelled) return
-          setPendingStory((prev) => ({
-            intro: partial.intro ?? prev?.intro ?? '',
-            reason: partial.reason ?? prev?.reason ?? '',
-            tripFit: '',
-          }))
-        },
-      }).then((copy) => {
-        if (!copy) {
-          return {
-            intro: place.description,
-            reason: fallbackReason,
-            tripFit: '',
+    void memoizePlaceDetailCopy(
+      detailKeys,
+      () =>
+        generatePlaceDetailCopy({
+          name: place.name,
+          nameLocal: place.nameLocal,
+          type: place.type,
+          existingDescription: place.description,
+          stopNote,
+          day: pending.dayNum,
+          dayTitle: day?.title,
+          dayTheme: day?.theme,
+          dayPace: day?.pace,
+          hotelArea: ctx.hotel.areaKey,
+          tripDays: ctx.days.map((d) => ({
+            day: d.day,
+            title: d.title,
+            pace: d.pace,
+            theme: d.theme,
+          })),
+          onPartial: (partial) => {
+            if (cancelled) return
+            setPendingStory((prev) => ({
+              intro: partial.intro ?? prev?.intro ?? '',
+              reason: partial.reason ?? prev?.reason ?? '',
+              tripFit: '',
+            }))
+          },
+        }).then((copy) => {
+          if (!copy) {
+            return {
+              intro: place.description,
+              reason: fallbackReason,
+              tripFit: '',
+            }
           }
-        }
-        return { ...copy, tripFit: '' }
-      }),
+          return { ...copy, tripFit: '' }
+        }),
+      { bypass },
     )
       .then((copy) => {
         if (cancelled || !copy) return
@@ -710,8 +717,12 @@ export function TripChatPanel({
     return () => {
       cancelled = true
     }
-    // Only re-run when the pending confirm target changes.
+    // Only re-run when the pending confirm target changes or user regenerates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePending?.id, pendingStoryRegenToken])
+
+  useEffect(() => {
+    setPendingStoryRegenToken(0)
   }, [activePending?.id])
 
   // Keep the panel mounted through the close animation so exit can play.
@@ -2140,6 +2151,10 @@ export function TripChatPanel({
                     : undefined),
                 loading: pendingStoryLoading,
                 labels: PENDING_PLACE_LABELS,
+                onRegenerate: isLlmConfigured()
+                  ? () => setPendingStoryRegenToken((n) => n + 1)
+                  : undefined,
+                regenerating: pendingStoryLoading && pendingStoryRegenToken > 0,
               }
             : null
         }

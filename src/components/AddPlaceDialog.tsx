@@ -87,6 +87,7 @@ export function AddPlaceDialog({
   } | null>(null)
   const [googleStory, setGoogleStory] = useState<HotelDetailCopy | null>(null)
   const [googleStoryLoading, setGoogleStoryLoading] = useState(false)
+  const [googleStoryRegenToken, setGoogleStoryRegenToken] = useState(0)
   const [searching, setSearching] = useState(false)
   const [addingName, setAddingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -402,11 +403,14 @@ export function AddPlaceDialog({
 
     const { details, type } = googleDetail
     const detailKeys = placeDetailKeysFromGoogle(details)
-    const memoHit = peekPlaceDetailCopy(...detailKeys)
-    if (memoHit) {
-      setGoogleStory({ ...memoHit, tripFit: '' })
-      setGoogleStoryLoading(false)
-      return
+    const bypass = googleStoryRegenToken > 0
+    if (!bypass) {
+      const memoHit = peekPlaceDetailCopy(...detailKeys)
+      if (memoHit) {
+        setGoogleStory({ ...memoHit, tripFit: '' })
+        setGoogleStoryLoading(false)
+        return
+      }
     }
 
     if (!isLlmConfigured()) {
@@ -422,35 +426,38 @@ export function AddPlaceDialog({
     let cancelled = false
     setGoogleStory({ intro: '', reason: '', tripFit: '' })
     setGoogleStoryLoading(true)
-    void memoizePlaceDetailCopy(detailKeys, () =>
-      generatePlaceDetailCopy({
-        name: details.name,
-        type: typeLabel[type] || type,
-        address: details.address,
-        existingDescription: details.summary,
-        day: dayNumber,
-        dayTitle,
-        dayTheme,
-        dayPace,
-        hotelArea,
-        onPartial: (partial) => {
-          if (cancelled) return
-          setGoogleStory((prev) => ({
-            intro: partial.intro ?? prev?.intro ?? '',
-            reason: partial.reason ?? prev?.reason ?? '',
-            tripFit: '',
-          }))
-        },
-      }).then((copy) => {
-        if (!copy) {
-          return {
-            intro: details.summary || '',
-            reason: '',
-            tripFit: '',
+    void memoizePlaceDetailCopy(
+      detailKeys,
+      () =>
+        generatePlaceDetailCopy({
+          name: details.name,
+          type: typeLabel[type] || type,
+          address: details.address,
+          existingDescription: details.summary,
+          day: dayNumber,
+          dayTitle,
+          dayTheme,
+          dayPace,
+          hotelArea,
+          onPartial: (partial) => {
+            if (cancelled) return
+            setGoogleStory((prev) => ({
+              intro: partial.intro ?? prev?.intro ?? '',
+              reason: partial.reason ?? prev?.reason ?? '',
+              tripFit: '',
+            }))
+          },
+        }).then((copy) => {
+          if (!copy) {
+            return {
+              intro: details.summary || '',
+              reason: '',
+              tripFit: '',
+            }
           }
-        }
-        return { ...copy, tripFit: '' }
-      }),
+          return { ...copy, tripFit: '' }
+        }),
+      { bypass },
     )
       .then((copy) => {
         if (cancelled || !copy) return
@@ -465,6 +472,10 @@ export function AddPlaceDialog({
     }
     // Snapshot day context on open; remount / same place should hit memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleDetail, googleStoryRegenToken])
+
+  useEffect(() => {
+    setGoogleStoryRegenToken(0)
   }, [googleDetail])
 
   if (!open) return null
@@ -843,6 +854,10 @@ export function AddPlaceDialog({
                 reason: googleStory?.reason || undefined,
                 loading: googleStoryLoading,
                 labels: GOOGLE_PLACE_LABELS,
+                onRegenerate: isLlmConfigured()
+                  ? () => setGoogleStoryRegenToken((n) => n + 1)
+                  : undefined,
+                regenerating: googleStoryLoading && googleStoryRegenToken > 0,
               }
             : null
         }

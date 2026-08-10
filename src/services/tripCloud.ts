@@ -83,6 +83,12 @@ export type TripShareRow = {
 function asSnapshot(raw: unknown): TripSnapshot {
   if (!raw || typeof raw !== 'object') return emptyTripSnapshot()
   const s = raw as Partial<TripSnapshot>
+  const hasArtifacts = 'llmArtifacts' in s
+  const llmArtifacts = hasArtifacts
+    ? s.llmArtifacts && typeof s.llmArtifacts === 'object'
+      ? s.llmArtifacts
+      : {}
+    : null
   return {
     version: 1,
     dates: s.dates ?? null,
@@ -91,6 +97,7 @@ function asSnapshot(raw: unknown): TripSnapshot {
     hotel: s.hotel ?? null,
     itinerary: s.itinerary ?? null,
     baseline: s.baseline ?? null,
+    llmArtifacts,
   }
 }
 
