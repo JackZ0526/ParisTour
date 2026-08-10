@@ -12,6 +12,7 @@ import {
   extractPartialJsonStringField,
   openaiChat,
   openaiChatStream,
+  openaiResponsesWithWebSearch,
   type OpenAIChatMessage,
 } from './llm'
 import { dateForTripDay, formatTripDayLabel } from './tripDates'
@@ -127,6 +128,35 @@ export interface TripChatDestination {
   country?: string | null
 }
 
+/** What the user is currently viewing in a detail overlay (PlacePanel / hotel popup). */
+export type TripChatViewingTarget =
+  | {
+      type: 'place'
+      id: string
+      name: string
+      nameLocal?: string | null
+      placeType?: PlaceType
+      description?: string | null
+      cuisine?: string | null
+      priceHint?: string | null
+      ratingHint?: string | null
+      /** Day number when this place is a stop on the current viewing day. */
+      day?: number | null
+      note?: string | null
+    }
+  | {
+      type: 'hotel'
+      id: string
+      name: string
+      address?: string | null
+      area?: string | null
+      description?: string | null
+      priceHint?: string | null
+      nearestMetro?: string | null
+      reason?: string | null
+      tripFit?: string | null
+    }
+
 export interface TripChatContext {
   hotel: SelectedHotel
   hotelCandidates: HotelCandidate[]
@@ -144,6 +174,11 @@ export interface TripChatContext {
   itineraryStartDate?: string | null
   outbound?: FlightInfo | null
   returnFlight?: FlightInfo | null
+  /**
+   * Detail overlay the user currently has open (PlacePanel / hotel GooglePlacePage).
+   * When set, 「这个 / 多少钱」等指代优先指向该对象。
+   */
+  viewing?: TripChatViewingTarget | null
 }
 
 function normalizeDestination(
@@ -345,6 +380,38 @@ function buildItinerarySnapshot(ctx: TripChatContext) {
   })
 }
 
+function buildViewingSnapshot(ctx: TripChatContext) {
+  const v = ctx.viewing
+  if (!v || (v.type !== 'place' && v.type !== 'hotel')) return null
+  if (v.type === 'place') {
+    return {
+      type: 'place' as const,
+      id: v.id,
+      name: v.name,
+      nameLocal: v.nameLocal || null,
+      placeType: v.placeType || null,
+      description: v.description || null,
+      cuisine: v.cuisine || null,
+      priceHint: v.priceHint || null,
+      ratingHint: v.ratingHint || null,
+      day: v.day ?? null,
+      note: v.note || null,
+    }
+  }
+  return {
+    type: 'hotel' as const,
+    id: v.id,
+    name: v.name,
+    address: v.address || null,
+    area: v.area || null,
+    description: v.description || null,
+    priceHint: v.priceHint || null,
+    nearestMetro: v.nearestMetro || null,
+    reason: v.reason || null,
+    tripFit: v.tripFit || null,
+  }
+}
+
 function systemPrompt(ctx: TripChatContext): string {
   const dates = buildTripDatesSnapshot(ctx)
   const destination = buildDestinationSnapshot(ctx)
@@ -363,7 +430,10 @@ function systemPrompt(ctx: TripChatContext): string {
   const lines: string[] = [
     `你是行程助手，帮助用户了解与调整「${destName}」行程与住宿。`,
     '用简洁中文回复。可以介绍地点/酒店、解释节奏、建议改动，并在需要时输出可执行操作。',
-    '只依据下方快照中的事实回答（目的地、日期、航班、酒店、行程）。缺少的信息就如实说尚未选定或快照里没有，禁止编造具体日期、模糊季节窗口、或不存在的酒店/地点。',
+    '资料来源（硬规则）：',
+    '- 下方「当前行程」是用户计划的唯一事实来源（目的地、日期、航班、酒店、行程停点）。回答「我订了哪家酒店 / 第几天去哪」等计划问题，只依据这些内容；没有就说尚未选定或行程里没有，禁止编造具体日期、模糊季节窗口、或不存在的酒店/地点。',
+    '- 价目、菜单、营业时间、门票、预约、实时天气细节等公开事实：优先使用消息中附带的「网络检索摘要」（若有）。没有摘要时可以说大致区间或建议出发前再查，禁止编造精确价格/时刻并装作确定。',
+    '- 对用户说话时禁止提及「快照」「系统提示」「网络检索摘要」「内部结构」等实现用语；用自然语言讲行程与公开信息即可。',
     seasonLine,
   ]
 
@@ -389,21 +459,36 @@ function systemPrompt(ctx: TripChatContext): string {
   }
 
   if (!destination.name) {
-    lines.push('目的地尚未在应用中选定：讨论具体城市景点前先说明快照里没有目的地；不要默认巴黎或其他城市。')
+    lines.push('目的地尚未在应用中选定：讨论具体城市景点前先说明尚未选定目的地；不要默认巴黎或其他城市。')
   }
 
   if (prefs) {
     lines.push(`用户行程偏好（来自应用状态）：${prefs}`)
   }
 
+  const viewing = buildViewingSnapshot(ctx)
+  if (viewing) {
+    const label =
+      viewing.type === 'place'
+        ? `地点「${viewing.name}」${viewing.nameLocal ? `（${viewing.nameLocal}）` : ''}`
+        : `酒店「${viewing.name}」`
+    lines.push(
+      `用户当前正在查看的详情页是：${label}。`,
+      '指代规则（硬规则）：用户说「这个 / 这家 / 这里 / 它 / 怎么样 / 多少钱 / 贵不贵 / 适合去吗」等而未另点名时，优先当作在问该详情页对象；先围绕它回答，再结合行程与（若有）网络检索。',
+      `详情页快照：${JSON.stringify(viewing)}`,
+    )
+  } else {
+    lines.push('用户当前没有打开地点/酒店详情页：指代不明时先问清对象，或默认结合当前查看日与已选酒店。')
+  }
+
   lines.push(
     '当用户要求添加/删除/替换/重排/切换日期/选中地点，或选择/增加/删除/换一批/替换酒店时，必须在 JSON 的 actions 里给出操作；纯问答时 actions 为空数组。',
-    '介绍当前酒店或候选项时：直接根据「酒店快照」回答，不要编造不存在的酒店；无需 actions。',
+    '介绍当前酒店或候选项时：直接根据下方酒店资料回答，不要编造不存在的酒店；无需 actions。',
     '添加地点时 placeName 用 Google Maps 可搜到的正式名称。',
     '日期默认（硬规则）：用户说「今天/本日/这天」或未指定日期时，一律针对「当前查看的日期」操作；actions 里不要填 day 字段（省略即可，系统会用当前日）。',
-    `只有用户明确说「第N天 / Day N / 换成第N天」时，才设置 day=N（N 须在 ${dayRange}），或使用 switch_day。不要因为行程快照里其它天有同名地点就擅自改其它天。`,
+    `只有用户明确说「第N天 / Day N / 换成第N天」时，才设置 day=N（N 须在 ${dayRange}），或使用 switch_day。不要因为行程里其它天有同名地点就擅自改其它天。`,
     'select_place / 介绍地点：优先当前查看日；不要为了找到地点自动跳到其它天，除非用户点名了那一天。',
-    '删除/重排/替换时地点名尽量匹配行程快照里的 name；酒店名尽量匹配酒店快照里的 name 或 area。',
+    '删除/重排/替换时地点名尽量匹配行程里的 name；酒店名尽量匹配酒店资料里的 name 或 area。',
     '酒店操作：',
     '- select_hotel：从候选项中选中当前住宿',
     '- add_hotel：按店名/地址新增候选项（select 默认 true）',
@@ -413,8 +498,8 @@ function systemPrompt(ctx: TripChatContext): string {
     '- replace_hotels：一次替换多家（fromHotelNames 数组 + preferences）',
     '若用户说行程地点「不喜欢A换成B」：必须使用 replace_place（不要拆成 remove+add）。酒店替换用 replace_hotel / replace_hotels，不要用 replace_place。',
     '「换一家 / 换个 / 换成别的 / 替换」类意图（硬规则）：必须用 replace_place，禁止用 add_place。',
-    '- fromPlaceName 必须是行程快照里当天已有地点的真实 name（例如当天的中餐厅店名），不要写「中餐厅」「餐厅」「咖啡馆」这类类型词。',
-    '- 用户说「换一家中餐厅 / 换个晚餐 / 换一家咖啡馆」且没点名旧店：从快照里选当天对应类型的那一家（同类型多间时优先最后一家），把它的 name 填进 fromPlaceName；toPlaceName 填你推荐的新店；source="recommend"。',
+    '- fromPlaceName 必须是当天行程里已有地点的真实 name（例如当天的中餐厅店名），不要写「中餐厅」「餐厅」「咖啡馆」这类类型词。',
+    '- 用户说「换一家中餐厅 / 换个晚餐 / 换一家咖啡馆」且没点名旧店：从当天行程里选对应类型的那一家（同类型多间时优先最后一家），把它的 name 填进 fromPlaceName；toPlaceName 填你推荐的新店；source="recommend"。',
     '- 绝不能把「换」做成新增/顺路插入；替换后当天不应多出一个同类型停点。',
     '若是「新增/加上」某地点（不是替换）：使用 add_place，且 mode 必须为 "best"（系统会按当日路线算最顺路：第1天 机场→酒店入住→其他地点，其余天从酒店出发）。不要传 insertAt。仅当用户明确说「加到最后/末尾」时 mode 才用 "end"。第1天酒店入住点不可删除。',
     'add_place / replace_place 的 note（可选）：写面向旅客的地点简介或用餐/游玩提示（1–2 句，讲这家店本身），不要写插入操作说明（禁止「顺路插入」「加到末尾」「作为第N天晚餐按路线安排」这类句子）。',
@@ -422,7 +507,7 @@ function systemPrompt(ctx: TripChatContext): string {
     '- source="explicit"：用户话里已经点名了目标地点（店名/景点名），系统会立刻改行程、不弹确认。例：「加上某某咖啡馆」「把 A 换成 B」。',
     '- source="recommend"：用户只说了类型/槽位、没点名新地点，需要你挑一家推荐，系统会先出详情页让用户确认。例：「加一个中餐厅」「换一家中餐厅」「换个晚餐」「帮我加附近一家咖啡馆」。',
     '- 「加一个…」→ add_place；「换一家/换个…」→ replace_place（不要用 add_place）。',
-    '- replace_place：toPlaceName 由用户点名 → explicit；toPlaceName 由你推荐 → recommend（fromPlaceName 必须是快照里的旧点 name）。',
+    '- replace_place：toPlaceName 由用户点名 → explicit；toPlaceName 由你推荐 → recommend（fromPlaceName 必须是行程里的旧点 name）。',
     '- remove_place 始终立刻生效，不需要 source。',
     'reply 与 actions 一致性（硬规则，禁止幻觉成功）：',
     '- 只要要改行程/酒店，actions 绝不能为空；口头答应「好的/这就加」却不给 action = 严重错误。',
@@ -446,13 +531,109 @@ function systemPrompt(ctx: TripChatContext): string {
     '{"type":"replace_hotel","fromHotelName":"旧酒店或区位","toHotelName":"新店名?","preferences":"更安静/更便宜?"} ',
     '{"type":"replace_hotels","fromHotelNames":["酒店A","酒店B"],"preferences":"..."}',
     `当前查看第 ${ctx.currentDay} 天${currentDayLabel}（默认操作日；未点名其它天时所有行程改动都作用于此日）`,
-    `目的地快照：${JSON.stringify(destination)}`,
-    `旅行日期与航班快照：${JSON.stringify(dates)}`,
-    `酒店快照：${JSON.stringify(buildHotelSnapshot(ctx))}`,
-    `行程快照：${JSON.stringify(buildItinerarySnapshot(ctx))}`,
+    `当前目的地：${JSON.stringify(destination)}`,
+    `旅行日期与航班：${JSON.stringify(dates)}`,
+    `当前酒店：${JSON.stringify(buildHotelSnapshot(ctx))}`,
+    `当前行程：${JSON.stringify(buildItinerarySnapshot(ctx))}`,
   )
 
   return lines.join('\n')
+}
+
+/** Heuristic: user is asking for live/public facts beyond the itinerary plan. */
+export function tripChatNeedsWebResearch(userMessage: string): boolean {
+  const text = userMessage.trim()
+  if (!text) return false
+  // Pure itinerary edits usually don't need web search.
+  if (
+    /^(帮我)?(把|将)?.{0,24}(换成|改成|替换成|换成别的)/.test(text) &&
+    !/(价格|多少钱|菜单|营业|开门|票价|门票)/.test(text)
+  ) {
+    return false
+  }
+  if (
+    /^(加|加上|新增|删除|去掉|移除|选中|切换到|换成第)/.test(text) &&
+    !/(价格|多少钱|菜单|营业|票价|门票|天气)/.test(text)
+  ) {
+    return false
+  }
+  return /价格|价位|人均|多少钱|贵不贵|便宜吗|菜单|menu|营业|开门|关门|几点开|几点关|open(ing)?\s*hours?|营业时间|门票|票价|预约|订位|排队|天气|气温|几度|下雨|降雨|forecast|ticket|price|€|\byen\b|欧元|法郎/i.test(
+    text,
+  )
+}
+
+function webResearchInstructions(ctx: TripChatContext): string {
+  const dest = buildDestinationSnapshot(ctx)
+  const destName = dest.name || '目的地'
+  const viewing = buildViewingSnapshot(ctx)
+  const lines = [
+    '你是旅行信息检索助手。根据用户问题检索公开网页，汇总与行程相关的事实。',
+    `目的地语境：${destName}${dest.country ? `（${dest.country}）` : ''}。`,
+    '重点：餐厅/咖啡馆大致价位或人均、菜单线索、营业时间、门票/预约、短期天气预报等。',
+    '输出简洁中文要点列表；标明不确定或可能过时；不要编造精确数字。',
+    '不要输出 JSON，不要提快照/系统内部结构。',
+  ]
+  if (viewing) {
+    const subject =
+      viewing.type === 'place'
+        ? `地点 ${viewing.name}${viewing.nameLocal ? ` / ${viewing.nameLocal}` : ''}`
+        : `酒店 ${viewing.name}${viewing.address ? `（${viewing.address}）` : ''}`
+    lines.splice(
+      2,
+      0,
+      `用户正在查看详情页：${subject}。若问题含「这个/这家/多少钱」等指代，检索对象优先为该详情页。`,
+    )
+  }
+  return lines.join('\n')
+}
+
+/**
+ * OpenAI Responses + web_search research step for trip chat.
+ * Returns null when search is unavailable or fails (chat continues without it).
+ */
+export async function fetchTripChatWebResearch(input: {
+  ctx: TripChatContext
+  userMessage: string
+  signal?: AbortSignal
+}): Promise<string | null> {
+  try {
+    const text = await openaiResponsesWithWebSearch({
+      instructions: webResearchInstructions(input.ctx),
+      user: input.userMessage,
+      signal: input.signal,
+    })
+    const trimmed = text.trim()
+    return trimmed || null
+  } catch {
+    return null
+  }
+}
+
+function buildTripChatMessages(input: {
+  ctx: TripChatContext
+  history: TripChatTurn[]
+  userMessage: string
+  webResearch?: string | null
+}): OpenAIChatMessage[] {
+  const messages: OpenAIChatMessage[] = [
+    { role: 'system', content: systemPrompt(input.ctx) },
+    ...input.history.map((t) => ({ role: t.role, content: t.content })),
+  ]
+  const research = String(input.webResearch || '').trim()
+  if (research) {
+    messages.push({
+      role: 'system',
+      content: [
+        '以下是针对本轮用户问题的网络检索摘要（可能过时或不完整）。',
+        '回答价目/营业/门票/天气等时优先参考；与「当前行程」冲突时以行程计划为准。',
+        '对用户回复时不要提及本段或「检索摘要」字样。',
+        '',
+        research,
+      ].join('\n'),
+    })
+  }
+  messages.push({ role: 'user', content: input.userMessage })
+  return messages
 }
 
 function normalizePlaceType(raw: unknown): PlaceType | undefined {
@@ -710,16 +891,31 @@ function parseTripChatResult(
   return { reply, actions }
 }
 
-function buildTripChatMessages(input: {
+export type TripChatWebSearchPhase = 'start' | 'done' | 'skip'
+
+async function resolveTripChatWebResearch(input: {
   ctx: TripChatContext
-  history: TripChatTurn[]
   userMessage: string
-}): OpenAIChatMessage[] {
-  return [
-    { role: 'system', content: systemPrompt(input.ctx) },
-    ...input.history.map((t) => ({ role: t.role, content: t.content })),
-    { role: 'user', content: input.userMessage },
-  ]
+  signal?: AbortSignal
+  /** auto = heuristic; true = always try; false = never. */
+  webSearch?: boolean | 'auto'
+  onWebSearch?: (phase: TripChatWebSearchPhase) => void
+}): Promise<string | null> {
+  const mode = input.webSearch ?? 'auto'
+  const should =
+    mode === true || (mode === 'auto' && tripChatNeedsWebResearch(input.userMessage))
+  if (!should) {
+    input.onWebSearch?.('skip')
+    return null
+  }
+  input.onWebSearch?.('start')
+  const research = await fetchTripChatWebResearch({
+    ctx: input.ctx,
+    userMessage: input.userMessage,
+    signal: input.signal,
+  })
+  input.onWebSearch?.('done')
+  return research
 }
 
 export async function sendTripChatMessage(input: {
@@ -727,8 +923,12 @@ export async function sendTripChatMessage(input: {
   history: TripChatTurn[]
   userMessage: string
   signal?: AbortSignal
+  /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
+  webSearch?: boolean | 'auto'
+  onWebSearch?: (phase: TripChatWebSearchPhase) => void
 }): Promise<TripChatResult> {
-  const messages = buildTripChatMessages(input)
+  const webResearch = await resolveTripChatWebResearch(input)
+  const messages = buildTripChatMessages({ ...input, webResearch })
   const text = await openaiChat(messages, {
     task: 'tripChat',
     userText: input.userMessage,
@@ -747,18 +947,26 @@ export async function sendTripChatMessage(input: {
  * then parse full JSON for actions when the stream completes.
  * Optional `onReasoningDelta` surfaces model CoT when the API sends it
  * (thinking mode); never mixed into reply parsing.
+ *
+ * When the question needs live facts (prices/hours/weather/…), optionally runs
+ * OpenAI Responses `web_search` first and injects a research summary into
+ * context — streaming + action JSON parsing stay on the normal chat path.
  */
 export async function sendTripChatMessageStream(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
   signal?: AbortSignal
+  /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
+  webSearch?: boolean | 'auto'
+  onWebSearch?: (phase: TripChatWebSearchPhase) => void
   /** Progressive user-visible reply extracted from the streaming JSON buffer. */
   onReplyDelta?: (reply: string) => void
   /** Model reasoning tokens when thinking is enabled and the API emits them. */
   onReasoningDelta?: (delta: string, fullReasoning: string) => void
 }): Promise<TripChatResult> {
-  const messages = buildTripChatMessages(input)
+  const webResearch = await resolveTripChatWebResearch(input)
+  const messages = buildTripChatMessages({ ...input, webResearch })
   let lastEmitted = ''
 
   const text = await openaiChatStream(messages, {

@@ -191,7 +191,12 @@ export function AddPlaceDialog({
         fetchedAt: Date.now(),
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '推荐加载失败，请稍后再试。')
+      // Bare JSON.parse / res.json() SyntaxError must not surface as English noise.
+      if (err instanceof SyntaxError) {
+        setError('推荐结果解析失败，请再试一次。')
+      } else {
+        setError(err instanceof Error ? err.message : '推荐加载失败，请稍后再试。')
+      }
     } finally {
       setLoadingRecs(false)
     }

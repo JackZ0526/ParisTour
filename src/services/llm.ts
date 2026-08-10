@@ -119,7 +119,9 @@ type TaskThinkingBounds = {
 /** Baseline + clamp bounds per task (auto mode only). */
 const TASK_THINKING: Record<LlmTaskKind, TaskThinkingBounds> = {
   tripChat: { baseline: 'medium', min: 'low', max: 'high' },
-  placeRecommend: { baseline: 'medium', min: 'low', max: 'high' },
+  // Structured JSON batches — keep thinking light so CoT does not eat the
+  // completion budget / hit proxy timeouts (empty body → JSON parse errors).
+  placeRecommend: { baseline: 'low', min: 'off', max: 'medium' },
   hotelRecommend: { baseline: 'medium', min: 'low', max: 'high' },
   placeDescription: { baseline: 'off', min: 'off', max: 'low' },
   placeDetail: { baseline: 'low', min: 'off', max: 'low' },
@@ -781,6 +783,37 @@ function friendlyLlmError(
   return new LlmRequestError(`${label} 请求失败：${detail}`, code || String(status))
 }
 
+/**
+ * Read + parse a JSON HTTP body without letting bare SyntaxError
+ * ("Unexpected end of JSON input") leak into the UI.
+ */
+async function readResponseJson<T>(
+  res: Response,
+  provider: LlmProvider | ChatBackend,
+): Promise<T> {
+  const raw = await res.text()
+  if (!raw.trim()) {
+    const emptyHint =
+      provider === 'deepseek'
+        ? 'DeepSeek 返回了空响应（可能被网关中断），请稍后再试。'
+        : provider === 'gemini'
+          ? 'Gemini 返回了空响应，请稍后再试。'
+          : '模型返回了空响应（可能被网关中断），请稍后再试。'
+    throw new LlmRequestError(emptyHint, 'empty_body')
+  }
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    const parseHint =
+      provider === 'deepseek'
+        ? 'DeepSeek 响应不完整或无法解析，请再试一次。'
+        : provider === 'gemini'
+          ? 'Gemini 响应不完整或无法解析，请再试一次。'
+          : '模型响应不完整或无法解析，请再试一次。'
+    throw new LlmRequestError(parseHint, 'invalid_json')
+  }
+}
+
 async function callGemini(system: string, user: string): Promise<string> {
   // Key injected by /api/gemini (Vite proxy or Vercel) — never send from the browser.
   const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -800,9 +833,9 @@ async function callGemini(system: string, user: string): Promise<string> {
   if (!res.ok) {
     throw friendlyLlmError(res.status, await res.text(), 'gemini')
   }
-  const data = (await res.json()) as {
+  const data = await readResponseJson<{
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-  }
+  }>(res, 'gemini')
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
   if (!text.trim()) throw new LlmRequestError('Gemini 没有返回内容。', 'empty')
   return text.trim()
@@ -1110,12 +1143,12 @@ async function callOpenAIMessages(
       throw friendlyLlmError(res.status, errText, backend)
     }
 
-    const data = (await res.json()) as {
+    const data = await readResponseJson<{
       choices?: Array<{
         finish_reason?: string
         message?: { content?: string | Array<{ type?: string; text?: string }>; refusal?: string }
       }>
-    }
+    }>(res, backend)
     const refusal = data.choices?.[0]?.message?.refusal?.trim()
     if (refusal) {
       throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
@@ -1170,12 +1203,12 @@ async function callOpenAIMessagesStream(
     const contentType = res.headers.get('content-type') || ''
     // Some gateways may fall back to a non-stream JSON body.
     if (!contentType.includes('text/event-stream') && !contentType.includes('octet-stream')) {
-      const data = (await res.json()) as {
+      const data = await readResponseJson<{
         choices?: Array<{
           finish_reason?: string
           message?: { content?: string | Array<{ type?: string; text?: string }>; refusal?: string }
         }>
-      }
+      }>(res, backend)
       const refusal = data.choices?.[0]?.message?.refusal?.trim()
       if (refusal) throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
       const text = extractOpenAIMessageText(data)
@@ -1341,12 +1374,28 @@ function extractResponsesText(data: OpenAIResponsesPayload): string {
 }
 
 /**
+ * Model id for OpenAI Responses + web_search.
+ * Always an OpenAI GPT model — DeepSeek chat Completions cannot use this tool.
+ */
+export function openaiWebSearchModel(): string {
+  const current = openaiModel()
+  if (!isDeepSeekModel(current)) return current
+  return OPENAI_ONLY_MODEL_OPTIONS[0]?.id || 'gpt-5.6-luna'
+}
+
+/**
  * OpenAI Responses API with built-in web_search tool.
- * Used when live APIs fail and we need fresher public web data.
+ * Used for fresher public web data (prices, hours, weather detail, etc.).
+ * Always routes through `/api/openai/responses` with an OpenAI model, even when
+ * the global picker is on DeepSeek (DeepSeek has no first-party web_search on
+ * the OpenAI-compatible chat Completions path used by this app).
  */
 export async function openaiResponsesWithWebSearch(input: {
   instructions: string
   user: string
+  /** Override model; defaults to current OpenAI pick or gpt-5.6-luna. */
+  model?: string
+  signal?: AbortSignal
 }): Promise<string> {
   if (!isLlmConfigured()) {
     throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
@@ -1354,6 +1403,13 @@ export async function openaiResponsesWithWebSearch(input: {
 
   const url = '/api/openai/responses'
   const { authFetch } = await import('./authFetch')
+  const model = (input.model && input.model.trim()) || openaiWebSearchModel()
+  if (isDeepSeekModel(model)) {
+    throw new LlmRequestError(
+      '联网检索仅支持 OpenAI Responses（web_search），请配置 OPENAI_API_KEY。',
+      'unsupported_model',
+    )
+  }
 
   const res = await authFetch(url, {
     method: 'POST',
@@ -1361,19 +1417,20 @@ export async function openaiResponsesWithWebSearch(input: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: openaiModel(),
+      model,
       tools: [{ type: 'web_search' }],
       tool_choice: 'required',
       instructions: input.instructions,
       input: input.user,
     }),
+    signal: input.signal,
   })
 
   if (!res.ok) {
     throw friendlyLlmError(res.status, await res.text(), 'openai')
   }
 
-  const data = (await res.json()) as OpenAIResponsesPayload
+  const data = await readResponseJson<OpenAIResponsesPayload>(res, 'openai')
   if (data.error?.message) {
     throw new LlmRequestError(data.error.message, data.error.code || data.error.type)
   }
@@ -2032,6 +2089,7 @@ export async function recommendPlacesForDay(input: {
     },
   })
 
+  // Non-stream chat: await full completion body before JSON parse (not SSE).
   const text = await generateText(system, user, {
     strict: true,
     task: 'placeRecommend',
@@ -2044,7 +2102,13 @@ export async function recommendPlacesForDay(input: {
   const parsed = extractJsonObject(text)
   const list = (parsed?.recommendations as unknown[]) || []
   if (!Array.isArray(list) || !list.length) {
-    throw new LlmRequestError('大模型返回了内容，但无法解析成地点列表，请再点「换一批」。')
+    const looksTruncated =
+      !parsed && (text.includes('"recommendations"') || /```/.test(text) || text.includes('{'))
+    throw new LlmRequestError(
+      looksTruncated
+        ? '推荐结果不完整（可能被截断），请再点「换一批」。'
+        : '大模型返回了内容，但无法解析成地点列表，请再点「换一批」。',
+    )
   }
 
   const out: PlaceRecommendation[] = []

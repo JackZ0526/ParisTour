@@ -28,6 +28,8 @@ interface Props {
   onSelect: (hotel: SelectedHotel) => void
   onCandidatesChange: (candidates: HotelCandidate[]) => void
   readOnly?: boolean
+  /** Fired when hotel GooglePlacePage opens/closes (for trip chat viewing context). */
+  onDetailChange?: (hotel: HotelCandidate | null) => void
 }
 
 /** Match DayTimeline float settle. */
@@ -162,6 +164,7 @@ export function HotelPicker({
   onSelect,
   onCandidatesChange,
   readOnly = false,
+  onDetailChange,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
   const [customQuery, setCustomQuery] = useState('')
@@ -211,6 +214,10 @@ export function HotelPicker({
     if (pendingCustom) return pendingCustom
     return candidates.find((h) => h.id === popupHotelId) || null
   }, [candidates, popupHotelId, pendingCustom])
+
+  useEffect(() => {
+    onDetailChange?.(popupCandidate)
+  }, [popupCandidate, onDetailChange])
 
   const decidingCustom = Boolean(pendingCustom)
 

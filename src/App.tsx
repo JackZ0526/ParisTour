@@ -12,6 +12,7 @@ import { CloudSaveIndicator } from './components/CloudSaveIndicator'
 import { PlacePanel } from './components/PlacePanel'
 import { ShareDialog } from './components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
+import type { TripChatViewingTarget } from './services/tripChat'
 import { TripDatesPanel } from './components/TripDatesPanel'
 import { TripMap } from './components/TripMap'
 import {
@@ -413,6 +414,8 @@ export default function App() {
   )
   const [dayIndex, setDayIndex] = useState(0)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
+  /** Hotel GooglePlacePage currently open in HotelPicker (trip chat context). */
+  const [viewingHotelDetail, setViewingHotelDetail] = useState<HotelCandidate | null>(null)
   const [days, setDays] = useState<DayPlan[]>(() => initialItinerary.days)
   const [customPlaces, setCustomPlaces] = useState<Record<string, Place>>(
     () => initialItinerary.customPlaces,
@@ -888,6 +891,45 @@ export default function App() {
     }),
     [customPlaces, hotel],
   )
+  /** Detail overlay for trip chat: PlacePanel selection wins over hotel popup. */
+  const tripChatViewing = useMemo((): TripChatViewingTarget | null => {
+    if (selectedPlaceId) {
+      try {
+        const place = getPlace(selectedPlaceId, placesWithHotel)
+        const stop = day.stops.find((s) => s.placeId === selectedPlaceId)
+        return {
+          type: 'place',
+          id: place.id,
+          name: place.name,
+          nameLocal: place.nameLocal || null,
+          placeType: place.type,
+          description: place.description || null,
+          cuisine: place.cuisine || null,
+          priceHint: place.priceHint || null,
+          ratingHint: place.ratingHint || null,
+          day: day.day,
+          note: stop?.note || null,
+        }
+      } catch {
+        /* fall through to hotel */
+      }
+    }
+    if (viewingHotelDetail) {
+      return {
+        type: 'hotel',
+        id: viewingHotelDetail.id,
+        name: viewingHotelDetail.name,
+        address: viewingHotelDetail.address || null,
+        area: viewingHotelDetail.area || null,
+        description: viewingHotelDetail.description || null,
+        priceHint: viewingHotelDetail.priceHint || null,
+        nearestMetro: viewingHotelDetail.nearestMetro || null,
+        reason: viewingHotelDetail.reason || null,
+        tripFit: viewingHotelDetail.tripFit || null,
+      }
+    }
+    return null
+  }, [selectedPlaceId, placesWithHotel, day.stops, day.day, viewingHotelDetail])
   const placesWithHotelRef = useRef(placesWithHotel)
   placesWithHotelRef.current = placesWithHotel
   const hotelRef = useRef(hotel)
@@ -1727,6 +1769,7 @@ export default function App() {
           onSelect={setHotel}
           onCandidatesChange={setHotelCandidates}
           readOnly={readOnly}
+          onDetailChange={setViewingHotelDetail}
         />
 
         <section className="space-y-4">
@@ -2030,6 +2073,7 @@ export default function App() {
           itineraryStartDate={itineraryStartDate}
           outbound={flights.outbound}
           returnFlight={flights.returnFlight}
+          viewing={tripChatViewing}
           handlers={{
             switchDay: handleSwitchDay,
             selectPlace: setSelectedPlaceId,

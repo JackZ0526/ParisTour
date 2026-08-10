@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
 } from '../services/googlePlaceDetails'
@@ -37,6 +38,7 @@ import {
   type TripChatContext,
   type TripChatDestination,
   type TripChatTurn,
+  type TripChatViewingTarget,
   type TripChatWorkStep,
 } from '../services/tripChat'
 import type {
@@ -175,6 +177,7 @@ function notesClaimDetailConfirm(notes: string[]): boolean {
 /** Client-side pipeline steps shown while the assistant works (Cursor-ish). */
 type ChatWorkStepId =
   | 'understand'
+  | 'webSearch'
   | 'generate'
   | 'parse'
   | 'resolvePlaces'
@@ -184,6 +187,7 @@ type ChatWorkStep = TripChatWorkStep & { id: ChatWorkStepId }
 
 const CHAT_WORK_STEP_LABELS: Record<ChatWorkStepId, string> = {
   understand: '理解你的需求…',
+  webSearch: '检索公开信息…',
   generate: '生成回复…',
   parse: '解析行程操作…',
   resolvePlaces: '查找地点详情…',
@@ -197,6 +201,15 @@ function initialChatWorkSteps(): ChatWorkStep[] {
     status: i === 0 ? 'active' : 'pending',
   }))
 }
+
+const CHAT_WORK_STEP_ORDER: ChatWorkStepId[] = [
+  'understand',
+  'webSearch',
+  'generate',
+  'parse',
+  'resolvePlaces',
+  'apply',
+]
 
 function activateChatWorkStep(
   steps: ChatWorkStep[],
@@ -212,8 +225,18 @@ function activateChatWorkStep(
     const existing = new Set(list.map((s) => s.id))
     const toAdd = extras.insert.filter((s) => !existing.has(s.id))
     if (toAdd.length) {
-      const parseIdx = list.findIndex((s) => s.id === 'parse')
-      const at = parseIdx >= 0 ? parseIdx + 1 : list.length
+      const activeOrder = CHAT_WORK_STEP_ORDER.indexOf(activeId)
+      let at = list.length
+      if (activeOrder >= 0) {
+        const beforeIdx = list.findIndex((s) => {
+          const order = CHAT_WORK_STEP_ORDER.indexOf(s.id)
+          return order >= 0 && order >= activeOrder
+        })
+        at = beforeIdx >= 0 ? beforeIdx : list.length
+      } else {
+        const parseIdx = list.findIndex((s) => s.id === 'parse')
+        at = parseIdx >= 0 ? parseIdx + 1 : list.length
+      }
       list = [...list.slice(0, at), ...toAdd, ...list.slice(at)]
     }
   }
@@ -426,6 +449,14 @@ export interface TripChatHandlers {
   setHotelCandidates: (candidates: HotelCandidate[]) => void
 }
 
+/**
+ * Chat chrome above PlacePanel/hotel detail (2000), below AddPlaceDialog (2100)
+ * and pending confirm GooglePlacePage (2300+/2500).
+ */
+const TRIP_CHAT_FAB_Z = 2050
+const TRIP_CHAT_BACKDROP_Z = 2040
+const TRIP_CHAT_PANEL_Z = 2045
+
 interface Props {
   hotel: SelectedHotel
   hotelCandidates: HotelCandidate[]
@@ -441,6 +472,8 @@ interface Props {
   itineraryStartDate?: string | null
   outbound?: FlightInfo | null
   returnFlight?: FlightInfo | null
+  /** Open PlacePanel / hotel detail the user is viewing (for 「这个怎么样」). */
+  viewing?: TripChatViewingTarget | null
   handlers: TripChatHandlers
 }
 
@@ -465,6 +498,7 @@ export function TripChatPanel({
   itineraryStartDate = null,
   outbound = null,
   returnFlight = null,
+  viewing = null,
   handlers,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
@@ -528,6 +562,7 @@ export function TripChatPanel({
       itineraryStartDate,
       outbound,
       returnFlight,
+      viewing,
     }
   }
 
@@ -1195,6 +1230,26 @@ export function TripChatPanel({
         history,
         userMessage: message,
         signal: ac.signal,
+        onWebSearch: (phase) => {
+          if (abortRef.current !== ac) return
+          if (phase === 'start') {
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'webSearch', {
+                insert: [
+                  {
+                    id: 'webSearch',
+                    label: CHAT_WORK_STEP_LABELS.webSearch,
+                    status: 'pending',
+                  },
+                ],
+              }),
+            )
+            return
+          }
+          if (phase === 'done') {
+            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+          }
+        },
         onReplyDelta: (reply) => {
           setStreamingReply(true)
           setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
@@ -1683,6 +1738,26 @@ export function TripChatPanel({
         history,
         userMessage: message,
         signal: ac.signal,
+        onWebSearch: (phase) => {
+          if (abortRef.current !== ac) return
+          if (phase === 'start') {
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'webSearch', {
+                insert: [
+                  {
+                    id: 'webSearch',
+                    label: CHAT_WORK_STEP_LABELS.webSearch,
+                    status: 'pending',
+                  },
+                ],
+              }),
+            )
+            return
+          }
+          if (phase === 'done') {
+            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+          }
+        },
         onReplyDelta: (reply) => {
           setStreamingReply(true)
           setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
@@ -1794,12 +1869,14 @@ export function TripChatPanel({
     }
   }
 
-  return (
+  const chatChrome = (
     <>
       <div
-        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2001] flex flex-col-reverse items-end gap-2 sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
+        data-trip-chat-fab="1"
+        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] flex flex-col-reverse items-end gap-2 sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
           open ? 'max-sm:pointer-events-none max-sm:invisible' : ''
         }`}
+        style={{ zIndex: TRIP_CHAT_FAB_Z }}
       >
         <LlmModelPicker />
         <button
@@ -1816,15 +1893,17 @@ export function TripChatPanel({
         <button
           type="button"
           aria-label="关闭行程助手"
-          className={`fixed inset-0 z-[1999] bg-black/45 transition-opacity duration-300 sm:hidden ${
+          className={`fixed inset-0 bg-black/45 transition-opacity duration-300 sm:hidden ${
             panelEntered ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
+          style={{ zIndex: TRIP_CHAT_BACKDROP_Z }}
           onClick={() => setOpen(false)}
         />
       )}
 
       {panelMounted && (
         <div
+          data-trip-chat-panel="1"
           role="dialog"
           aria-label="行程助手"
           aria-hidden={!open}
@@ -1834,11 +1913,12 @@ export function TripChatPanel({
             if (e.propertyName !== 'opacity' && e.propertyName !== 'transform') return
             if (!open) setPanelMounted(false)
           }}
-          className={`fixed z-[2000] flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] inset-x-0 bottom-0 h-[min(85dvh,640px)] w-full rounded-t-3xl sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(70vh,560px)] sm:w-[min(92vw,380px)] sm:rounded-2xl ${
+          className={`fixed flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] inset-x-0 bottom-0 h-[min(85dvh,640px)] w-full rounded-t-3xl sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(70vh,560px)] sm:w-[min(92vw,380px)] sm:rounded-2xl ${
             panelEntered
               ? 'translate-x-0 translate-y-0 opacity-100'
               : 'pointer-events-none translate-y-6 opacity-0 sm:translate-x-2 sm:translate-y-3'
           }`}
+          style={{ zIndex: TRIP_CHAT_PANEL_Z }}
         >
           <div className="border-b border-[var(--mist)] px-4 py-3">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--mist)] sm:hidden" />
@@ -1846,7 +1926,11 @@ export function TripChatPanel({
               <div className="min-w-0">
                 <h3 className="font-display text-xl leading-tight">行程助手</h3>
                 <p className="mt-0.5 text-xs text-[var(--stone)]">
-                  当前第 {currentDay} 天 · {getActiveLlmLabel()}
+                  当前第 {currentDay} 天
+                  {viewing
+                    ? ` · 正在看「${viewing.name}」`
+                    : ''}{' '}
+                  · {getActiveLlmLabel()}
                 </p>
               </div>
               <button
@@ -2005,7 +2089,12 @@ export function TripChatPanel({
           </form>
         </div>
       )}
+    </>
+  )
 
+  return (
+    <>
+      {createPortal(chatChrome, document.body)}
       <GooglePlacePage
         key={`${activePending?.id || 'pending-place'}-${confirmEpoch}`}
         open={Boolean(activePending)}
