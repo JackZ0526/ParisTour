@@ -245,7 +245,7 @@ export function AddPlaceDialog({
     }
 
     try {
-      const list = await recommendPlacesForDay({
+      let list = await recommendPlacesForDay({
         day: dayNumber,
         title: dayTitle,
         pace: dayPace,
@@ -259,6 +259,61 @@ export function AddPlaceDialog({
         countPerType: 4,
       })
       if (epoch !== recommendationEpochRef.current) return false
+
+      // Models occasionally return a duplicate or a place already present in
+      // the itinerary, which the service correctly filters out. Ask only for
+      // the missing slots, in one extra call, instead of leaving a tab at 3.
+      const countByType = (rows: PlaceRecommendation[]) => {
+        const counts: Record<RecommendPlaceType, number> = {
+          attraction: 0,
+          cafe: 0,
+          restaurant: 0,
+        }
+        for (const item of rows) counts[item.type] += 1
+        return counts
+      }
+      const initialCounts = countByType(list)
+      const missingTypes = types.filter((type) => initialCounts[type] < 4)
+      if (missingTypes.length) {
+        const missingCount = Math.max(
+          ...missingTypes.map((type) => 4 - initialCounts[type]),
+        )
+        try {
+          const topUp = await recommendPlacesForDay({
+            day: dayNumber,
+            title: dayTitle,
+            pace: dayPace,
+            theme: dayTheme,
+            hotelArea,
+            currentPlaceNames,
+            tripPlaceNames,
+            excludeNames: [
+              ...(options.excludeNames || []),
+              ...recommendationsRef.current.map((item) => item.name),
+              ...list.map((item) => item.name),
+            ],
+            batch,
+            types: missingTypes,
+            countPerType: missingCount,
+          })
+          if (epoch !== recommendationEpochRef.current) return false
+          list = [...list, ...topUp]
+        } catch {
+          // Preserve the valid first response; the current tab can retry later.
+        }
+      }
+
+      const capped: PlaceRecommendation[] = []
+      const cappedCounts = countByType([])
+      const seenNames = new Set<string>()
+      for (const item of list) {
+        const nameKey = item.name.trim().toLowerCase()
+        if (!nameKey || seenNames.has(nameKey) || cappedCounts[item.type] >= 4) continue
+        seenNames.add(nameKey)
+        cappedCounts[item.type] += 1
+        capped.push(item)
+      }
+      list = capped
 
       const returnedTypes = new Set(list.map((item) => item.type))
       if (!list.length) {
@@ -334,15 +389,16 @@ export function AddPlaceDialog({
       applyCachedRecommendations([], undefined, 1)
     }
 
-    const hasType = (type: RecommendPlaceType) =>
-      recommendationsRef.current.some((item) => item.type === type)
+    const hasFullType = (type: RecommendPlaceType) =>
+      recommendationsRef.current.filter((item) => item.type === type).length >= 4
     const primaryType = category
 
     void (async () => {
-      if (!hasType(primaryType)) {
+      if (!hasFullType(primaryType)) {
         await fetchRecommendations({
           types: [primaryType],
           batch: recBatchesRef.current[primaryType],
+          excludeNames: recommendationsRef.current.map((item) => item.name),
           epoch,
         })
       }
@@ -350,7 +406,7 @@ export function AddPlaceDialog({
 
       const remaining = recommendTabs
         .map((tab) => tab.id)
-        .filter((type) => type !== primaryType && !hasType(type))
+        .filter((type) => type !== primaryType && !hasFullType(type))
       if (remaining.length) {
         await fetchRecommendations({
           types: remaining,
@@ -373,7 +429,7 @@ export function AddPlaceDialog({
 
   async function ensureRecommendationCategory(type: RecommendPlaceType) {
     if (
-      recommendationsRef.current.some((item) => item.type === type) ||
+      recommendationsRef.current.filter((item) => item.type === type).length >= 4 ||
       loadingCategoriesRef.current.has(type)
     ) {
       return
