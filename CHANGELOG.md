@@ -19,6 +19,26 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.4.0] - 2026-08-10
+
+Large feature release (~3900 LOC): server-side backups, bilingual place naming, and place-detail / gallery UX.
+
+### Added
+
+- Server-side trip backups (`trip_backups`): keep last 5 snapshots after each full save, with restore UI (`BackupDialog`)
+- Bilingual place naming with Google ZH priority, LLM translate + badge, and streaming name updates
+- Witty Google price-level labels and richer landmark review details
+- Gallery UX: swipe navigation, thumbnail sync, and hidden scrollbar
+- Shared `CloseIconButton` and header icon-action polish
+
+### Changed
+
+- Harden trip cloud persistence, Google place details fetching, and trip-assistant workflows
+
+### Migration
+
+- Apply the `trip_backups` section from `supabase/schema.sql` (table + RLS). Already applied on production project `zyfcpitiyrpfzvmyyxxu`.
+
 ## [0.3.1] - 2026-08-10
 
 ### Changed
@@ -98,7 +118,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...HEAD
+- [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0
 - [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
 - [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
 - [0.2.0]: https://github.com/JackZ0526/ParisTour/compare/e48cfb8...620c6a8

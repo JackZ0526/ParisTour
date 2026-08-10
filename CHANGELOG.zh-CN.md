@@ -18,6 +18,26 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.4.0] - 2026-08-10
+
+> 大型功能版本（约 3900 LOC）：服务端备份、地点双语命名、地点详情与图库体验。
+
+### 新增
+
+- 服务端行程备份（`trip_backups`）：每次完整保存后保留最近 5 份快照，并提供恢复 UI（`BackupDialog`）
+- 地点双语命名：优先 Google 中文名，LLM 翻译 + 角标，支持流式更新
+- Google 价位文案与地标类地点评论详情增强
+- 图库体验：滑动浏览、缩略图同步、隐藏滚动条
+- 共用关闭按钮组件与顶栏图标操作打磨
+
+### 变更
+
+- 强化行程云端持久化、Google 地点详情拉取与行程助手工作流
+
+### 迁移
+
+- 执行 `supabase/schema.sql` 中的 `trip_backups` 段（表 + RLS）。生产项目 `zyfcpitiyrpfzvmyyxxu` 已应用。
+
 ## [0.3.1] - 2026-08-10
 
 ### 变更
@@ -97,7 +117,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...HEAD
+- [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0
 - [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
 - [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
 - [0.2.0]: https://github.com/JackZ0526/ParisTour/compare/e48cfb8...620c6a8
