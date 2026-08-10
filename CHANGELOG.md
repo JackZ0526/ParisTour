@@ -19,6 +19,24 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.5.0] - 2026-08-10
+
+AI recommendation reliability and control: verified Google candidates, editable preferences, progressive place loading, and hardened cloud/deployment behavior.
+
+### Added
+
+- Ground place, hotel, and itinerary recommendations in verified Google candidates, with structured prompt contracts and repair validation.
+- Add editable, cloud-synced recommendation preferences that remain soft defaults instead of forced itinerary rules.
+- Load the selected recommendation tab first, then fill other categories in the background; refresh only the active tab.
+
+### Fixed
+
+- Preserve Google Place IDs through recommendation, itinerary, detail, and hotel flows so exact entities survive refreshes.
+- Keep live trip synchronization from temporarily blanking the app.
+- Align manual and automatic DeepSeek thinking-effort mappings.
+- Fill incomplete recommendation tabs without duplicating already returned places.
+- Prevent empty DeepSeek responses behind the Vercel proxy.
+- Resolve itinerary start dates from structured flight timestamps instead of model inference.
 ## [0.4.0] - 2026-08-10
 
 Large feature release (~3900 LOC): server-side backups, bilingual place naming, and place-detail / gallery UX.
@@ -118,7 +136,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...HEAD
+- [0.5.0]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...v0.5.0
 - [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0
 - [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
 - [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0

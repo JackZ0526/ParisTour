@@ -18,6 +18,24 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.5.0] - 2026-08-10
+
+本版本重点提升 AI 推荐的可靠性和可控性：引入 Google 真实候选、可编辑推荐偏好、分批加载，以及更稳健的云端与部署逻辑。
+
+### 新增
+
+- 地点、酒店和完整行程推荐先取得 Google 已验证候选，模型只负责筛选、排序与编排，并增加结构化提示词契约和 JSON 修复校验。
+- 新增可编辑、可云端同步的推荐偏好；开始时间、咖啡馆、餐饮、迪士尼、地标与步行强度均作为可让步倾向，不再强制改写行程。
+- 添加地点时优先加载当前类别的 4 个推荐，再在后台补齐其他类别；“换一批”只刷新当前类别。
+
+### 修复
+
+- 在推荐、行程、详情和酒店流程中持续保存 Google Place ID，刷新后仍能定位同一实体。
+- 修复行程实时同步后短暂出现空白页面的问题。
+- 对齐 DeepSeek 手动与自动思考强度的实际 API 参数映射。
+- 推荐数量不足时自动补齐，同时避免重复返回已有地点。
+- 修复 Vercel 代理环境中 DeepSeek 偶发空响应的问题。
+- 行程起算日改为读取结构化航班时间，不再由模型猜测抵达日期。
 ## [0.4.0] - 2026-08-10
 
 > 大型功能版本（约 3900 LOC）：服务端备份、地点双语命名、地点详情与图库体验。
@@ -117,7 +135,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...HEAD
+- [0.5.0]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...v0.5.0
 - [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0
 - [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
 - [0.3.0]: https://github.com/JackZ0526/ParisTour/releases/tag/v0.3.0
