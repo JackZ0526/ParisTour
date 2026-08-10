@@ -442,6 +442,8 @@ export default function App() {
     () => Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
   )
   const [panelResetKey, setPanelResetKey] = useState(0)
+  /** Remount stateful trip children after a remote snapshot is reconciled. */
+  const [syncRenderKey, setSyncRenderKey] = useState(0)
   const [copyRefreshing, setCopyRefreshing] = useState(false)
   const prevStopsKeyRef = useRef<string | null>(null)
   const suppressCopyRef = useRef(false)
@@ -485,19 +487,42 @@ export default function App() {
     const nextItinerary = loadItineraryState()
     ensureBaselineFromGenerated(nextItinerary)
 
+    // A remote snapshot replaces the data underneath several stateful children.
+    // Cancel local work first so stale completions/animation timers cannot write
+    // the pre-sync itinerary back into the newly hydrated React state.
+    genRequestIdRef.current += 1
+    dayRegenRequestIdRef.current += 1
+    copyRequestIdRef.current += 1
+    if (dayRestoreTimerRef.current != null) {
+      window.clearTimeout(dayRestoreTimerRef.current)
+      dayRestoreTimerRef.current = null
+    }
+    clearDayNavCache()
+    tripInputsHydratedRef.current = false
+    suppressCloudSaveRef.current = false
+
     setHotel(nextHotels.hotel)
     setHotelCandidates(nextHotels.candidates)
     setTripDates(nextDates)
     setFlights(nextFlights)
+    setItineraryStart(null)
+    setItineraryStartLoading(
+      Boolean(nextDates?.startDate && nextFlights.outbound?.flightNumber),
+    )
     setDays(nextItinerary.days)
     setCustomPlaces(nextItinerary.customPlaces)
     setItineraryGenerated(
       Boolean(nextItinerary.generated && nextItinerary.days.length),
     )
     setItineraryFingerprint(nextItinerary.fingerprint || null)
+    setItineraryGenerating(false)
     setItineraryGenError(null)
+    setDayRegenerating(false)
     setDayRegenError(null)
+    setDayRestoring(false)
     setCopyRefreshing(false)
+    setViewingHotelDetail(null)
+    setSyncRenderKey((key) => key + 1)
     prevStopsKeyRef.current = null
     suppressCopyRef.current = true
 
@@ -510,12 +535,18 @@ export default function App() {
     }
     setDayIndex(nextIndex)
 
-    if (prevSelected) {
-      const stillOnDay = nextDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
-      const stillInCustom = Boolean(nextItinerary.customPlaces?.[prevSelected])
-      const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
-      setSelectedPlaceId(stillOnDay || stillInCustom || isHotel ? prevSelected : null)
-    }
+    const stillOnDay = prevSelected
+      ? nextDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
+      : false
+    const stillInCustom = prevSelected
+      ? Boolean(nextItinerary.customPlaces?.[prevSelected])
+      : false
+    const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
+    setSelectedPlaceId(
+      prevSelected && (stillOnDay || stillInCustom || isHotel)
+        ? prevSelected
+        : null,
+    )
 
     cloudSaveSkipRunsRef.current = 2
     cloudHydratedAtRef.current = Date.now()
@@ -1924,20 +1955,20 @@ export default function App() {
 
       <main className="mt-8 space-y-10 sm:mt-10 sm:space-y-12">
         <TripDatesPanel
-          key={`dates-${panelResetKey}`}
+          key={`dates-${panelResetKey}-${syncRenderKey}`}
           value={tripDates}
           onChange={setTripDates}
           readOnly={readOnly}
         />
         <FlightPanel
-          key={`flights-${panelResetKey}`}
+          key={`flights-${panelResetKey}-${syncRenderKey}`}
           tripDates={tripDates}
           destination={destination}
           onFlightsChange={handleFlightsChange}
           readOnly={readOnly}
         />
         <HotelPicker
-          key={`hotel-${panelResetKey}`}
+          key={`hotel-${panelResetKey}-${syncRenderKey}`}
           selected={hotel}
           candidates={hotelCandidates}
           days={days}
@@ -2160,7 +2191,7 @@ export default function App() {
                         }
                       >
                         <DayTimeline
-                          key={`timeline-${day.day}-${hotel.id}`}
+                          key={`timeline-${syncRenderKey}-${day.day}-${hotel.id}`}
                           day={day}
                           hotel={hotel}
                           customPlaces={placesWithHotel}
@@ -2193,7 +2224,7 @@ export default function App() {
                         }`}
                       >
                         <TripMap
-                          key={`map-${day.day}-${hotel.id}`}
+                          key={`map-${syncRenderKey}-${day.day}-${hotel.id}`}
                           hotel={hotel}
                           day={day}
                           customPlaces={placesWithHotel}
@@ -2203,6 +2234,7 @@ export default function App() {
                           onSelectPlace={setSelectedPlaceId}
                         />
                         <PlacePanel
+                          key={`place-panel-${syncRenderKey}-${day.day}-${hotel.id}`}
                           placeId={selectedPlaceId}
                           customPlaces={placesWithHotel}
                           day={day}
@@ -2237,7 +2269,7 @@ export default function App() {
 
       {!readOnly && (
         <TripChatPanel
-          key={`chat-${panelResetKey}`}
+          key={`chat-${panelResetKey}-${syncRenderKey}`}
           hotel={hotel}
           hotelCandidates={hotelCandidates}
           days={days}

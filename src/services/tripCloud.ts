@@ -413,6 +413,8 @@ let suppressFlushTimer: ReturnType<typeof setTimeout> | null = null
  * Used to skip no-op local uploads — not to reject re-applying historical remote states.
  */
 const lastSavedJsonByTrip = new Map<string, string>()
+/** Last known generated itinerary, retained as a safety baseline across an empty regression. */
+const lastGeneratedJsonByTrip = new Map<string, string>()
 /** Last trip.updated_at we reconciled (save or remote apply). */
 const lastAppliedUpdatedAtByTrip = new Map<string, string>()
 
@@ -531,6 +533,22 @@ function baselineSnapshot(tripId: string): TripSnapshot | null {
   }
 }
 
+function generatedBaselineSnapshot(tripId: string): TripSnapshot | null {
+  const raw = lastGeneratedJsonByTrip.get(tripId)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as TripSnapshot
+  } catch {
+    return null
+  }
+}
+
+function rememberGeneratedSnapshot(tripId: string, snapshot: TripSnapshot): void {
+  if (hasGeneratedTrip(snapshot)) {
+    lastGeneratedJsonByTrip.set(tripId, snapshotJson(snapshot))
+  }
+}
+
 function collectSnapshotForMode(
   tripId: string,
   mode: 'artifacts' | 'full',
@@ -614,12 +632,13 @@ export function rememberSavedSnapshot(
 ): void {
   if (!tripId) return
   lastSavedJsonByTrip.set(tripId, snapshotJson(snapshot))
+  rememberGeneratedSnapshot(tripId, snapshot)
   if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
 }
 
 /**
  * Apply a remote trip snapshot when cloud updated_at is newer than what we last reconciled.
- * Returns true when applied (caller should remount UI).
+ * Returns true when applied (caller should rehydrate its React state).
  */
 export function applyRemoteTripSnapshot(
   tripId: string,
@@ -656,6 +675,7 @@ export function applyRemoteTripSnapshot(
   try {
     if (snapshotJson(collectTripSnapshot()) === json) {
       lastSavedJsonByTrip.set(tripId, json)
+      rememberGeneratedSnapshot(tripId, snapshot)
       if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
       return false
     }
@@ -664,19 +684,28 @@ export function applyRemoteTripSnapshot(
   }
 
   // Remote write wins over a debounced local save that hasn't uploaded yet.
+  // Discard the entire queued transaction, including an intentional-clear flag;
+  // otherwise a stale empty snapshot can flush after the remote snapshot lands.
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
   }
+  queuedSnapshot = null
+  queuedSaveMode = 'none'
+  queuedAllowEmptyTrip = false
+  pendingAfterFlight = false
   if (cloudSaveStatus === 'pending') setCloudSaveStatus('idle')
 
   setCloudSyncStatus('syncing')
   applyTripSnapshot(snapshot)
   // Reconcile against *local* round-trip form so remount autosave does not re-upload.
   try {
-    lastSavedJsonByTrip.set(tripId, snapshotJson(collectTripSnapshot()))
+    const reconciled = collectTripSnapshot()
+    lastSavedJsonByTrip.set(tripId, snapshotJson(reconciled))
+    rememberGeneratedSnapshot(tripId, reconciled)
   } catch {
     lastSavedJsonByTrip.set(tripId, json)
+    rememberGeneratedSnapshot(tripId, snapshot)
   }
   if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
   saveTripId = tripId
@@ -834,7 +863,11 @@ export async function flushTripCloudSave(): Promise<void> {
   }
 
   const previous = baselineSnapshot(tripId)
-  if (!allowEmptyTrip && isUnexpectedEmptyRegression(previous, snapshot)) {
+  const safetyBaseline =
+    previous && hasGeneratedTrip(previous)
+      ? previous
+      : generatedBaselineSnapshot(tripId) || previous
+  if (!allowEmptyTrip && isUnexpectedEmptyRegression(safetyBaseline, snapshot)) {
     console.error('[tripCloud] blocked an unexpected empty-trip autosave')
     setCloudSaveStatus('error', '已阻止异常空行程覆盖云端存档')
     flushQueuedRemote()
@@ -849,6 +882,7 @@ export async function flushTripCloudSave(): Promise<void> {
       archivePrevious: saveMode === 'full',
     })
     lastSavedJsonByTrip.set(tripId, json)
+    rememberGeneratedSnapshot(tripId, snapshot)
     if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
     // Swallow our own realtime echo.
     armSuppressRemote(3000)
