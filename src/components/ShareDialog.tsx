@@ -9,6 +9,7 @@ import {
   type TripShareRole,
   type TripShareRow,
 } from '../services/tripCloud'
+import { CloseIconButton } from './CloseIconButton'
 
 type Props = {
   tripId: string
@@ -197,16 +198,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                 输入同伴邮箱并发送邀请后，对方会收到邮件，按提示注册或登录后即可查看行程。
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="关闭"
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mist)] bg-white/70 text-[var(--ink)] transition hover:border-[var(--sage)] hover:bg-white"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
+            <CloseIconButton onClick={onClose} className="mt-0.5" />
           </div>
         </header>
 

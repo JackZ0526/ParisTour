@@ -1,8 +1,8 @@
 /**
- * Durable LLM output store (localStorage + trip cloud snapshot).
+ * Durable generated-artifact store (localStorage + trip cloud snapshot).
  *
- * Generate once → persist → reuse across remounts / devices until the user
- * explicitly regenerates (bypass) or the trip is wiped.
+ * LLM output and stable fetched payloads are persisted once and reused across
+ * remounts / devices until the user explicitly regenerates or wipes the trip.
  */
 
 const STORAGE_KEY = 'paris-tour-llm-artifacts-v1'
@@ -46,14 +46,36 @@ function readAll(): LlmArtifactMap {
 }
 
 function writeAll(map: LlmArtifactMap, options?: { silent?: boolean }) {
+  const serialized = JSON.stringify(map)
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
+    if (localStorage.getItem(STORAGE_KEY) === serialized) return false
+    localStorage.setItem(STORAGE_KEY, serialized)
   } catch {
     /* ignore quota / private mode */
   }
   if (!options?.silent) {
     for (const cb of changeListeners) cb()
   }
+  return true
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
+}
+
+function sameEntry(
+  entry: LlmArtifactEntry | undefined,
+  value: unknown,
+  model?: string,
+): boolean {
+  return Boolean(
+    entry && entry.model === model && sameValue(entry.value, value),
+  )
 }
 
 /** Subscribe to durable writes (used to trigger trip cloud autosave). */
@@ -77,12 +99,14 @@ export function saveLlmArtifacts(
 }
 
 export function clearLlmArtifacts(options?: { silent?: boolean }) {
+  let changed = false
   try {
+    changed = localStorage.getItem(STORAGE_KEY) != null
     localStorage.removeItem(STORAGE_KEY)
   } catch {
     /* ignore */
   }
-  if (!options?.silent) {
+  if (changed && !options?.silent) {
     for (const cb of changeListeners) cb()
   }
 }
@@ -106,14 +130,22 @@ export function setLlmArtifact(
 ) {
   if (!key) return
   const map = readAll()
-  const entry: LlmArtifactEntry = {
+  const keys = [key, ...(options?.aliases || [])].filter(
+    (item, index, all) => Boolean(item) && all.indexOf(item) === index,
+  )
+  if (keys.every((item) => sameEntry(map[item], value, options?.model))) {
+    return
+  }
+  const existing = keys.map((item) => map[item]).find(
+    (entry) => sameEntry(entry, value, options?.model),
+  )
+  const entry: LlmArtifactEntry = existing || {
     value,
     generatedAt: Date.now(),
     model: options?.model,
   }
-  map[key] = entry
-  for (const alias of options?.aliases || []) {
-    if (alias && alias !== key) map[alias] = entry
+  for (const item of keys) {
+    if (!sameEntry(map[item], value, options?.model)) map[item] = entry
   }
   writeAll(map, { silent: options?.silent })
 }
@@ -126,12 +158,20 @@ export function setLlmArtifactsForKeys(
   const unique = [...new Set(keys.filter(Boolean))]
   if (!unique.length) return
   const map = readAll()
-  const entry: LlmArtifactEntry = {
+  if (unique.every((key) => sameEntry(map[key], value, options?.model))) {
+    return
+  }
+  const existing = unique.map((key) => map[key]).find(
+    (entry) => sameEntry(entry, value, options?.model),
+  )
+  const entry: LlmArtifactEntry = existing || {
     value,
     generatedAt: Date.now(),
     model: options?.model,
   }
-  for (const key of unique) map[key] = entry
+  for (const key of unique) {
+    if (!sameEntry(map[key], value, options?.model)) map[key] = entry
+  }
   writeAll(map, { silent: options?.silent })
 }
 

@@ -452,6 +452,39 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Trip backups (server-side history — last N kept by app after each full save)
+-- ---------------------------------------------------------------------------
+create table if not exists public.trip_backups (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references public.trips (id) on delete cascade,
+  snapshot jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists trip_backups_trip_id_created_at_idx
+  on public.trip_backups (trip_id, created_at desc);
+
+alter table public.trip_backups enable row level security;
+
+create policy "trip_backups_select"
+  on public.trip_backups
+  for select
+  to authenticated
+  using (public.user_can_read_trip(trip_id));
+
+create policy "trip_backups_insert"
+  on public.trip_backups
+  for insert
+  to authenticated
+  with check (public.user_can_edit_trip(trip_id));
+
+create policy "trip_backups_delete"
+  on public.trip_backups
+  for delete
+  to authenticated
+  using (public.user_can_edit_trip(trip_id));
+
+-- ---------------------------------------------------------------------------
 -- Bootstrap: add your email(s) to the allowlist, then sign up.
 -- Example:
 --   insert into public.allowlist_emails (email) values ('you@example.com');

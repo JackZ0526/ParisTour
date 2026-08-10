@@ -16,9 +16,9 @@ import { memoizeLlmCall } from './llmMemo'
  * - DeepSeek V4: `thinking: { type }` + `reasoning_effort: low|high|max`
  *   (UI 低/中/高 → API low/high/max; no native "medium").
  * - GPT-5.6: `reasoning_effort: none|low|medium|high`.
- * - 「自动」: task-type baseline + light keyword/length heuristics only (no
- *   second LLM). A future optional classifier could use DeepSeek V4 Flash
- *   with thinking off — not used in v1.
+ * - 「自动」: every uncached model call first runs a compact semantic
+ *   classifier with thinking disabled, then selects off/low/medium/high.
+ *   Task baselines + local heuristics remain the failure fallback.
  */
 
 export type LlmProvider = 'openai' | 'gemini'
@@ -855,6 +855,15 @@ export type ChatCallOptions = {
   task?: LlmTaskKind
   /** Optional user text for auto-mode heuristics (trip chat message, prefs, etc.). */
   userText?: string
+  /**
+   * Per-request resolved thinking override. Used when a preflight planner has
+   * already selected the appropriate effort for this specific request.
+   */
+  thinking?: ResolvedThinking
+  /** Run the shared semantic preflight. False is reserved for the preflight itself or callers with their own planner. */
+  preflight?: boolean
+  /** auto lets preflight decide; true/false explicitly force generic web research. */
+  webSearch?: boolean | 'auto'
   /** Abort an in-flight request (including mid-stream). */
   signal?: AbortSignal
 }
@@ -868,6 +877,164 @@ export type ChatStreamOptions = ChatCallOptions & {
    * Does not affect the content buffer used for JSON parsing.
    */
   onReasoningDelta?: (delta: string, fullReasoning: string) => void
+}
+
+function preflightEffortFromText(value: unknown): ResolvedThinkingEffort | null {
+  const effort = String(value || '').trim().toLowerCase()
+  if (effort === 'off' || effort === 'low' || effort === 'medium' || effort === 'high') {
+    return effort
+  }
+  return null
+}
+
+function compactPreflightContext(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+) {
+  const lastUser = [...messages].reverse().find((message) => message.role === 'user')
+  const firstSystem = messages.find((message) => message.role === 'system')
+  return {
+    task: options?.task || 'default',
+    userText: String(options?.userText || lastUser?.content || '').slice(0, 1200),
+    taskInstructions: String(firstSystem?.content || '').slice(0, 700),
+  }
+}
+
+type ModelCallPreflight = {
+  thinking: ResolvedThinking
+  needsWeb: boolean
+}
+
+function explicitGenericWebRequest(text: string): boolean {
+  return /联网|上网|网络搜索|网页搜索|web\s*search|search\s+the\s+web|网上查|查一下最新/i.test(text)
+}
+
+function fallbackGenericNeedsWeb(text: string): boolean {
+  return /最新|实时|目前|现在|近期|今天|今年|本周|本月|营业时间|开门|关门|票价|价格|天气|气温|降雨|罢工|交通状态|活动|展览|演出|比赛结果|谁赢了|评分|评论数|current|latest|today|weather|opening\s*hours?|price|event|score/i.test(
+    text,
+  )
+}
+
+function thinkingFromEffort(effort: ResolvedThinkingEffort): ResolvedThinking {
+  return effort === 'off'
+    ? { enabled: false, effort: 'low' }
+    : { enabled: true, effort }
+}
+
+/**
+ * Semantic tool + thinking router shared by every OpenAI/DeepSeek chat call.
+ * The router call explicitly disables its own preflight, so it cannot recurse.
+ */
+async function resolveModelCallPreflight(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+): Promise<ModelCallPreflight> {
+  const fallback = resolveThinkingForTask(options?.task || 'default', options?.userText)
+  if (options?.preflight === false) {
+    return { thinking: options.thinking || fallback, needsWeb: options.webSearch === true }
+  }
+
+  const context = compactPreflightContext(messages, options)
+  const routingText = `${context.userText}\n${context.taskInstructions}`
+  const forcedWeb = options?.webSearch === true || explicitGenericWebRequest(routingText)
+  const forbiddenWeb = options?.webSearch === false
+  let classifiedEffort: ResolvedThinkingEffort | null = null
+  let classifiedNeedsWeb: boolean | null = null
+
+  try {
+    const raw = await callOpenAIMessages(
+      [
+        {
+          role: 'system',
+          content: [
+            '你是大模型调用前的轻量任务路由器。不要执行任务，只判断是否需要联网以及所需思考强度。',
+            '只输出 JSON：{"needsWeb":boolean,"reasoningEffort":"off|low|medium|high"}。',
+            'needsWeb=true：任务依赖当前或外部可变事实，例如最新新闻、营业与票务、价格、天气、赛事结果、近期活动、法规政策、评分评论、库存可用性，或需要核实地点/商品是否真实存在。',
+            'needsWeb=false：翻译、摘要、改写、格式转换、根据输入资料生成文案、纯计算、固定知识，以及上下文已经提供了所需的 Google/网页事实。',
+            '不要只匹配“联网”字样，要理解任务是否会因信息过时或未经核实而不可靠。',
+            'off：无需推理即可直接完成的翻译、摘录、格式转换、简短事实回答、明确单步操作或固定模板生成。',
+            'low：需要少量语义理解、字段提取、简短文案或简单结构化输出。',
+            'medium：需要比较、解释、推荐、多个约束或一般规划。',
+            'high：复杂多步骤规划、多目标权衡、长上下文综合、歧义消解或高风险决策。',
+            '不要因为任务由大模型执行就默认开启思考；确实无需推理时必须选择 off。',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(context),
+        },
+      ],
+      {
+        task: 'default',
+        userText: 'model-call-preflight',
+        thinking: { enabled: false, effort: 'low' },
+        preflight: false,
+        webSearch: false,
+        signal: options?.signal,
+      },
+    )
+    const parsed = extractJsonObject(raw)
+    classifiedEffort = preflightEffortFromText(parsed?.reasoningEffort ?? parsed?.effort)
+    if (typeof parsed?.needsWeb === 'boolean') classifiedNeedsWeb = parsed.needsWeb
+  } catch (error) {
+    if (options?.signal?.aborted) throw error
+  }
+
+  const thinking =
+    options?.thinking ||
+    (getThinkingMode() === 'auto' && classifiedEffort
+      ? thinkingFromEffort(classifiedEffort)
+      : fallback)
+  const needsWeb = forbiddenWeb
+    ? false
+    : forcedWeb
+      ? true
+      : classifiedNeedsWeb ?? fallbackGenericNeedsWeb(routingText)
+  return { thinking, needsWeb }
+}
+
+function injectWebResearch(
+  messages: OpenAIChatMessage[],
+  research: string,
+): OpenAIChatMessage[] {
+  const content = [
+    '以下是本轮任务执行前取得的公开网络资料。仅在与任务相关时使用，并优先于可能过时的模型记忆。',
+    '不要向用户提及“前置检索”“内部摘要”或本段系统说明；不确定的信息要明确标注。',
+    '',
+    research.slice(0, 7000),
+  ].join('\n')
+  const at = messages.map((message) => message.role).lastIndexOf('user')
+  if (at < 0) return [...messages, { role: 'system', content }]
+  return [
+    ...messages.slice(0, at),
+    { role: 'system' as const, content },
+    ...messages.slice(at),
+  ]
+}
+
+async function addGenericWebResearch(
+  messages: OpenAIChatMessage[],
+  options: ChatCallOptions | undefined,
+  preflight: ModelCallPreflight,
+): Promise<OpenAIChatMessage[]> {
+  if (!preflight.needsWeb) return messages
+  const context = compactPreflightContext(messages, options)
+  try {
+    const research = await openaiResponsesWithWebSearch({
+      instructions: [
+        '你是通用任务的网络检索助手。检索并汇总完成任务所需的最新、可核实公开事实。',
+        `任务类型：${context.task}。`,
+        `任务说明：${context.taskInstructions}`,
+        '输出简洁中文事实要点；尽量注明日期与来源主体；不要执行最终写作或输出 JSON。',
+      ].join('\n'),
+      user: context.userText,
+      signal: options?.signal,
+    })
+    return research.trim() ? injectWebResearch(messages, research) : messages
+  } catch (error) {
+    if (options?.signal?.aborted) throw error
+    return messages
+  }
 }
 
 function buildOpenAIChatBody(
@@ -933,7 +1100,8 @@ function prepareOpenAIChatBody(
   const model = openaiModel()
   const backend = chatBackendForModel(model)
   const url = chatCompletionsUrl(model)
-  const thinking = resolveThinkingForTask(options?.task || 'default', options?.userText)
+  const thinking =
+    options?.thinking ?? resolveThinkingForTask(options?.task || 'default', options?.userText)
   const body = buildOpenAIChatBody(messages, thinking)
 
   // DeepSeek chat uses max_tokens (OpenAI-compatible); thinking needs more headroom for CoT.
@@ -1122,8 +1290,11 @@ async function callOpenAIMessages(
   messages: OpenAIChatMessage[],
   options?: ChatCallOptions,
 ): Promise<string> {
+  const preflight = await resolveModelCallPreflight(messages, options)
+  const effectiveOptions: ChatCallOptions = { ...options, thinking: preflight.thinking }
+  const effectiveMessages = await addGenericWebResearch(messages, effectiveOptions, preflight)
   // Key injected by /api/openai or /api/deepseek — never send Authorization from the browser.
-  const { body, backend, url } = prepareOpenAIChatBody(messages, options, false)
+  const { body, backend, url } = prepareOpenAIChatBody(effectiveMessages, effectiveOptions, false)
   const headers = {
     'Content-Type': 'application/json',
   }
@@ -1134,7 +1305,7 @@ async function callOpenAIMessages(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: options?.signal,
+      signal: effectiveOptions.signal,
     })
 
     if (!res.ok) {
@@ -1179,7 +1350,10 @@ async function callOpenAIMessagesStream(
   messages: OpenAIChatMessage[],
   options?: ChatStreamOptions,
 ): Promise<string> {
-  const { body, backend, url } = prepareOpenAIChatBody(messages, options, true)
+  const preflight = await resolveModelCallPreflight(messages, options)
+  const effectiveOptions: ChatStreamOptions = { ...options, thinking: preflight.thinking }
+  const effectiveMessages = await addGenericWebResearch(messages, effectiveOptions, preflight)
+  const { body, backend, url } = prepareOpenAIChatBody(effectiveMessages, effectiveOptions, true)
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
@@ -1191,7 +1365,7 @@ async function callOpenAIMessagesStream(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: options?.signal,
+      signal: effectiveOptions.signal,
     })
 
     if (!res.ok) {
@@ -1213,7 +1387,7 @@ async function callOpenAIMessagesStream(
       if (refusal) throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
       const text = extractOpenAIMessageText(data)
       if (text) {
-        options?.onDelta?.(text, text)
+        effectiveOptions.onDelta?.(text, text)
         return text
       }
       throw new LlmRequestError(
@@ -1223,9 +1397,9 @@ async function callOpenAIMessagesStream(
     }
 
     const text = await readOpenAIChatSse(res, {
-      signal: options?.signal,
-      onDelta: options?.onDelta,
-      onReasoningDelta: options?.onReasoningDelta,
+      signal: effectiveOptions.signal,
+      onDelta: effectiveOptions.onDelta,
+      onReasoningDelta: effectiveOptions.onReasoningDelta,
     })
     if (text.trim()) return text
     throw new LlmRequestError(
@@ -1536,7 +1710,7 @@ export async function generatePlaceDescription(input: {
       .join('\n')
 
     return generateText(system, user, { task: 'placeDescription', userText: input.name })
-  })
+  }, { durable: true })
 }
 
 export interface HotelDetailCopy {
@@ -1777,7 +1951,7 @@ export async function generateDayCopy(input: {
       theme: theme || input.pace,
       summary,
     }
-  })
+  }, { durable: true })
 }
 
 export interface ItineraryStartInput {
@@ -1910,7 +2084,7 @@ export async function resolveItineraryStart(
       startsOnTripStartDate,
       reasonZh,
     }
-  }).catch(() => fallbackItineraryStart(start, out, input.tripEndDate))
+  }, { durable: true }).catch(() => fallbackItineraryStart(start, out, input.tripEndDate))
 }
 
 function normalizeIsoDate(value: unknown): string | null {

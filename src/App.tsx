@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './auth/AuthProvider'
-import { DayTimeline } from './components/DayTimeline'
+import {
+  DayTimeline,
+  TIMELINE_DELETE_TOTAL_MS,
+  TIMELINE_INSERT_TOTAL_MS,
+  TIMELINE_SWAP_TOTAL_MS,
+} from './components/DayTimeline'
 import {
   FlightPanel,
   areFlightsComplete,
@@ -9,6 +14,7 @@ import {
 import { HotelPicker } from './components/HotelPicker'
 import { LoadingIndicator } from './components/LoadingIndicator'
 import { CloudSaveIndicator } from './components/CloudSaveIndicator'
+import { BackupDialog } from './components/BackupDialog'
 import { PlacePanel } from './components/PlacePanel'
 import { ShareDialog } from './components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
@@ -389,6 +395,7 @@ export default function App() {
   } = useAuth()
   const readOnly = !canEdit
   const [shareOpen, setShareOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
   /** Below `lg`, itinerary shows one pane at a time to avoid a tall stacked map. */
   const [mobileItineraryPane, setMobileItineraryPane] = useState<
     'timeline' | 'map'
@@ -430,6 +437,7 @@ export default function App() {
   const [itineraryGenError, setItineraryGenError] = useState<string | null>(null)
   const [dayRegenerating, setDayRegenerating] = useState(false)
   const [dayRegenError, setDayRegenError] = useState<string | null>(null)
+  const [dayRestoring, setDayRestoring] = useState(false)
   const [itineraryLoadingLineIndex, setItineraryLoadingLineIndex] = useState(
     () => Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
   )
@@ -441,6 +449,7 @@ export default function App() {
   const copyRequestIdRef = useRef(0)
   const genRequestIdRef = useRef(0)
   const dayRegenRequestIdRef = useRef(0)
+  const dayRestoreTimerRef = useRef<number | null>(null)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
   /** Skip autosave during hydrate + React Strict Mode double-effect. */
@@ -454,6 +463,14 @@ export default function App() {
   dayIndexRef.current = dayIndex
   daysRef.current = days
   selectedPlaceIdRef.current = selectedPlaceId
+
+  useEffect(() => {
+    return () => {
+      if (dayRestoreTimerRef.current != null) {
+        window.clearTimeout(dayRestoreTimerRef.current)
+      }
+    }
+  }, [])
 
   // Live sync: pull cloud-applied localStorage into React state without remounting / jumping to Day 1.
   useEffect(() => {
@@ -1568,6 +1585,7 @@ export default function App() {
     setCopyRefreshing(false)
     prevStopsKeyRef.current = null
     setPanelResetKey((k) => k + 1)
+    notifyTripChanged({ force: true, allowEmptyTrip: true })
   }
 
   function handleRestoreDefault() {
@@ -1593,21 +1611,88 @@ export default function App() {
   }
 
   function handleRestoreDayDefault() {
+    if (dayRestoring || dayRestoreTimerRef.current != null) return
     const dayNum = days[safeDayIndex]?.day ?? day.day
     const restored = restoreDayFromBaseline(dayNum, days, customPlaces)
     if (!restored) return
-    suppressCopyRef.current = true
-    setDays(restored.days)
-    setCustomPlaces(restored.customPlaces)
-    saveItineraryState(restored.days, restored.customPlaces, {
-      generated: true,
-      fingerprint: itineraryFingerprint,
-    })
+    const currentDay = days.find((d) => d.day === dayNum)
+    const targetDay = restored.days.find((d) => d.day === dayNum)
+    if (!currentDay || !targetDay) return
+
+    const currentKeyList = currentDay.stops.map((stop, index) =>
+      ensureStopId(dayNum, stop, index),
+    )
+    const targetKeyList = targetDay.stops.map((stop, index) =>
+      ensureStopId(dayNum, stop, index),
+    )
+    const targetKeys = new Set(targetKeyList)
+    const keptStops = currentDay.stops.filter((stop, index) =>
+      targetKeys.has(ensureStopId(dayNum, stop, index)),
+    )
+    const hasRemovals = keptStops.length !== currentDay.stops.length
+    const mismatchedIndexes = currentKeyList
+      .map((key, index) => (key !== targetKeyList[index] ? index : -1))
+      .filter((index) => index >= 0)
+    const isSingleSameSlotReplacement =
+      currentKeyList.length === targetKeyList.length &&
+      mismatchedIndexes.length === 1
+
+    const applyRestoredDay = (
+      settleMs = TIMELINE_INSERT_TOTAL_MS,
+      preserveOutgoingPlaces = false,
+    ) => {
+      dayRestoreTimerRef.current = null
+      suppressCopyRef.current = true
+      setDays(restored.days)
+      setCustomPlaces(
+        preserveOutgoingPlaces
+          ? { ...customPlaces, ...restored.customPlaces }
+          : restored.customPlaces,
+      )
+      saveItineraryState(restored.days, restored.customPlaces, {
+        generated: true,
+        fingerprint: itineraryFingerprint,
+      })
+      setSelectedPlaceId(null)
+      setDayRegenError(null)
+      prevStopsKeyRef.current = null
+      // Bypass hydrate skip window — restore must upload even if effect is muted.
+      if (canEdit) notifyTripChanged({ force: true })
+      dayRestoreTimerRef.current = window.setTimeout(() => {
+        dayRestoreTimerRef.current = null
+        if (preserveOutgoingPlaces) {
+          setCustomPlaces(restored.customPlaces)
+        }
+        setDayRestoring(false)
+      }, settleMs)
+    }
+
+    setDayRestoring(true)
+    if (isSingleSameSlotReplacement) {
+      // Let DayTimeline use its in-place wipe/height morph. The slot never
+      // collapses to zero, so a one-for-one replacement stays continuous.
+      applyRestoredDay(TIMELINE_SWAP_TOTAL_MS, true)
+      return
+    }
+    if (!hasRemovals) {
+      applyRestoredDay()
+      return
+    }
+
+    // Phase 1: remove obsolete cards with the normal gommage/collapse animation.
+    // Phase 2 starts only after the exit slots have fully collapsed.
     setSelectedPlaceId(null)
-    setDayRegenError(null)
-    prevStopsKeyRef.current = null
-    // Bypass hydrate skip window — restore must upload even if effect is muted.
-    if (canEdit) notifyTripChanged({ force: true })
+    setDays((prev) =>
+      prev.map((candidate) =>
+        candidate.day === dayNum
+          ? { ...candidate, stops: keptStops }
+          : candidate,
+      ),
+    )
+    dayRestoreTimerRef.current = window.setTimeout(
+      applyRestoredDay,
+      TIMELINE_DELETE_TOTAL_MS + 60,
+    )
   }
 
   const canRestoreDefault = hasMatchingBaseline(
@@ -1678,6 +1763,31 @@ export default function App() {
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
+          {activeTrip && (
+            <button
+              type="button"
+              onClick={() => setBackupOpen(true)}
+              aria-label="存档"
+              title="存档"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <rect x="3" y="4" width="18" height="4" rx="1" />
+                <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+                <path d="M10 12h4" />
+              </svg>
+            </button>
+          )}
           {role === 'owner' && activeTrip && (
             <button
               type="button"
@@ -1685,19 +1795,52 @@ export default function App() {
                 setShareOpen(true)
                 void refreshTrips().catch(() => undefined)
               }}
-              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)] sm:px-4"
+              aria-label="分享"
+              title="分享"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
             >
-              分享
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <circle cx="18" cy="5" r="2.5" />
+                <circle cx="6" cy="12" r="2.5" />
+                <circle cx="18" cy="19" r="2.5" />
+                <path d="M8.3 10.8 15.7 6.2M8.3 13.2l7.4 4.6" />
+              </svg>
             </button>
           )}
           {!readOnly && (
             <button
               type="button"
               onClick={handleClearAllTripState}
-              className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)] sm:px-4"
+              aria-label="清空全部"
+              title="清空全部"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
             >
-              <span className="sm:hidden">清空</span>
-              <span className="hidden sm:inline">清空全部</span>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M3 6h18" />
+                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                <path d="M19 6v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
             </button>
           )}
           <button
@@ -1705,9 +1848,25 @@ export default function App() {
             onClick={() => {
               void signOut()
             }}
-            className="rounded-full border border-[var(--stone)]/35 bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--ink)] transition hover:border-[var(--sage)] sm:px-4"
+            aria-label="退出"
+            title="退出"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--stone)]/35 bg-[var(--card)] text-[var(--ink)] transition hover:border-[var(--sage)]"
           >
-            退出
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
+              <path d="M16 8l4 4-4 4" />
+              <path d="M9 12h11" />
+            </svg>
           </button>
         </div>
       </div>
@@ -1717,6 +1876,18 @@ export default function App() {
           tripId={activeTrip.id}
           open={shareOpen}
           onClose={() => setShareOpen(false)}
+        />
+      )}
+
+      {activeTrip && (
+        <BackupDialog
+          tripId={activeTrip.id}
+          open={backupOpen}
+          onClose={() => setBackupOpen(false)}
+          onRestored={() => {
+            setBackupOpen(false)
+            window.location.reload()
+          }}
         />
       )}
 
@@ -1999,6 +2170,7 @@ export default function App() {
                           copyRefreshing={copyRefreshing}
                           dayRegenerating={dayRegenerating}
                           dayRegenError={dayRegenError}
+                          dayRestoring={dayRestoring}
                           isLastDay={day.day === lastDayNum}
                           onSelectPlace={setSelectedPlaceId}
                           onReorder={handleReorder}

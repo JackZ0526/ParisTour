@@ -149,40 +149,32 @@ export function PlacePanel({
   }, [placeId])
 
   return (
-    <>
-      <aside className="rounded-2xl border border-dashed border-[var(--stone)]/30 bg-[var(--card)] px-4 py-6 text-center text-sm text-[var(--stone)]">
-        {place
-          ? `已选中「${place.name}」，详情以弹层展示。`
-          : '点击地图标记或行程地点，查看地点详情'}
-      </aside>
-
-      <GooglePlacePage
-        open={Boolean(place)}
-        name={place?.name || ''}
-        nameLocal={place?.nameLocal}
-        location={place?.location}
-        fallbackImage={place?.image}
-        showMap={false}
-        llmNarrative={
-          place
-            ? {
-                intro:
-                  story?.intro ||
-                  (!storyLoading ? place.description : undefined),
-                reason:
-                  story?.reason ||
-                  (!storyLoading ? stopNote || undefined : undefined),
-                loading: storyLoading,
-                labels: PLACE_LABELS,
-                onRegenerate: isLlmConfigured()
-                  ? () => setRegenToken((n) => n + 1)
-                  : undefined,
-                regenerating: storyLoading && regenToken > 0,
-              }
-            : null
-        }
-        onClose={onClose}
-      />
-    </>
+    <GooglePlacePage
+      open={Boolean(place)}
+      name={place?.name || ''}
+      nameLocal={place?.nameLocal}
+      location={place?.location}
+      fallbackImage={place?.image}
+      showMap={false}
+      llmNarrative={
+        place
+          ? {
+              intro:
+                story?.intro ||
+                (!storyLoading ? place.description : undefined),
+              reason:
+                story?.reason ||
+                (!storyLoading ? stopNote || undefined : undefined),
+              loading: storyLoading,
+              labels: PLACE_LABELS,
+              onRegenerate: isLlmConfigured()
+                ? () => setRegenToken((n) => n + 1)
+                : undefined,
+              regenerating: storyLoading && regenToken > 0,
+            }
+          : null
+      }
+      onClose={onClose}
+    />
   )
 }

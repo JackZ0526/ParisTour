@@ -6,7 +6,16 @@ import {
   type GooglePlaceDetails,
 } from '../services/googlePlaceDetails'
 import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../services/googleMapsKey'
+import { isLlmConfigured } from '../services/llm'
+import {
+  looksChinese,
+  peekPlaceNameZh,
+  translatePlaceNameToChinese,
+} from '../services/translate'
 import type { Coordinates } from '../types'
+import { placeOriginalLabel, placeTitleLines } from '../utils/placeTitle'
+import { formatPriceLevelLabel } from '../utils/priceLevel'
+import { CloseIconButton } from './CloseIconButton'
 import { GoogleReviewsList } from './GoogleReviewsList'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -73,20 +82,44 @@ export function GooglePlacePage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = useState(0)
+  const [llmZh, setLlmZh] = useState<string | null>(null)
+  /** idle = not finished; loading = in flight; done = success or gave up */
+  const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
   const swipeStartX = useRef<number | null>(null)
+  const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const query = placeDetailsQuery(name, nameLocal)
   const apiKey = getGoogleMapsApiKey()
   const embedSrc = googleMapsEmbedApiUrl(query, apiKey)
+  const nameTranslateKey = `${open ? 1 : 0}|${name}|${nameLocal || ''}`
+  const nameTranslateKeyRef = useRef(nameTranslateKey)
+  if (nameTranslateKeyRef.current !== nameTranslateKey) {
+    nameTranslateKeyRef.current = nameTranslateKey
+    setLlmZh(null)
+    setNameZhPhase('idle')
+  }
 
   const photos =
     details?.photos?.length ? details.photos : fallbackImage ? [fallbackImage] : []
   const activePhoto = photos[photoIndex] || photos[0]
+  const googleMapsPlaceUrl = details?.id
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        details.nameOriginal || details.name || query,
+      )}&query_place_id=${encodeURIComponent(details.id)}`
+    : null
 
   function stepPhoto(delta: number) {
     if (photos.length < 2) return
     setPhotoIndex((i) => (i + delta + photos.length) % photos.length)
   }
+
+  useEffect(() => {
+    thumbRefs.current[photoIndex]?.scrollIntoView({
+      inline: 'nearest',
+      block: 'nearest',
+      behavior: 'smooth',
+    })
+  }, [photoIndex])
 
   useEffect(() => {
     if (!open) return
@@ -137,10 +170,116 @@ export function GooglePlacePage({
     }
   }, [open, isLoaded, query, location?.lat, location?.lng])
 
+  // When Google / trip data has no Chinese display name, LLM-translate the original.
+  useEffect(() => {
+    if (!open) {
+      setLlmZh(null)
+      setNameZhPhase('idle')
+      return
+    }
+
+    const base = placeTitleLines(
+      name,
+      nameLocal,
+      details?.name,
+      details?.nameOriginal,
+    )
+    if (looksChinese(base.title)) {
+      setLlmZh(null)
+      setNameZhPhase('done')
+      return
+    }
+    if (!isLlmConfigured()) {
+      setLlmZh(null)
+      setNameZhPhase('done')
+      return
+    }
+
+    const original = placeOriginalLabel(
+      name,
+      nameLocal,
+      details?.name,
+      details?.nameOriginal,
+    )
+    const cached = peekPlaceNameZh(original)
+    if (cached && looksChinese(cached)) {
+      setLlmZh(cached)
+      setNameZhPhase('done')
+      return
+    }
+
+    // Reserve the Chinese title slot immediately — don't flash the English name first.
+    setLlmZh(null)
+    setNameZhPhase('loading')
+    let cancelled = false
+    void translatePlaceNameToChinese(original, {
+      onPartial: (partial) => {
+        if (cancelled || !partial.trim()) return
+        setLlmZh(partial)
+      },
+    })
+      .then((zh) => {
+        if (cancelled) return
+        setLlmZh(zh)
+        setNameZhPhase('done')
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLlmZh(null)
+          setNameZhPhase('done')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, name, nameLocal, details?.name, details?.nameOriginal])
+
   if (!open) return null
-  // Empty name still mounts the portal shell so callers can surface errors;
-  // title falls back so the overlay is never a blank no-op.
-  const title = (details?.name || name || '地点详情').trim() || '地点详情'
+
+  const originalLabel = placeOriginalLabel(
+    name,
+    nameLocal,
+    details?.name,
+    details?.nameOriginal,
+  )
+  const official = placeTitleLines(
+    name,
+    nameLocal,
+    details?.name,
+    details?.nameOriginal,
+  )
+  const cachedZh = peekPlaceNameZh(originalLabel)
+  const effectiveLlmZh =
+    llmZh ||
+    (cachedZh && looksChinese(cachedZh) ? cachedZh : null) ||
+    null
+  const needsLlmZh = !looksChinese(official.title) && isLlmConfigured()
+  // Empty Chinese slot + translate animation until first streamed chars (or done).
+  const showNameLoader = needsLlmZh && !effectiveLlmZh && nameZhPhase !== 'done'
+  const nameStreaming = nameZhPhase === 'loading' && Boolean(effectiveLlmZh)
+
+  const resolved = placeTitleLines(
+    name,
+    nameLocal,
+    details?.name,
+    details?.nameOriginal,
+    effectiveLlmZh || undefined,
+  )
+  // While streaming, prefer the live partial even before placeTitleLines accepts it as CJK.
+  const title = showNameLoader
+    ? ''
+    : nameStreaming && llmZh?.trim()
+      ? llmZh.trim()
+      : resolved.title
+  const subtitle =
+    showNameLoader || nameStreaming ? originalLabel : resolved.subtitle
+  const titleIsLlmTranslated = Boolean(
+    resolved.titleIsLlmTranslated && nameZhPhase === 'done',
+  )
+  const dialogLabel = showNameLoader
+    ? `正在翻译「${originalLabel}」`
+    : `${title || originalLabel} Google 地点页`
+  const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel)
 
   return createPortal(
     <div
@@ -160,27 +299,66 @@ export function GooglePlacePage({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`${title} Google 地点页`}
+        aria-label={dialogLabel}
         className="relative z-10 flex max-h-[min(92vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
-          <div>
-            <h3 className="font-display text-2xl leading-tight">{title}</h3>
-            {nameLocal && (
-              <p className="text-sm text-[var(--stone)]">{nameLocal}</p>
+          <div className="min-w-0 pr-3">
+            <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
+              {showNameLoader ? (
+                <LoadingIndicator
+                  thinkingLabel="正在翻译名称…"
+                  generatingLabel="正在翻译名称…"
+                  mode="thinking"
+                  task="translate"
+                  userText={originalLabel}
+                  size="sm"
+                  showDots
+                  className="font-display text-2xl leading-tight"
+                />
+              ) : (
+                <h3 className="font-display text-2xl leading-tight">
+                  {title}
+                  {nameStreaming ? (
+                    <span
+                      className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+                      aria-hidden
+                    />
+                  ) : null}
+                </h3>
+              )}
+              {titleIsLlmTranslated && (
+                <span
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--mist)] text-[var(--stone)]"
+                  title="非公认中文名，由 AI 翻译"
+                  aria-label="非公认中文名，由 AI 翻译"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="m5 8 6 6" />
+                    <path d="m4 14 6-6 2-3" />
+                    <path d="M2 5h12" />
+                    <path d="M7 2h1" />
+                    <path d="m22 22-5-10-5 10" />
+                    <path d="M14 18h6" />
+                  </svg>
+                </span>
+              )}
+            </div>
+            {subtitle && (
+              <p className="text-sm text-[var(--stone)]">{subtitle}</p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="关闭"
-            title="关闭"
-            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mist)] bg-white/70 text-[var(--ink)] transition hover:border-[var(--sage)] hover:bg-white"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
+          <CloseIconButton onClick={onClose} className="mt-0.5" />
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
@@ -244,10 +422,13 @@ export function GooglePlacePage({
                 )}
               </div>
               {photos.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {photos.map((url, i) => (
                     <button
                       key={url + i}
+                      ref={(el) => {
+                        thumbRefs.current[i] = el
+                      }}
                       type="button"
                       onClick={() => setPhotoIndex(i)}
                       className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
@@ -269,8 +450,8 @@ export function GooglePlacePage({
                 {details.userRatingCount != null ? `（${details.userRatingCount}）` : ''}
               </span>
             )}
-            {details?.priceLevel && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{details.priceLevel}</span>
+            {priceLevelLabel && (
+              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{priceLevelLabel}</span>
             )}
             {details?.phone && (
               <span className="rounded-full bg-[var(--mist)] px-3 py-1">{details.phone}</span>
@@ -398,6 +579,31 @@ export function GooglePlacePage({
             )}
 
           {details?.reviews?.length ? <GoogleReviewsList reviews={details.reviews} /> : null}
+
+          {details &&
+            !loading &&
+            !details.reviews.length &&
+            (details.userRatingCount || 0) > 0 && (
+              <div>
+                <p className="mb-2 text-sm font-medium">Google 评论</p>
+                <div className="rounded-xl bg-white/70 px-3 py-2 text-sm">
+                  <p className="leading-relaxed text-[var(--stone)]">
+                    Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。
+                  </p>
+                  {googleMapsPlaceUrl && (
+                    <a
+                      href={googleMapsPlaceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1.5 inline-flex items-center gap-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
+                    >
+                      在 Google 地图查看评价
+                      <span aria-hidden>↗</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
 
           {showMap && (
             <div>

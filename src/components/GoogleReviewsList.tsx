@@ -12,6 +12,8 @@ export function GoogleReviewsList({ reviews }: Props) {
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [showOriginal, setShowOriginal] = useState<Record<number, boolean>>({})
   const [translating, setTranslating] = useState(false)
+  const [translationFailed, setTranslationFailed] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   const reviewKey = useMemo(
     () => reviews.map((r) => r.text).join('\n---\n'),
@@ -27,9 +29,12 @@ export function GoogleReviewsList({ reviews }: Props) {
     if (!nonChinese.length || !isLlmConfigured()) {
       setTranslations({})
       setTranslating(false)
+      setTranslationFailed(false)
       return
     }
 
+    setTranslations({})
+    setTranslationFailed(false)
     setTranslating(true)
     void translateTextsToChinese(nonChinese)
       .then((map) => {
@@ -40,6 +45,9 @@ export function GoogleReviewsList({ reviews }: Props) {
         }
         setTranslations(next)
       })
+      .catch(() => {
+        if (!cancelled) setTranslationFailed(true)
+      })
       .finally(() => {
         if (!cancelled) setTranslating(false)
       })
@@ -48,7 +56,7 @@ export function GoogleReviewsList({ reviews }: Props) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewKey])
+  }, [reviewKey, retryCount])
 
   if (!reviews.length) return null
 
@@ -65,6 +73,15 @@ export function GoogleReviewsList({ reviews }: Props) {
             mode="thinking"
             task="translate"
           />
+        )}
+        {translationFailed && !translating && (
+          <button
+            type="button"
+            onClick={() => setRetryCount((count) => count + 1)}
+            className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
+          >
+            翻译暂不可用，点击重试
+          </button>
         )}
       </div>
       <div className="space-y-3">

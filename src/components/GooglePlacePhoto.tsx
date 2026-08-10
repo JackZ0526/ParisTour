@@ -80,7 +80,7 @@ export function GooglePlacePhoto({
     return (
       <div
         className={className}
-        style={{ backgroundImage: `url(${src})` }}
+        style={{ backgroundImage: src ? `url(${src})` : undefined }}
         role="img"
         aria-label={alt}
         title={fromGoogle ? `Google Maps 照片${attribution ? ` · ${attribution}` : ''}` : alt}
@@ -90,14 +90,18 @@ export function GooglePlacePhoto({
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
-      <img
-        src={src}
-        alt={alt}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-        onError={handleImgError}
-      />
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          onError={handleImgError}
+        />
+      ) : (
+        <span className="block h-full w-full bg-[var(--mist)]" aria-hidden />
+      )}
       {fromGoogle && showBadge && src !== fallback && (
         <span className="absolute bottom-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
           Google{attribution ? ` · ${attribution}` : ''}

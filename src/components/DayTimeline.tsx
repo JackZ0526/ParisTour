@@ -15,13 +15,16 @@ import { GommagePetals } from './GommagePetals'
 import { GooglePlacePhoto } from './GooglePlacePhoto'
 import { LoadingIndicator } from './LoadingIndicator'
 import { HouseIcon, PlaneIcon } from './markerIcons'
+import { PlaceName } from './PlaceName'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
 /** Collapse exiting li height so list doesn't pop on unmount. */
 const GOMMAGE_COLLAPSE_MS = 400
-const CONTRACT_SETTLE_MS = 680
-const ENTER_ANIM_MS = 720
+export const TIMELINE_DELETE_TOTAL_MS =
+  GOMMAGE_DISSOLVE_MS + GOMMAGE_COLLAPSE_MS
+const ENTER_ANIM_MS = 560
+export const TIMELINE_INSERT_TOTAL_MS = ENTER_ANIM_MS
 /** Shared height-morph timing — card swap + leg body must stay in sync. */
 const TIMELINE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const LEG_MORPH_MS = 320
@@ -31,6 +34,8 @@ const REORDER_FLIP_MS = 420
 const SWAP_LEG_FADE_MS = 220
 const SWAP_MORPH_MS = LEG_MORPH_MS
 const SWAP_WIPE_MS = 720
+export const TIMELINE_SWAP_TOTAL_MS =
+  Math.max(SWAP_LEG_FADE_MS, SWAP_MORPH_MS) + SWAP_WIPE_MS + 80
 /** Ignore sub-pixel / rounding noise — wipe-only when heights match. */
 const SWAP_HEIGHT_EPS_PX = 2
 /** Ignore sub-pixel jitter when deciding whether a FLIP delta is real. */
@@ -113,6 +118,51 @@ function PinIcon() {
       {/* Classic thumbtack / pushpin */}
       <path d="M12 17v5" />
       <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </svg>
+  )
+}
+
+function RestoreDayIcon({ busy = false }: { busy?: boolean }) {
+  return (
+    <svg
+      className={busy ? 'animate-spin' : undefined}
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  )
+}
+
+function RegenerateDayIcon({ busy = false }: { busy?: boolean }) {
+  return (
+    <svg
+      className={busy ? 'animate-pulse' : undefined}
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m14.5 4.5 5 5L8 21H3v-5L14.5 4.5Z" />
+      <path d="m11.5 7.5 5 5" />
+      <path d="M5 3v4" />
+      <path d="M3 5h4" />
+      <path d="M19 16v4" />
+      <path d="M17 18h4" />
     </svg>
   )
 }
@@ -384,6 +434,8 @@ interface Props {
   /** True while this day's stops are being regenerated via LLM. */
   dayRegenerating?: boolean
   dayRegenError?: string | null
+  /** True while a baseline restore is sequencing removals before insertions. */
+  dayRestoring?: boolean
   /** True when this day is the trip's return day (hotel origin-only, no overnight pin). */
   isLastDay?: boolean
   onSelectPlace: (id: string) => void
@@ -441,6 +493,7 @@ export function DayTimeline({
   copyRefreshing,
   dayRegenerating = false,
   dayRegenError = null,
+  dayRestoring = false,
   isLastDay = false,
   onSelectPlace,
   onReorder,
@@ -470,9 +523,6 @@ export function DayTimeline({
   } | null>(null)
   /** Cards removed by sync/restore/regen — kept mounted for gommage. */
   const [exitGhosts, setExitGhosts] = useState<ExitGhost[]>([])
-  const [contractAnim, setContractAnim] = useState<{
-    fromIndex: number
-  } | null>(null)
   /** Same-slot replace — height morph (if needed) then wipe; stage height controlled. */
   const [swapAnim, setSwapAnim] = useState<SwapAnim | null>(null)
   /** Pure reorder FLIP (assistant / any non-drag order change). */
@@ -494,7 +544,6 @@ export function DayTimeline({
   const skipNextFlipRef = useRef(false)
   const enterClearTimerRef = useRef<number | null>(null)
   const exitTimerRef = useRef<number | null>(null)
-  const contractTimerRef = useRef<number | null>(null)
   const swapTimerRef = useRef<number | null>(null)
   const swapPhaseTimerRef = useRef<number | null>(null)
   const swapRafRef = useRef<number | null>(null)
@@ -582,10 +631,6 @@ export function DayTimeline({
       window.clearTimeout(exitTimerRef.current)
       exitTimerRef.current = null
     }
-    if (contractTimerRef.current != null) {
-      window.clearTimeout(contractTimerRef.current)
-      contractTimerRef.current = null
-    }
     for (const t of ghostTimersRef.current.values()) {
       window.clearTimeout(t)
     }
@@ -593,21 +638,7 @@ export function DayTimeline({
   }
 
   const finishGhostExit = (stopKey: string) => {
-    setExitGhosts((prev) => {
-      const ghost = prev.find((g) => g.stopKey === stopKey)
-      const next = prev.filter((g) => g.stopKey !== stopKey)
-      if (ghost) {
-        setContractAnim({ fromIndex: ghost.index })
-        if (contractTimerRef.current != null) {
-          window.clearTimeout(contractTimerRef.current)
-        }
-        contractTimerRef.current = window.setTimeout(() => {
-          contractTimerRef.current = null
-          setContractAnim(null)
-        }, CONTRACT_SETTLE_MS)
-      }
-      return next
-    })
+    setExitGhosts((prev) => prev.filter((g) => g.stopKey !== stopKey))
   }
 
   const scheduleGhostExit = (stopKey: string) => {
@@ -751,6 +782,25 @@ export function DayTimeline({
         window.clearTimeout(enterClearTimerRef.current)
       }
       clearReorderFlip()
+
+      // FLIP every existing card from its real pre-insert position. Unlike a
+      // fixed translate value, this stays exact for cards and legs of any height.
+      const shifts: Record<string, number> = {}
+      let hasPeerShift = false
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i]
+        if (added.includes(key)) continue
+        const firstTop = prevTopsByKeyRef.current.get(key)
+        const el = itemRefs.current[i]
+        if (firstTop == null || !el) continue
+        const dy = firstTop - el.getBoundingClientRect().top
+        if (Math.abs(dy) > REORDER_FLIP_EPS_PX) {
+          shifts[key] = dy
+          hasPeerShift = true
+        }
+      }
+      if (hasPeerShift) setReorderFlip({ shifts, playing: false })
+
       setEnteringKeys(added)
       const primary = added[0]
       const index = keys.indexOf(primary)
@@ -779,7 +829,10 @@ export function DayTimeline({
           stopKey: k,
           stop: fromSnap.stop,
           index: index >= 0 ? index : 0,
-          heightPx: 140,
+          heightPx: Math.max(
+            1,
+            Math.round(heightCacheRef.current[index] || 140),
+          ),
           collapsing: false,
         })
       }
@@ -1003,7 +1056,7 @@ export function DayTimeline({
   }
 
   const requestDelete = (stopKey: string, index: number) => {
-    if (readOnly || isFixedAt(index) || drag || exitAnim || exitGhosts.length || swapAnim || reorderFlip) return
+    if (readOnly || dayRestoring || isFixedAt(index) || drag || exitAnim || exitGhosts.length || swapAnim || reorderFlip) return
     clearEnterAnim()
     const el = itemRefs.current[index]
     const heightPx = el?.offsetHeight ?? 140
@@ -1022,11 +1075,6 @@ export function DayTimeline({
         skipExternalExitRef.current.add(stopKey)
         onDelete(stopKey)
         setExitAnim(null)
-        setContractAnim({ fromIndex: index })
-        contractTimerRef.current = window.setTimeout(() => {
-          contractTimerRef.current = null
-          setContractAnim(null)
-        }, CONTRACT_SETTLE_MS)
       }, GOMMAGE_COLLAPSE_MS)
     }, GOMMAGE_DISSOLVE_MS)
   }
@@ -1216,7 +1264,7 @@ export function DayTimeline({
     e: ReactPointerEvent,
     cardEl: HTMLElement,
   ) => {
-    if (readOnly || isFixedAt(index) || drag || exitAnim || exitGhosts.length || swapAnim || reorderFlip) return
+    if (readOnly || dayRestoring || isFixedAt(index) || drag || exitAnim || exitGhosts.length || swapAnim || reorderFlip) return
     e.preventDefault()
     e.stopPropagation()
 
@@ -1254,7 +1302,7 @@ export function DayTimeline({
   const dragging = Boolean(drag)
   const avgSlot = drag?.slot ?? 120
   /**
-   * Structural list motion (enter / exit / replace / post-delete settle).
+   * Structural list motion (enter / exit / replace).
    * While busy: fade legs + freeze leg-body height so morph can't fight card motion.
    */
   const layoutBusy = Boolean(
@@ -1263,7 +1311,6 @@ export function DayTimeline({
       exitAnim ||
       exitGhosts.length ||
       swapAnim ||
-      contractAnim ||
       reorderFlip,
   )
   /** Drag-reorder: collapse leg height so cards can pack while sorting. */
@@ -1325,19 +1372,25 @@ export function DayTimeline({
               <button
                 type="button"
                 onClick={onRestoreDayDefault}
-                disabled={dayRegenerating}
-                className="rounded-full border border-[var(--stone)]/30 px-3 py-1 text-xs hover:border-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+                disabled={dayRegenerating || dayRestoring}
+                title={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
+                aria-label={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
+                aria-busy={dayRestoring || undefined}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
               >
-                恢复本日默认
+                <RestoreDayIcon busy={dayRestoring} />
               </button>
             )}
             <button
               type="button"
               onClick={onResetDay}
-              disabled={dayRegenerating}
-              className="rounded-full border border-[var(--stone)]/30 px-3 py-1 text-xs hover:border-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+              disabled={dayRegenerating || dayRestoring}
+              title={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
+              aria-label={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
+              aria-busy={dayRegenerating || undefined}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
             >
-              {dayRegenerating ? '生成中…' : '重新生成行程'}
+              <RegenerateDayIcon busy={dayRegenerating} />
             </button>
           </div>
           )}
@@ -1484,13 +1537,6 @@ export function DayTimeline({
             drag.hover === liveIndex &&
             drag.from !== liveIndex
           const isEntering = enteringKeys.includes(stopKey)
-          const enterIndexes = enteringKeys
-            .map((k) => day.stops.findIndex((s, i) => stopKeyOf(s, i) === k))
-            .filter((i) => i >= 0)
-          const isPushedByEnter =
-            !isGhost &&
-            liveIndex != null &&
-            enterIndexes.some((ei) => liveIndex > ei)
           const ghostExiting = Boolean(ghost)
           const liveExiting = exitAnim?.stopKey === stopKey
           const isExiting = ghostExiting || liveExiting
@@ -1498,9 +1544,6 @@ export function DayTimeline({
             ? Boolean(ghost.collapsing)
             : Boolean(liveExiting && exitAnim?.collapsing)
           const exitHeightPx = ghost?.heightPx ?? exitAnim?.heightPx
-          const isContracting =
-            Boolean(contractAnim) &&
-            displayIndex >= (contractAnim?.fromIndex ?? Infinity)
           const isSwappingHere = Boolean(
             swapAnim &&
               !isGhost &&
@@ -1600,8 +1643,14 @@ export function DayTimeline({
                       {typeLabel[place.type] || place.type}
                     </span>
                   </div>
-                  <p className="mt-1 font-medium">{place.name}</p>
-                  <p className="mt-1 text-sm text-[var(--stone)]">{stop.note}</p>
+                  <PlaceName
+                    className="mt-1"
+                    mode="originalWithZh"
+                    name={place.name}
+                    nameLocal={place.nameLocal}
+                    location={place.location}
+                  />
+                  <p className="mt-1.5 text-sm text-[var(--stone)]">{stop.note}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
                       <span className="rounded-full bg-[var(--mist)] px-2 py-1">
@@ -1633,6 +1682,7 @@ export function DayTimeline({
                   title="删除地点"
                   aria-label="删除地点"
                   disabled={
+                    dayRestoring ||
                     Boolean(exitAnim) ||
                     exitGhosts.length > 0 ||
                     Boolean(swapAnim) ||
@@ -1654,23 +1704,17 @@ export function DayTimeline({
           return (
             <li
               key={
-                // Stable slot key during replace prevents remount flash.
-                !isGhost && liveIndex != null
-                  ? `live-${day.day}-${liveIndex}`
-                  : stopKey
+                // Keep the same card instance when deletion shifts its index.
+                stopKey
               }
               ref={(el) => {
                 if (liveIndex != null) itemRefs.current[liveIndex] = el
               }}
               className={`timeline-sortable-item relative ${
                 isEntering ? 'timeline-card-entering' : ''
-              } ${isPushedByEnter ? 'timeline-card-pushed' : ''} ${
-                isExiting ? 'timeline-card-exiting' : ''
-              } ${
+              } ${isExiting ? 'timeline-card-exiting' : ''} ${
                 isExiting && isCollapsing ? 'timeline-card-exiting-collapse' : ''
-              } ${isContracting ? 'timeline-card-contract' : ''} ${
-                isSwappingHere ? 'timeline-card-swapping' : ''
-              }`}
+              } ${isSwappingHere ? 'timeline-card-swapping' : ''}`}
               style={{
                 transform: shiftY
                   ? `translate3d(0, ${shiftY}px, 0)`
@@ -1690,7 +1734,6 @@ export function DayTimeline({
                         exitAnim ||
                         exitGhosts.length ||
                         swapAnim ||
-                        contractAnim ||
                         reorderFlip
                       ? undefined
                       : 'transform 200ms ease',
@@ -1776,8 +1819,14 @@ export function DayTimeline({
                                 {typeLabel[oldSwapPlace.type] || oldSwapPlace.type}
                               </span>
                             </div>
-                            <p className="mt-1 font-medium">{oldSwapPlace.name}</p>
-                            <p className="mt-1 text-sm text-[var(--stone)]">
+                            <PlaceName
+                              className="mt-1"
+                              mode="originalWithZh"
+                              name={oldSwapPlace.name}
+                              nameLocal={oldSwapPlace.nameLocal}
+                              location={oldSwapPlace.location}
+                            />
+                            <p className="mt-1.5 text-sm text-[var(--stone)]">
                               {swapAnim.oldStop.note}
                             </p>
                           </div>
@@ -1895,8 +1944,14 @@ export function DayTimeline({
                         {typeLabel[place.type] || place.type}
                       </span>
                     </div>
-                    <p className="mt-1 font-medium">{place.name}</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-[var(--stone)]">
+                    <PlaceName
+                      className="mt-1"
+                      mode="originalWithZh"
+                      name={place.name}
+                      nameLocal={place.nameLocal}
+                      location={place.location}
+                    />
+                    <p className="mt-1.5 line-clamp-2 text-sm text-[var(--stone)]">
                       {stop.note}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
@@ -1940,7 +1995,8 @@ export function DayTimeline({
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="w-full rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10"
+            disabled={dayRestoring}
+            className="w-full rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
           >
             + 添加地点
           </button>

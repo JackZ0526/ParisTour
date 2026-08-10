@@ -1,5 +1,39 @@
 @import 'tailwindcss';
 
+@keyframes chat-step-shimmer {
+  0% {
+    background-position: 160% 50%;
+  }
+  100% {
+    background-position: -60% 50%;
+  }
+}
+
+.chat-step-shimmer {
+  color: var(--stone);
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--stone) 48%, transparent) 10%,
+    var(--stone) 42%,
+    color-mix(in srgb, white 88%, var(--stone)) 50%,
+    var(--stone) 58%,
+    color-mix(in srgb, var(--stone) 48%, transparent) 90%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chat-step-shimmer 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-step-shimmer {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
 :root {
   --ink: #1c2420;
   --paper: #e8ebe4;
@@ -130,16 +164,13 @@ select {
 @keyframes add-place-tab-in {
   from {
     opacity: 0.55;
-    transform: scale(0.98);
   }
   to {
     opacity: 1;
-    transform: scale(1);
   }
 }
 
 .add-place-tab-pane {
-  transform-origin: top center;
   animation: add-place-tab-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -856,7 +887,6 @@ body.timeline-dragging {
 
 /* Keep enter/push/swap from clipping; swap stage itself clips wipe */
 .timeline-sortable-item.timeline-card-entering,
-.timeline-sortable-item.timeline-card-pushed,
 .timeline-sortable-item.timeline-card-swapping {
   overflow: visible;
   z-index: 2;
@@ -913,14 +943,7 @@ body.timeline-dragging {
 @keyframes timeline-card-enter {
   0% {
     opacity: 0;
-    transform: translate3d(0, -36px, 0) scale(0.96);
-  }
-  55% {
-    opacity: 1;
-    transform: translate3d(0, 6px, 0) scale(1.012);
-  }
-  78% {
-    transform: translate3d(0, -2px, 0) scale(0.998);
+    transform: translate3d(0, -20px, 0) scale(0.985);
   }
   100% {
     opacity: 1;
@@ -928,30 +951,9 @@ body.timeline-dragging {
   }
 }
 
-/* Vertical-only peer shift ? horizontal jitter was clipping the left edge */
-@keyframes timeline-card-pushed {
-  0% {
-    transform: translate3d(0, -44px, 0);
-  }
-  42% {
-    transform: translate3d(0, 8px, 0);
-  }
-  68% {
-    transform: translate3d(0, -2.5px, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
 .timeline-card-entering {
-  animation: timeline-card-enter 700ms cubic-bezier(0.22, 1.08, 0.32, 1) both;
+  animation: timeline-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: 50% 0%;
-  backface-visibility: hidden;
-}
-
-.timeline-card-pushed {
-  animation: timeline-card-pushed 700ms cubic-bezier(0.25, 0.9, 0.3, 1) both;
   backface-visibility: hidden;
 }
 
@@ -987,18 +989,6 @@ body.timeline-dragging {
     filter: saturate(0) brightness(1.18) contrast(1.12);
     transform: scale(0.94);
     clip-path: inset(18% 12% 22% 14% round 6px);
-  }
-}
-
-@keyframes timeline-card-contract {
-  0% {
-    transform: translate3d(0, 10px, 0);
-  }
-  62% {
-    transform: translate3d(0, -1.5px, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -1077,10 +1067,6 @@ body.timeline-dragging {
   will-change: transform, opacity;
   animation: gommage-petal-drift var(--gommage-dur, 720ms) cubic-bezier(0.18, 0.55, 0.28, 1)
     var(--gommage-delay, 0ms) both;
-}
-
-.timeline-card-contract {
-  animation: timeline-card-contract 640ms cubic-bezier(0.28, 0.82, 0.28, 1) both;
 }
 
 .timeline-leg-slot {

@@ -51,7 +51,11 @@ type AuthContextValue = {
   signOut: () => Promise<void>
   switchTrip: (tripId: string) => Promise<void>
   refreshTrips: () => Promise<void>
-  notifyTripChanged: (opts?: { force?: boolean }) => void
+  notifyTripChanged: (opts?: {
+    force?: boolean
+    artifactsOnly?: boolean
+    allowEmptyTrip?: boolean
+  }) => void
   /**
    * Increments on live remote apply. App soft-reloads trip data without remounting
    * (so the user keeps the day / selection they were viewing).
@@ -336,15 +340,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, email, canEdit, activeTrip],
   )
 
-  const notifyTripChanged = useCallback((opts?: { force?: boolean }) => {
+  const notifyTripChanged = useCallback((opts?: {
+    force?: boolean
+    artifactsOnly?: boolean
+    allowEmptyTrip?: boolean
+  }) => {
     if (!activeTrip || !canEdit) return
     scheduleTripCloudSave(activeTrip.id, true, opts)
   }, [activeTrip, canEdit])
 
-  // Durable LLM artifacts live in the trip snapshot — autosave when they change.
+  // Durable generated artifacts live in the trip snapshot — autosave on writes.
   useEffect(() => {
     return subscribeLlmArtifacts(() => {
-      notifyTripChanged()
+      notifyTripChanged({ artifactsOnly: true })
     })
   }, [notifyTripChanged])
 

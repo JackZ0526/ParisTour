@@ -48,3 +48,15 @@ export function withGoogleMapsPhotoKey(url: string): string {
     return url
   }
 }
+
+/** Keep browser credentials out of durable/cloud snapshots; re-add on read. */
+export function withoutGoogleMapsPhotoKey(url: string): string {
+  if (!url || !url.includes('places.googleapis.com')) return url
+  try {
+    const u = new URL(url)
+    u.searchParams.delete('key')
+    return u.toString()
+  } catch {
+    return url
+  }
+}

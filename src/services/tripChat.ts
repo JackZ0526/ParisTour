@@ -10,12 +10,18 @@ import { getPlace } from '../data/places'
 import {
   extractLlmJsonObject,
   extractPartialJsonStringField,
+  getThinkingMode,
   openaiChat,
   openaiChatStream,
   openaiResponsesWithWebSearch,
+  resolveThinkingForTask,
   type OpenAIChatMessage,
+  type ResolvedThinking,
+  type ResolvedThinkingEffort,
+  type ThinkingEffortUi,
 } from './llm'
 import { dateForTripDay, formatTripDayLabel } from './tripDates'
+import { searchNearbyGooglePlaceCandidates } from './googlePlaceDetails'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
   | { type: 'select_place'; placeName: string }
@@ -485,6 +491,8 @@ function systemPrompt(ctx: TripChatContext): string {
     '当用户要求添加/删除/替换/重排/切换日期/选中地点，或选择/增加/删除/换一批/替换酒店时，必须在 JSON 的 actions 里给出操作；纯问答时 actions 为空数组。',
     '介绍当前酒店或候选项时：直接根据下方酒店资料回答，不要编造不存在的酒店；无需 actions。',
     '添加地点时 placeName 用 Google Maps 可搜到的正式名称。',
+    '地点推荐的地理范围（硬规则）：餐厅/咖啡馆必须推荐当前酒店或当天路线附近、且位于巴黎都会区内的真实地点；景点也必须与当前目的地相符。不要仅凭同名店猜测地址或距离。',
+    '如果不能确定推荐地点就在巴黎附近，不要声称它位于某区或步行可达；应换一个能用正式名称准确检索的地点。系统会用酒店坐标做硬距离复核，超出范围的推荐会被拒绝。',
     '日期默认（硬规则）：用户说「今天/本日/这天」或未指定日期时，一律针对「当前查看的日期」操作；actions 里不要填 day 字段（省略即可，系统会用当前日）。',
     `只有用户明确说「第N天 / Day N / 换成第N天」时，才设置 day=N（N 须在 ${dayRange}），或使用 switch_day。不要因为行程里其它天有同名地点就擅自改其它天。`,
     'select_place / 介绍地点：优先当前查看日；不要为了找到地点自动跳到其它天，除非用户点名了那一天。',
@@ -544,6 +552,17 @@ function systemPrompt(ctx: TripChatContext): string {
 export function tripChatNeedsWebResearch(userMessage: string): boolean {
   const text = userMessage.trim()
   if (!text) return false
+  // An explicit request to browse always wins over the automatic heuristic.
+  if (
+    /联网|上网|网络搜索|网页搜索|web\s*search|search\s+the\s+web|搜一下|搜索一下|网上查|查查网上/i.test(
+      text,
+    )
+  ) {
+    return true
+  }
+  // Open-ended recommendations need live candidates and ratings before the
+  // model chooses a place. This is handled primarily by Google Places below.
+  if (isLivePlaceRecommendationRequest(text)) return true
   // Pure itinerary edits usually don't need web search.
   if (
     /^(帮我)?(把|将)?.{0,24}(换成|改成|替换成|换成别的)/.test(text) &&
@@ -557,19 +576,108 @@ export function tripChatNeedsWebResearch(userMessage: string): boolean {
   ) {
     return false
   }
-  return /价格|价位|人均|多少钱|贵不贵|便宜吗|菜单|menu|营业|开门|关门|几点开|几点关|open(ing)?\s*hours?|营业时间|门票|票价|预约|订位|排队|天气|气温|几度|下雨|降雨|forecast|ticket|price|€|\byen\b|欧元|法郎/i.test(
+  return /价格|价位|人均|多少钱|贵不贵|便宜吗|菜单|menu|营业|开门|关门|几点开|几点关|open(ing)?\s*hours?|营业时间|门票|票价|预约|订位|排队|天气|气温|几度|下雨|降雨|forecast|ticket|price|活动|展览|展会|演出|音乐会|节庆|市集|event|exhibition|concert|festival|€|\byen\b|欧元|法郎/i.test(
     text,
   )
+}
+
+export function isLivePlaceRecommendationRequest(text: string): boolean {
+  const hasPlaceKind =
+    /餐厅|饭店|晚餐|午餐|早餐|咖啡|甜品|酒吧|景点|博物馆|商店|购物|restaurant|cafe|coffee|museum/i.test(
+      text,
+    )
+  if (!hasPlaceKind) return false
+  return /推荐|帮我找|找一家|找一个|找个|换一家|换一个|换个|换成别的|附近|近一点|更近/i.test(
+    text,
+  )
+}
+
+function recommendationSearchQuery(ctx: TripChatContext, userMessage: string): {
+  textQuery: string
+  maxDistanceMeters: number
+} | null {
+  if (!isLivePlaceRecommendationRequest(userMessage)) return null
+  if (
+    !Number.isFinite(ctx.hotel.lat) ||
+    !Number.isFinite(ctx.hotel.lng) ||
+    (ctx.hotel.lat === 0 && ctx.hotel.lng === 0)
+  ) {
+    return null
+  }
+
+  const type = inferPlaceTypeFromText(userMessage) || 'attraction'
+  const normalizedDestination = normalizeDestination(ctx.destination)
+  const destination =
+    normalizedDestination?.locale || normalizedDestination?.name || 'Paris'
+  let category = type === 'cafe' ? 'cafe' : type === 'restaurant' ? 'restaurant' : 'tourist attraction'
+  const cuisineHints: Array<[RegExp, string]> = [
+    [/中餐|中国菜|川菜|粤菜/, 'Chinese restaurant'],
+    [/法餐|法国菜/, 'French restaurant'],
+    [/意大利|披萨|pizza/i, 'Italian restaurant'],
+    [/日料|日本菜|寿司|sushi/i, 'Japanese restaurant'],
+    [/韩餐|韩国菜/, 'Korean restaurant'],
+    [/素食|vegan|vegetarian/i, 'vegetarian restaurant'],
+    [/海鲜|seafood/i, 'seafood restaurant'],
+    [/牛排|steak/i, 'steakhouse'],
+  ]
+  const cuisine = cuisineHints.find(([pattern]) => pattern.test(userMessage))?.[1]
+  if (cuisine) category = cuisine
+
+  const explicitlyNearbyHotel =
+    /离.{0,6}酒店.{0,8}(近|附近)|酒店.{0,8}(附近|近一点|更近)/.test(userMessage)
+  const maxDistanceMeters = explicitlyNearbyHotel
+    ? 5_000
+    : type === 'restaurant' || type === 'cafe'
+      ? 20_000
+      : 75_000
+  return { textQuery: `${category} ${destination}`, maxDistanceMeters }
+}
+
+async function fetchGooglePlaceRecommendationResearch(input: {
+  ctx: TripChatContext
+  userMessage: string
+}): Promise<string | null> {
+  const query = recommendationSearchQuery(input.ctx, input.userMessage)
+  if (!query) return null
+  try {
+    const candidates = await searchNearbyGooglePlaceCandidates({
+      textQuery: query.textQuery,
+      location: { lat: input.ctx.hotel.lat, lng: input.ctx.hotel.lng },
+      maxDistanceMeters: query.maxDistanceMeters,
+      limit: 5,
+    })
+    if (!candidates.length) return null
+    const rows = candidates.map((candidate, index) => {
+      const rating = candidate.rating != null ? candidate.rating.toFixed(1) : '暂无'
+      const reviews = candidate.userRatingCount != null ? `${candidate.userRatingCount} 条评分` : '评论数未知'
+      const distance = `${(candidate.distanceMeters / 1000).toFixed(1)} 公里`
+      const price = candidate.priceLevel ? `；价位 ${candidate.priceLevel}` : ''
+      return `${index + 1}. ${candidate.name}｜评分 ${rating}（${reviews}）｜距酒店约 ${distance}${price}｜${candidate.address || '地址待确认'}`
+    })
+    return [
+      '【Google Places 实时附近候选】',
+      `已按评分、评论量与距离综合排序；硬范围 ${Math.round(query.maxDistanceMeters / 1000)} 公里。`,
+      ...rows,
+      '推荐动作必须从以上候选中选择；比较评分时同时考虑评论量与距离，不要另造店名、地址或评分。',
+    ].join('\n')
+  } catch {
+    return null
+  }
 }
 
 function webResearchInstructions(ctx: TripChatContext): string {
   const dest = buildDestinationSnapshot(ctx)
   const destName = dest.name || '目的地'
+  const dates = buildTripDatesSnapshot(ctx)
   const viewing = buildViewingSnapshot(ctx)
   const lines = [
     '你是旅行信息检索助手。根据用户问题检索公开网页，汇总与行程相关的事实。',
     `目的地语境：${destName}${dest.country ? `（${dest.country}）` : ''}。`,
-    '重点：餐厅/咖啡馆大致价位或人均、菜单线索、营业时间、门票/预约、短期天气预报等。',
+    dates.tripStartDate && dates.tripEndDate
+      ? `旅行日期（硬约束）：${dates.tripStartDate} 至 ${dates.tripEndDate}；用户说“旅行期间/到时候/那几天”均指这个日期范围。`
+      : '旅行日期尚未确定；不要擅自假设月份或年份。',
+    '重点：餐厅/咖啡馆大致价位或人均、菜单线索、营业时间、门票/预约、短期天气，以及指定旅行日期内的活动、展览、演出、节庆和市集。',
+    '活动类问题要优先核对举办日期、地点和官方来源；只列与用户旅行日期重叠或明确相关的项目。',
     '输出简洁中文要点列表；标明不确定或可能过时；不要编造精确数字。',
     '不要输出 JSON，不要提快照/系统内部结构。',
   ]
@@ -595,11 +703,24 @@ export async function fetchTripChatWebResearch(input: {
   ctx: TripChatContext
   userMessage: string
   signal?: AbortSignal
+  onSearch?: (detail: TripChatWebSearchDetail) => void
 }): Promise<string | null> {
+  const googleQuery = recommendationSearchQuery(input.ctx, input.userMessage)
+  if (googleQuery) {
+    input.onSearch?.({ source: 'google_places', query: googleQuery.textQuery })
+  }
+  const googleResearch = await fetchGooglePlaceRecommendationResearch(input)
+  if (googleResearch) return googleResearch
   try {
+    input.onSearch?.({ source: 'web', query: input.userMessage })
+    const dates = buildTripDatesSnapshot(input.ctx)
+    const datedQuery =
+      dates.tripStartDate && dates.tripEndDate
+        ? `旅行日期：${dates.tripStartDate} 至 ${dates.tripEndDate}\n用户请求：${input.userMessage}`
+        : input.userMessage
     const text = await openaiResponsesWithWebSearch({
       instructions: webResearchInstructions(input.ctx),
-      user: input.userMessage,
+      user: datedQuery,
       signal: input.signal,
     })
     const trimmed = text.trim()
@@ -621,11 +742,16 @@ function buildTripChatMessages(input: {
   ]
   const research = String(input.webResearch || '').trim()
   if (research) {
+    const isGooglePlacesShortlist = research.includes('【Google Places 实时附近候选】')
     messages.push({
       role: 'system',
       content: [
-        '以下是针对本轮用户问题的网络检索摘要（可能过时或不完整）。',
-        '回答价目/营业/门票/天气等时优先参考；与「当前行程」冲突时以行程计划为准。',
+        isGooglePlacesShortlist
+          ? '以下是本轮从 Google Places 实时获取并按评分、评论量和距离排序的附近候选。'
+          : '以下是针对本轮用户问题的网络检索摘要（可能过时或不完整）。',
+        isGooglePlacesShortlist
+          ? '开放式地点推荐必须从候选中选择，并在回复中简要说明与其它候选相比的理由。'
+          : '回答价目/营业/门票/天气等时优先参考；与「当前行程」冲突时以行程计划为准。',
         '对用户回复时不要提及本段或「检索摘要」字样。',
         '',
         research,
@@ -892,19 +1018,144 @@ function parseTripChatResult(
 }
 
 export type TripChatWebSearchPhase = 'start' | 'done' | 'skip'
+export interface TripChatWebSearchDetail {
+  source: 'google_places' | 'web'
+  query: string
+}
+
+export type TripChatRequestPlanPhase = 'start' | 'done'
+
+/** Preflight decision made before search, generation, or itinerary actions. */
+export interface TripChatRequestPlan {
+  needsWeb: boolean
+  recommendedEffort: ResolvedThinkingEffort
+  thinking: ResolvedThinking
+  source: 'model' | 'fallback'
+  reason?: string
+}
+
+function parseThinkingEffort(value: unknown): ResolvedThinkingEffort | null {
+  const effort = String(value || '').trim().toLowerCase()
+  if (effort === 'off' || effort === 'low' || effort === 'medium' || effort === 'high') {
+    return effort
+  }
+  return null
+}
+
+function planningContext(input: {
+  ctx: TripChatContext
+  history: TripChatTurn[]
+  userMessage: string
+}) {
+  const destination = buildDestinationSnapshot(input.ctx)
+  const dates = buildTripDatesSnapshot(input.ctx)
+  const viewing = buildViewingSnapshot(input.ctx)
+  const recentHistory = input.history
+    .slice(-4)
+    .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 500) }))
+  return {
+    request: input.userMessage,
+    destination,
+    dates,
+    currentDay: input.ctx.currentDay,
+    viewing,
+    recentHistory,
+  }
+}
+
+/**
+ * Lightweight semantic router for a chat turn. It intentionally runs with
+ * thinking disabled; its job is only to decide tools and final-answer effort.
+ */
+export async function planTripChatRequest(input: {
+  ctx: TripChatContext
+  history: TripChatTurn[]
+  userMessage: string
+  signal?: AbortSignal
+  webSearch?: boolean | 'auto'
+}): Promise<TripChatRequestPlan> {
+  const fallbackNeedsWeb = tripChatNeedsWebResearch(input.userMessage)
+  const fallbackThinking = resolveThinkingForTask('tripChat', input.userMessage)
+  let modelNeedsWeb: boolean | null = null
+  let modelEffort: ResolvedThinkingEffort | null = null
+  let reason = ''
+  let source: TripChatRequestPlan['source'] = 'fallback'
+
+  try {
+    const raw = await openaiChat(
+      [
+        {
+          role: 'system',
+          content: [
+            '你是行程助手的请求路由器。只分析任务，不回答用户，也不修改行程。',
+            '判断后只输出 JSON：{"needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"简短原因"}。',
+            'needsWeb=true：答案依赖当前或第三方公开事实，例如营业时间、价格、票务、天气、罢工与交通状态、近期活动、评分评论、开放式地点/餐厅推荐、地点是否真实存在，或任何应先核实才可靠的信息。',
+            'needsWeb=false：仅根据当前行程即可完成的增删改排、切换日期、概括现有内容、写作文案、一般常识且不要求最新事实。',
+            '不要只看“联网”关键词，要理解指代、上下文和任务真正需要的信息。信息可能变化或不确定时宁可联网。',
+            'reasoningEffort：无需推理、可直接作答的简单事实/确认、或完全明确的单步操作=off；需要少量理解或结构化操作=low；比较、建议、含少量约束或需要解释=medium；多日重排、多目标权衡、多步骤复杂修改或高度歧义=high。',
+            '不要为了保险把所有简单请求都设为 low；确实不需要推理时应选择 off。',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(planningContext(input)),
+        },
+      ],
+      {
+        task: 'tripChat',
+        userText: input.userMessage,
+        thinking: { enabled: false, effort: 'low' },
+        preflight: false,
+        webSearch: false,
+        signal: input.signal,
+      },
+    )
+    const parsed = extractLlmJsonObject(raw)
+    if (parsed) {
+      if (typeof parsed.needsWeb === 'boolean') modelNeedsWeb = parsed.needsWeb
+      modelEffort = parseThinkingEffort(parsed.reasoningEffort ?? parsed.effort)
+      reason = String(parsed.reason || '').trim().slice(0, 160)
+      if (modelNeedsWeb != null || modelEffort != null) source = 'model'
+    }
+  } catch (error) {
+    if (input.signal?.aborted) throw error
+    // The deterministic fallback keeps chat available when planning fails.
+  }
+
+  const mode = input.webSearch ?? 'auto'
+  const needsWeb =
+    mode === true
+      ? true
+      : mode === false
+        ? false
+        : Boolean(modelNeedsWeb || fallbackNeedsWeb)
+  const recommendedEffort =
+    modelEffort || (fallbackThinking.enabled ? fallbackThinking.effort : 'off')
+  const thinkingMode = getThinkingMode()
+  const thinking =
+    thinkingMode === 'auto'
+      ? recommendedEffort === 'off'
+        ? { enabled: false, effort: 'low' as ThinkingEffortUi }
+        : { enabled: true, effort: recommendedEffort }
+      : resolveThinkingForTask('tripChat', input.userMessage)
+
+  return {
+    needsWeb,
+    recommendedEffort,
+    thinking,
+    source,
+    ...(reason ? { reason } : {}),
+  }
+}
 
 async function resolveTripChatWebResearch(input: {
   ctx: TripChatContext
   userMessage: string
   signal?: AbortSignal
-  /** auto = heuristic; true = always try; false = never. */
-  webSearch?: boolean | 'auto'
-  onWebSearch?: (phase: TripChatWebSearchPhase) => void
+  plan: TripChatRequestPlan
+  onWebSearch?: (phase: TripChatWebSearchPhase, detail?: TripChatWebSearchDetail) => void
 }): Promise<string | null> {
-  const mode = input.webSearch ?? 'auto'
-  const should =
-    mode === true || (mode === 'auto' && tripChatNeedsWebResearch(input.userMessage))
-  if (!should) {
+  if (!input.plan.needsWeb) {
     input.onWebSearch?.('skip')
     return null
   }
@@ -913,6 +1164,7 @@ async function resolveTripChatWebResearch(input: {
     ctx: input.ctx,
     userMessage: input.userMessage,
     signal: input.signal,
+    onSearch: (detail) => input.onWebSearch?.('start', detail),
   })
   input.onWebSearch?.('done')
   return research
@@ -925,13 +1177,20 @@ export async function sendTripChatMessage(input: {
   signal?: AbortSignal
   /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
   webSearch?: boolean | 'auto'
-  onWebSearch?: (phase: TripChatWebSearchPhase) => void
+  onRequestPlan?: (phase: TripChatRequestPlanPhase, plan?: TripChatRequestPlan) => void
+  onWebSearch?: (phase: TripChatWebSearchPhase, detail?: TripChatWebSearchDetail) => void
 }): Promise<TripChatResult> {
-  const webResearch = await resolveTripChatWebResearch(input)
+  input.onRequestPlan?.('start')
+  const plan = await planTripChatRequest(input)
+  input.onRequestPlan?.('done', plan)
+  const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const messages = buildTripChatMessages({ ...input, webResearch })
   const text = await openaiChat(messages, {
     task: 'tripChat',
     userText: input.userMessage,
+    thinking: plan.thinking,
+    preflight: false,
+    webSearch: false,
     signal: input.signal,
   })
   return parseTripChatResult(
@@ -959,19 +1218,26 @@ export async function sendTripChatMessageStream(input: {
   signal?: AbortSignal
   /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
   webSearch?: boolean | 'auto'
-  onWebSearch?: (phase: TripChatWebSearchPhase) => void
+  onRequestPlan?: (phase: TripChatRequestPlanPhase, plan?: TripChatRequestPlan) => void
+  onWebSearch?: (phase: TripChatWebSearchPhase, detail?: TripChatWebSearchDetail) => void
   /** Progressive user-visible reply extracted from the streaming JSON buffer. */
   onReplyDelta?: (reply: string) => void
   /** Model reasoning tokens when thinking is enabled and the API emits them. */
   onReasoningDelta?: (delta: string, fullReasoning: string) => void
 }): Promise<TripChatResult> {
-  const webResearch = await resolveTripChatWebResearch(input)
+  input.onRequestPlan?.('start')
+  const plan = await planTripChatRequest(input)
+  input.onRequestPlan?.('done', plan)
+  const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const messages = buildTripChatMessages({ ...input, webResearch })
   let lastEmitted = ''
 
   const text = await openaiChatStream(messages, {
     task: 'tripChat',
     userText: input.userMessage,
+    thinking: plan.thinking,
+    preflight: false,
+    webSearch: false,
     signal: input.signal,
     onDelta: (_delta, fullText) => {
       const partial =

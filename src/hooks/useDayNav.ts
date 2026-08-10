@@ -3,7 +3,9 @@ import { getPlace } from '../data/places'
 import {
   planDayNavigation,
   type DayNavPlan,
+  type ResolvedDayLeg,
 } from '../services/googleNav'
+import { getLlmArtifact, setLlmArtifact } from '../services/llmArtifactStore'
 import type { DayPlan, Place, SelectedHotel } from '../types'
 import { getDayOrigin } from '../utils/dayOrigin'
 import { useGoogleMapsReady } from '../components/GoogleMapsProvider'
@@ -30,6 +32,50 @@ const emptyPlan = (
 
 /** Session cache: reuse Directions results when switching days (invalidate when places/origin change). */
 const navPlanCache = new Map<string, DayNavPlan>()
+
+const NAV_ARTIFACT_PREFIX = 'day-navigation:v1:'
+
+function artifactKey(day: number): string {
+  return `${NAV_ARTIFACT_PREFIX}${day}`
+}
+
+function persistedLeg(leg: ResolvedDayLeg | null): ResolvedDayLeg | null {
+  if (!leg) return null
+  // Google DirectionsResult contains Maps runtime objects. All information the
+  // timeline and cached-map renderer need already lives in these normalized fields.
+  const { directionsResult: _directionsResult, ...serializable } = leg
+  return serializable
+}
+
+function persistedPlan(plan: DayNavPlan): DayNavPlan {
+  return {
+    ...plan,
+    hotelToFirst: persistedLeg(plan.hotelToFirst),
+    betweenStops: plan.betweenStops.map(persistedLeg),
+    lastToDestination: persistedLeg(plan.lastToDestination),
+  }
+}
+
+function durablePlan(day: number, stopsKey: string): DayNavPlan | null {
+  const stored = getLlmArtifact<DayNavPlan>(artifactKey(day))
+  if (
+    !stored ||
+    stored.stopsKey !== stopsKey ||
+    stored.error ||
+    !Array.isArray(stored.betweenStops) ||
+    !Array.isArray(stored.segments) ||
+    !Array.isArray(stored.routePath) ||
+    !Array.isArray(stored.hotelLinkPath)
+  ) {
+    return null
+  }
+  return stored
+}
+
+function cachePlan(day: number, stopsKey: string, plan: DayNavPlan) {
+  navPlanCache.set(stopsKey, plan)
+  setLlmArtifact(artifactKey(day), persistedPlan(plan))
+}
 
 export function clearDayNavCache() {
   navPlanCache.clear()
@@ -99,29 +145,33 @@ export function useDayNav(
   }, [stopsKey, enabled])
 
   useLayoutEffect(() => {
-    if (!enabled || !isLoaded) {
+    if (!enabled) {
       setLoading((prev) => (prev ? false : prev))
-      if (!enabled) {
-        const summary = '日期、航班和酒店还没齐，导航先歇着'
-        const hotelToFirstText = '正在计算出发方式…'
-        setPlan((prev) =>
-          prev.stopsKey === stopsKey &&
-          prev.walkSummaryText === summary &&
-          prev.hotelToFirstText === hotelToFirstText &&
-          !prev.hotelToFirst &&
-          prev.betweenStops.length === 0
-            ? prev
-            : emptyPlan(stopsKey, summary, origin.kind),
-        )
-      }
+      const summary = '日期、航班和酒店还没齐，导航先歇着'
+      const hotelToFirstText = '正在计算出发方式…'
+      setPlan((prev) =>
+        prev.stopsKey === stopsKey &&
+        prev.walkSummaryText === summary &&
+        prev.hotelToFirstText === hotelToFirstText &&
+        !prev.hotelToFirst &&
+        prev.betweenStops.length === 0
+          ? prev
+          : emptyPlan(stopsKey, summary, origin.kind),
+      )
       return
     }
 
-    const cached = navPlanCache.get(stopsKey)
+    const cached = navPlanCache.get(stopsKey) || durablePlan(day.day, stopsKey)
     if (cached) {
+      navPlanCache.set(stopsKey, cached)
       requestIdRef.current += 1
       setLoading(false)
       setPlan((prev) => (prev === cached || prev.stopsKey === cached.stopsKey ? prev : cached))
+      return
+    }
+
+    if (!isLoaded) {
+      setLoading((prev) => (prev ? false : prev))
       return
     }
 
@@ -146,7 +196,7 @@ export function useDayNav(
         // Always cache a successful result so switching back does not refetch,
         // even if this request was superseded for the UI.
         if (cacheablePlan(next)) {
-          navPlanCache.set(stopsKey, next)
+          cachePlan(day.day, stopsKey, next)
         }
         if (requestId !== requestIdRef.current) return
         setPlan(next)

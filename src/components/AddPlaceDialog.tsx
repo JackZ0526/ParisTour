@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
   type GooglePlaceDetails,
@@ -23,9 +24,12 @@ import {
   setDayRecommendCache,
 } from '../services/recommendCache'
 import type { Place, PlaceType } from '../types'
+import { formatPriceLevelLabel } from '../utils/priceLevel'
+import { CloseIconButton } from './CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
+import { PlaceName } from './PlaceName'
 
 interface Props {
   open: boolean
@@ -92,6 +96,7 @@ export function AddPlaceDialog({
   const [addingName, setAddingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadingRecs, setLoadingRecs] = useState(false)
+  const [refreshingRecs, setRefreshingRecs] = useState(false)
   const [recommendations, setRecommendations] = useState<PlaceRecommendation[]>([])
   const [recBatch, setRecBatch] = useState(1)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
@@ -100,11 +105,23 @@ export function AddPlaceDialog({
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
   const chromeRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
+  const photoSwipeStartX = useRef<number | null>(null)
+  const thumbRefsByKey = useRef<Record<string, (HTMLButtonElement | null)[]>>({})
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
 
-  // Reset height animation gate when the sheet closes so reopen doesn't tween from stale size.
+  const expandedPhotoIndex = expandedKey ? photoIndexByKey[expandedKey] || 0 : 0
   useEffect(() => {
+    if (!expandedKey) return
+    thumbRefsByKey.current[expandedKey]?.[expandedPhotoIndex]?.scrollIntoView({
+      inline: 'nearest',
+      block: 'nearest',
+      behavior: 'smooth',
+    })
+  }, [expandedKey, expandedPhotoIndex])
+
+  // Reset height animation gate when the sheet closes so reopen doesn't tween from stale size.
+  useLayoutEffect(() => {
     if (!open) {
       setHeightReady(false)
       setBodyHeight(undefined)
@@ -129,16 +146,15 @@ export function AddPlaceDialog({
     ro.observe(measureEl)
     window.addEventListener('resize', apply)
 
-    let cancelled = false
-    const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setHeightReady(true)
-      })
-    })
+    // Opening can hydrate cached bilingual names a moment after the first
+    // measurement. Keep height transitions off until that initial content has
+    // settled, otherwise the sheet visibly grows by one text line on entry.
+    const readyTimer = window.setTimeout(() => {
+      setHeightReady(true)
+    }, 360)
 
     return () => {
-      cancelled = true
-      cancelAnimationFrame(raf)
+      window.clearTimeout(readyTimer)
       ro.disconnect()
       window.removeEventListener('resize', apply)
     }
@@ -227,10 +243,15 @@ export function AddPlaceDialog({
   async function refreshRecommendations() {
     if (loadingRecs || searching) return
     const previousNames = recommendations.map((r) => r.name)
-    await fetchRecommendations({
-      batch: recBatch + 1,
-      excludeNames: previousNames,
-    })
+    setRefreshingRecs(true)
+    try {
+      await fetchRecommendations({
+        batch: recBatch + 1,
+        excludeNames: previousNames,
+      })
+    } finally {
+      setRefreshingRecs(false)
+    }
   }
 
   /** Hide places already on the trip; restore them automatically when removed. */
@@ -257,6 +278,17 @@ export function AddPlaceDialog({
 
   function itemKey(item: PlaceRecommendation) {
     return `${item.type}:${item.name}`
+  }
+
+  function stepPhoto(key: string, photoCount: number, delta: number) {
+    if (photoCount < 2) return
+    setPhotoIndexByKey((prev) => {
+      const current = prev[key] || 0
+      return {
+        ...prev,
+        [key]: (current + delta + photoCount) % photoCount,
+      }
+    })
   }
 
   async function ensureDetails(item: PlaceRecommendation) {
@@ -478,14 +510,14 @@ export function AddPlaceDialog({
     setGoogleStoryRegenToken(0)
   }, [googleDetail])
 
-  if (!open) return null
+  if (!open || typeof document === 'undefined') return null
 
   const googleBusyBest =
     googleDetail != null && addingName === `${googleDetail.details.name}:best`
   const googleBusyEnd =
     googleDetail != null && addingName === `${googleDetail.details.name}:end`
 
-  return (
+  return createPortal(
     <>
       {/* Keep search sheet under the Google detail page while previewing. */}
       <div
@@ -504,17 +536,7 @@ export function AddPlaceDialog({
             <div>
               <h3 className="font-display text-2xl">添加地点</h3>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="关闭"
-              title="关闭"
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mist)] bg-white/70 text-[var(--ink)] transition hover:border-[var(--sage)] hover:bg-white"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
+            <CloseIconButton onClick={onClose} className="mt-0.5" />
           </div>
 
           <div className="flex gap-2 px-4 pt-3">
@@ -549,7 +571,7 @@ export function AddPlaceDialog({
           className={`add-place-body min-h-0${heightReady ? ' add-place-body--ready' : ''}`}
           style={bodyHeight != null ? { height: bodyHeight } : undefined}
         >
-          <div className="h-full overflow-y-auto overscroll-contain">
+          <div className="h-full overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
               ref={measureRef}
               key={mainTab}
@@ -582,11 +604,11 @@ export function AddPlaceDialog({
                 ))}
               </div>
 
-              {loadingRecs ? (
+              {loadingRecs && !refreshingRecs ? (
                 <LoadingIndicator
                   variant="block"
-                  thinkingLabel="AI 正在思考推荐…"
-                  generatingLabel="AI 正在根据行程推荐…"
+                  thinkingLabel="AI 正在思考推荐"
+                  generatingLabel="AI 正在根据行程推荐"
                   showDots
                   size="md"
                   mode="thinking"
@@ -604,6 +626,7 @@ export function AddPlaceDialog({
                     const photos = details?.photos?.length ? details.photos : []
                     const photoIndex = photoIndexByKey[key] || 0
                     const activePhoto = photos[photoIndex]
+                    const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel)
 
                     return (
                       <li key={key}>
@@ -620,15 +643,16 @@ export function AddPlaceDialog({
                             className="flex w-full items-start gap-3 p-3 text-left"
                           >
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium">
-                                {item.nameLocal ? `${item.nameLocal} · ` : ''}
-                                {item.name}
-                              </p>
-                              {item.area && (
-                                <p className="mt-0.5 text-xs text-[var(--copper)]">{item.area}</p>
-                              )}
+                              <PlaceName
+                                mode="originalWithZh"
+                                name={item.name}
+                                nameLocal={item.nameLocal}
+                                enrichFromGoogle
+                                // Recommend nameLocal is LLM-authored — exclude from official zh
+                                zhIsLlmTranslated
+                              />
                               {!expanded && (
-                                <p className="mt-1 text-sm text-[var(--stone)] line-clamp-2">
+                                <p className="mt-1.5 text-sm text-[var(--stone)] line-clamp-2">
                                   {item.intro || item.reason}
                                 </p>
                               )}
@@ -646,18 +670,94 @@ export function AddPlaceDialog({
                               ) : (
                                 <>
                                   {activePhoto ? (
-                                    <div>
-                                      <img
-                                        src={activePhoto}
-                                        alt={item.name}
-                                        className="h-44 w-full rounded-xl object-cover"
-                                        referrerPolicy="no-referrer-when-downgrade"
-                                      />
+                                    <div className="space-y-2">
+                                      <div
+                                        className="relative overflow-hidden rounded-xl select-none"
+                                        onPointerDown={(e) => {
+                                          if (photos.length < 2) return
+                                          photoSwipeStartX.current = e.clientX
+                                        }}
+                                        onPointerUp={(e) => {
+                                          if (
+                                            photoSwipeStartX.current == null ||
+                                            photos.length < 2
+                                          )
+                                            return
+                                          const dx = e.clientX - photoSwipeStartX.current
+                                          photoSwipeStartX.current = null
+                                          if (Math.abs(dx) < 40) return
+                                          stepPhoto(key, photos.length, dx < 0 ? 1 : -1)
+                                        }}
+                                        onPointerCancel={() => {
+                                          photoSwipeStartX.current = null
+                                        }}
+                                      >
+                                        <img
+                                          src={activePhoto}
+                                          alt={item.name}
+                                          className="h-44 w-full object-cover"
+                                          referrerPolicy="no-referrer-when-downgrade"
+                                          draggable={false}
+                                        />
+                                        {photos.length > 1 && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              aria-label="上一张"
+                                              onClick={() => stepPhoto(key, photos.length, -1)}
+                                              className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
+                                            >
+                                              <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                aria-hidden
+                                              >
+                                                <path d="M15 18l-6-6 6-6" />
+                                              </svg>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              aria-label="下一张"
+                                              onClick={() => stepPhoto(key, photos.length, 1)}
+                                              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
+                                            >
+                                              <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                aria-hidden
+                                              >
+                                                <path d="M9 18l6-6-6-6" />
+                                              </svg>
+                                            </button>
+                                            <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                                              {photoIndex + 1} / {photos.length}
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
                                       {photos.length > 1 && (
-                                        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                                        <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                           {photos.slice(0, 8).map((url, i) => (
                                             <button
                                               key={url + i}
+                                              ref={(el) => {
+                                                if (!thumbRefsByKey.current[key]) {
+                                                  thumbRefsByKey.current[key] = []
+                                                }
+                                                thumbRefsByKey.current[key][i] = el
+                                              }}
                                               type="button"
                                               onClick={() =>
                                                 setPhotoIndexByKey((prev) => ({
@@ -697,14 +797,9 @@ export function AddPlaceDialog({
                                           : ''}
                                       </span>
                                     )}
-                                    {details?.priceLevel && (
+                                    {priceLevelLabel && (
                                       <span className="rounded-full bg-[var(--mist)] px-2.5 py-1">
-                                        {details.priceLevel}
-                                      </span>
-                                    )}
-                                    {item.area && (
-                                      <span className="rounded-full bg-[var(--mist)] px-2.5 py-1">
-                                        {item.area}
+                                        {priceLevelLabel}
                                       </span>
                                     )}
                                   </div>
@@ -719,9 +814,6 @@ export function AddPlaceDialog({
                                       <span className="font-medium text-[var(--ink)]">为何适合今天：</span>
                                       {item.reason}
                                     </p>
-                                    {details?.summary && details.summary !== item.intro && (
-                                      <p className="text-[var(--stone)]">{details.summary}</p>
-                                    )}
                                   </div>
 
                                   <div className="grid grid-cols-2 gap-2">
@@ -781,16 +873,20 @@ export function AddPlaceDialog({
                 </ul>
               )}
 
-              <button
-                type="button"
-                disabled={loadingRecs || searching}
-                onClick={() => void refreshRecommendations()}
-                aria-busy={loadingRecs || undefined}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
-              >
-                {loadingRecs && <ButtonSpinner mode="thinking" task="placeRecommend" />}
-                {loadingRecs ? '正在换一批…' : '换一批'}
-              </button>
+              {(!loadingRecs || refreshingRecs) && (
+                <button
+                  type="button"
+                  disabled={loadingRecs || searching}
+                  onClick={() => void refreshRecommendations()}
+                  aria-busy={refreshingRecs || undefined}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
+                >
+                  {refreshingRecs && (
+                    <ButtonSpinner mode="thinking" task="placeRecommend" />
+                  )}
+                  {refreshingRecs ? '正在换一批…' : '换一批'}
+                </button>
+              )}
 
               {error && mainTab === 'ai' && <p className="text-sm text-red-700">{error}</p>}
             </div>
@@ -843,6 +939,7 @@ export function AddPlaceDialog({
       <GooglePlacePage
         open={Boolean(googleDetail)}
         name={googleDetail?.details.name || ''}
+        nameLocal={googleDetail?.details.nameOriginal}
         location={googleDetail?.details.location}
         fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
         showMap={false}
@@ -914,6 +1011,7 @@ export function AddPlaceDialog({
         }
         onClose={closeGoogleDetail}
       />
-    </>
+    </>,
+    document.body,
   )
 }

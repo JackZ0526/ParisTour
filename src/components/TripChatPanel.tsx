@@ -27,6 +27,7 @@ import {
   extractQuotedPlaceNames,
   findReplaceTargetInDay,
   inferPlaceTypeFromText,
+  isLivePlaceRecommendationRequest,
   isReplacePlaceIntent,
   matchHotelCandidate,
   matchPlaceInDay,
@@ -39,7 +40,9 @@ import {
   type TripChatDestination,
   type TripChatTurn,
   type TripChatViewingTarget,
+  type TripChatRequestPlan,
   type TripChatWorkStep,
+  type TripChatWebSearchDetail,
 } from '../services/tripChat'
 import type {
   DayPlan,
@@ -50,6 +53,7 @@ import type {
   SelectedHotel,
 } from '../types'
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
+import { CloseIconButton } from './CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
@@ -57,6 +61,11 @@ import { LlmModelPicker } from './LlmModelPicker'
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
+
+// Model-picked food should remain within the Paris metro area around the stay.
+// Attractions allow common day trips such as Versailles / Disneyland Paris.
+const RECOMMENDED_FOOD_MAX_DISTANCE_METERS = 20_000
+const RECOMMENDED_ATTRACTION_MAX_DISTANCE_METERS = 75_000
 
 const PENDING_PLACE_LABELS = {
   title: '行程顾问点评',
@@ -186,20 +195,38 @@ type ChatWorkStepId =
 type ChatWorkStep = TripChatWorkStep & { id: ChatWorkStepId }
 
 const CHAT_WORK_STEP_LABELS: Record<ChatWorkStepId, string> = {
-  understand: '理解你的需求…',
-  webSearch: '检索公开信息…',
-  generate: '生成回复…',
-  parse: '解析行程操作…',
-  resolvePlaces: '查找地点详情…',
-  apply: '应用改动…',
+  understand: '正在判断是否需要联网与思考强度',
+  webSearch: '正在搜索网络',
+  generate: '正在组织回复',
+  parse: '正在检查行程操作',
+  resolvePlaces: '正在核对地点与坐标',
+  apply: '正在应用改动',
 }
 
-function initialChatWorkSteps(): ChatWorkStep[] {
+function initialChatWorkSteps(userText: string): ChatWorkStep[] {
+  const generateLabel = isLivePlaceRecommendationRequest(userText)
+    ? '正在比较候选并生成推荐'
+    : CHAT_WORK_STEP_LABELS.generate
   return (['understand', 'generate', 'parse'] as const).map((id, i) => ({
     id,
-    label: CHAT_WORK_STEP_LABELS[id],
+    label: id === 'generate' ? generateLabel : CHAT_WORK_STEP_LABELS[id],
     status: i === 0 ? 'active' : 'pending',
   }))
+}
+
+function searchStepLabel(detail: TripChatWebSearchDetail | undefined, userText: string) {
+  const source = detail?.source === 'google_places' ? 'Google Places' : '网络'
+  const raw = detail?.query?.trim() || userText.trim()
+  const query = raw.length > 42 ? `${raw.slice(0, 42)}…` : raw
+  return query ? `正在搜索${source}：${query}` : `正在搜索${source}`
+}
+
+function requestPlanStepLabel(plan: TripChatRequestPlan) {
+  const web = plan.needsWeb ? '需要联网' : '无需联网'
+  const effort = plan.thinking.enabled
+    ? `思考强度${plan.thinking.effort === 'low' ? '低' : plan.thinking.effort === 'high' ? '高' : '中'}`
+    : '思考已关闭'
+  return `已判断：${web} · ${effort}`
 }
 
 const CHAT_WORK_STEP_ORDER: ChatWorkStepId[] = [
@@ -247,7 +274,7 @@ function activateChatWorkStep(
     if (i < activeIdx) {
       return {
         ...s,
-        label,
+        label: label.replace(/^正在/, '已'),
         status: s.status === 'skipped' ? 'skipped' : 'done',
       }
     }
@@ -263,8 +290,76 @@ function activateChatWorkStep(
 function finishChatWorkSteps(steps: ChatWorkStep[]): ChatWorkStep[] {
   return steps.map((s) => ({
     ...s,
+    label: s.label.replace(/^正在/, '已'),
     status: s.status === 'skipped' ? 'skipped' : 'done',
   }))
+}
+
+function completedWorkSummary(steps: TripChatWorkStep[]): string {
+  const ids = new Set(steps.filter((step) => step.status !== 'skipped').map((step) => step.id))
+  const searched = ids.has('webSearch')
+  const resolvedPlace = ids.has('resolvePlaces')
+  const applied = ids.has('apply')
+  if (searched && resolvedPlace) return '已搜索并核对推荐地点'
+  if (searched) return '已联网查询并完成回答'
+  if (resolvedPlace && applied) return '已核对地点并处理行程'
+  if (applied) return '已处理行程请求'
+  return '已理解并完成回答'
+}
+
+function ChatWorkStepIcon({
+  id,
+  status,
+}: {
+  id: string
+  status: TripChatWorkStep['status']
+}) {
+  const common = `h-4 w-4 ${status === 'active' ? 'animate-pulse' : ''}`
+  if (id === 'understand') {
+    return (
+      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M5 18.5 6.5 15H18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2" />
+        <path d="M8 9h8M8 12h5" />
+      </svg>
+    )
+  }
+  if (id === 'webSearch') {
+    return (
+      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+      </svg>
+    )
+  }
+  if (id === 'resolvePlaces') {
+    return (
+      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+        <circle cx="12" cy="10" r="2.5" />
+      </svg>
+    )
+  }
+  if (id === 'apply') {
+    return (
+      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="5" y="3.5" width="14" height="17" rx="2" />
+        <path d="M8.5 9h7M8.5 13h7M8.5 17h4" />
+      </svg>
+    )
+  }
+  if (id === 'parse') {
+    return (
+      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M8 4H5v16h3M16 4h3v16h-3M10 9h4M10 13h4" />
+      </svg>
+    )
+  }
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3Z" />
+      <path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" />
+    </svg>
+  )
 }
 
 function actionsNeedPlaceLookup(actions: TripChatAction[]): boolean {
@@ -276,6 +371,42 @@ function actionsNeedPlaceLookup(actions: TripChatAction[]): boolean {
       a.type === 'refresh_hotels' ||
       a.type === 'replace_hotel' ||
       a.type === 'replace_hotels',
+  )
+}
+
+function DisclosureChevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 20 20"
+      className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${
+        open ? 'rotate-90' : ''
+      }`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m7 4.5 5.5 5.5L7 15.5" />
+    </svg>
+  )
+}
+
+function CompletedCheckIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m5 12.5 4.2 4.2L19 7" />
+    </svg>
   )
 }
 
@@ -297,54 +428,72 @@ function ChatWorkStepsPanel({
   const summary = completed
     ? lastDone?.label || '步骤'
     : active?.label || '处理中…'
-  const expandable = completed ? visible.length >= 1 : visible.length > 1
-  const collapsedLabel =
-    completed && !open && visible.length > 1 ? '步骤' : summary
+  // While working, only show the current tool/status line. Completed turns may
+  // still expose their compact history on demand.
+  const expandable = completed && visible.length >= 1
+  const collapsedLabel = completed ? completedWorkSummary(visible) : summary
+  const summaryStep = active || lastDone || visible[0]
 
   return (
-    <div className="mb-1.5 text-xs leading-snug">
+    <div className="mb-1.5 text-xs leading-snug" aria-live="polite">
       {expandable ? (
         <button
           type="button"
           onClick={onToggle}
-          className="group flex w-full items-center gap-1.5 text-left text-[var(--stone)]/65 transition hover:text-[var(--stone)]"
+          className="group flex w-full items-center gap-1.5 rounded-sm text-left text-[var(--stone)]/78 outline-none transition hover:text-[var(--stone)] focus-visible:ring-1 focus-visible:ring-[var(--sage)]/25"
           aria-expanded={open}
         >
-          <span className="min-w-0 truncate">{collapsedLabel}</span>
-          <span
-            className="shrink-0 text-[10px] text-[var(--stone)]/40 transition group-hover:text-[var(--stone)]/60"
-            aria-hidden
-          >
-            {open ? '▾' : '▸'}
+          <span className="shrink-0" aria-hidden>
+            <CompletedCheckIcon />
           </span>
+          <span className="min-w-0 truncate">{collapsedLabel}</span>
+          <DisclosureChevron open={open} />
         </button>
       ) : (
-        <p className="truncate text-[var(--stone)]/65">{summary}</p>
+        <p className="flex items-center gap-1.5 truncate text-[var(--stone)]/78">
+          <ChatWorkStepIcon id={summaryStep.id} status={summaryStep.status} />
+          <span className={`truncate ${!completed && active ? 'chat-step-shimmer' : ''}`}>
+            {summary}
+          </span>
+        </p>
       )}
-      {open && expandable && (
-        <ol className="mt-1 space-y-0.5 pl-0.5">
-          {visible.map((step) => {
-            const done = step.status === 'done'
-            const activeStep = step.status === 'active'
-            return (
-              <li
-                key={step.id}
-                className={`flex items-center gap-1.5 ${
-                  activeStep
-                    ? 'text-[var(--stone)]/80'
-                    : done
-                      ? 'text-[var(--stone)]/45'
-                      : 'text-[var(--stone)]/30'
-                }`}
-              >
-                <span className="w-2.5 shrink-0 text-center text-[10px] leading-none" aria-hidden>
-                  {done ? '✓' : activeStep ? '·' : ''}
-                </span>
-                <span className="truncate">{step.label}</span>
-              </li>
-            )
-          })}
-        </ol>
+      {expandable && (
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+          }`}
+          aria-hidden={!open}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <ol className="ml-[1.375rem] mt-1 space-y-0.5 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
+              {visible.map((step) => {
+                const done = step.status === 'done'
+                const activeStep = step.status === 'active'
+                return (
+                  <li
+                    key={step.id}
+                    className={`flex items-center gap-1.5 ${
+                      activeStep
+                        ? 'text-[var(--stone)]/90'
+                        : done
+                          ? 'text-[var(--stone)]/62'
+                          : 'text-[var(--stone)]/45'
+                    }`}
+                  >
+                    <span className="w-4 shrink-0" aria-hidden>
+                      <ChatWorkStepIcon id={step.id} status={step.status} />
+                    </span>
+                    <span className="truncate">
+                      {step.status === 'pending'
+                        ? step.label.replace(/^正在/, '等待')
+                        : step.label}
+                    </span>
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -369,6 +518,7 @@ function StoredChatReasoningDisclosure({ text }: { text: string }) {
       text={text}
       open={open}
       onToggle={() => setOpen((v) => !v)}
+      completed
     />
   )
 }
@@ -377,34 +527,47 @@ function ChatReasoningDisclosure({
   text,
   open,
   onToggle,
+  completed = false,
 }: {
   text: string
   open: boolean
   onToggle: () => void
+  completed?: boolean
 }) {
   const trimmed = text.trim()
   if (!trimmed) return null
   return (
-    <div className="mb-1.5 text-xs leading-snug">
+    <div className="mb-1.5 text-xs leading-snug" aria-live="polite">
       <button
         type="button"
         onClick={onToggle}
-        className="group flex items-center gap-1 text-[var(--stone)]/50 transition hover:text-[var(--stone)]/75"
+        className="group flex w-full items-center gap-1.5 rounded-sm text-left text-[var(--stone)]/78 outline-none transition hover:text-[var(--stone)] focus-visible:ring-1 focus-visible:ring-[var(--sage)]/25"
         aria-expanded={open}
       >
-        <span>思考过程</span>
-        <span
-          className="text-[10px] text-[var(--stone)]/35 transition group-hover:text-[var(--stone)]/55"
-          aria-hidden
-        >
-          {open ? '▾' : '▸'}
+        <span className="shrink-0" aria-hidden>
+          {completed ? (
+            <CompletedCheckIcon />
+          ) : (
+            <ChatWorkStepIcon id="generate" status="active" />
+          )}
         </span>
+        <span className={`min-w-0 truncate ${completed ? '' : 'chat-step-shimmer'}`}>
+          {completed ? '思考完成' : '思考中'}
+        </span>
+        <DisclosureChevron open={open} />
       </button>
-      {open && (
-        <div className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap text-[var(--stone)]/55">
-          {trimmed}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+        aria-hidden={!open}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="ml-[1.375rem] mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1 text-[var(--stone)]/68">
+            {trimmed}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -542,12 +705,19 @@ export function TripChatPanel({
   const [reasoningText, setReasoningText] = useState('')
   const [reasoningOpen, setReasoningOpen] = useState(false)
   const [showReasoningUi, setShowReasoningUi] = useState(false)
+  const [requestThinkingEnabled, setRequestThinkingEnabled] = useState<boolean | undefined>(
+    undefined,
+  )
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const workStepsRef = useRef<ChatWorkStep[]>([])
   const reasoningTextRef = useRef('')
-  const chatBusy = useLlmBusyMode({ task: 'tripChat', userText: busyUserText || input })
+  const chatBusy = useLlmBusyMode({
+    task: 'tripChat',
+    userText: busyUserText || input,
+    thinkingEnabled: requestThinkingEnabled,
+  })
   // Snapshot day/hotel context so itinerary edits don't re-fire LLM mid-confirm.
   const pendingCtxRef = useRef({ hotel, days })
   pendingCtxRef.current = { hotel, days }
@@ -754,12 +924,14 @@ export function TripChatPanel({
   }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open])
 
   function beginWorkPipeline(userText: string) {
-    const thinkingOn = resolveThinkingForTask('tripChat', userText).enabled
-    setWorkSteps(initialChatWorkSteps())
+    setWorkSteps(initialChatWorkSteps(userText))
     setWorkStepsOpen(false)
     setReasoningText('')
     setReasoningOpen(false)
-    setShowReasoningUi(thinkingOn)
+    // The preflight classifier itself runs without thinking. Its result will
+    // update this before the answer model starts.
+    setRequestThinkingEnabled(false)
+    setShowReasoningUi(false)
   }
 
   function clearWorkPipeline() {
@@ -768,6 +940,7 @@ export function TripChatPanel({
     setReasoningText('')
     setShowReasoningUi(false)
     setReasoningOpen(false)
+    setRequestThinkingEnabled(undefined)
   }
 
   function persistWorkOnLastAssistant(
@@ -796,18 +969,42 @@ export function TripChatPanel({
   async function buildPlaceFromQuery(input: {
     placeName: string
     placeType?: PlaceType
+    source?: 'explicit' | 'recommend'
     /** Optional chat-action note — only used when traveler-facing, never operational. */
     note?: string
     dayNum: number
   }): Promise<Place> {
     if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加地点。')
 
-    const details = await fetchGooglePlaceDetails(`${input.placeName} Paris`)
+    const placeType: PlaceType = input.placeType || 'attraction'
+    const hotelLocation =
+      Number.isFinite(hotel.lat) &&
+      Number.isFinite(hotel.lng) &&
+      Math.abs(hotel.lat) <= 90 &&
+      Math.abs(hotel.lng) <= 180 &&
+      (hotel.lat !== 0 || hotel.lng !== 0)
+        ? { lat: hotel.lat, lng: hotel.lng }
+        : undefined
+    const maxDistanceMeters =
+      input.source === 'recommend' && hotelLocation
+        ? placeType === 'restaurant' || placeType === 'cafe'
+          ? RECOMMENDED_FOOD_MAX_DISTANCE_METERS
+          : RECOMMENDED_ATTRACTION_MAX_DISTANCE_METERS
+        : undefined
+    const details = await fetchGooglePlaceDetails(
+      `${input.placeName} Paris`,
+      hotelLocation,
+      { maxDistanceMeters },
+    )
     if (!details?.location) {
+      if (maxDistanceMeters) {
+        throw new Error(
+          `没有在当前住宿附近验证到「${input.placeName}」，已取消操作，避免误选外地同名地点。`,
+        )
+      }
       throw new Error(`找不到地点「${input.placeName}」，请换个更完整的名称。`)
     }
 
-    const placeType: PlaceType = input.placeType || 'attraction'
     // Never seed place.description from operational action.note
     // (e.g. 「作为第1天晚餐，按行程路线顺路插入。」) — that becomes the DayTimeline card.
     const travelerNote = !isOperationalStopNote(input.note) ? input.note?.trim() : undefined
@@ -903,6 +1100,7 @@ export function TripChatPanel({
     const place = await buildPlaceFromQuery({
       placeName: action.placeName,
       placeType: action.placeType,
+      source: action.source,
       note: action.note,
       dayNum,
     })
@@ -971,6 +1169,7 @@ export function TripChatPanel({
     const place = await buildPlaceFromQuery({
       placeName: action.toPlaceName,
       placeType: action.placeType || hit.place.type,
+      source: action.source,
       note: action.note,
       dayNum,
     })
@@ -1250,24 +1449,36 @@ export function TripChatPanel({
     setStreamingReply(false)
     const ac = beginChatRequest()
 
-    // Brief beat so「理解你的需求」is visible before stream starts.
-    setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
-
     try {
       const result = await sendTripChatMessageStream({
         ctx: buildChatContext(),
         history,
         userMessage: message,
         signal: ac.signal,
-        onWebSearch: (phase) => {
+        onRequestPlan: (phase, plan) => {
+          if (abortRef.current !== ac || phase !== 'done' || !plan) return
+          setRequestThinkingEnabled(plan.thinking.enabled)
+          setShowReasoningUi(plan.thinking.enabled)
+          setWorkSteps((prev) =>
+            prev.map((step) =>
+              step.id === 'understand'
+                ? { ...step, label: requestPlanStepLabel(plan) }
+                : step,
+            ),
+          )
+        },
+        onWebSearch: (phase, detail) => {
           if (abortRef.current !== ac) return
           if (phase === 'start') {
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'webSearch', {
+                labels: {
+                  webSearch: searchStepLabel(detail, message),
+                },
                 insert: [
                   {
                     id: 'webSearch',
-                    label: CHAT_WORK_STEP_LABELS.webSearch,
+                    label: searchStepLabel(detail, message),
                     status: 'pending',
                   },
                 ],
@@ -1276,6 +1487,10 @@ export function TripChatPanel({
             return
           }
           if (phase === 'done') {
+            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+            return
+          }
+          if (phase === 'skip') {
             setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
           }
         },
@@ -1304,10 +1519,13 @@ export function TripChatPanel({
             if (phase === 'resolvePlaces') {
               setWorkSteps((prev) =>
                 activateChatWorkStep(prev, 'resolvePlaces', {
+                  labels: {
+                    resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                  },
                   insert: [
                     {
                       id: 'resolvePlaces',
-                      label: CHAT_WORK_STEP_LABELS.resolvePlaces,
+                      label: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
                       status: 'pending',
                     },
                     {
@@ -1416,7 +1634,10 @@ export function TripChatPanel({
     options?: {
       rejectedNames?: string[]
       userMessage?: string
-      onProgress?: (phase: 'resolvePlaces' | 'apply', detail?: { pending?: boolean }) => void
+      onProgress?: (
+        phase: 'resolvePlaces' | 'apply',
+        detail?: { pending?: boolean; label?: string },
+      ) => void
     },
   ): Promise<{ notes: string[]; pending: PendingPlaceConfirm[] }> {
     const notes: string[] = []
@@ -1430,7 +1651,21 @@ export function TripChatPanel({
     let activeDay = currentDay
     const needLookup = actionsNeedPlaceLookup(actions)
     if (needLookup) {
-      options?.onProgress?.('resolvePlaces')
+      const names = actions
+        .flatMap((action) => {
+          if (action.type === 'add_place') return [action.placeName]
+          if (action.type === 'replace_place') return [action.toPlaceName]
+          if (action.type === 'add_hotel') return [action.hotelName]
+          if (action.type === 'replace_hotel') return action.toHotelName ? [action.toHotelName] : []
+          return []
+        })
+        .filter(Boolean)
+      const compactNames = [...new Set(names)].slice(0, 2).join('、')
+      options?.onProgress?.('resolvePlaces', {
+        label: compactNames
+          ? `正在核对地点：${compactNames}`
+          : CHAT_WORK_STEP_LABELS.resolvePlaces,
+      })
     } else {
       options?.onProgress?.('apply', { pending: false })
     }
@@ -1759,23 +1994,36 @@ export function TripChatPanel({
       { role: 'assistant', content: '' },
     ])
     const ac = beginChatRequest()
-    setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
-
     try {
       const result = await sendTripChatMessageStream({
         ctx: buildChatContext(),
         history,
         userMessage: message,
         signal: ac.signal,
-        onWebSearch: (phase) => {
+        onRequestPlan: (phase, plan) => {
+          if (abortRef.current !== ac || phase !== 'done' || !plan) return
+          setRequestThinkingEnabled(plan.thinking.enabled)
+          setShowReasoningUi(plan.thinking.enabled)
+          setWorkSteps((prev) =>
+            prev.map((step) =>
+              step.id === 'understand'
+                ? { ...step, label: requestPlanStepLabel(plan) }
+                : step,
+            ),
+          )
+        },
+        onWebSearch: (phase, detail) => {
           if (abortRef.current !== ac) return
           if (phase === 'start') {
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'webSearch', {
+                labels: {
+                  webSearch: searchStepLabel(detail, message),
+                },
                 insert: [
                   {
                     id: 'webSearch',
-                    label: CHAT_WORK_STEP_LABELS.webSearch,
+                    label: searchStepLabel(detail, message),
                     status: 'pending',
                   },
                 ],
@@ -1784,6 +2032,10 @@ export function TripChatPanel({
             return
           }
           if (phase === 'done') {
+            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+            return
+          }
+          if (phase === 'skip') {
             setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
           }
         },
@@ -1811,10 +2063,13 @@ export function TripChatPanel({
             if (phase === 'resolvePlaces') {
               setWorkSteps((prev) =>
                 activateChatWorkStep(prev, 'resolvePlaces', {
+                  labels: {
+                    resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                  },
                   insert: [
                     {
                       id: 'resolvePlaces',
-                      label: CHAT_WORK_STEP_LABELS.resolvePlaces,
+                      label: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
                       status: 'pending',
                     },
                     {
@@ -1964,17 +2219,11 @@ export function TripChatPanel({
                   · {getActiveLlmLabel()}
                 </p>
               </div>
-              <button
-                type="button"
+              <CloseIconButton
                 onClick={() => setOpen(false)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition hover:bg-[var(--mist)] hover:text-[var(--ink)] sm:hidden"
                 aria-label="关闭助手"
-                title="关闭助手"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+                className="sm:hidden"
+              />
             </div>
           </div>
 
@@ -2023,56 +2272,78 @@ export function TripChatPanel({
                   !showLiveReasoning &&
                   Boolean(turn.reasoning?.trim())
                 const showThinking =
-                  isStreamingAssistant && !turn.content && !streamingReply
+                  isStreamingAssistant &&
+                  !turn.content &&
+                  !streamingReply &&
+                  !showLiveSteps
+                const showAnswerBubble =
+                  turn.role === 'user' ||
+                  Boolean(turn.content) ||
+                  streamingReply ||
+                  showThinking
                 return (
-              <div
-                key={`${turn.role}-${i}`}
-                className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                  turn.role === 'user'
-                    ? 'ml-auto bg-[var(--ink)] text-[var(--paper)]'
-                    : 'bg-white/80 text-[var(--ink)]'
-                }`}
-              >
-                {showLiveSteps ? (
-                  <ChatWorkStepsPanel
-                    steps={workSteps}
-                    open={workStepsOpen}
-                    onToggle={() => setWorkStepsOpen((v) => !v)}
-                  />
-                ) : showStoredSteps ? (
-                  <StoredChatWorkStepsPanel steps={turn.steps!} />
-                ) : null}
-                {showLiveReasoning ? (
-                  <ChatReasoningDisclosure
-                    text={reasoningText}
-                    open={reasoningOpen}
-                    onToggle={() => setReasoningOpen((v) => !v)}
-                  />
-                ) : showStoredReasoning ? (
-                  <StoredChatReasoningDisclosure text={turn.reasoning!} />
-                ) : null}
-                {showThinking ? (
-                  <LoadingIndicator
-                    thinkingLabel="助手思考中…"
-                    generatingLabel="助手回答中…"
-                    showDots
-                    size="sm"
-                    mode="thinking"
-                    task="tripChat"
-                    userText={busyUserText}
-                  />
-                ) : (
-                  <>
-                    {turn.content}
-                    {isStreamingAssistant && streamingReply ? (
-                      <span
-                        className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
-                        aria-hidden
-                      />
+                  <div
+                    key={`${turn.role}-${i}`}
+                    className={`max-w-[92%] ${turn.role === 'user' ? 'ml-auto' : ''}`}
+                  >
+                    {showLiveSteps ? (
+                      <div className="px-1">
+                        <ChatWorkStepsPanel
+                          steps={workSteps}
+                          open={workStepsOpen}
+                          onToggle={() => setWorkStepsOpen((v) => !v)}
+                        />
+                      </div>
+                    ) : showStoredSteps ? (
+                      <div className="px-1">
+                        <StoredChatWorkStepsPanel steps={turn.steps!} />
+                      </div>
                     ) : null}
-                  </>
-                )}
-              </div>
+                    {showLiveReasoning ? (
+                      <div className="px-1">
+                        <ChatReasoningDisclosure
+                          text={reasoningText}
+                          open={reasoningOpen}
+                          onToggle={() => setReasoningOpen((v) => !v)}
+                        />
+                      </div>
+                    ) : showStoredReasoning ? (
+                      <div className="px-1">
+                        <StoredChatReasoningDisclosure text={turn.reasoning!} />
+                      </div>
+                    ) : null}
+                    {showAnswerBubble ? (
+                      <div
+                        className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                          turn.role === 'user'
+                            ? 'bg-[var(--ink)] text-[var(--paper)]'
+                            : 'bg-white/80 text-[var(--ink)]'
+                        }`}
+                      >
+                        {showThinking ? (
+                          <LoadingIndicator
+                            thinkingLabel="助手思考中…"
+                            generatingLabel="助手回答中…"
+                            showDots
+                            size="sm"
+                            mode="thinking"
+                            task="tripChat"
+                            userText={busyUserText}
+                          />
+                        ) : (
+                          <>
+                            {turn.content}
+                            {isStreamingAssistant && streamingReply ? (
+                              <span
+                                className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+                                aria-hidden
+                              />
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 )
               })}
 
@@ -2113,7 +2384,12 @@ export function TripChatPanel({
             >
               {busy ? (
                 <>
-                  <ButtonSpinner mode="thinking" task="tripChat" userText={busyUserText || input} />
+                  <ButtonSpinner
+                    mode="thinking"
+                    task="tripChat"
+                    userText={busyUserText || input}
+                    thinkingEnabled={requestThinkingEnabled}
+                  />
                   {chatBusy.label({ thinking: '思考中', generating: '回答中' })}
                 </>
               ) : (
@@ -2133,6 +2409,7 @@ export function TripChatPanel({
         key={`${activePending?.id || 'pending-place'}-${confirmEpoch}`}
         open={Boolean(activePending)}
         name={activePending?.place.name || ''}
+        nameLocal={activePending?.place.nameLocal}
         location={activePending?.place.location}
         fallbackImage={activePending?.place.image}
         showMap={false}

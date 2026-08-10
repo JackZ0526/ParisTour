@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
+import { DirectionsRenderer, GoogleMap, Marker, Polyline } from '@react-google-maps/api'
 import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../types'
@@ -17,6 +17,8 @@ import {
   homeIconUrl,
   numberIconUrl,
 } from './markerIcons'
+import { placeOriginalLabel } from '../utils/placeTitle'
+import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
 
 const mapContainerStyle = { width: '100%', height: '100%' }
 
@@ -153,6 +155,14 @@ export function TripMap({
     () => collectNavLegs(navPlan).filter((leg) => Boolean(leg.directionsResult)),
     [navPlan],
   )
+  const cachedPathLegs = useMemo(
+    () =>
+      collectNavLegs(navPlan).filter(
+        (leg) => !leg.directionsResult && leg.path.length >= 2,
+      ),
+    [navPlan],
+  )
+  const resolvedLegCount = directionsLegs.length + cachedPathLegs.length
 
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const onLoad = useCallback((m: google.maps.Map) => setMap(m), [])
@@ -283,8 +293,8 @@ export function TripMap({
           <LoadingIndicator label="正在获取实时导航…" size="sm" showDots />
         ) : (
           <span>
-            {directionsLegs.length
-              ? `实时路线 · ${directionsLegs.length} 段`
+            {resolvedLegCount
+              ? `${cachedPathLegs.length ? '已保存路线' : '实时路线'} · ${resolvedLegCount} 段`
               : '等待路线数据'}
           </span>
         )}
@@ -320,6 +330,17 @@ export function TripMap({
               }}
             />
           ))}
+          {cachedPathLegs.map((leg, i) => (
+            <Polyline
+              key={`${navPlan.stopsKey || 'nav'}-cached-${i}-${leg.displayMode}-${leg.durationSeconds}-${leg.distanceMeters}`}
+              path={leg.path}
+              options={{
+                strokeColor: GOOGLE_ROUTE_BLUE,
+                strokeOpacity: 0.9,
+                strokeWeight: 6,
+              }}
+            />
+          ))}
 
           <Marker
             position={{ lat: dayOrigin.lat, lng: dayOrigin.lng }}
@@ -339,10 +360,21 @@ export function TripMap({
             // Hotel/airport markers do not consume sequence numbers.
             const isHotelStop = isHotelPlace(place)
             const isAirportStop = isAirportPlace(place)
+            const cached = peekGooglePlaceDetails(
+              place.name,
+              place.nameLocal,
+              place.location,
+            )
+            const label = placeOriginalLabel(
+              place.name,
+              place.nameLocal,
+              cached?.name,
+              cached?.nameOriginal,
+            )
             const title =
               isHotelStop || isAirportStop || n == null
-                ? place.name
-                : `${n}. ${place.name}`
+                ? label
+                : `${n}. ${label}`
             return (
               <Marker
                 key={`${day.day}-${place.id}-${index}`}

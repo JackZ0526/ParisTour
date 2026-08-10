@@ -38,8 +38,8 @@ export type TripSnapshot = {
   itinerary: PersistedItineraryState | null
   baseline: PersistedBaselineState | null
   /**
-   * Durable LLM outputs (place narratives, day recommends, translations, …).
-   * Generated once, reused until the user regenerates or the trip is wiped.
+   * Durable generated artifacts (place narratives, recommendations,
+   * translations, Google place payloads, …), kept under the legacy field name.
    */
   llmArtifacts?: LlmArtifactMap | null
 }

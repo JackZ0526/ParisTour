@@ -142,7 +142,9 @@ async function resolveDraftPlace(
   const place: Place = {
     id,
     name: details?.name || draft.name,
-    nameLocal: draft.nameLocal,
+    // Persist Google's local/original title so itinerary cards are bilingual
+    // immediately, even when the LLM only returned a Chinese place name.
+    nameLocal: details?.nameOriginal || draft.nameLocal,
     type: draft.type,
     description:
       draft.description ||

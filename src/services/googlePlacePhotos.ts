@@ -1,5 +1,9 @@
 import type { Coordinates } from '../types'
-import { withGoogleMapsPhotoKey } from './googleMapsKey'
+import {
+  withGoogleMapsPhotoKey,
+  withoutGoogleMapsPhotoKey,
+} from './googleMapsKey'
+import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
 
 export interface PlacePhotoResult {
   url: string
@@ -10,11 +14,29 @@ export interface PlacePhotoResult {
 
 const cache = new Map<string, PlacePhotoResult>()
 const inflight = new Map<string, Promise<PlacePhotoResult | null>>()
+const PHOTO_ARTIFACT_PREFIX = 'google-place-photo:'
 
 function cacheKey(query: string, location?: Coordinates) {
   // v3: allow clients to cache-bust failed media; key always appended server-side params
   if (!location) return `v3|${query.trim().toLowerCase()}`
   return `v3|${query.trim().toLowerCase()}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}`
+}
+
+function artifactKey(key: string) {
+  return `${PHOTO_ARTIFACT_PREFIX}${key}`
+}
+
+function getStoredPhoto(key: string): PlacePhotoResult | null {
+  const stored = getLlmArtifact<PlacePhotoResult>(artifactKey(key))
+  if (
+    !stored ||
+    typeof stored.url !== 'string' ||
+    !stored.url ||
+    typeof stored.query !== 'string'
+  ) {
+    return null
+  }
+  return { ...stored, url: withGoogleMapsPhotoKey(stored.url) }
 }
 
 /**
@@ -28,6 +50,12 @@ export async function fetchGooglePlacePhoto(
   const key = cacheKey(query, location)
   const hit = cache.get(key)
   if (hit) return hit
+
+  const stored = getStoredPhoto(key)
+  if (stored) {
+    cache.set(key, stored)
+    return stored
+  }
 
   const pending = inflight.get(key)
   if (pending) return pending
@@ -76,6 +104,10 @@ export async function fetchGooglePlacePhoto(
       query,
     }
     cache.set(key, result)
+    setLlmArtifact(artifactKey(key), {
+      ...result,
+      url: withoutGoogleMapsPhotoKey(result.url),
+    })
     return result
   })()
 
