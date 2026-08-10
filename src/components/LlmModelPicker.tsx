@@ -86,14 +86,14 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         aria-label={fullLabel}
         title={fullLabel}
         onClick={() => setOpen((v) => !v)}
-        className="group flex max-w-[13.5rem] items-center gap-1.5 rounded-full border border-[var(--ink)]/12 bg-[var(--card)] px-2.5 py-2 text-xs font-medium text-[var(--ink)] shadow-[0_8px_24px_rgba(28,36,32,0.08)] backdrop-blur transition hover:border-[var(--sage)]/40 hover:bg-[color-mix(in_srgb,var(--paper)_92%,white)] disabled:opacity-50 sm:max-w-[15.5rem] sm:px-3 sm:py-2.5 sm:text-sm"
+        className="group flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--ink)]/12 bg-[var(--card)] text-xs font-medium text-[var(--ink)] shadow-[0_8px_24px_rgba(28,36,32,0.08)] backdrop-blur transition hover:border-[var(--sage)]/40 hover:bg-[color-mix(in_srgb,var(--paper)_92%,white)] disabled:opacity-50 sm:h-auto sm:w-auto sm:max-w-[15.5rem] sm:justify-start sm:gap-1.5 sm:px-3 sm:py-2.5 sm:text-sm"
       >
-        <ModelBrandIcon deepseek={deepseek} className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 truncate tracking-tight">{chip}</span>
+        <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
+        <span className="hidden min-w-0 truncate tracking-tight sm:inline">{chip}</span>
         <svg
           aria-hidden
           viewBox="0 0 12 12"
-          className={`h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 ${
+          className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
             open ? 'rotate-180' : ''
           }`}
           fill="none"

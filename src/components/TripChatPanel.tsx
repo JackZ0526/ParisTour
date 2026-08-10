@@ -457,6 +457,24 @@ const TRIP_CHAT_FAB_Z = 2050
 const TRIP_CHAT_BACKDROP_Z = 2040
 const TRIP_CHAT_PANEL_Z = 2045
 
+function ChatBubbleIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7.5 8.5h9M7.5 12h5.5" />
+      <path d="M6 18.5 7.5 15H18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2Z" />
+    </svg>
+  )
+}
+
 interface Props {
   hotel: SelectedHotel
   hotelCandidates: HotelCandidate[]
@@ -1882,9 +1900,11 @@ export function TripChatPanel({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="rounded-full bg-[var(--ink)] px-3.5 py-3 text-sm font-medium text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)] sm:px-4"
+          aria-label={open ? '关闭行程助手' : '打开行程助手'}
+          title={open ? '关闭行程助手' : '行程助手'}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)] sm:h-auto sm:w-auto sm:px-4 sm:py-3 sm:text-sm sm:font-medium"
         >
-          <span className="sm:hidden">{open ? '关闭' : '助手'}</span>
+          <ChatBubbleIcon className="h-5 w-5 sm:hidden" />
           <span className="hidden sm:inline">{open ? '关闭助手' : '行程助手'}</span>
         </button>
       </div>
