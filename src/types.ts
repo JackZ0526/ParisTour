@@ -30,6 +30,8 @@ export interface HotelCandidate {
 
 export interface Place {
   id: string
+  /** Stable Google Places identity. Prefer this over text search when available. */
+  googlePlaceId?: string
   name: string
   nameLocal?: string
   type: PlaceType

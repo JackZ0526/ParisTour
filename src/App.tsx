@@ -1297,6 +1297,36 @@ export default function App() {
     handleAddOnDay(day.day, place, { mode, select: false })
   }
 
+  function handleGoogleIdentityResolved(
+    placeId: string,
+    googlePlaceId: string,
+    nameOriginal?: string,
+  ) {
+    setCustomPlaces((prev) => {
+      const current = prev[placeId]
+      if (!current) return prev
+      const nextNameLocal = nameOriginal || current.nameLocal
+      if (
+        current.googlePlaceId === googlePlaceId &&
+        current.nameLocal === nextNameLocal
+      ) {
+        return prev
+      }
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        nextNameLocal || current.name,
+      )}&query_place_id=${encodeURIComponent(googlePlaceId)}`
+      return {
+        ...prev,
+        [placeId]: {
+          ...current,
+          googlePlaceId,
+          nameLocal: nextNameLocal,
+          googleMapsUrl,
+        },
+      }
+    })
+  }
+
   function handleAddOnDay(
     dayNum: number,
     place: Place,
@@ -2240,6 +2270,7 @@ export default function App() {
                           day={day}
                           hotel={hotel}
                           days={days}
+                          onGoogleIdentityResolved={handleGoogleIdentityResolved}
                           onClose={() => setSelectedPlaceId(null)}
                         />
                       </div>

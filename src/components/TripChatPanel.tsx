@@ -2410,6 +2410,7 @@ export function TripChatPanel({
         open={Boolean(activePending)}
         name={activePending?.place.name || ''}
         nameLocal={activePending?.place.nameLocal}
+        googlePlaceId={activePending?.place.googlePlaceId}
         location={activePending?.place.location}
         fallbackImage={activePending?.place.image}
         showMap={false}

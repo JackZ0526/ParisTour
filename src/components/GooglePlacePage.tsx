@@ -43,6 +43,7 @@ interface Props {
   open: boolean
   name: string
   nameLocal?: string
+  googlePlaceId?: string
   location?: Coordinates
   fallbackImage?: string
   showMap?: boolean
@@ -60,6 +61,8 @@ interface Props {
    * be easy to miss visually when another fixed layer shares the viewport.
    */
   overlayZIndex?: number
+  /** Persist a recovered Google identity in the owning trip record. */
+  onDetailsResolved?: (details: GooglePlaceDetails) => void
   onClose: () => void
 }
 
@@ -67,6 +70,7 @@ export function GooglePlacePage({
   open,
   name,
   nameLocal,
+  googlePlaceId,
   location,
   fallbackImage,
   showMap = true,
@@ -75,6 +79,7 @@ export function GooglePlacePage({
   closeOnBackdrop = true,
   overlayClassName = 'z-[2000]',
   overlayZIndex,
+  onDetailsResolved,
   onClose,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
@@ -87,6 +92,8 @@ export function GooglePlacePage({
   const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
   const swipeStartX = useRef<number | null>(null)
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const onDetailsResolvedRef = useRef(onDetailsResolved)
+  onDetailsResolvedRef.current = onDetailsResolved
 
   const query = placeDetailsQuery(name, nameLocal)
   const apiKey = getGoogleMapsApiKey()
@@ -148,7 +155,10 @@ export function GooglePlacePage({
     setError(null)
     setPhotoIndex(0)
 
-    void fetchGooglePlaceDetails(query, location)
+    void fetchGooglePlaceDetails(query, location, {
+      placeId: googlePlaceId,
+      recoverFromLocation: !googlePlaceId && !query,
+    })
       .then((result) => {
         if (cancelled) return
         if (!result) {
@@ -156,6 +166,7 @@ export function GooglePlacePage({
           setDetails(null)
         } else {
           setDetails(result)
+          onDetailsResolvedRef.current?.(result)
         }
       })
       .catch(() => {
@@ -168,7 +179,7 @@ export function GooglePlacePage({
     return () => {
       cancelled = true
     }
-  }, [open, isLoaded, query, location?.lat, location?.lng])
+  }, [open, isLoaded, query, googlePlaceId, location])
 
   // When Google / trip data has no Chinese display name, LLM-translate the original.
   useEffect(() => {

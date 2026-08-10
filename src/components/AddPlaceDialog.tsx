@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
+  placeDetailsQuery,
   type GooglePlaceDetails,
 } from '../services/googlePlaceDetails'
 import {
@@ -513,9 +514,12 @@ export function AddPlaceDialog({
     setLoadingDetailsKey(key)
     setError(null)
     try {
-      const query = item.name.toLowerCase().includes('paris')
-        ? item.name
-        : `${item.name} Paris`
+      const query = placeDetailsQuery(item.name, item.nameLocal)
+      if (!query) {
+        setDetailsByKey((prev) => ({ ...prev, [key]: null }))
+        setError('缺少地点原文名称，无法查询 Google 详情。')
+        return null
+      }
       const details = await fetchGooglePlaceDetails(query)
       setDetailsByKey((prev) => ({ ...prev, [key]: details }))
       setPhotoIndexByKey((prev) => ({ ...prev, [key]: 0 }))
@@ -556,7 +560,10 @@ export function AddPlaceDialog({
     setSearching(true)
     setError(null)
     try {
-      const query = name.toLowerCase().includes('paris') ? name : `${name} Paris`
+      const query = placeDetailsQuery(name)
+      if (!cached?.location && !query) {
+        throw new Error('缺少地点原文名称，无法查询 Google 详情。')
+      }
       const details = cached?.location
         ? cached
         : await fetchGooglePlaceDetails(query)
@@ -580,7 +587,9 @@ export function AddPlaceDialog({
 
       const place: Place = {
         id: `custom-${Date.now()}`,
+        googlePlaceId: details.id,
         name: details.name,
+        nameLocal: details.nameOriginal,
         type,
         description,
         ratingHint:
@@ -590,7 +599,13 @@ export function AddPlaceDialog({
         priceHint: details.priceLevel,
         image: details.photos[0] || FALLBACK_IMAGE,
         location: details.location,
-        googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name)}`,
+        googleMapsUrl: details.id
+          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+              details.nameOriginal || details.name,
+            )}&query_place_id=${encodeURIComponent(details.id)}`
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+              details.nameOriginal || details.name,
+            )}`,
         durationHint: '自定',
       }
       onAddCustom(place, mode)
@@ -616,7 +631,10 @@ export function AddPlaceDialog({
     setSearching(true)
     setError(null)
     try {
-      const query = q.toLowerCase().includes('paris') ? q : `${q} Paris`
+      const query = placeDetailsQuery(q)
+      if (!query) {
+        throw new Error('请使用地点的原文名称搜索。')
+      }
       const details = await fetchGooglePlaceDetails(query)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
@@ -1158,6 +1176,7 @@ export function AddPlaceDialog({
         open={Boolean(googleDetail)}
         name={googleDetail?.details.name || ''}
         nameLocal={googleDetail?.details.nameOriginal}
+        googlePlaceId={googleDetail?.details.id}
         location={googleDetail?.details.location}
         fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
         showMap={false}

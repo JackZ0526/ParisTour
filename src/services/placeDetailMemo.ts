@@ -35,8 +35,17 @@ export function placeDetailKeysFromGoogle(details: {
 }
 
 /** Keys used when opening an itinerary place in PlacePanel. */
-export function placeDetailKeysFromPlace(place: { id: string; name: string }): string[] {
-  return [placeDetailIdKey(place.id), placeDetailNameKey(place.name)]
+export function placeDetailKeysFromPlace(place: {
+  id: string
+  name: string
+  googlePlaceId?: string
+}): string[] {
+  const keys = [placeDetailIdKey(place.id)]
+  if (place.googlePlaceId?.trim()) {
+    keys.push(placeDetailGoogleIdKey(place.googlePlaceId))
+  }
+  keys.push(placeDetailNameKey(place.name))
+  return keys
 }
 
 export function peekPlaceDetailCopy(

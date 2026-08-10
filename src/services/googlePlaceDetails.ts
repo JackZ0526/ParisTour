@@ -43,6 +43,10 @@ export interface GooglePlaceDetails {
 export interface GooglePlaceSearchOptions {
   /** Reject candidates farther than this from `location` (locationBias alone is not a limit). */
   maxDistanceMeters?: number
+  /** Exact Google Places identity; bypasses text search when present. */
+  placeId?: string
+  /** Resolve a legacy place without an id/original name from its saved coordinates. */
+  recoverFromLocation?: boolean
 }
 
 export interface NearbyGooglePlaceCandidate {
@@ -64,6 +68,7 @@ type PlacesLib = {
       requestedRegion?: string
     }): PlaceLike
     searchByText: (req: Record<string, unknown>) => Promise<{ places?: PlaceLike[] }>
+    searchNearby?: (req: Record<string, unknown>) => Promise<{ places?: PlaceLike[] }>
   }
 }
 
@@ -136,14 +141,17 @@ function cacheKey(
 ) {
   // Versioned because matching/review hydration changes must not reuse an older
   // thin or incorrectly matched payload.
-  const base = `v10|${query.trim().toLowerCase()}`
+  const placeId = options?.placeId?.trim()
+  const identity = placeId ? `id:${placeId}` : query.trim().toLowerCase()
+  const base = `v11|${identity}`
   if (!location) return base
   const maxDistance = options?.maxDistanceMeters
   const limit =
     Number.isFinite(maxDistance) && Number(maxDistance) > 0
       ? `|max:${Math.round(Number(maxDistance))}`
       : ''
-  return `${base}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}${limit}`
+  const recovery = options?.recoverFromLocation ? '|recover' : ''
+  return `${base}|${location.lat.toFixed(4)},${location.lng.toFixed(4)}${limit}${recovery}`
 }
 
 function artifactKey(key: string) {
@@ -196,6 +204,21 @@ function hasCjkText(text: string) {
   return /[\u3400-\u9fff]/.test(text)
 }
 
+/** Keep automatic Google text searches in the place's original Latin script. */
+function originalSearchLabel(label?: string): string {
+  const value = label?.trim()
+  if (!value) return ''
+  const latinOnly = value
+    .replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s·,，、:：;；/|—–-]+|[\s·,，、:：;；/|—–-]+$/g, '')
+    .trim()
+  const meaningful = latinOnly
+    .replace(/\b(?:paris|france)\b/gi, ' ')
+    .replace(/[^\p{Script=Latin}\p{M}]/gu, '')
+  return meaningful ? latinOnly : ''
+}
+
 /** Prefer fr/en for Latin queries so scoring can match "Chez Paul", not zh-only garden names. */
 function searchLanguage(query: string): string {
   return hasLatin(query) ? 'fr' : 'zh-CN'
@@ -238,11 +261,7 @@ function haversineMeters(
 
 /** Prefer Latin / local catalog names for Maps text search. */
 function preferSearchLabel(name: string, nameLocal?: string): string {
-  const local = nameLocal?.trim()
-  if (local && /[A-Za-zÀ-ÿ]/.test(local)) return local
-  const primary = name.trim()
-  if (primary && /[A-Za-zÀ-ÿ]/.test(primary)) return primary
-  return local || primary
+  return originalSearchLabel(nameLocal) || originalSearchLabel(name)
 }
 
 function usableReviews(place: PlaceLike): GoogleReview[] {
@@ -446,6 +465,64 @@ async function backfillById(
   return place
 }
 
+async function fetchPlaceById(
+  lib: PlacesLib,
+  placeId: string,
+  requestedLanguage = 'fr',
+  fields: readonly string[] = DETAIL_FIELDS,
+): Promise<PlaceLike | null> {
+  try {
+    const place = new lib.Place({
+      id: placeId,
+      requestedLanguage,
+      requestedRegion: 'fr',
+    })
+    if (!place.fetchFields) return null
+    await place.fetchFields({ fields: [...fields] })
+    return place
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Legacy migration path: the saved coordinates originally came from Google,
+ * so an extremely close nearby result can safely restore the stable Place ID
+ * without sending a translated name back to Google.
+ */
+async function recoverPlaceByLocation(
+  lib: PlacesLib,
+  location: Coordinates,
+): Promise<PlaceLike | null> {
+  if (!lib.Place.searchNearby) return null
+  try {
+    const { places } = await lib.Place.searchNearby({
+      fields: [...DETAIL_FIELDS],
+      locationRestriction: { center: location, radius: 40 },
+      rankPreference: 'DISTANCE',
+      language: 'fr',
+      region: 'fr',
+      maxResultCount: 5,
+    })
+    const nearest = (places || [])
+      .map((place) => ({ place, coords: toCoords(place.location) }))
+      .filter(
+        (row): row is { place: PlaceLike; coords: Coordinates } =>
+          Boolean(row.place.id && row.coords),
+      )
+      .sort(
+        (a, b) =>
+          haversineMeters(location, a.coords) -
+          haversineMeters(location, b.coords),
+      )[0]
+    if (!nearest || haversineMeters(location, nearest.coords) > 25) return null
+    await enrichPlace(nearest.place)
+    return backfillById(lib, nearest.place)
+  } catch {
+    return null
+  }
+}
+
 async function searchCandidates(
   lib: PlacesLib,
   textQuery: string,
@@ -565,6 +642,17 @@ async function pickBestPlace(
   location?: Coordinates,
   options?: GooglePlaceSearchOptions,
 ): Promise<PlaceLike | null> {
+  const placeId = options?.placeId?.trim()
+  if (placeId) {
+    const exact = await fetchPlaceById(lib, placeId, 'fr')
+    if (exact) return backfillById(lib, exact)
+  }
+  if (!query.trim()) {
+    return location && options?.recoverFromLocation
+      ? recoverPlaceByLocation(lib, location)
+      : null
+  }
+
   let best: PlaceLike | null = null
   let bestScore = -Infinity
   const lang = searchLanguage(query)
@@ -612,7 +700,8 @@ export async function fetchGooglePlaceDetails(
   location?: Coordinates,
   options?: GooglePlaceSearchOptions,
 ): Promise<GooglePlaceDetails | null> {
-  const key = cacheKey(query, location, options)
+  const lookupQuery = originalSearchLabel(query)
+  const key = cacheKey(lookupQuery, location, options)
   const hit = detailsCache.get(key)
   if (hit && !isIncompleteCacheHit(hit)) return hit
   if (hit) detailsCache.delete(key)
@@ -631,7 +720,7 @@ export async function fetchGooglePlaceDetails(
 
     const lib = (await google.maps.importLibrary('places')) as unknown as PlacesLib
 
-    const place = await pickBestPlace(lib, query, location, options)
+    const place = await pickBestPlace(lib, lookupQuery, location, options)
     if (!place) return null
 
     const photos = (place.photos || [])
@@ -640,7 +729,7 @@ export async function fetchGooglePlaceDetails(
       .filter(Boolean)
 
     let reviews = usableReviews(place)
-    const searchName = displayNameOf(place.displayName) || query
+    const searchName = displayNameOf(place.displayName) || lookupQuery
     const idHint = place.id
 
     if (!reviews.length && idHint && expectsReviews(place)) {
@@ -650,32 +739,14 @@ export async function fetchGooglePlaceDetails(
 
     // Latin / local title: prefer search language name when already Latin.
     let nameOriginal = hasLatin(searchName) ? searchName : undefined
-    if (!nameOriginal) {
+    if (!nameOriginal && idHint) {
       for (const lang of ['fr', 'en'] as const) {
-        for (const localizedQuery of queryFallbacks(query)) {
-          try {
-            const altReq: Record<string, unknown> = {
-              textQuery: localizedQuery,
-              fields: ['displayName', 'id'],
-              language: lang,
-              region: 'fr',
-              maxResultCount: 3,
-            }
-            if (location) altReq.locationBias = location
-            const { places: altPlaces } = await lib.Place.searchByText(altReq)
-            // Only accept same place id — never fall back to nearby altPlaces[0].
-            const match = idHint
-              ? altPlaces?.find((p) => p.id === idHint)
-              : undefined
-            const alt = displayNameOf(match?.displayName).trim()
-            if (alt) {
-              nameOriginal = alt
-              break
-            }
-          } catch {
-            /* try the next localized query */
-          }
-        }
+        const localized = await fetchPlaceById(lib, idHint, lang, [
+          'displayName',
+          'id',
+        ])
+        const alt = displayNameOf(localized?.displayName).trim()
+        if (alt) nameOriginal = alt
         if (nameOriginal) break
       }
     }
@@ -683,49 +754,40 @@ export async function fetchGooglePlaceDetails(
     // zh-CN display name for bilingual UI (same place id only).
     let zhName = hasCjkText(searchName) ? searchName : undefined
     if (!zhName && idHint) {
-      try {
-        for (const localizedQuery of queryFallbacks(query)) {
-          const zhReq: Record<string, unknown> = {
-            textQuery: localizedQuery,
-            fields: ['displayName', 'id', 'reviews'],
-            language: 'zh-CN',
-            region: 'fr',
-            maxResultCount: 5,
-          }
-          if (location) zhReq.locationBias = location
-          const { places: zhPlaces } = await lib.Place.searchByText(zhReq)
-          const match = zhPlaces?.find((p) => p.id === idHint)
-          const localizedReviews = match ? usableReviews(match) : []
-          const chineseReviews = localizedReviews.filter((review) =>
-            hasCjkText(review.text),
-          )
-          if (chineseReviews.length) {
-            reviews = [
-              ...chineseReviews,
-              ...localizedReviews.filter((review) => !hasCjkText(review.text)),
-            ].slice(0, 6)
-          }
-          const zh = displayNameOf(match?.displayName).trim()
-          if (zh) {
-            zhName = zh
-            break
-          }
-        }
-      } catch {
-        /* fall through */
+      const localized = await fetchPlaceById(lib, idHint, 'zh-CN', [
+        'displayName',
+        'id',
+        'reviews',
+      ])
+      const localizedReviews = localized ? usableReviews(localized) : []
+      const chineseReviews = localizedReviews.filter((review) =>
+        hasCjkText(review.text),
+      )
+      if (chineseReviews.length) {
+        reviews = [
+          ...chineseReviews,
+          ...localizedReviews.filter((review) => !hasCjkText(review.text)),
+        ].slice(0, 6)
       }
+      zhName = displayNameOf(localized?.displayName).trim() || undefined
     }
     if (!zhName) zhName = searchName
 
     // Final identity check: Latin title must resemble the search query.
     const identity = nameOriginal || (hasLatin(zhName) ? zhName : '')
+    const trustedId = Boolean(
+      idHint &&
+        (options?.placeId?.trim() === idHint ||
+          (!lookupQuery && options?.recoverFromLocation)),
+    )
     if (
+      !trustedId &&
       identity &&
-      placeIdentitySimilarity(query, identity) < PLACE_NAME_MATCH_MIN
+      placeIdentitySimilarity(lookupQuery, identity) < PLACE_NAME_MATCH_MIN
     ) {
       return null
     }
-    if (!identity && hasLatin(query)) {
+    if (!trustedId && !identity && hasLatin(lookupQuery)) {
       // No Latin Google title to verify — refuse rather than show wrong zh.
       return null
     }
@@ -748,7 +810,7 @@ export async function fetchGooglePlaceDetails(
       openingHours: place.regularOpeningHours?.weekdayDescriptions,
       priceLevel: place.priceLevel,
       location: toCoords(place.location),
-      query,
+      query: lookupQuery,
     }
 
     // Avoid locking the session on a thin "success" that Maps would still show reviews for.
@@ -772,6 +834,7 @@ export async function fetchGooglePlaceDetails(
 
 export function placeDetailsQuery(name: string, nameLocal?: string): string {
   const label = preferSearchLabel(name, nameLocal)
+  if (!label) return ''
   if (/paris|france|迪士尼|枫丹白露|cdg|airport/i.test(label)) return label
   return `${label} Paris`
 }

@@ -19,6 +19,11 @@ interface Props {
   day: DayPlan
   hotel: SelectedHotel
   days: DayPlan[]
+  onGoogleIdentityResolved?: (
+    placeId: string,
+    googlePlaceId: string,
+    nameOriginal?: string,
+  ) => void
   onClose: () => void
 }
 
@@ -35,6 +40,7 @@ export function PlacePanel({
   day,
   hotel,
   days,
+  onGoogleIdentityResolved,
   onClose,
 }: Props) {
   const [story, setStory] = useState<HotelDetailCopy | null>(null)
@@ -153,6 +159,7 @@ export function PlacePanel({
       open={Boolean(place)}
       name={place?.name || ''}
       nameLocal={place?.nameLocal}
+      googlePlaceId={place?.googlePlaceId}
       location={place?.location}
       fallbackImage={place?.image}
       showMap={false}
@@ -174,6 +181,14 @@ export function PlacePanel({
             }
           : null
       }
+      onDetailsResolved={(resolved) => {
+        if (!placeId || !resolved.id) return
+        onGoogleIdentityResolved?.(
+          placeId,
+          resolved.id,
+          resolved.nameOriginal,
+        )
+      }}
       onClose={onClose}
     />
   )
