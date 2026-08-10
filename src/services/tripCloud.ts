@@ -105,6 +105,7 @@ function asSnapshot(raw: unknown): TripSnapshot {
     hotel: s.hotel ?? null,
     itinerary: s.itinerary ?? null,
     baseline: s.baseline ?? null,
+    recommendationPreferences: s.recommendationPreferences ?? null,
     llmArtifacts,
   }
 }
@@ -130,6 +131,7 @@ function substantiveSnapshotJson(snapshot: TripSnapshot): string {
     hotel: clean.hotel,
     itinerary: clean.itinerary,
     baseline: clean.baseline,
+    recommendationPreferences: clean.recommendationPreferences,
   })
 }
 

@@ -107,7 +107,12 @@ export async function translateTextsToChinese(
           content: JSON.stringify({ texts: needTranslate }),
         },
       ],
-      { task: 'translate', userText: needTranslate[0] },
+      {
+        task: 'translate',
+        userText: needTranslate[0],
+        webSearch: false,
+        responseFormat: 'json_object',
+      },
     )
 
     const parsed = extractLlmJsonObject(raw)
@@ -184,6 +189,8 @@ export async function translatePlaceNameToChinese(
         {
           task: 'translate',
           userText: key,
+          webSearch: false,
+          responseFormat: 'json_object',
           signal: options?.signal,
           onDelta: (_delta, fullText) => {
             if (!options?.onPartial) return

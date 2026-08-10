@@ -10,6 +10,7 @@ export interface Coordinates {
 /** Hotel card shown in the picker (LLM recommend or custom address). */
 export interface HotelCandidate {
   id: string
+  googlePlaceId?: string
   name: string
   area: string
   address: string
@@ -109,6 +110,7 @@ export interface FlightInfo {
 
 export interface SelectedHotel {
   id: string
+  googlePlaceId?: string
   name: string
   address: string
   lat: number

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
+  searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
 } from '../services/googlePlaceDetails'
 import {
@@ -25,6 +26,7 @@ import {
   setDayRecommendCache,
 } from '../services/recommendCache'
 import type { Place, PlaceType } from '../types'
+import type { RecommendationPreferences } from '../services/recommendationPreferences'
 import { formatPriceLevelLabel } from '../utils/priceLevel'
 import { CloseIconButton } from './CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
@@ -39,6 +41,8 @@ interface Props {
   dayPace: string
   dayTheme?: string
   hotelArea?: string
+  hotelLocation: { lat: number; lng: number }
+  recommendationPreferences: RecommendationPreferences
   currentPlaceNames: string[]
   tripPlaceNames: string[]
   onClose: () => void
@@ -76,6 +80,8 @@ export function AddPlaceDialog({
   dayPace,
   dayTheme,
   hotelArea,
+  hotelLocation,
+  recommendationPreferences,
   currentPlaceNames,
   tripPlaceNames,
   onClose,
@@ -218,6 +224,33 @@ export function AddPlaceDialog({
     })
   }
 
+  async function loadVerifiedCandidates(types: RecommendPlaceType[]) {
+    const queryByType: Record<RecommendPlaceType, string> = {
+      attraction: 'tourist attraction Paris',
+      cafe: 'specialty coffee bakery brunch Paris',
+      restaurant: 'restaurant Paris',
+    }
+    const rows = await Promise.all(
+      types.map(async (type) => {
+        const candidates = await searchNearbyGooglePlaceCandidates({
+          textQuery: queryByType[type],
+          location: hotelLocation,
+          maxDistanceMeters: type === 'attraction' ? 20_000 : 12_000,
+          limit: 12,
+        })
+        return candidates.map((candidate) => ({ ...candidate, type }))
+      }),
+    )
+    return rows.flat().filter((candidate) => {
+      const key = candidate.name.trim().toLowerCase()
+      return (
+        key &&
+        !currentPlaceNames.some((name) => name.trim().toLowerCase() === key) &&
+        !tripPlaceNames.some((name) => name.trim().toLowerCase() === key)
+      )
+    })
+  }
+
   async function fetchRecommendations(options: {
     types: RecommendPlaceType[]
     batch?: number
@@ -246,6 +279,10 @@ export function AddPlaceDialog({
     }
 
     try {
+      const verifiedCandidates = await loadVerifiedCandidates(types)
+      if (!verifiedCandidates.length) {
+        throw new Error('Google 暂时没有返回附近候选，请稍后重试。')
+      }
       let list = await recommendPlacesForDay({
         day: dayNumber,
         title: dayTitle,
@@ -258,6 +295,8 @@ export function AddPlaceDialog({
         batch,
         types,
         countPerType: 4,
+        verifiedCandidates,
+        recommendationPreferences,
       })
       if (epoch !== recommendationEpochRef.current) return false
 
@@ -296,6 +335,8 @@ export function AddPlaceDialog({
             batch,
             types: missingTypes,
             countPerType: missingCount,
+            verifiedCandidates,
+            recommendationPreferences,
           })
           if (epoch !== recommendationEpochRef.current) return false
           list = [...list, ...topUp]
@@ -520,7 +561,9 @@ export function AddPlaceDialog({
         setError('缺少地点原文名称，无法查询 Google 详情。')
         return null
       }
-      const details = await fetchGooglePlaceDetails(query)
+      const details = await fetchGooglePlaceDetails(query, undefined, {
+        placeId: item.googlePlaceId,
+      })
       setDetailsByKey((prev) => ({ ...prev, [key]: details }))
       setPhotoIndexByKey((prev) => ({ ...prev, [key]: 0 }))
       return details

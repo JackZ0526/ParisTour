@@ -15,6 +15,10 @@ import { HotelPicker } from './components/HotelPicker'
 import { LoadingIndicator } from './components/LoadingIndicator'
 import { CloudSaveIndicator } from './components/CloudSaveIndicator'
 import { BackupDialog } from './components/BackupDialog'
+import {
+  RecommendationPreferencesButton,
+  RecommendationPreferencesDialog,
+} from './components/RecommendationPreferencesDialog'
 import { PlacePanel } from './components/PlacePanel'
 import { ShareDialog } from './components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
@@ -96,20 +100,24 @@ import {
   type ItineraryInputFingerprint,
 } from './utils/itineraryState'
 import { flushTripCloudSave } from './services/tripCloud'
+import {
+  loadRecommendationPreferences,
+  recommendationPreferencesPrompt,
+  saveRecommendationPreferences,
+  type RecommendationPreferences,
+} from './services/recommendationPreferences'
 
 const ITINERARY_LOADING_LINES = [
-  '正在把巴黎掰成日历块…咖啡因与地铁图同步加载中。',
-  '按航班、酒店与「想睡到自然醒」三条戒律排日程，请稍候。',
-  '迪士尼已预留倒数第二天席位，其余天正在顺路拼图…',
-  '拒绝 7 点观光闹钟——行程约 10 点开场，生成中。',
-  '香榭丽舍与凯旋门已列入必去清单，正在找顺路的好日子…',
-  '地铁换乘尽量少、步行尽量短：正在给景点做片区拼图。',
-  '正餐两顿、咖啡馆开场——胃口与行程表同时对齐中。',
-  '戴高乐的时差还在谈判，抵达日会轻一点，别急。',
-  '卢浮宫与凡尔赛今日请假；我们挑更顺路的巴黎。',
-  'RER A 已在脑内预演：乐园日只留迪士尼，其他景点靠边站。',
-  '正在把「想去」压成「走得动」——巴黎很大，腿只有两条。',
-  '酒店作原点、末站回家睡觉：日程像回力镖一样收束中。',
+  '正在按航班、酒店和推荐偏好拼接日程…',
+  '正在从 Google 已验证地点中筛选候选…',
+  '正在比较评分、评论量与路线距离…',
+  '正在给同一天的地点做片区聚类…',
+  '正在检查抵达日和返程日的时间边界…',
+  '正在平衡餐饮、景点与休息时间…',
+  '正在检查地点重复与路线绕行…',
+  '正在把用户偏好转成可执行的日程…',
+  '正在确认每天的酒店起点与返程安排…',
+  '正在完成结构校验，马上就好…',
 ]
 
 const ITINERARY_LOADING_ROTATE_MS = 3200
@@ -338,7 +346,7 @@ function buildHeroCopy(
   let blurb: string
   if (tripDates && hotelPhrase) {
     blurb = dest
-      ? `温哥华往返 · 目的地${destLabel}，${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}，住${hotelPhrase}。闹钟可以偷懒，行程不行——每天先用一杯咖啡谈判，把这座城市慢慢吃干抹净。`
+      ? `温哥华往返 · 目的地${destLabel}，${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}，住${hotelPhrase}。航班、路线和你的推荐偏好会一起决定每天的节奏。`
       : `温哥华往返 · ${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}，住${hotelPhrase}。闹钟可以偷懒，行程不行——先定下目的地，故事才真正开场。`
   } else if (tripDates) {
     blurb = dest
@@ -396,6 +404,10 @@ export default function App() {
   const readOnly = !canEdit
   const [shareOpen, setShareOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [recommendationPreferencesOpen, setRecommendationPreferencesOpen] =
+    useState(false)
+  const [recommendationPreferences, setRecommendationPreferences] =
+    useState<RecommendationPreferences>(() => loadRecommendationPreferences())
   /** Below `lg`, itinerary shows one pane at a time to avoid a tall stacked map. */
   const [mobileItineraryPane, setMobileItineraryPane] = useState<
     'timeline' | 'map'
@@ -485,6 +497,7 @@ export default function App() {
     const nextFlights = initialFlightsState()
     const nextDates = loadTripDates()
     const nextItinerary = loadItineraryState()
+    const nextRecommendationPreferences = loadRecommendationPreferences()
     ensureBaselineFromGenerated(nextItinerary)
 
     // A remote snapshot replaces the data underneath several stateful children.
@@ -515,6 +528,7 @@ export default function App() {
       Boolean(nextItinerary.generated && nextItinerary.days.length),
     )
     setItineraryFingerprint(nextItinerary.fingerprint || null)
+    setRecommendationPreferences(nextRecommendationPreferences)
     setItineraryGenerating(false)
     setItineraryGenError(null)
     setDayRegenerating(false)
@@ -575,6 +589,7 @@ export default function App() {
     customPlaces,
     itineraryGenerated,
     itineraryFingerprint,
+    recommendationPreferences,
     canEdit,
     notifyTripChanged,
   ])
@@ -853,6 +868,7 @@ export default function App() {
         },
         outbound: flightContextBrief(flights.outbound),
         returnFlight: flightContextBrief(flights.returnFlight),
+        recommendationPreferences,
       })
 
       if (requestId !== genRequestIdRef.current) return
@@ -891,6 +907,7 @@ export default function App() {
     flights.returnFlight,
     numberOfDays,
     destination,
+    recommendationPreferences,
   ])
 
   // First expand (dates + flights + hotel ready): generate full itinerary if none saved.
@@ -1542,6 +1559,7 @@ export default function App() {
         occupiedPlaces,
         existingDays: days,
         existingCustomPlaces: customPlaces,
+        recommendationPreferences,
       })
 
       if (requestId !== dayRegenRequestIdRef.current) return
@@ -2035,8 +2053,8 @@ export default function App() {
                 <div className="mt-2 text-sm text-[var(--ink)]/85">
                   {itineraryStartLoading && !itineraryStart ? (
                     <LoadingIndicator
-                      thinkingLabel="正在判断行程开始日…"
-                      generatingLabel="正在根据航班与时差确定行程开始日…"
+                      thinkingLabel="正在读取航班抵达时间…"
+                      generatingLabel="正在按航班日期确定行程开始日…"
                       showDots
                       size="sm"
                       mode="thinking"
@@ -2068,8 +2086,13 @@ export default function App() {
                 </div>
               )}
             </div>
-            {itineraryReady && itineraryGenerated && !readOnly && (
+            {!readOnly && (
               <div className="flex flex-wrap items-center gap-2">
+                <RecommendationPreferencesButton
+                  onClick={() => setRecommendationPreferencesOpen(true)}
+                />
+                {itineraryReady && itineraryGenerated && (
+                  <>
                 {canRestoreDefault && (
                   <button
                     type="button"
@@ -2086,6 +2109,8 @@ export default function App() {
                 >
                   重新生成全部
                 </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -2244,6 +2269,7 @@ export default function App() {
                           onRestoreDayDefault={handleRestoreDayDefault}
                           tripPlaceNames={tripPlaceNames}
                           readOnly={readOnly}
+                          recommendationPreferences={recommendationPreferences}
                         />
                       </div>
                       <div
@@ -2313,6 +2339,9 @@ export default function App() {
           outbound={flights.outbound}
           returnFlight={flights.returnFlight}
           viewing={tripChatViewing}
+          preferences={recommendationPreferencesPrompt(
+            recommendationPreferences,
+          ).join('；')}
           handlers={{
             switchDay: handleSwitchDay,
             selectPlace: setSelectedPlaceId,
@@ -2325,6 +2354,16 @@ export default function App() {
           }}
         />
       )}
+
+      <RecommendationPreferencesDialog
+        open={recommendationPreferencesOpen}
+        value={recommendationPreferences}
+        onSave={(next) => {
+          const saved = saveRecommendationPreferences(next)
+          setRecommendationPreferences(saved)
+        }}
+        onClose={() => setRecommendationPreferencesOpen(false)}
+      />
     </div>
   )
 }

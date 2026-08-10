@@ -3,6 +3,7 @@ import type { PersistedFlightSelection } from './flightSelection'
 import type { HotelCacheState } from './hotelCache'
 import type { TripDateRange } from './tripDates'
 import type { LlmArtifactMap } from './llmArtifactStore'
+import type { RecommendationPreferences } from './recommendationPreferences'
 import {
   clearBaselineItinerary,
   clearItineraryState,
@@ -25,6 +26,11 @@ import {
   saveLlmArtifacts,
 } from './llmArtifactStore'
 import { clearLlmMemo, seedLlmMemo } from './llmMemo'
+import {
+  clearRecommendationPreferences,
+  loadRecommendationPreferences,
+  saveRecommendationPreferences,
+} from './recommendationPreferences'
 
 export const TRIP_SNAPSHOT_VERSION = 1 as const
 
@@ -37,6 +43,7 @@ export type TripSnapshot = {
   hotel: HotelCacheState | null
   itinerary: PersistedItineraryState | null
   baseline: PersistedBaselineState | null
+  recommendationPreferences?: RecommendationPreferences | null
   /**
    * Durable generated artifacts (place narratives, recommendations,
    * translations, Google place payloads, …), kept under the legacy field name.
@@ -53,6 +60,7 @@ export function emptyTripSnapshot(): TripSnapshot {
     hotel: null,
     itinerary: null,
     baseline: null,
+    recommendationPreferences: loadRecommendationPreferences(),
     llmArtifacts: {},
   }
 }
@@ -80,6 +88,7 @@ export function collectTripSnapshot(): TripSnapshot {
         ? itinerary
         : null,
     baseline,
+    recommendationPreferences: loadRecommendationPreferences(),
     llmArtifacts: Object.keys(llmArtifacts).length ? llmArtifacts : {},
   }
 }
@@ -123,6 +132,12 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
       snap.baseline.customPlaces || {},
       snap.baseline.fingerprint,
     )
+  }
+
+  if (snap.recommendationPreferences) {
+    saveRecommendationPreferences(snap.recommendationPreferences)
+  } else {
+    clearRecommendationPreferences()
   }
 
   const artifacts = snap.llmArtifacts

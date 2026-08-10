@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { getPlace } from '../data/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import { PATH_MODE_COLORS } from '../services/googleNav'
+import type { RecommendationPreferences } from '../services/recommendationPreferences'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../types'
 import {
   getDayOrigin,
@@ -447,6 +448,7 @@ interface Props {
   canRestoreDayDefault?: boolean
   onRestoreDayDefault?: () => void
   tripPlaceNames: string[]
+  recommendationPreferences: RecommendationPreferences
   readOnly?: boolean
 }
 
@@ -503,6 +505,7 @@ export function DayTimeline({
   canRestoreDayDefault = false,
   onRestoreDayDefault,
   tripPlaceNames,
+  recommendationPreferences,
   readOnly = false,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
@@ -2008,6 +2011,8 @@ export function DayTimeline({
             dayPace={day.pace}
             dayTheme={day.theme}
             hotelArea={hotel.areaKey}
+            hotelLocation={{ lat: hotel.lat, lng: hotel.lng }}
+            recommendationPreferences={recommendationPreferences}
             currentPlaceNames={day.stops.map((s) => {
               try {
                 return getPlace(s.placeId, customPlaces).name

@@ -10,7 +10,11 @@ import type {
 } from '../types'
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
-import { fetchGooglePlaceDetails, placeDetailsQuery } from './googlePlaceDetails'
+import {
+  fetchGooglePlaceDetails,
+  placeDetailsQuery,
+  searchNearbyGooglePlaceCandidates,
+} from './googlePlaceDetails'
 import {
   generateFullItinerary,
   generateSingleDayItinerary,
@@ -18,6 +22,7 @@ import {
   type GenerateFullItineraryInput,
   type GenerateSingleDayItineraryInput,
   type OccupiedPlaceBrief,
+  type VerifiedPlaceCandidate,
 } from './llm'
 
 const FALLBACK_IMAGE =
@@ -133,7 +138,9 @@ async function resolveDraftPlace(
     draft.area ? `${draft.name} ${draft.area}` : draft.name,
     draft.nameLocal,
   )
-  const details = await fetchGooglePlaceDetails(query).catch(() => null)
+  const details = await fetchGooglePlaceDetails(query, undefined, {
+    placeId: draft.googlePlaceId,
+  }).catch(() => null)
   const loc = details?.location
   const id = `gen-${slugKey(draft.key || draft.name) || 'place'}-${Math.random()
     .toString(36)
@@ -141,6 +148,7 @@ async function resolveDraftPlace(
 
   const place: Place = {
     id,
+    googlePlaceId: details?.id || draft.googlePlaceId,
     name: details?.name || draft.name,
     // Persist Google's local/original title so itinerary cards are bilingual
     // immediately, even when the LLM only returned a Chinese place name.
@@ -165,6 +173,42 @@ async function resolveDraftPlace(
     durationHint: draft.durationHint || '60 分钟',
   }
   return { id, place }
+}
+
+async function loadItineraryCandidates(
+  hotel: SelectedHotel,
+  occupiedNames: string[] = [],
+): Promise<VerifiedPlaceCandidate[]> {
+  const excluded = new Set(occupiedNames.map(normalizePlaceName))
+  const specs: Array<{
+    type: VerifiedPlaceCandidate['type']
+    query: string
+    radius: number
+  }> = [
+    { type: 'cafe', query: 'specialty coffee bakery brunch Paris', radius: 12_000 },
+    { type: 'restaurant', query: 'restaurant Paris', radius: 12_000 },
+    { type: 'attraction', query: 'tourist attraction museum Paris', radius: 20_000 },
+  ]
+  const batches = await Promise.all(
+    specs.map(async (spec) => {
+      const rows = await searchNearbyGooglePlaceCandidates({
+        textQuery: spec.query,
+        location: { lat: hotel.lat, lng: hotel.lng },
+        maxDistanceMeters: spec.radius,
+        limit: 20,
+      })
+      return rows
+        .filter((row) => row.id && !excluded.has(normalizePlaceName(row.name)))
+        .map((row) => ({ ...row, type: spec.type }))
+    }),
+  )
+  const seen = new Set<string>()
+  return batches.flat().filter((row) => {
+    const key = row.id || `${row.type}:${normalizePlaceName(row.name)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function blankMetroHints(): Record<string, string> {
@@ -234,98 +278,6 @@ function collapseDisneyStopsOnDay(day: DayPlan, places: Record<string, Place>): 
   }
 }
 
-function tripHasPlaceId(days: DayPlan[], placeId: string): boolean {
-  return days.some((d) => d.stops.some((s) => s.placeId === placeId))
-}
-
-function isLandmarkStop(stop: ItineraryStop, places: Record<string, Place>, kind: 'champs' | 'arc'): boolean {
-  if (kind === 'champs') {
-    if (stop.placeId === CHAMPS_PLACE_ID) return true
-    return /champs|香榭/i.test(places[stop.placeId]?.name || '')
-  }
-  if (stop.placeId === ARC_PLACE_ID) return true
-  return /arc\s*de\s*triomphe|凯旋门/i.test(places[stop.placeId]?.name || '')
-}
-
-/** Ensure 香榭丽舍 + 凯旋门 appear somewhere on a non-Disney, non-last mid day. */
-function ensureMustSeeLandmarks(days: DayPlan[], places: Record<string, Place>): DayPlan[] {
-  const n = days.length
-  if (n < 1) return days
-
-  const hasChamps = days.some((d) =>
-    d.stops.some((s) => isLandmarkStop(s, places, 'champs')),
-  )
-  const hasArc = days.some((d) => d.stops.some((s) => isLandmarkStop(s, places, 'arc')))
-  if (hasChamps && hasArc) {
-    // Normalize placeIds when matched by name
-    return days.map((day) => ({
-      ...day,
-      stops: day.stops.map((s) => {
-        if (isLandmarkStop(s, places, 'champs') && s.placeId !== CHAMPS_PLACE_ID) {
-          return { ...s, placeId: CHAMPS_PLACE_ID }
-        }
-        if (isLandmarkStop(s, places, 'arc') && s.placeId !== ARC_PLACE_ID) {
-          return { ...s, placeId: ARC_PLACE_ID }
-        }
-        return s
-      }),
-    }))
-  }
-
-  const disneyDay = n >= 3 ? n - 1 : null
-  // Prefer a mid sightseeing day: not day1, not last, not disney
-  let targetIdx = days.findIndex((d) => {
-    if (d.day === 1) return false
-    if (n > 1 && d.day === n) return false
-    if (disneyDay != null && d.day === disneyDay) return false
-    return true
-  })
-  if (targetIdx < 0) {
-    // Fall back to day 1 outing if trip is very short
-    targetIdx = 0
-  }
-
-  const next = days.map((d) => ({ ...d, stops: [...d.stops] }))
-  const day = next[targetIdx]
-  const insert: ItineraryStop[] = []
-  if (!hasArc && !tripHasPlaceId(next, ARC_PLACE_ID)) {
-    insert.push({
-      id: `d${day.day}-${ARC_PLACE_ID}-must`,
-      time: '11:00',
-      placeId: ARC_PLACE_ID,
-      note: '必去：凯旋门；可登顶俯瞰香街。',
-      transport: '地铁 1/2/6 号线 Étoile',
-      walkLevel: '短步行',
-      duration: '60–90 分钟',
-    })
-  }
-  if (!hasChamps && !tripHasPlaceId(next, CHAMPS_PLACE_ID)) {
-    insert.push({
-      id: `d${day.day}-${CHAMPS_PLACE_ID}-must`,
-      time: '12:30',
-      placeId: CHAMPS_PLACE_ID,
-      note: '必去：香榭丽舍大街中段散步即可，不必走完全程。',
-      transport: '从凯旋门向东步行',
-      walkLevel: '短步行',
-      duration: '45–60 分钟',
-    })
-  }
-  if (!insert.length) return next
-
-  // Insert before overnight hotel if present, else append
-  const hotelIdx = day.stops.findIndex((s) => s.placeId === SELECTED_HOTEL_PLACE_ID)
-  if (hotelIdx >= 0 && (n === 1 || day.day !== n)) {
-    // Prefer after first café / check-in: put before last hotel
-    day.stops.splice(hotelIdx, 0, ...insert)
-  } else if (day.day === 1 && day.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID) {
-    day.stops.splice(1, 0, ...insert)
-  } else {
-    day.stops.push(...insert)
-  }
-  next[targetIdx] = { ...day, stops: [...day.stops] }
-  return next
-}
-
 /**
  * Light-touch dedupe: drop later repeats of the same placeId / place name across the trip.
  * Hotel, CDG, and Disney (handled per Disney-day collapse) are exempt.
@@ -388,34 +340,23 @@ export function validateAndFixGeneratedDays(
         : {
             day: i,
             title: i === 1 ? '抵达巴黎' : i === n ? '返程' : `第 ${i} 天`,
-            theme: i === n - 1 && n >= 3 ? '迪士尼乐园日' : '自由安排',
-            pace: i === n - 1 && n >= 3 ? '乐园日' : i === 1 || i === n ? '轻松' : '适中',
-            summary:
-              i === n - 1 && n >= 3
-                ? '今天只去迪士尼，不安排其他景点。'
-                : '今天行程待补全。',
+            theme: '自由安排',
+            pace: i === 1 || i === n ? '轻松' : '适中',
+            summary: '今天行程待补全。',
             metroHintFromArea: blankMetroHints(),
-            stops:
-              i === n - 1 && n >= 3
-                ? [
-                    {
-                      id: `d${i}-${DISNEY_PLACE_ID}-0`,
-                      time: '10:00',
-                      placeId: DISNEY_PLACE_ID,
-                      note: '巴黎迪士尼乐园全日；建议提前购票与 App 排队。',
-                      transport: 'RER A → Marne-la-Vallée–Chessy',
-                      walkLevel: '中等步行',
-                      duration: '全天',
-                    },
-                  ]
-                : [],
+            stops: [],
           },
     )
   }
 
-  // Disney day = second-to-last when N >= 3 — outing is Disney only (+ overnight hotel)
-  if (n >= 3) {
-    const disneyIdx = n - 2
+  // If the generated plan chose Disney, keep that day structurally coherent.
+  const disneyIdx = filled.findIndex(
+    (day) =>
+      day.pace === '乐园日' ||
+      /迪士尼|disney/i.test(`${day.title} ${day.theme}`) ||
+      day.stops.some((stop) => isDisneyStop(stop, places)),
+  )
+  if (disneyIdx >= 0) {
     const d = filled[disneyIdx]
     filled[disneyIdx] = collapseDisneyStopsOnDay(
       {
@@ -442,10 +383,6 @@ export function validateAndFixGeneratedDays(
   // Drop obvious duplicate attractions across the trip (hotel/CDG exempt).
   const deduped = dedupeAttractionStops(filled, places)
   for (let i = 0; i < n; i++) filled[i] = deduped[i]
-
-  // Must-see: 香榭丽舍 + 凯旋门
-  const withLandmarks = ensureMustSeeLandmarks(filled, places)
-  for (let i = 0; i < n; i++) filled[i] = withLandmarks[i]
 
   // Last day (N>1): hotel is departure origin only — strip hotel stops (Day 1 check-in kept).
   if (n > 1) {
@@ -483,33 +420,6 @@ export function validateAndFixGeneratedDays(
     }
   }
 
-  // Meals (午餐/晚餐 restaurant stops): enforced mainly via LLM hardRules; no structural rewrite here.
-  // Soft: days 2..n should prefer ~10:00 starts (skip pushing airport-only last day)
-  for (let i = 1; i < n; i++) {
-    const d = filled[i]
-    if (!d.stops.length) continue
-    const first = d.stops[0]
-    if (first.placeId === CDG_PLACE_ID) continue
-    const m = first.time?.match(/^(\d{1,2}):(\d{2})$/)
-    if (!m) continue
-    const minutes = Number(m[1]) * 60 + Number(m[2])
-    // Don't force Disney day earlier than 10 if LLM put café at 10; only bump very early starts
-    if (minutes < 9 * 60) {
-      const delta = 10 * 60 - minutes
-      filled[i] = {
-        ...d,
-        stops: d.stops.map((s) => {
-          const tm = s.time?.match(/^(\d{1,2}):(\d{2})$/)
-          if (!tm) return s
-          const nextMin = Number(tm[1]) * 60 + Number(tm[2]) + delta
-          const hh = String(Math.floor(nextMin / 60) % 24).padStart(2, '0')
-          const mm = String(nextMin % 60).padStart(2, '0')
-          return { ...s, time: `${hh}:${mm}` }
-        }),
-      }
-    }
-  }
-
   // Day 1 hotel first + non-last days end at hotel + last-day hotel strip.
   return ensureDay1HotelFirst(filled)
 }
@@ -534,8 +444,11 @@ function softFixSingleDay(
     })),
   }
 
-  const disneyDay = n >= 3 ? n - 1 : null
-  if (disneyDay != null && next.day === disneyDay) {
+  const choseDisney =
+    next.pace === '乐园日' ||
+    /迪士尼|disney/i.test(`${next.title} ${next.theme}`) ||
+    next.stops.some((stop) => isDisneyStop(stop, places))
+  if (choseDisney) {
     next = collapseDisneyStopsOnDay(
       {
         ...next,
@@ -546,7 +459,7 @@ function softFixSingleDay(
       },
       places,
     )
-  } else if (n >= 3) {
+  } else {
     // Non-Disney days must not keep a Disney stop.
     const filtered = next.stops.filter((s) => !isDisneyStop(s, places))
     if (filtered.length !== next.stops.length) {
@@ -580,31 +493,6 @@ function softFixSingleDay(
             duration: '离境',
           },
         ],
-      }
-    }
-  }
-
-  // Soft bump very early starts on non-Day-1 days.
-  if (next.day > 1 && next.stops.length) {
-    const first = next.stops[0]
-    if (first.placeId !== CDG_PLACE_ID) {
-      const m = first.time?.match(/^(\d{1,2}):(\d{2})$/)
-      if (m) {
-        const minutes = Number(m[1]) * 60 + Number(m[2])
-        if (minutes < 9 * 60) {
-          const delta = 10 * 60 - minutes
-          next = {
-            ...next,
-            stops: next.stops.map((s) => {
-              const tm = s.time?.match(/^(\d{1,2}):(\d{2})$/)
-              if (!tm) return s
-              const nextMin = Number(tm[1]) * 60 + Number(tm[2]) + delta
-              const hh = String(Math.floor(nextMin / 60) % 24).padStart(2, '0')
-              const mm = String(nextMin % 60).padStart(2, '0')
-              return { ...s, time: `${hh}:${mm}` }
-            }),
-          }
-        }
       }
     }
   }
@@ -651,7 +539,7 @@ function stripDupesAgainstOccupied(
  * Keeps other days intact; preserves generated fingerprint at the App layer.
  */
 export async function buildGeneratedSingleDay(
-  input: Omit<GenerateSingleDayItineraryInput, 'hotel'> & {
+  input: Omit<GenerateSingleDayItineraryInput, 'hotel' | 'verifiedCandidates'> & {
     hotel: SelectedHotel
     /** Display label for hotel area (e.g. 16区特罗卡德罗). */
     hotelAreaLabel?: string
@@ -660,6 +548,13 @@ export async function buildGeneratedSingleDay(
   },
 ): Promise<GeneratedItineraryResult> {
   const hotel = input.hotel
+  const verifiedCandidates = await loadItineraryCandidates(
+    hotel,
+    (input.occupiedPlaces || []).map((place) => place.name),
+  )
+  if (!verifiedCandidates.length) {
+    throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+  }
   const areaLabel =
     input.hotelAreaLabel || hotel.areaKey || undefined
   const draft = await generateSingleDayItinerary({
@@ -684,6 +579,8 @@ export async function buildGeneratedSingleDay(
     returnFlight: input.returnFlight,
     occupiedPlaces: input.occupiedPlaces,
     preferences: input.preferences,
+    recommendationPreferences: input.recommendationPreferences,
+    verifiedCandidates,
   })
   const dayNumber = Math.max(1, Math.min(input.dayCount, input.dayNumber))
 
@@ -768,7 +665,11 @@ export async function buildGeneratedSingleDay(
     stops,
   }
 
-  newDay = softFixSingleDay(newDay, customPlaces, input.dayCount)
+  newDay = softFixSingleDay(
+    newDay,
+    customPlaces,
+    input.dayCount,
+  )
   newDay = stripDupesAgainstOccupied(
     newDay,
     customPlaces,
@@ -804,10 +705,19 @@ export async function buildGeneratedSingleDay(
  * Ask the LLM for a full multi-day plan, resolve places via Google, then light-fix.
  */
 export async function buildGeneratedItinerary(
-  input: GenerateFullItineraryInput & { hotel: SelectedHotel },
+  input: Omit<GenerateFullItineraryInput, 'hotel' | 'verifiedCandidates'> & {
+    hotel: SelectedHotel & { area?: string }
+  },
 ): Promise<GeneratedItineraryResult> {
-  const draft = await generateFullItinerary(input)
   const hotel = input.hotel
+  const verifiedCandidates = await loadItineraryCandidates(hotel)
+  if (!verifiedCandidates.length) {
+    throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+  }
+  const draft = await generateFullItinerary({
+    ...input,
+    verifiedCandidates,
+  })
 
   const draftByKey = new Map(draft.places.map((p) => [p.key, p]))
   // Also collect placeKeys referenced in stops but missing from places[]
@@ -890,7 +800,11 @@ export async function buildGeneratedItinerary(
     }
   })
 
-  const fixed = validateAndFixGeneratedDays(days, customPlaces, input.dayCount)
+  const fixed = validateAndFixGeneratedDays(
+    days,
+    customPlaces,
+    input.dayCount,
+  )
   return { days: fixed, customPlaces }
 }
 

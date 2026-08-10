@@ -9,6 +9,7 @@ const FALLBACK_HOTEL_IMAGE =
 export function candidateToSelected(card: HotelCandidate): SelectedHotel {
   return {
     id: card.id,
+    googlePlaceId: card.googlePlaceId,
     name: card.name,
     address: card.address,
     lat: card.lat,
@@ -34,6 +35,7 @@ function ratingHint(details: {
 
 /** Resolve a hotel name/address into a candidate card via Google Places (+ Nominatim fallback). */
 export async function resolveHotelCandidate(input: {
+  googlePlaceId?: string
   name: string
   address?: string
   area?: string
@@ -45,7 +47,9 @@ export async function resolveHotelCandidate(input: {
   source?: 'llm' | 'custom'
 }): Promise<HotelCandidate> {
   const query = [input.name, input.address, 'Paris'].filter(Boolean).join(' ')
-  const details = await fetchGooglePlaceDetails(query).catch(() => null)
+  const details = await fetchGooglePlaceDetails(query, undefined, {
+    placeId: input.googlePlaceId,
+  }).catch(() => null)
 
   let lat = details?.location?.lat
   let lng = details?.location?.lng
@@ -70,6 +74,7 @@ export async function resolveHotelCandidate(input: {
 
   return {
     id: `hotel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    googlePlaceId: details?.id || input.googlePlaceId,
     name,
     area,
     address: address || `${name}, Paris`,
@@ -90,6 +95,7 @@ export async function resolveHotelCandidate(input: {
 
 export async function resolveHotelCandidates(
   rows: Array<{
+    googlePlaceId?: string
     name: string
     address?: string
     area?: string

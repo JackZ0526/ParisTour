@@ -8,6 +8,7 @@ import {
   resolveHotelCandidates,
 } from './hotelResolve'
 import type { HotelCandidate, SelectedHotel } from '../types'
+import { searchNearbyGooglePlaceCandidates } from './googlePlaceDetails'
 
 export function persistHotelState(
   candidates: HotelCandidate[],
@@ -47,12 +48,25 @@ export async function fetchResolvedHotelRecommendations(input?: {
   dayCount?: number
 }): Promise<HotelCandidate[]> {
   const count = Math.max(1, Math.min(8, input?.count || 5))
+  const excluded = new Set(
+    (input?.excludeNames || []).map((name) => name.trim().toLowerCase()),
+  )
+  const verifiedCandidates = (await searchNearbyGooglePlaceCandidates({
+    textQuery: 'hotel Paris',
+    location: { lat: 48.8566, lng: 2.3522 },
+    maxDistanceMeters: 25_000,
+    limit: 20,
+  })).filter((candidate) => !excluded.has(candidate.name.trim().toLowerCase()))
+  if (!verifiedCandidates.length) {
+    throw new Error('Google 暂时没有返回可验证的酒店候选。')
+  }
   const raw = await recommendHotelsForTrip({
     count,
     batch: input?.batch || 1,
     excludeNames: input?.excludeNames,
     preferences: input?.preferences,
     dayCount: input?.dayCount,
+    verifiedCandidates,
   })
   const resolved = await resolveHotelCandidates(raw.slice(0, count))
   if (!resolved.length) {
