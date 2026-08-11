@@ -7,7 +7,7 @@ import {
 import { requireAllowlistedUser } from './_lib/auth.js'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 
 /** Proxies /api/deepseek/* → DeepSeek OpenAI-compatible API. */
 export async function GET(req: Request): Promise<Response> {

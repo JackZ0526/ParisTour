@@ -43,6 +43,7 @@ const TASK_THINKING: Record<
   default: { baseline: 'low', min: 'off', max: 'medium' },
   tripChat: { baseline: 'low', min: 'off', max: 'high' },
   dayCopy: { baseline: 'low', min: 'off', max: 'low' },
+  translate: { baseline: 'low', min: 'off', max: 'low' },
   placeRecommend: { baseline: 'low', min: 'off', max: 'medium' },
   placeDescription: { baseline: 'low', min: 'off', max: 'medium' },
   placeDetail: { baseline: 'low', min: 'off', max: 'medium' },
@@ -50,8 +51,10 @@ const TASK_THINKING: Record<
   placeReviews: { baseline: 'low', min: 'off', max: 'medium' },
   hotelRecommend: { baseline: 'low', min: 'off', max: 'medium' },
   hotelDetail: { baseline: 'low', min: 'off', max: 'medium' },
-  itineraryGenerate: { baseline: 'medium', min: 'low', max: 'high' },
-  itineraryDayGenerate: { baseline: 'medium', min: 'low', max: 'high' },
+  // Cap at medium → DeepSeek `high` (not UI-high→`max`); max CoT often
+  // exhausts max_tokens before the multi-day JSON body is emitted.
+  itineraryGenerate: { baseline: 'medium', min: 'low', max: 'medium' },
+  itineraryDayGenerate: { baseline: 'medium', min: 'low', max: 'medium' },
   itineraryStart: { baseline: 'low', min: 'off', max: 'low' },
   destinationSuggest: { baseline: 'low', min: 'off', max: 'low' },
   router: { baseline: 'low', min: 'off', max: 'low' },
@@ -148,7 +151,26 @@ export async function resolveModelCallPreflight(
   messages: OpenAIChatMessage[],
   options?: ChatCallOptions,
 ): Promise<ModelCallPreflight> {
-  const fallback = resolveThinkingForTask(options?.task || 'default', options?.userText)
+  const taskBounds = TASK_THINKING[options?.task || 'default'] || TASK_THINKING.default
+  const mode = getThinkingMode()
+  const rawFallback = resolveThinkingForTask(
+    mode,
+    options?.userText,
+    options?.task || 'default',
+  )
+  let fallbackEffort: ResolvedThinkingEffort
+  if (mode === 'off' || !rawFallback.enabled) {
+    fallbackEffort = 'off'
+  } else if (mode === 'auto') {
+    const heuristic = rawFallback.effort === 'off' ? 'low' : rawFallback.effort
+    // Prefer the task baseline when the heuristic only returned generic low.
+    const preferred = heuristic === 'low' ? taskBounds.baseline : heuristic
+    fallbackEffort = clampEffort(preferred, taskBounds.min, taskBounds.max)
+  } else {
+    fallbackEffort = clampEffort(mode, taskBounds.min, taskBounds.max)
+  }
+  const fallback = thinkingFromEffort(fallbackEffort)
+
   if (options?.preflight === false) {
     return { thinking: options.thinking || fallback, needsWeb: options.webSearch === true }
   }
@@ -209,7 +231,6 @@ export async function resolveModelCallPreflight(
     if (options?.signal?.aborted) throw error
   }
 
-  const taskBounds = TASK_THINKING[options?.task || 'default'] || TASK_THINKING.default
   const classifiedForTask = classifiedEffort
     ? clampEffort(classifiedEffort, taskBounds.min, taskBounds.max)
     : null

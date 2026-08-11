@@ -65,23 +65,23 @@ export function uiEffortToOpenAI(
 }
 
 export const THINKING_MODE_OPTIONS: Array<{
-  value: ThinkingMode
+  id: ThinkingMode
   label: string
 }> = [
-  { value: 'auto', label: '自动' },
-  { value: 'off', label: '关闭' },
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
+  { id: 'auto', label: '自动' },
+  { id: 'off', label: '关闭' },
+  { id: 'low', label: '低' },
+  { id: 'medium', label: '中' },
+  { id: 'high', label: '高' },
 ]
 
 export const THINKING_EFFORT_OPTIONS: Array<{
-  value: ThinkingEffortUi
+  id: ThinkingEffortUi
   label: string
 }> = [
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
+  { id: 'low', label: '低' },
+  { id: 'medium', label: '中' },
+  { id: 'high', label: '高' },
 ]
 
 /** Heuristic nudge of the auto classifier: -1 (simpler), 0 (default), +1 (harder). */
@@ -105,43 +105,62 @@ function thinkingHeuristicBucket(
   if (task === 'dayCopy' || task === 'destinationSuggest' || task === 'placeName') {
     return 'easy'
   }
-  // Full / single-day itinerary generation: hard when long or analytical.
+  // Full / single-day itinerary: structured JSON with verified candidates —
+  // medium planning is enough; "hard" would map UI-high → DeepSeek max CoT.
   if (task === 'itineraryGenerate' || task === 'itineraryDayGenerate') {
-    return 'hard'
+    return 'default'
   }
   const delta = thinkingHeuristicDelta(userText)
   if (delta > 0) return 'hard'
   return 'default'
 }
 
+const THINKING_MODES: ReadonlySet<string> = new Set([
+  'auto',
+  'off',
+  'low',
+  'medium',
+  'high',
+])
+
 /**
  * Resolve ThinkingMode → concrete effort + enabled flag.
  *  - 「auto」 runs the classifier per task
  *  - 「off」  disables thinking
  *  - explicit low/medium/high uses that bucket
+ *
+ * Call as `resolveThinkingForTask(getThinkingMode(), userText, task)`.
+ * If a caller accidentally passes `task` as the first arg (legacy stage-3
+ * call sites), treat first arg as task and fall back to auto mode so we
+ * don't map unknown strings to DeepSeek `max` via `uiEffortToApi`.
  */
 export function resolveThinkingForTask(
   mode: ThinkingMode,
   userText?: string,
   task?: LlmTaskKind,
 ): ResolvedThinking {
-  if (mode === 'off') return { enabled: false, effort: 'off' }
+  if (!THINKING_MODES.has(mode)) {
+    return resolveThinkingForTask('auto', userText, mode as LlmTaskKind)
+  }
+  if (mode === 'off') return { enabled: false, effort: 'off', source: 'manual' }
   if (mode === 'auto') {
     const bucket = thinkingHeuristicBucket(task, userText)
-    if (bucket === 'easy') return { enabled: true, effort: 'low' }
-    if (bucket === 'hard') return { enabled: true, effort: 'high' }
-    return { enabled: true, effort: 'low' }
+    if (bucket === 'easy') return { enabled: true, effort: 'low', source: 'auto' }
+    if (bucket === 'hard') return { enabled: true, effort: 'high', source: 'auto' }
+    return { enabled: true, effort: 'low', source: 'auto' }
   }
-  return { enabled: true, effort: mode as ThinkingEffortUi }
+  return { enabled: true, effort: mode as ThinkingEffortUi, source: 'manual' }
 }
 
 export function resolveLlmBusyVisual(options?: {
   mode?: ThinkingMode
   userText?: string
   task?: LlmTaskKind
+  thinkingEnabled?: boolean
 }): LlmBusyVisual {
   const mode = options?.mode
   if (mode === 'off') return 'generating'
+  if (options?.thinkingEnabled === false) return 'generating'
   if (mode === 'auto') {
     const bucket = thinkingHeuristicBucket(options?.task, options?.userText)
     if (bucket === 'hard') return 'thinking'

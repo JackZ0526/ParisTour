@@ -16,6 +16,7 @@ import { LlmRequestError } from './errors'
 import {
   getActiveLlmLabel,
   getOpenAIModel,
+  getThinkingMode,
   isDeepSeekModel,
 } from './model-state'
 import { getProviderLabel } from './provider-state'
@@ -24,9 +25,86 @@ import type {
   ChatCallOptions,
   ChatStreamOptions,
   LlmProvider,
+  LlmTaskKind,
   OpenAIChatMessage,
   ResolvedThinking,
 } from './types'
+
+/** Shared completion budget: thinking CoT counts toward the same cap as visible content. */
+function completionTokenBudget(
+  thinking: ResolvedThinking,
+  task?: LlmTaskKind,
+): number {
+  const jsonHeavy =
+    task === 'itineraryGenerate' ||
+    task === 'itineraryDayGenerate' ||
+    task === 'placeRecommend' ||
+    task === 'hotelRecommend'
+  if (thinking.enabled) {
+    // DeepSeek V4 max output is 384K; leave headroom for CoT + full multi-day JSON.
+    return jsonHeavy ? 65536 : 32768
+  }
+  return jsonHeavy ? 24576 : 8192
+}
+
+function applyCompletionBudget(
+  body: Record<string, unknown>,
+  backend: ChatBackend,
+  tokens: number,
+) {
+  if (backend === 'deepseek') {
+    delete body.max_completion_tokens
+    body.max_tokens = tokens
+  } else {
+    delete body.max_tokens
+    body.max_completion_tokens = tokens
+  }
+}
+
+/** After a length truncation: raise budget and soften / disable thinking so content can finish. */
+function adaptBodyAfterLengthTruncation(
+  body: Record<string, unknown>,
+  backend: ChatBackend,
+  attempt: number,
+): void {
+  const current = Number(body.max_tokens ?? body.max_completion_tokens ?? 16384) || 16384
+  const next = Math.min(Math.max(current * 2, 65536), 131072)
+  applyCompletionBudget(body, backend, next)
+  if (backend === 'deepseek') {
+    if (attempt >= 1) {
+      body.thinking = { type: 'disabled' }
+      delete body.reasoning_effort
+    } else {
+      body.thinking = { type: 'enabled' }
+      body.reasoning_effort = 'low'
+    }
+  } else {
+    body.reasoning_effort = attempt >= 1 ? 'none' : 'low'
+  }
+}
+
+function truncationDebugBits(
+  body: Record<string, unknown>,
+  backend: ChatBackend,
+  finish: string,
+  contentLen: number,
+): string {
+  const model = String(body.model || getOpenAIModel())
+  const maxTok = body.max_tokens ?? body.max_completion_tokens ?? '?'
+  const thinking =
+    backend === 'deepseek'
+      ? JSON.stringify(body.thinking ?? null)
+      : String(body.reasoning_effort ?? 'n/a')
+  const effort = body.reasoning_effort != null ? String(body.reasoning_effort) : ''
+  return [
+    `finish_reason=${finish || 'unknown'}`,
+    `content_chars=${contentLen}`,
+    `model=${model}`,
+    `max_tokens=${maxTok}`,
+    `thinking=${thinking}${effort && backend === 'deepseek' ? ` · effort=${effort}` : ''}`,
+    `backend=${backend}`,
+  ].join(' · ')
+}
 
 type ChatBackend = 'openai' | 'deepseek' | 'gemini'
 
@@ -121,7 +199,11 @@ export async function readResponseJson<T>(
   }
 }
 
-export async function callGemini(system: string, user: string): Promise<string> {
+export async function callGemini(
+  system: string,
+  user: string,
+  options?: { signal?: AbortSignal },
+): Promise<string> {
   // Key injected by /api/gemini (Vite proxy or Vercel) — never send from the browser.
   const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
   const { authFetch } = await import('../../../features/auth/services/authFetch')
@@ -136,6 +218,7 @@ export async function callGemini(system: string, user: string): Promise<string> 
         maxOutputTokens: 4096,
       },
     }),
+    signal: options?.signal,
   })
   if (!res.ok) {
     throw friendlyLlmError(res.status, await res.text(), 'gemini')
@@ -156,14 +239,16 @@ export function openaiUsesRestrictedSampling(model: string): boolean {
 export function buildOpenAIChatBody(
   messages: OpenAIChatMessage[],
   thinking: ResolvedThinking,
+  task?: LlmTaskKind,
 ): Record<string, unknown> {
   const model = getOpenAIModel()
   const backend = chatBackendForModel(model)
   const thinkingOn = thinking.enabled
+  const budget = completionTokenBudget(thinking, task)
   const body: Record<string, unknown> = {
     model,
     // Reasoning models spend tokens before visible content; keep headroom for JSON replies.
-    max_completion_tokens: thinkingOn ? 16384 : 8192,
+    max_completion_tokens: budget,
     messages,
   }
 
@@ -213,13 +298,13 @@ export function prepareOpenAIChatBody(
   const backend = chatBackendForModel(model)
   const url = chatCompletionsUrl(model)
   const thinking =
-    options?.thinking ?? resolveThinkingForTask(options?.task || 'default', options?.userText)
-  const body = buildOpenAIChatBody(messages, thinking)
+    options?.thinking ??
+    resolveThinkingForTask(getThinkingMode(), options?.userText, options?.task || 'default')
+  const body = buildOpenAIChatBody(messages, thinking, options?.task)
 
   // DeepSeek chat uses max_tokens (OpenAI-compatible); thinking needs more headroom for CoT.
   if (backend === 'deepseek') {
-    delete body.max_completion_tokens
-    body.max_tokens = thinking.enabled ? 16384 : 8192
+    applyCompletionBudget(body, backend, completionTokenBudget(thinking, options?.task))
   }
   if (stream) body.stream = true
   if (options?.responseFormat === 'json_object') {
@@ -242,7 +327,7 @@ export function adaptOpenAIBodyForError(body: Record<string, unknown>, errText: 
   }
   if (lower.includes('max_tokens') && 'max_tokens' in body) {
     delete body.max_tokens
-    body.max_completion_tokens = body.max_completion_tokens || 8192
+    body.max_completion_tokens = body.max_completion_tokens || 65536
     return true
   }
   if (
@@ -251,7 +336,7 @@ export function adaptOpenAIBodyForError(body: Record<string, unknown>, errText: 
     !('max_tokens' in body)
   ) {
     delete body.max_completion_tokens
-    body.max_tokens = 8192
+    body.max_tokens = 65536
     return true
   }
   return false
@@ -282,35 +367,93 @@ export async function callOpenAIMessages(
   let attempt = 0
   let lastError: unknown = null
   while (attempt < 3) {
-    const res = await authFetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: effectiveOptions.signal,
-    })
+    let res: Response
+    try {
+      res = await authFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: effectiveOptions.signal,
+      })
+    } catch (err) {
+      const sig = effectiveOptions.signal
+      const reason = sig ? (sig as any).reason : undefined
+      const reasonStr = reason ? String(reason) : ''
+      if (sig?.aborted || /timeout/i.test(reasonStr)) {
+        const isTimeout = /timeout/i.test(reasonStr)
+        throw new LlmRequestError(
+          isTimeout ? '请求超时（已终止）。' : '请求已取消。',
+          isTimeout ? 'timeout' : 'aborted',
+        )
+      }
+      throw err
+    }
     if (res.ok) {
       try {
         const data = await readResponseJson<{
           choices?: Array<{
-            message?: { content?: string | Array<{ type?: string; text?: string }>; refusal?: string }
+            finish_reason?: string
+            message?: {
+              content?: string | Array<{ type?: string; text?: string }>
+              refusal?: string
+              reasoning_content?: string
+            }
           }>
+          usage?: {
+            completion_tokens?: number
+            completion_tokens_details?: { reasoning_tokens?: number }
+          }
         }>(res, provider)
-        const refusal = data.choices?.[0]?.message?.refusal?.trim()
+        const choice = data.choices?.[0]
+        const refusal = choice?.message?.refusal?.trim()
         if (refusal) {
           throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
         }
         const text = extractOpenAIMessageText(data)
-        if (text) return text
-        const finish = data.choices?.[0]?.finish_reason || ''
+        const finish = choice?.finish_reason || ''
+        const reasoningLen = String(choice?.message?.reasoning_content || '').length
+        const usageBits = [
+          data.usage?.completion_tokens != null
+            ? `completion_tokens=${data.usage.completion_tokens}`
+            : '',
+          data.usage?.completion_tokens_details?.reasoning_tokens != null
+            ? `reasoning_tokens=${data.usage.completion_tokens_details.reasoning_tokens}`
+            : reasoningLen
+              ? `reasoning_chars=${reasoningLen}`
+              : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+
+        // finish_reason=length means the shared completion budget ran out (often on CoT).
+        // Never return a partial JSON body; retry with a larger budget / softer thinking.
         if (finish === 'length') {
+          if (attempt < 2) {
+            adaptBodyAfterLengthTruncation(body, backend, attempt)
+            attempt++
+            await new Promise((r) => setTimeout(r, 200 * attempt))
+            continue
+          }
+          const detail = [
+            truncationDebugBits(body, backend, finish, text.length),
+            usageBits,
+            text
+              ? '最终回复被截断（有部分 content）。'
+              : '最终 content 为空（额度可能全用在内部推理上）。',
+          ]
+            .filter(Boolean)
+            .join(' · ')
           throw new LlmRequestError(
-            backend === 'deepseek'
-              ? '模型输出被截断。请换 deepseek-v4-flash，或稍后再试。'
-              : '模型输出被截断（可能把额度用在了内部推理上）。请换 gpt-5.4-nano，或稍后再试。',
+            `模型输出被截断。\n${detail}`,
             'truncated',
           )
         }
-        lastError = new LlmRequestError(`${backend} 没有返回内容。`, 'empty')
+
+        if (text) return text
+        lastError = new LlmRequestError(
+          `${backend} 没有返回内容（finish_reason=${finish || 'unknown'} · model=${body.model || getOpenAIModel()}${usageBits ? ` · ${usageBits}` : ''}）。`,
+          'empty',
+        )
       } catch (parseError) {
         if (parseError instanceof LlmRequestError) throw parseError
         lastError = parseError
@@ -335,7 +478,12 @@ export async function callOpenAIMessages(
         await new Promise((r) => setTimeout(r, 250 * attempt))
         continue
       }
-      throw friendlyLlmError(res.status, errText, provider)
+      const mapped = friendlyLlmError(res.status, errText, provider)
+      throw new LlmRequestError(
+        `${mapped.message}\nHTTP ${res.status} · model=${body.model || getOpenAIModel()} · backend=${backend}${errText ? ` · body=${errText.slice(0, 180)}` : ''}`,
+        mapped.code,
+        res.status,
+      )
     }
     attempt++
     if (attempt < 3) {
@@ -365,15 +513,30 @@ export async function callOpenAIMessagesStream(
   const provider: LlmProvider | ChatBackend = backend
   const { authFetch } = await import('../../../features/auth/services/authFetch')
 
-  const res = await authFetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify(body),
-    signal: options?.signal,
-  })
+  let res: Response
+  try {
+    res = await authFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    })
+  } catch (err) {
+    const sig = options?.signal
+    const reason = sig ? (sig as any).reason : undefined
+    const reasonStr = reason ? String(reason) : ''
+    if (sig?.aborted || /timeout/i.test(reasonStr)) {
+      const isTimeout = /timeout/i.test(reasonStr)
+      throw new LlmRequestError(
+        isTimeout ? '请求超时（已终止）。' : '请求已取消。',
+        isTimeout ? 'timeout' : 'aborted',
+      )
+    }
+    throw err
+  }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '')
@@ -513,7 +676,8 @@ function parseChatStreamBlock(block: string): ChatStreamEvent | null {
     if (parsed.error && typeof parsed.error === 'object') {
       return { type: 'error', error: parsed.error as { message?: string; code?: string; type?: string } }
     }
-    return { type: 'data', choice: parsed.choices?.[0], raw: data }
+    const parsedWithChoices = parsed as Record<string, unknown> & { choices?: unknown[] }
+    return { type: 'data', choice: parsedWithChoices.choices?.[0], raw: data }
   } catch {
     return null
   }
