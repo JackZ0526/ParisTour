@@ -6,7 +6,7 @@ import {
   saveFlightSelection,
   type PersistedFlightSelection,
 } from '../services/flightSelection'
-import type { TripDateRange } from '../../../services/tripDates'
+import type { TripDateRange } from '../../itinerary/services/tripDates'
 import type { FlightEndpoint, FlightInfo } from '../../../types'
 import { formatAirportLocalTime } from '../utils/flightTime'
 import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'

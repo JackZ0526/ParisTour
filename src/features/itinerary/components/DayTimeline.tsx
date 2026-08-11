@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { getPlace } from '../data/places'
-import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
-import { PATH_MODE_COLORS } from '../services/googleNav'
-import type { RecommendationPreferences } from '../services/recommendationPreferences'
-import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../types'
+import { getPlace } from '../../../data/places'
+import type { DayNavPlan, ResolvedDayLeg } from '../../../services/googleNav'
+import { PATH_MODE_COLORS } from '../../../services/googleNav'
+import type { RecommendationPreferences } from '../../../services/recommendationPreferences'
+import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../../../types'
 import {
   getDayOrigin,
   isAirportPlace,
@@ -11,12 +11,12 @@ import {
   numberedStopIndexes,
   SELECTED_HOTEL_PLACE_ID,
 } from '../utils/dayOrigin'
-import { AddPlaceDialog } from './AddPlaceDialog'
-import { GommagePetals } from './GommagePetals'
-import { GooglePlacePhoto } from './GooglePlacePhoto'
-import { LoadingIndicator } from './LoadingIndicator'
-import { HouseIcon, PlaneIcon } from './markerIcons'
-import { PlaceName } from './PlaceName'
+import { AddPlaceDialog } from '../../../components/AddPlaceDialog'
+import { GommagePetals } from '../../../components/GommagePetals'
+import { GooglePlacePhoto } from '../../../components/GooglePlacePhoto'
+import { LoadingIndicator } from '../../../components/LoadingIndicator'
+import { HouseIcon, PlaneIcon } from '../../../components/markerIcons'
+import { PlaceName } from '../../../components/PlaceName'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560

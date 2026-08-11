@@ -1,4 +1,4 @@
-import type { DayPlan, ItineraryStop, Place } from '../types'
+import type { DayPlan, ItineraryStop, Place } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from './dayOrigin'
 
 const STORAGE_KEY = 'paris-tour-itinerary-v1'

@@ -1,7 +1,7 @@
-import type { PersistedBaselineState, PersistedItineraryState } from '../../../utils/itineraryState'
+import type { PersistedBaselineState, PersistedItineraryState } from '../../itinerary/utils/itineraryState'
 import type { PersistedFlightSelection } from '../../flight/services/flightSelection'
 import type { HotelCacheState } from '../../hotel/services/hotelCache'
-import type { TripDateRange } from '../../../services/tripDates'
+import type { TripDateRange } from '../../itinerary/services/tripDates'
 import type { LlmArtifactMap } from '../../../services/llmArtifactStore'
 import type { RecommendationPreferences } from '../../../services/recommendationPreferences'
 import {
@@ -11,7 +11,7 @@ import {
   loadItineraryState,
   saveBaselineItinerary,
   saveItineraryState,
-} from '../../../utils/itineraryState'
+} from '../../itinerary/utils/itineraryState'
 import {
   clearFlightSelection,
   loadFlightSelection,
@@ -19,7 +19,7 @@ import {
 } from '../../flight/services/flightSelection'
 import { clearHotelCache, loadHotelCache, saveHotelCache } from '../../hotel/services/hotelCache'
 import { loadDestination, saveDestination } from '../../destination/services/destination'
-import { loadTripDates, saveTripDates } from '../../../services/tripDates'
+import { loadTripDates, saveTripDates } from '../../itinerary/services/tripDates'
 import {
   clearLlmArtifacts,
   loadLlmArtifacts,

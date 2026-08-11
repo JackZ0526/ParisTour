@@ -1,4 +1,4 @@
-import { places as catalogPlaces } from '../data/places'
+import { places as catalogPlaces } from '../../../data/places'
 import type {
   DayPlan,
   FlightInfo,
@@ -7,14 +7,14 @@ import type {
   PlaceType,
   SelectedHotel,
   WalkLevel,
-} from '../types'
+} from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
-} from './googlePlaceDetails'
+} from '../../../services/googlePlaceDetails'
 import {
   generateFullItinerary,
   generateSingleDayItinerary,
@@ -23,7 +23,7 @@ import {
   type GenerateSingleDayItineraryInput,
   type OccupiedPlaceBrief,
   type VerifiedPlaceCandidate,
-} from './llm'
+} from '../../../services/llm'
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'

@@ -1,4 +1,4 @@
-import type { Coordinates, Place, SelectedHotel } from '../types'
+import type { Coordinates, Place, SelectedHotel } from '../../../types'
 
 /** Charles de Gaulle — day-1 route origin (not an itinerary stop). */
 export const CDG_PLACE_ID = 'attr-cdg'

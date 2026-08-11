@@ -8,7 +8,7 @@ import {
   isAirportPlace,
   isHotelPlace,
   numberedStopIndexes,
-} from '../utils/dayOrigin'
+} from '../features/itinerary/utils/dayOrigin'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { googleMapsLoadErrorHelp } from '../services/googleMapsErrors'
 import { LoadingIndicator } from './LoadingIndicator'

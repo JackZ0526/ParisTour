@@ -1,4 +1,4 @@
-import type { DayPlan } from '../types'
+import type { DayPlan } from '../../../types'
 
 const metroHints = {
   west: {

@@ -5,7 +5,7 @@ import {
   TIMELINE_DELETE_TOTAL_MS,
   TIMELINE_INSERT_TOTAL_MS,
   TIMELINE_SWAP_TOTAL_MS,
-} from './components/DayTimeline'
+} from './features/itinerary/components/DayTimeline'
 import {
   FlightPanel,
   areFlightsComplete,
@@ -23,7 +23,7 @@ import { PlacePanel } from './components/PlacePanel'
 import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
 import type { TripChatViewingTarget } from './services/tripChat'
-import { TripDatesPanel } from './components/TripDatesPanel'
+import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { TripMap } from './components/TripMap'
 import { MapErrorBoundary } from './components/MapErrorBoundary'
 import {
@@ -33,7 +33,7 @@ import {
   isPlaceholderHotelArea,
 } from './features/hotel/constants/hotels'
 import { getPlace } from './data/places'
-import { clearDayNavCache, useDayNav } from './hooks/useDayNav'
+import { clearDayNavCache, useDayNav } from './features/itinerary/hooks/useDayNav'
 import { clearAllFlightCache } from './features/flight/services/flightCache'
 import {
   clearFlightSelection,
@@ -47,7 +47,7 @@ import {
   buildGeneratedItinerary,
   buildGeneratedSingleDay,
   flightContextBrief,
-} from './services/itineraryGenerate'
+} from './features/itinerary/services/itineraryGenerate'
 import {
   generateDayCopy,
   isLlmConfigured,
@@ -64,13 +64,13 @@ import {
   loadTripDates,
   saveTripDates,
   type TripDateRange,
-} from './services/tripDates'
+} from './features/itinerary/services/tripDates'
 import type { DayPlan, HotelCandidate, ItineraryStop, Place, SelectedHotel } from './types'
 import {
   getDayOrigin,
   placeFromHotel,
   SELECTED_HOTEL_PLACE_ID,
-} from './utils/dayOrigin'
+} from './features/itinerary/utils/dayOrigin'
 import {
   applyDay1HotelArrivalTimes,
   computeDay1HotelArrivalHm,
@@ -99,7 +99,7 @@ import {
   saveItineraryState,
   wipeGeneratedItinerary,
   type ItineraryInputFingerprint,
-} from './utils/itineraryState'
+} from './features/itinerary/utils/itineraryState'
 import { flushTripCloudSave, isRemoteQuietPeriodActive } from './features/cloud-sync/services/tripCloud'
 import {
   loadRecommendationPreferences,

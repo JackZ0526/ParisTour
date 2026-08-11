@@ -5,7 +5,7 @@ import {
   type RecommendationPreferences,
 } from '../services/recommendationPreferences'
 import { CloseIconButton } from './CloseIconButton'
-import { TimePicker } from './TimePicker'
+import { TimePicker } from '../features/itinerary/components/TimePicker'
 
 interface Props {
   open: boolean

@@ -1,14 +1,14 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { getPlace } from '../data/places'
+import { getPlace } from '../../../data/places'
 import {
   planDayNavigation,
   type DayNavPlan,
   type ResolvedDayLeg,
-} from '../services/googleNav'
-import { getLlmArtifact, setLlmArtifact } from '../services/llmArtifactStore'
-import type { DayPlan, Place, SelectedHotel } from '../types'
+} from '../../../services/googleNav'
+import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
+import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getDayOriginFromHotelFields } from '../utils/dayOrigin'
-import { useGoogleMapsReady } from '../components/GoogleMapsProvider'
+import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
 
 const emptyPlan = (
   stopsKey = '',

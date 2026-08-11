@@ -20,7 +20,7 @@ import {
   type ResolvedThinkingEffort,
   type ThinkingEffortUi,
 } from './llm'
-import { dateForTripDay, formatTripDayLabel } from './tripDates'
+import { dateForTripDay, formatTripDayLabel } from '../features/itinerary/services/tripDates'
 import { searchNearbyGooglePlaceCandidates } from './googlePlaceDetails'
 import {
   COMMON_RULES,
