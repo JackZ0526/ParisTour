@@ -1,59 +1,59 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAuth } from './auth/AuthProvider'
+import { useAuth } from './features/auth/AuthProvider'
 import {
   DayTimeline,
   TIMELINE_DELETE_TOTAL_MS,
   TIMELINE_INSERT_TOTAL_MS,
   TIMELINE_SWAP_TOTAL_MS,
-} from './components/DayTimeline'
+} from './features/itinerary/components/DayTimeline'
 import {
   FlightPanel,
   areFlightsComplete,
   type FlightSelection,
-} from './components/FlightPanel'
-import { HotelPicker } from './components/HotelPicker'
-import { LoadingIndicator } from './components/LoadingIndicator'
-import { CloudSaveIndicator } from './components/CloudSaveIndicator'
-import { BackupDialog } from './components/BackupDialog'
+} from './features/flight/components/FlightPanel'
+import { HotelPicker } from './features/hotel/components/HotelPicker'
+import { LoadingIndicator } from './shared/components/LoadingIndicator'
+import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
+import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {
   RecommendationPreferencesButton,
   RecommendationPreferencesDialog,
-} from './components/RecommendationPreferencesDialog'
-import { PlacePanel } from './components/PlacePanel'
-import { ShareDialog } from './components/ShareDialog'
-import { TripChatPanel } from './components/TripChatPanel'
-import type { TripChatViewingTarget } from './services/tripChat'
-import { TripDatesPanel } from './components/TripDatesPanel'
-import { TripMap } from './components/TripMap'
-import { MapErrorBoundary } from './components/MapErrorBoundary'
+} from './features/place/components/RecommendationPreferencesDialog'
+import { PlacePanel } from './features/place/components/PlacePanel'
+import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
+import { TripChatPanel } from './features/chat/components/TripChatPanel'
+import type { TripChatViewingTarget } from './features/chat/services/tripChat'
+import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
+import { TripMap } from './features/map/components/TripMap'
+import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import {
   PENDING_HOTEL,
   inferParisAreaLabel,
   isHotelSelected,
   isPlaceholderHotelArea,
-} from './data/hotels'
-import { getPlace } from './data/places'
-import { clearDayNavCache, useDayNav } from './hooks/useDayNav'
-import { clearAllFlightCache } from './services/flightCache'
+} from './features/hotel/constants/hotels'
+import { getPlace } from './features/place/constants/places'
+import { clearDayNavCache, useDayNav } from './features/itinerary/hooks/useDayNav'
+import { clearAllFlightCache } from './features/flight/services/flightCache'
 import {
   clearFlightSelection,
   loadFlightSelection,
-} from './services/flightSelection'
-import { clearHotelCache, loadHotelCache } from './services/hotelCache'
-import { clearLlmMemo } from './services/llmMemo'
-import { clearLlmArtifacts } from './services/llmArtifactStore'
-import { clearAllRecommendCache } from './services/recommendCache'
+} from './features/flight/services/flightSelection'
+import { clearHotelCache, loadHotelCache } from './features/hotel/services/hotelCache'
+import { clearLlmMemo } from './shared/services/llm/llmMemo'
+import { clearLlmArtifacts } from './shared/services/llm/llmArtifactStore'
+import { clearAllRecommendCache } from './features/place/services/recommendCache'
 import {
   buildGeneratedItinerary,
   buildGeneratedSingleDay,
   flightContextBrief,
-} from './services/itineraryGenerate'
+} from './features/itinerary/services/itineraryGenerate'
 import {
   generateDayCopy,
   isLlmConfigured,
   resolveItineraryStart,
   type ItineraryStartResult,
-} from './services/llm'
+} from './shared/services/llm/llm'
 import {
   clampIsoDate,
   dateForTripDay,
@@ -64,18 +64,18 @@ import {
   loadTripDates,
   saveTripDates,
   type TripDateRange,
-} from './services/tripDates'
+} from './features/itinerary/services/tripDates'
 import type { DayPlan, HotelCandidate, ItineraryStop, Place, SelectedHotel } from './types'
 import {
   getDayOrigin,
   placeFromHotel,
   SELECTED_HOTEL_PLACE_ID,
-} from './utils/dayOrigin'
+} from './features/itinerary/utils/dayOrigin'
 import {
   applyDay1HotelArrivalTimes,
   computeDay1HotelArrivalHm,
   recomputeDayStopTimes,
-} from './utils/stopTimes'
+} from './shared/utils/stopTimes'
 import {
   blankDay,
   buildItineraryFingerprint,
@@ -99,14 +99,14 @@ import {
   saveItineraryState,
   wipeGeneratedItinerary,
   type ItineraryInputFingerprint,
-} from './utils/itineraryState'
-import { flushTripCloudSave, isRemoteQuietPeriodActive } from './services/tripCloud'
+} from './features/itinerary/utils/itineraryState'
+import { flushTripCloudSave, isRemoteQuietPeriodActive } from './features/cloud-sync/services/tripCloud'
 import {
   loadRecommendationPreferences,
   recommendationPreferencesPrompt,
   saveRecommendationPreferences,
   type RecommendationPreferences,
-} from './services/recommendationPreferences'
+} from './features/place/services/recommendationPreferences'
 
 const ITINERARY_LOADING_LINES = [
   '正在按航班、酒店和推荐偏好拼接日程…',
