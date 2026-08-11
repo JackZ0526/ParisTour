@@ -13,14 +13,14 @@ import {
 } from './components/FlightPanel'
 import { HotelPicker } from './components/HotelPicker'
 import { LoadingIndicator } from './components/LoadingIndicator'
-import { CloudSaveIndicator } from './components/CloudSaveIndicator'
-import { BackupDialog } from './components/BackupDialog'
+import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
+import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {
   RecommendationPreferencesButton,
   RecommendationPreferencesDialog,
 } from './components/RecommendationPreferencesDialog'
 import { PlacePanel } from './components/PlacePanel'
-import { ShareDialog } from './components/ShareDialog'
+import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
 import type { TripChatViewingTarget } from './services/tripChat'
 import { TripDatesPanel } from './components/TripDatesPanel'
@@ -100,7 +100,7 @@ import {
   wipeGeneratedItinerary,
   type ItineraryInputFingerprint,
 } from './utils/itineraryState'
-import { flushTripCloudSave, isRemoteQuietPeriodActive } from './services/tripCloud'
+import { flushTripCloudSave, isRemoteQuietPeriodActive } from './features/cloud-sync/services/tripCloud'
 import {
   loadRecommendationPreferences,
   recommendationPreferencesPrompt,

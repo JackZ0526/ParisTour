@@ -1,9 +1,9 @@
-import type { PersistedBaselineState, PersistedItineraryState } from '../utils/itineraryState'
-import type { PersistedFlightSelection } from './flightSelection'
-import type { HotelCacheState } from './hotelCache'
-import type { TripDateRange } from './tripDates'
-import type { LlmArtifactMap } from './llmArtifactStore'
-import type { RecommendationPreferences } from './recommendationPreferences'
+import type { PersistedBaselineState, PersistedItineraryState } from '../../../utils/itineraryState'
+import type { PersistedFlightSelection } from '../../../services/flightSelection'
+import type { HotelCacheState } from '../../../services/hotelCache'
+import type { TripDateRange } from '../../../services/tripDates'
+import type { LlmArtifactMap } from '../../../services/llmArtifactStore'
+import type { RecommendationPreferences } from '../../../services/recommendationPreferences'
 import {
   clearBaselineItinerary,
   clearItineraryState,
@@ -11,26 +11,26 @@ import {
   loadItineraryState,
   saveBaselineItinerary,
   saveItineraryState,
-} from '../utils/itineraryState'
+} from '../../../utils/itineraryState'
 import {
   clearFlightSelection,
   loadFlightSelection,
   saveFlightSelection,
-} from './flightSelection'
-import { clearHotelCache, loadHotelCache, saveHotelCache } from './hotelCache'
-import { loadDestination, saveDestination } from './destination'
-import { loadTripDates, saveTripDates } from './tripDates'
+} from '../../../services/flightSelection'
+import { clearHotelCache, loadHotelCache, saveHotelCache } from '../../../services/hotelCache'
+import { loadDestination, saveDestination } from '../../../services/destination'
+import { loadTripDates, saveTripDates } from '../../../services/tripDates'
 import {
   clearLlmArtifacts,
   loadLlmArtifacts,
   saveLlmArtifacts,
-} from './llmArtifactStore'
-import { clearLlmMemo, seedLlmMemo } from './llmMemo'
+} from '../../../services/llmArtifactStore'
+import { clearLlmMemo, seedLlmMemo } from '../../../services/llmMemo'
 import {
   clearRecommendationPreferences,
   loadRecommendationPreferences,
   saveRecommendationPreferences,
-} from './recommendationPreferences'
+} from '../../../services/recommendationPreferences'
 
 export const TRIP_SNAPSHOT_VERSION = 1 as const
 

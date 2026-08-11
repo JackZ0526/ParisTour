@@ -9,7 +9,7 @@ import {
   type CloudSaveStatus,
   type CloudSyncStatus,
 } from '../services/tripCloud'
-import { ActivityBars, SyncOrbitIcon } from './LoadingIndicator'
+import { ActivityBars, SyncOrbitIcon } from '../../../components/LoadingIndicator'
 
 type ToastKind = 'save' | 'sync'
 

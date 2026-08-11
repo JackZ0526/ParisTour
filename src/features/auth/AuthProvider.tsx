@@ -23,7 +23,7 @@ import {
   subscribeTripRealtime,
   type AccessibleTrip,
   type TripRole,
-} from '../../services/tripCloud'
+} from '../cloud-sync/services/tripCloud'
 import { subscribeLlmArtifacts } from '../../services/llmArtifactStore'
 
 type AuthStatus =
