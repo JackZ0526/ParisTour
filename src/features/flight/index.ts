@@ -3,7 +3,9 @@ export { FlightPanel, areFlightsComplete } from './components/FlightPanel'
 export {
   lookupFlight,
   meaningfulFlightStatus,
-  type FlightLookupResult,
+  templateToFlightInfo,
+  type FlightLookupDirection,
+  type FlightTravelContext,
 } from './services/flightLookup'
 export {
   clearFlightSelection,
@@ -13,9 +15,12 @@ export {
 } from './services/flightSelection'
 export {
   clearAllFlightCache,
-  clearFlightCacheEntry,
+  clearCachedFlight,
+  flightCacheKey,
   getCachedFlight,
+  hasCompleteSchedule,
   purgeNonApiFlightCache,
+  setCachedFlight,
 } from './services/flightCache'
 export { recommendedFlights } from './constants/flights'
 export { formatAirportLocalTime, parseAirportLocalTime } from './utils/flightTime'

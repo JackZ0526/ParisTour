@@ -1,7 +1,7 @@
-import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../data/hotels'
-import type { HotelCandidate, SelectedHotel } from '../types'
-import { geocodeParisAddress } from './geocode'
-import { fetchGooglePlaceDetails } from './googlePlaceDetails'
+import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../constants/hotels'
+import type { HotelCandidate, SelectedHotel } from '../../../types'
+import { geocodeParisAddress } from '../../../services/geocode'
+import { fetchGooglePlaceDetails } from '../../../services/googlePlaceDetails'
 
 const FALLBACK_HOTEL_IMAGE =
   'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'

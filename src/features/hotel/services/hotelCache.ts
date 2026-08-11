@@ -1,5 +1,5 @@
-import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel, isHotelSelected } from '../data/hotels'
-import type { HotelCandidate, SelectedHotel } from '../types'
+import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel, isHotelSelected } from '../constants/hotels'
+import type { HotelCandidate, SelectedHotel } from '../../../types'
 
 const STORAGE_KEY = 'paris-tour-hotel-cache-v1'
 

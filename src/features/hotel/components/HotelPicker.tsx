@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { PENDING_HOTEL, isHotelSelected } from '../data/hotels'
+import { PENDING_HOTEL, isHotelSelected } from '../constants/hotels'
 import { loadHotelCache } from '../services/hotelCache'
 import {
   fetchResolvedHotelRecommendations,
@@ -13,13 +13,13 @@ import {
   refreshHotelCandidates,
 } from '../services/hotelRecommend'
 import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
-import { generateHotelDetailCopy, isLlmConfigured } from '../services/llm'
-import { memoizeLlmCall } from '../services/llmMemo'
-import type { DayPlan, HotelCandidate, SelectedHotel } from '../types'
-import { GooglePlacePage } from './GooglePlacePage'
-import { GooglePlacePhoto } from './GooglePlacePhoto'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
-import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
+import { generateHotelDetailCopy, isLlmConfigured } from '../../../services/llm'
+import { memoizeLlmCall } from '../../../services/llmMemo'
+import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
+import { GooglePlacePage } from '../../../components/GooglePlacePage'
+import { GooglePlacePhoto } from '../../../components/GooglePlacePhoto'
+import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 
 interface Props {
   selected: SelectedHotel

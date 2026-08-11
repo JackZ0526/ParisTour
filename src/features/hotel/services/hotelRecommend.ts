@@ -1,14 +1,14 @@
-import { getOpenAIModel, recommendHotelsForTrip } from './llm'
-import { clearLlmMemo } from './llmMemo'
-import { removeLlmArtifactsByPrefix } from './llmArtifactStore'
+import { getOpenAIModel, recommendHotelsForTrip } from '../../../services/llm'
+import { clearLlmMemo } from '../../../services/llmMemo'
+import { removeLlmArtifactsByPrefix } from '../../../services/llmArtifactStore'
 import { loadHotelCache, saveHotelCache } from './hotelCache'
 import {
   candidateToSelected,
   resolveHotelCandidate,
   resolveHotelCandidates,
 } from './hotelResolve'
-import type { HotelCandidate, SelectedHotel } from '../types'
-import { searchNearbyGooglePlaceCandidates } from './googlePlaceDetails'
+import type { HotelCandidate, SelectedHotel } from '../../../types'
+import { searchNearbyGooglePlaceCandidates } from '../../../services/googlePlaceDetails'
 
 export function persistHotelState(
   candidates: HotelCandidate[],

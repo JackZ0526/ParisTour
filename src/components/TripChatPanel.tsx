@@ -21,8 +21,8 @@ import {
   refreshHotelCandidates,
   replaceHotelCandidates,
   replaceOneHotelCandidate,
-} from '../services/hotelRecommend'
-import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
+} from '../features/hotel/services/hotelRecommend'
+import { candidateToSelected, resolveHotelCandidate } from '../features/hotel/services/hotelResolve'
 import {
   extractQuotedPlaceNames,
   findReplaceTargetInDay,

@@ -1,4 +1,4 @@
-import type { SelectedHotel } from '../types'
+import type { SelectedHotel } from '../../../types'
 
 /** Soft placeholder until LLM / custom hotel is ready. */
 export const PENDING_HOTEL: SelectedHotel = {
