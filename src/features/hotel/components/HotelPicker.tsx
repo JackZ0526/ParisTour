@@ -19,7 +19,7 @@ import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
+import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 interface Props {
   selected: SelectedHotel

@@ -5,7 +5,7 @@ import {
   restoreTripSnapshotBackup,
   type TripSnapshotBackup,
 } from '../services/tripCloud'
-import { CloseIconButton } from '../../../components/CloseIconButton'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 
 interface Props {
   tripId: string

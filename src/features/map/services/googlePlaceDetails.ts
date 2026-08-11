@@ -2,7 +2,7 @@ import type { Coordinates } from '../../../types'
 import {
   placeIdentitySimilarity,
   PLACE_NAME_MATCH_MIN,
-} from '../../../utils/placeTitle'
+} from '../../../shared/utils/placeTitle'
 import {
   getGoogleMapsApiKey,
   withGoogleMapsPhotoKey,

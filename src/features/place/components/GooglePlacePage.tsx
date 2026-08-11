@@ -13,12 +13,12 @@ import {
   translatePlaceNameToChinese,
 } from '../../chat/services/translate'
 import type { Coordinates } from '../../../types'
-import { placeOriginalLabel, placeTitleLines } from '../../../utils/placeTitle'
-import { formatPriceLevelLabel } from '../../../utils/priceLevel'
-import { CloseIconButton } from '../../../components/CloseIconButton'
+import { placeOriginalLabel, placeTitleLines } from '../../../shared/utils/placeTitle'
+import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GoogleReviewsList } from './GoogleReviewsList'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { LoadingIndicator } from '../../../components/LoadingIndicator'
+import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 export interface LlmPlaceNarrative {
   intro?: string

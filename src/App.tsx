@@ -12,7 +12,7 @@ import {
   type FlightSelection,
 } from './features/flight/components/FlightPanel'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
-import { LoadingIndicator } from './components/LoadingIndicator'
+import { LoadingIndicator } from './shared/components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
 import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {

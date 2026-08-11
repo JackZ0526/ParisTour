@@ -12,9 +12,9 @@ import {
   SELECTED_HOTEL_PLACE_ID,
 } from '../utils/dayOrigin'
 import { AddPlaceDialog } from '../../place/components/AddPlaceDialog'
-import { GommagePetals } from '../../../components/GommagePetals'
+import { GommagePetals } from '../../../shared/components/GommagePetals'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
-import { LoadingIndicator } from '../../../components/LoadingIndicator'
+import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { HouseIcon, PlaneIcon } from '../../map/components/markerIcons'
 import { PlaceName } from '../../place/components/PlaceName'
 

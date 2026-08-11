@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { GoogleReview } from '../../map/services/googlePlaceDetails'
 import { looksChinese, translateTextsToChinese } from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
-import { LoadingIndicator } from '../../../components/LoadingIndicator'
+import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 interface Props {
   reviews: GoogleReview[]

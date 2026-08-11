@@ -10,7 +10,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { normalizeAuthEmail } from './devTestAccount'
-import { getSupabase, isSupabaseConfigured } from '../../lib/supabase'
+import { getSupabase, isSupabaseConfigured } from '../../shared/lib/supabase'
 import {
   applyAccessibleTripLocally,
   flushTripCloudSave,

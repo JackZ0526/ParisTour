@@ -53,11 +53,11 @@ import type {
   SelectedHotel,
 } from '../../../types'
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
-import { CloseIconButton } from '../../../components/CloseIconButton'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
+import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
 
 const FALLBACK_IMAGE =

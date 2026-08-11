@@ -11,13 +11,13 @@ import {
 } from '../../itinerary/utils/dayOrigin'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { googleMapsLoadErrorHelp } from '../services/googleMapsErrors'
-import { LoadingIndicator } from '../../../components/LoadingIndicator'
+import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import {
   airportIconUrl,
   homeIconUrl,
   numberIconUrl,
 } from './markerIcons'
-import { placeOriginalLabel } from '../../../utils/placeTitle'
+import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
 import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
 
 const mapContainerStyle = { width: '100%', height: '100%' }

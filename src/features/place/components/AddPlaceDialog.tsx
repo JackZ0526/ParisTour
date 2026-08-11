@@ -27,11 +27,11 @@ import {
 } from '../services/recommendCache'
 import type { Place, PlaceType } from '../../../types'
 import type { RecommendationPreferences } from '../services/recommendationPreferences'
-import { formatPriceLevelLabel } from '../../../utils/priceLevel'
-import { CloseIconButton } from '../../../components/CloseIconButton'
+import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
+import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
 
 interface Props {

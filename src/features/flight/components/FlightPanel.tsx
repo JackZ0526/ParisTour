@@ -9,7 +9,7 @@ import {
 import type { TripDateRange } from '../../itinerary/services/tripDates'
 import type { FlightEndpoint, FlightInfo } from '../../../types'
 import { formatAirportLocalTime } from '../utils/flightTime'
-import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
+import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 function emptyFlightSelection(): PersistedFlightSelection {
   return {

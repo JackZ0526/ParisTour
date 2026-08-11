@@ -9,7 +9,7 @@ import {
   type TripShareRole,
   type TripShareRow,
 } from '../services/tripCloud'
-import { CloseIconButton } from '../../../components/CloseIconButton'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 
 type Props = {
   tripId: string

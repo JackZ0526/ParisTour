@@ -16,9 +16,9 @@ import {
   placeChineseLabel,
   placeOriginalLabel,
   placeTitleLines,
-} from '../../../utils/placeTitle'
+} from '../../../shared/utils/placeTitle'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { ActivityBars } from '../../../components/LoadingIndicator'
+import { ActivityBars } from '../../../shared/components/LoadingIndicator'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
 

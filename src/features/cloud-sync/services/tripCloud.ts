@@ -1,4 +1,4 @@
-import { getSupabase } from '../../../lib/supabase'
+import { getSupabase } from '../../../shared/lib/supabase'
 import {
   applyTripSnapshot,
   collectTripSnapshot,
