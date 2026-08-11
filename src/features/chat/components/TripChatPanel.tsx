@@ -7,6 +7,7 @@ import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
   getActiveLlmLabel,
+  getThinkingMode,
   isLlmConfigured,
   resolveThinkingForTask,
   type HotelDetailCopy,
@@ -27,7 +28,6 @@ import {
   extractQuotedPlaceNames,
   findReplaceTargetInDay,
   inferPlaceTypeFromText,
-  isLivePlaceRecommendationRequest,
   isReplacePlaceIntent,
   matchHotelCandidate,
   matchPlaceInDay,
@@ -40,9 +40,6 @@ import {
   type TripChatDestination,
   type TripChatTurn,
   type TripChatViewingTarget,
-  type TripChatRequestPlan,
-  type TripChatWorkStep,
-  type TripChatWebSearchDetail,
 } from '../services/tripChat'
 import type {
   DayPlan,
@@ -59,569 +56,27 @@ import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
+import {
+  FALLBACK_IMAGE,
+  PENDING_PLACE_LABELS,
+  RECOMMENDED_ATTRACTION_MAX_DISTANCE_METERS,
+  RECOMMENDED_FOOD_MAX_DISTANCE_METERS,
+  buildRerecommendMessage,
+  clarifyReplyForPending,
+  friendlyChatError,
+  isOperationalStopNote,
+  notesClaimDetailConfirm,
+  notesIndicateItineraryApplied,
+  pendingFallbackReason,
+  pickTravelerStopNote,
+  type PendingPlaceConfirm,
+} from './chatHelpers'
 
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
-
-// Model-picked food should remain within the Paris metro area around the stay.
-// Attractions allow common day trips such as Versailles / Disneyland Paris.
-const RECOMMENDED_FOOD_MAX_DISTANCE_METERS = 20_000
-const RECOMMENDED_ATTRACTION_MAX_DISTANCE_METERS = 75_000
-
-const PENDING_PLACE_LABELS = {
-  title: '行程顾问点评',
-  intro: '地点简介',
-  reason: '为什么推荐',
-  loadingText: '正在生成地点简介与推荐理由…',
-}
-
-type PendingPlaceConfirm = {
-  id: string
-  kind: 'add' | 'replace'
-  dayNum: number
-  place: Place
-  /** Chat-action note for advisor context only; never use as card note if operational. */
-  note?: string
-  /** add only */
-  mode?: 'best' | 'end'
-  /** replace only */
-  replaceStopId?: string
-  fromPlaceName?: string
-  /** Places already rejected in this confirm chain (for re-recommend). */
-  rejectedNames?: string[]
-  status?: 'ready' | 'rerecommending'
-}
-
-function pendingFallbackReason(pending: PendingPlaceConfirm): string {
-  if (pending.kind === 'replace') {
-    return `用于替换第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」`
-  }
-  return `计划加入第 ${pending.dayNum} 天行程`
-}
-
-/** Chat-model action.note often describes insertion logistics, not the place. */
-function isOperationalStopNote(note: string | undefined | null): boolean {
-  const t = String(note || '').trim()
-  if (!t) return true
-  if (
-    /顺路插入|按行程路线|加到.*末尾|加到当天|用于替换|计划加入第|按最顺路|按当天节奏/.test(
-      t,
-    )
-  ) {
-    return true
-  }
-  // e.g. 「作为第1天晚餐，…插入/加入/安排」
-  if (/作为第\s*\d+\s*天/.test(t) && /插入|加入|安排|替换/.test(t)) return true
-  return false
-}
-
-/** Prefer traveler-facing blurbs over operational chat-action notes. */
-function pickTravelerStopNote(opts: {
-  storyIntro?: string | null
-  placeDescription?: string | null
-  actionNote?: string | null
-}): string {
-  const candidates = [opts.storyIntro, opts.placeDescription, opts.actionNote]
-  for (const c of candidates) {
-    const t = String(c || '').trim()
-    if (t.length >= 8 && !isOperationalStopNote(t)) return t
-  }
-  for (const c of candidates) {
-    const t = String(c || '').trim()
-    if (t) return t
-  }
-  return ''
-}
-
-function placeTypeLabel(type: PlaceType): string {
-  if (type === 'cafe') return '咖啡馆'
-  if (type === 'restaurant') return '餐厅'
-  return '景点'
-}
-
-/** Soften false “already added” copy when confirm UI is still required. */
-function clarifyReplyForPending(
-  reply: string,
-  pending: PendingPlaceConfirm[],
-): string {
-  if (!pending.length) return reply
-  const names = pending.map((p) => `「${p.place.name}」`).join('、')
-  const confirmHint =
-    pending[0].kind === 'replace'
-      ? `行程尚未改动——请在详情页确认是否用${names}替换「${pending[0].fromPlaceName || '原地点'}」。`
-      : `行程尚未改动——请在详情页确认是否将${names}加入行程。`
-  if (replyClaimsItineraryApplied(reply) || !/详情|确认是否/.test(reply)) {
-    const cleaned = reply
-      .replace(
-        /已(经)?(正式)?加入[了]?|已经加[入进][了]?|已加到行程[了]?|已添加到行程[了]?|已帮你加[入了]?|已经帮你加[入了]?|已(经)?替换[了]?|已经换[成好][了]?/g,
-        '已为你找到候选',
-      )
-      .trim()
-    if (!cleaned || replyClaimsItineraryApplied(cleaned)) {
-      return `已为你找到${names}。${confirmHint}`
-    }
-    if (/详情|确认是否|尚未改动/.test(cleaned)) return cleaned
-    return `${cleaned}\n\n${confirmHint}`
-  }
-  return reply
-}
-
-const NO_ACTION_APPLIED_NOTE =
-  '这次没有可执行的操作，行程未改动。若要加地点，请再说一次（或点名具体店名）。'
-
-const DETAIL_CONFIRM_MISSING_NOTE =
-  '未能打开地点确认页：没有可用的推荐地点。请再说一次店名，或换个说法重试。'
-
-function notesIndicateItineraryApplied(notes: string[]): boolean {
-  return notes.some(
-    (n) =>
-      /已将|已从第|已选中|已切换到|已添加酒店|已重新推荐|已移除/.test(n) &&
-      !/请在详情页确认/.test(n),
-  )
-}
-
-function notesClaimDetailConfirm(notes: string[]): boolean {
-  return notes.some((n) => /请在详情页确认|详情页确认是否/.test(n))
-}
-
-/** Client-side pipeline steps shown while the assistant works (Cursor-ish). */
-type ChatWorkStepId =
-  | 'understand'
-  | 'webSearch'
-  | 'generate'
-  | 'parse'
-  | 'resolvePlaces'
-  | 'apply'
-
-type ChatWorkStep = TripChatWorkStep & { id: ChatWorkStepId }
-
-const CHAT_WORK_STEP_LABELS: Record<ChatWorkStepId, string> = {
-  understand: '正在判断是否需要联网与思考强度',
-  webSearch: '正在搜索网络',
-  generate: '正在组织回复',
-  parse: '正在检查行程操作',
-  resolvePlaces: '正在核对地点与坐标',
-  apply: '正在应用改动',
-}
-
-function initialChatWorkSteps(userText: string): ChatWorkStep[] {
-  const generateLabel = isLivePlaceRecommendationRequest(userText)
-    ? '正在比较候选并生成推荐'
-    : CHAT_WORK_STEP_LABELS.generate
-  return (['understand', 'generate', 'parse'] as const).map((id, i) => ({
-    id,
-    label: id === 'generate' ? generateLabel : CHAT_WORK_STEP_LABELS[id],
-    status: i === 0 ? 'active' : 'pending',
-  }))
-}
-
-function searchStepLabel(detail: TripChatWebSearchDetail | undefined, userText: string) {
-  const source = detail?.source === 'google_places' ? 'Google Places' : '网络'
-  const raw = detail?.query?.trim() || userText.trim()
-  const query = raw.length > 42 ? `${raw.slice(0, 42)}…` : raw
-  return query ? `正在搜索${source}：${query}` : `正在搜索${source}`
-}
-
-/**
- * Translate a raw provider error into something a user can act on. We try not
- * to expose internal model/vendor names like "DeepSeek 没有返回内容。" — those
- * are debug strings, not user guidance.
- */
-function friendlyChatError(err: unknown): string {
-  if (!(err instanceof Error)) return '对话失败，请稍后再试。'
-  const msg = err.message || ''
-  if (
-    msg.includes('没有返回内容') ||
-    msg.startsWith('DeepSeek') ||
-    msg.startsWith('OpenAI') ||
-    msg.startsWith('Gemini') ||
-    msg.includes('上游')
-  ) {
-    return '模型这次没回应，请再说一次或换个问法。'
-  }
-  if (msg.includes('被截断') || msg.includes('截断')) {
-    return '回答太长被截断了，可以问得更具体一些再试。'
-  }
-  if (msg.includes('拒绝回答') || msg.includes('refusal')) {
-    return '模型拒绝回答这个请求，可以换个问法。'
-  }
-  if (msg.includes('timeout') || msg.includes('超时') || msg.includes('aborted')) {
-    return '请求超时了，可以再试一次。'
-  }
-  // Fallback: keep the original message but trim the most common prefixes.
-  return msg || '对话失败，请稍后再试。'
-}
-
-function requestPlanStepLabel(plan: TripChatRequestPlan) {
-  const web = plan.needsWeb ? '需要联网' : '无需联网'
-  const effort = plan.thinking.enabled
-    ? `思考强度${plan.thinking.effort === 'low' ? '低' : plan.thinking.effort === 'high' ? '高' : '中'}`
-    : '思考已关闭'
-  return `已判断：${web} · ${effort}`
-}
-
-const CHAT_WORK_STEP_ORDER: ChatWorkStepId[] = [
-  'understand',
-  'webSearch',
-  'generate',
-  'parse',
-  'resolvePlaces',
-  'apply',
-]
-
-function activateChatWorkStep(
-  steps: ChatWorkStep[],
-  activeId: ChatWorkStepId,
-  extras?: {
-    labels?: Partial<Record<ChatWorkStepId, string>>
-    insert?: ChatWorkStep[]
-  },
-): ChatWorkStep[] {
-
-  let list = steps
-  if (extras?.insert?.length) {
-    const existing = new Set(list.map((s) => s.id))
-    const toAdd = extras.insert.filter((s) => !existing.has(s.id))
-    if (toAdd.length) {
-      const activeOrder = CHAT_WORK_STEP_ORDER.indexOf(activeId)
-      let at = list.length
-      if (activeOrder >= 0) {
-        const beforeIdx = list.findIndex((s) => {
-          const order = CHAT_WORK_STEP_ORDER.indexOf(s.id)
-          return order >= 0 && order >= activeOrder
-        })
-        at = beforeIdx >= 0 ? beforeIdx : list.length
-      } else {
-        const parseIdx = list.findIndex((s) => s.id === 'parse')
-        at = parseIdx >= 0 ? parseIdx + 1 : list.length
-      }
-      list = [...list.slice(0, at), ...toAdd, ...list.slice(at)]
-    }
-  }
-  const activeIdx = list.findIndex((s) => s.id === activeId)
-  return list.map((s, i) => {
-    const label = extras?.labels?.[s.id] ?? s.label
-    if (activeIdx < 0) return { ...s, label }
-    if (i < activeIdx) {
-      return {
-        ...s,
-        label: label.replace(/^正在/, '已'),
-        status: s.status === 'skipped' ? 'skipped' : 'done',
-      }
-    }
-    if (i === activeIdx) return { ...s, label, status: 'active' }
-    return {
-      ...s,
-      label,
-      status: s.status === 'skipped' || s.status === 'done' ? s.status : 'pending',
-    }
-  })
-}
-
-function finishChatWorkSteps(steps: ChatWorkStep[]): ChatWorkStep[] {
-  return steps.map((s) => ({
-    ...s,
-    label: s.label.replace(/^正在/, '已'),
-    status: s.status === 'skipped' ? 'skipped' : 'done',
-  }))
-}
-
-function completedWorkSummary(steps: TripChatWorkStep[]): string {
-  const ids = new Set(steps.filter((step) => step.status !== 'skipped').map((step) => step.id))
-  const searched = ids.has('webSearch')
-  const resolvedPlace = ids.has('resolvePlaces')
-  const applied = ids.has('apply')
-  if (searched && resolvedPlace) return '已搜索并核对推荐地点'
-  if (searched) return '已联网查询并完成回答'
-  if (resolvedPlace && applied) return '已核对地点并处理行程'
-  if (applied) return '已处理行程请求'
-  return '已理解并完成回答'
-}
-
-function ChatWorkStepIcon({
-  id,
-  status,
-}: {
-  id: string
-  status: TripChatWorkStep['status']
-}) {
-  const common = `h-4 w-4 ${status === 'active' ? 'animate-pulse' : ''}`
-  if (id === 'understand') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M5 18.5 6.5 15H18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2" />
-        <path d="M8 9h8M8 12h5" />
-      </svg>
-    )
-  }
-  if (id === 'webSearch') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-      </svg>
-    )
-  }
-  if (id === 'resolvePlaces') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
-        <circle cx="12" cy="10" r="2.5" />
-      </svg>
-    )
-  }
-  if (id === 'apply') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <rect x="5" y="3.5" width="14" height="17" rx="2" />
-        <path d="M8.5 9h7M8.5 13h7M8.5 17h4" />
-      </svg>
-    )
-  }
-  if (id === 'parse') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M8 4H5v16h3M16 4h3v16h-3M10 9h4M10 13h4" />
-      </svg>
-    )
-  }
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3Z" />
-      <path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" />
-    </svg>
-  )
-}
-
-function actionsNeedPlaceLookup(actions: TripChatAction[]): boolean {
-  return actions.some(
-    (a) =>
-      a.type === 'add_place' ||
-      a.type === 'replace_place' ||
-      a.type === 'add_hotel' ||
-      a.type === 'refresh_hotels' ||
-      a.type === 'replace_hotel' ||
-      a.type === 'replace_hotels',
-  )
-}
-
-function DisclosureChevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 20 20"
-      className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${
-        open ? 'rotate-90' : ''
-      }`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m7 4.5 5.5 5.5L7 15.5" />
-    </svg>
-  )
-}
-
-function CompletedCheckIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m5 12.5 4.2 4.2L19 7" />
-    </svg>
-  )
-}
-
-function ChatWorkStepsPanel({
-  steps,
-  open,
-  onToggle,
-  completed = false,
-}: {
-  steps: TripChatWorkStep[]
-  open: boolean
-  onToggle: () => void
-  completed?: boolean
-}) {
-  const visible = steps.filter((s) => s.status !== 'skipped')
-  if (!visible.length) return null
-  const active = visible.find((s) => s.status === 'active')
-  const lastDone = [...visible].reverse().find((s) => s.status === 'done')
-  const summary = completed
-    ? lastDone?.label || '步骤'
-    : active?.label || '处理中…'
-  // While working, only show the current tool/status line. Completed turns may
-  // still expose their compact history on demand.
-  const expandable = completed && visible.length >= 1
-  const collapsedLabel = completed ? completedWorkSummary(visible) : summary
-  const summaryStep = active || lastDone || visible[0]
-
-  return (
-    <div className="mb-1.5 text-xs leading-snug" aria-live="polite">
-      {expandable ? (
-        <button
-          type="button"
-          onClick={onToggle}
-          className="group flex w-full items-center gap-1.5 rounded-sm text-left text-[var(--stone)]/78 outline-none transition hover:text-[var(--stone)] focus-visible:ring-1 focus-visible:ring-[var(--sage)]/25"
-          aria-expanded={open}
-        >
-          <span className="shrink-0" aria-hidden>
-            <CompletedCheckIcon />
-          </span>
-          <span className="min-w-0 truncate">{collapsedLabel}</span>
-          <DisclosureChevron open={open} />
-        </button>
-      ) : (
-        <p className="flex items-center gap-1.5 truncate text-[var(--stone)]/78">
-          <ChatWorkStepIcon id={summaryStep.id} status={summaryStep.status} />
-          <span className={`truncate ${!completed && active ? 'chat-step-shimmer' : ''}`}>
-            {summary}
-          </span>
-        </p>
-      )}
-      {expandable && (
-        <div
-          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          }`}
-          aria-hidden={!open}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <ol className="ml-[1.375rem] mt-1 space-y-0.5 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
-              {visible.map((step) => {
-                const done = step.status === 'done'
-                const activeStep = step.status === 'active'
-                return (
-                  <li
-                    key={step.id}
-                    className={`flex items-center gap-1.5 ${
-                      activeStep
-                        ? 'text-[var(--stone)]/90'
-                        : done
-                          ? 'text-[var(--stone)]/62'
-                          : 'text-[var(--stone)]/45'
-                    }`}
-                  >
-                    <span className="w-4 shrink-0" aria-hidden>
-                      <ChatWorkStepIcon id={step.id} status={step.status} />
-                    </span>
-                    <span className="truncate">
-                      {step.status === 'pending'
-                        ? step.label.replace(/^正在/, '等待')
-                        : step.label}
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StoredChatWorkStepsPanel({ steps }: { steps: TripChatWorkStep[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <ChatWorkStepsPanel
-      steps={steps}
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-      completed
-    />
-  )
-}
-
-function StoredChatReasoningDisclosure({ text }: { text: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <ChatReasoningDisclosure
-      text={text}
-      open={open}
-      onToggle={() => setOpen((v) => !v)}
-      completed
-    />
-  )
-}
-
-function ChatReasoningDisclosure({
-  text,
-  open,
-  onToggle,
-  completed = false,
-}: {
-  text: string
-  open: boolean
-  onToggle: () => void
-  completed?: boolean
-}) {
-  const trimmed = text.trim()
-  if (!trimmed) return null
-  return (
-    <div className="mb-1.5 text-xs leading-snug" aria-live="polite">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="group flex w-full items-center gap-1.5 rounded-sm text-left text-[var(--stone)]/78 outline-none transition hover:text-[var(--stone)] focus-visible:ring-1 focus-visible:ring-[var(--sage)]/25"
-        aria-expanded={open}
-      >
-        <span className="shrink-0" aria-hidden>
-          {completed ? (
-            <CompletedCheckIcon />
-          ) : (
-            <ChatWorkStepIcon id="generate" status="active" />
-          )}
-        </span>
-        <span className={`min-w-0 truncate ${completed ? '' : 'chat-step-shimmer'}`}>
-          {completed ? '思考完成' : '思考中'}
-        </span>
-        <DisclosureChevron open={open} />
-      </button>
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-        aria-hidden={!open}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="ml-[1.375rem] mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1 text-[var(--stone)]/68">
-            {trimmed}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function buildRerecommendMessage(rejected: PendingPlaceConfirm, excluded: string[]): string {
-  const excludeText = excluded.map((n) => `「${n}」`).join('、')
-  if (rejected.kind === 'replace') {
-    return [
-      `刚才推荐的「${rejected.place.name}」我不想用。`,
-      `请再推荐另一个不同的地点，用来替换第 ${rejected.dayNum} 天的「${rejected.fromPlaceName}」。`,
-      `绝对不要再推荐：${excludeText}。`,
-      `请直接输出 replace_place（fromPlaceName 仍为「${rejected.fromPlaceName}」，source 必须为 "recommend"）。`,
-    ].join('')
-  }
-  const typeLabel = placeTypeLabel(rejected.place.type)
-  const modeHint = rejected.mode === 'end' ? '加到当天末尾' : '按最顺路插入'
-  return [
-    `刚才推荐的「${rejected.place.name}」我不喜欢。`,
-    `请再推荐另一家${typeLabel}加入第 ${rejected.dayNum} 天（${modeHint}）。`,
-    `绝对不要再推荐：${excludeText}。`,
-    '请直接输出 add_place（source 必须为 "recommend"）。',
-  ].join('')
-}
+const NO_ACTION_APPLIED_NOTE = '行程未改动，请再说一下你想要的调整。'
+const DETAIL_CONFIRM_MISSING_NOTE = '行程未改动：请在详情页确认是否加入。'
+const TRIP_CHAT_FAB_Z = 2050
+const TRIP_CHAT_BACKDROP_Z = 2040
+const TRIP_CHAT_PANEL_Z = 2045
 
 export interface TripChatHandlers {
   switchDay: (day: number) => void
@@ -638,36 +93,27 @@ export interface TripChatHandlers {
     place: Place,
     options?: { select?: boolean },
   ) => void
-  reorderStop: (day: number, from: number, to: number) => void
+  reorderStop: (day: number, fromIndex: number, toIndex: number) => void
   setHotel: (hotel: SelectedHotel) => void
   setHotelCandidates: (candidates: HotelCandidate[]) => void
 }
-
-/**
- * Chat chrome above PlacePanel/hotel detail (2000), below AddPlaceDialog (2100)
- * and pending confirm GooglePlacePage (2300+/2500).
- */
-const TRIP_CHAT_FAB_Z = 2050
-const TRIP_CHAT_BACKDROP_Z = 2040
-const TRIP_CHAT_PANEL_Z = 2045
-
-function ChatBubbleIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M7.5 8.5h9M7.5 12h5.5" />
-      <path d="M6 18.5 7.5 15H18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2Z" />
-    </svg>
-  )
-}
+import { ChatBubbleIcon } from './ChatBubbleIcon'
+import {
+  CHAT_WORK_STEP_LABELS,
+  ChatWorkStepsPanel,
+  StoredChatWorkStepsPanel,
+  actionsNeedPlaceLookup,
+  activateChatWorkStep,
+  finishChatWorkSteps,
+  initialChatWorkSteps,
+  requestPlanStepLabel,
+  searchStepLabel,
+  type ChatWorkStep,
+} from './ChatWorkStepList'
+import {
+  ChatReasoningDisclosure,
+  StoredChatReasoningDisclosure,
+} from './ChatReasoningDisclosure'
 
 interface Props {
   hotel: SelectedHotel
@@ -1535,7 +981,7 @@ export function TripChatPanel({
           updateLastAssistantContent(reply)
         },
         onReasoningDelta: (_delta, full) => {
-          if (!resolveThinkingForTask('tripChat', message).enabled) return
+          if (!resolveThinkingForTask(getThinkingMode(), message, "tripChat").enabled) return
           setShowReasoningUi(true)
           setReasoningText(full)
         },
@@ -2080,7 +1526,7 @@ export function TripChatPanel({
           updateLastAssistantContent(reply)
         },
         onReasoningDelta: (_delta, full) => {
-          if (!resolveThinkingForTask('tripChat', message).enabled) return
+          if (!resolveThinkingForTask(getThinkingMode(), message, "tripChat").enabled) return
           setShowReasoningUi(true)
           setReasoningText(full)
         },
@@ -2529,3 +1975,4 @@ export function TripChatPanel({
     </>
   )
 }
+
