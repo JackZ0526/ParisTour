@@ -13,8 +13,8 @@ import {
   refreshHotelCandidates,
 } from '../services/hotelRecommend'
 import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
-import { generateHotelDetailCopy, isLlmConfigured } from '../../../services/llm'
-import { memoizeLlmCall } from '../../../services/llmMemo'
+import { generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
+import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'

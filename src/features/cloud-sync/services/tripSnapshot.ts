@@ -2,7 +2,7 @@ import type { PersistedBaselineState, PersistedItineraryState } from '../../itin
 import type { PersistedFlightSelection } from '../../flight/services/flightSelection'
 import type { HotelCacheState } from '../../hotel/services/hotelCache'
 import type { TripDateRange } from '../../itinerary/services/tripDates'
-import type { LlmArtifactMap } from '../../../services/llmArtifactStore'
+import type { LlmArtifactMap } from '../../../shared/services/llm/llmArtifactStore'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
 import {
   clearBaselineItinerary,
@@ -24,8 +24,8 @@ import {
   clearLlmArtifacts,
   loadLlmArtifacts,
   saveLlmArtifacts,
-} from '../../../services/llmArtifactStore'
-import { clearLlmMemo, seedLlmMemo } from '../../../services/llmMemo'
+} from '../../../shared/services/llm/llmArtifactStore'
+import { clearLlmMemo, seedLlmMemo } from '../../../shared/services/llm/llmMemo'
 import {
   clearRecommendationPreferences,
   loadRecommendationPreferences,

@@ -1,13 +1,13 @@
 import type {
   PlaceRecommendation,
   RecommendPlaceType,
-} from '../../../services/llm'
+} from '../../../shared/services/llm/llm'
 import {
   getLlmArtifact,
   removeLlmArtifact,
   removeLlmArtifactsByPrefix,
   setLlmArtifact,
-} from '../../../services/llmArtifactStore'
+} from '../../../shared/services/llm/llmArtifactStore'
 
 export interface DayRecommendCache {
   day: number

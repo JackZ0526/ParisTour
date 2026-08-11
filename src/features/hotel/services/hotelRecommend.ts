@@ -1,6 +1,6 @@
-import { getOpenAIModel, recommendHotelsForTrip } from '../../../services/llm'
-import { clearLlmMemo } from '../../../services/llmMemo'
-import { removeLlmArtifactsByPrefix } from '../../../services/llmArtifactStore'
+import { getOpenAIModel, recommendHotelsForTrip } from '../../../shared/services/llm/llm'
+import { clearLlmMemo } from '../../../shared/services/llm/llmMemo'
+import { removeLlmArtifactsByPrefix } from '../../../shared/services/llm/llmArtifactStore'
 import { loadHotelCache, saveHotelCache } from './hotelCache'
 import {
   candidateToSelected,

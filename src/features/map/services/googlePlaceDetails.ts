@@ -8,7 +8,7 @@ import {
   withGoogleMapsPhotoKey,
   withoutGoogleMapsPhotoKey,
 } from './googleMapsKey'
-import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
+import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
 
 export interface GoogleReview {
   text: string

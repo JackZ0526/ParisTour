@@ -5,8 +5,8 @@ import {
   loadPopularDestinations,
   refreshPopularDestinations,
 } from '../services/destinationSuggest'
-import { isLlmConfigured } from '../../../services/llm'
-import type { DestinationSuggestion } from '../../../services/llm'
+import { isLlmConfigured } from '../../../shared/services/llm/llm'
+import type { DestinationSuggestion } from '../../../shared/services/llm/llm'
 import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 
 interface Props {

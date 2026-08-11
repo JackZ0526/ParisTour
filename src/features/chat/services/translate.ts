@@ -4,10 +4,10 @@ import {
   isLlmConfigured,
   openaiChat,
   openaiChatStream,
-} from './llm'
-import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
-import { memoizeLlmCall } from './llmMemo'
-import { buildPrompt, jsonContract } from './llm/prompts'
+} from '../../../shared/services/llm/llm'
+import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
+import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
+import { buildPrompt, jsonContract } from '../../../shared/services/llm/prompts'
 
 const MEMORY_CACHE = new Map<string, string>()
 const TRANSLATIONS_ARTIFACT_KEY = 'translations:zh'

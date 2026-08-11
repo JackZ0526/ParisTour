@@ -24,7 +24,7 @@ import {
   type AccessibleTrip,
   type TripRole,
 } from '../cloud-sync/services/tripCloud'
-import { subscribeLlmArtifacts } from '../../services/llmArtifactStore'
+import { subscribeLlmArtifacts } from '../../shared/services/llm/llmArtifactStore'
 
 type AuthStatus =
   | 'loading'

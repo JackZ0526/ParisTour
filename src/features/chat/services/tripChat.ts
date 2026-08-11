@@ -5,8 +5,8 @@ import type {
   Place,
   PlaceType,
   SelectedHotel,
-} from '../types'
-import { getPlace } from '../features/place/constants/places'
+} from '../../../types'
+import { getPlace } from '../../place/constants/places'
 import {
   extractLlmJsonObject,
   extractPartialJsonStringField,
@@ -19,9 +19,9 @@ import {
   type ResolvedThinking,
   type ResolvedThinkingEffort,
   type ThinkingEffortUi,
-} from './llm'
-import { dateForTripDay, formatTripDayLabel } from '../features/itinerary/services/tripDates'
-import { searchNearbyGooglePlaceCandidates } from '../features/map/services/googlePlaceDetails'
+} from '../../../shared/services/llm/llm'
+import { dateForTripDay, formatTripDayLabel } from '../../itinerary/services/tripDates'
+import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlaceDetails'
 import {
   COMMON_RULES,
   NO_HALLUCINATION,
@@ -29,7 +29,7 @@ import {
   ROUTER_EXAMPLES,
   buildPrompt,
   jsonContract,
-} from './llm/prompts'
+} from '../../../shared/services/llm/prompts'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
   | { type: 'select_place'; placeName: string }

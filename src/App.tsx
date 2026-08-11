@@ -21,8 +21,8 @@ import {
 } from './features/place/components/RecommendationPreferencesDialog'
 import { PlacePanel } from './features/place/components/PlacePanel'
 import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
-import { TripChatPanel } from './components/TripChatPanel'
-import type { TripChatViewingTarget } from './services/tripChat'
+import { TripChatPanel } from './features/chat/components/TripChatPanel'
+import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { TripMap } from './features/map/components/TripMap'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
@@ -40,8 +40,8 @@ import {
   loadFlightSelection,
 } from './features/flight/services/flightSelection'
 import { clearHotelCache, loadHotelCache } from './features/hotel/services/hotelCache'
-import { clearLlmMemo } from './services/llmMemo'
-import { clearLlmArtifacts } from './services/llmArtifactStore'
+import { clearLlmMemo } from './shared/services/llm/llmMemo'
+import { clearLlmArtifacts } from './shared/services/llm/llmArtifactStore'
 import { clearAllRecommendCache } from './features/place/services/recommendCache'
 import {
   buildGeneratedItinerary,
@@ -53,7 +53,7 @@ import {
   isLlmConfigured,
   resolveItineraryStart,
   type ItineraryStartResult,
-} from './services/llm'
+} from './shared/services/llm/llm'
 import {
   clampIsoDate,
   dateForTripDay,

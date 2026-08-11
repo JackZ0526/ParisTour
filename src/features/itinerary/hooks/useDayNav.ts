@@ -5,7 +5,7 @@ import {
   type DayNavPlan,
   type ResolvedDayLeg,
 } from '../../map/services/googleNav'
-import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
+import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getDayOriginFromHotelFields } from '../utils/dayOrigin'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'

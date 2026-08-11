@@ -15,7 +15,7 @@ import {
   type HotelDetailCopy,
   type PlaceRecommendation,
   type RecommendPlaceType,
-} from '../../../services/llm'
+} from '../../../shared/services/llm/llm'
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,

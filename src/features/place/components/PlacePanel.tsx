@@ -4,7 +4,7 @@ import {
   generatePlaceDetailCopy,
   isLlmConfigured,
   type HotelDetailCopy,
-} from '../../../services/llm'
+} from '../../../shared/services/llm/llm'
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,

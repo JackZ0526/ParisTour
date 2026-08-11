@@ -2,8 +2,8 @@ import {
   isLlmConfigured,
   suggestPopularDestinations,
   type DestinationSuggestion,
-} from '../../../services/llm'
-import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
+} from '../../../shared/services/llm/llm'
+import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
 
 const ARTIFACT_KEY = 'destinations:popular'
 

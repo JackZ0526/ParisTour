@@ -23,7 +23,7 @@ import {
   type GenerateSingleDayItineraryInput,
   type OccupiedPlaceBrief,
   type VerifiedPlaceCandidate,
-} from '../../../services/llm'
+} from '../../../shared/services/llm/llm'
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'

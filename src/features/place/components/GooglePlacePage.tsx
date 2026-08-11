@@ -6,12 +6,12 @@ import {
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
 import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../../map/services/googleMapsKey'
-import { isLlmConfigured } from '../../../services/llm'
+import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
   looksChinese,
   peekPlaceNameZh,
   translatePlaceNameToChinese,
-} from '../../../services/translate'
+} from '../../chat/services/translate'
 import type { Coordinates } from '../../../types'
 import { placeOriginalLabel, placeTitleLines } from '../../../utils/placeTitle'
 import { formatPriceLevelLabel } from '../../../utils/priceLevel'

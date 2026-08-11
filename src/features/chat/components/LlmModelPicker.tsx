@@ -23,7 +23,7 @@ import {
   THINKING_EFFORT_OPTIONS,
   type ThinkingEffortUi,
   type ThinkingMode,
-} from '../services/llm'
+} from '../../../shared/services/llm/llm'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
 
 type Props = {

@@ -6,7 +6,7 @@ import {
   subscribeThinking,
   type LlmBusyVisual,
   type LlmTaskKind,
-} from '../services/llm'
+} from '../shared/services/llm/llm'
 
 type Tone = 'sage' | 'copper' | 'ink' | 'paper'
 type Size = 'sm' | 'md'
@@ -18,8 +18,8 @@ type Variant = 'inline' | 'block' | 'badge'
  */
 type Mode = 'sync' | 'thinking' | 'generating'
 
-export { llmBusyDefaultLabel, llmBusyLabel, resolveLlmBusyVisual } from '../services/llm'
-export type { LlmBusyVisual } from '../services/llm'
+export { llmBusyDefaultLabel, llmBusyLabel, resolveLlmBusyVisual } from '../shared/services/llm/llm'
+export type { LlmBusyVisual } from '../shared/services/llm/llm'
 
 const toneClass: Record<Tone, string> = {
   sage: 'text-[var(--sage)]',

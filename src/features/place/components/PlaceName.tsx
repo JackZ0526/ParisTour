@@ -4,12 +4,12 @@ import {
   peekGooglePlaceDetails,
   placeDetailsQuery,
 } from '../../map/services/googlePlaceDetails'
-import { isLlmConfigured } from '../../../services/llm'
+import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
   looksChinese,
   peekPlaceNameZh,
   translatePlaceNameToChinese,
-} from '../../../services/translate'
+} from '../../chat/services/translate'
 import type { Coordinates } from '../../../types'
 import {
   formatPlaceLabel,

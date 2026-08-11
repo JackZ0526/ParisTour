@@ -10,7 +10,7 @@ import {
   subscribeThinking,
   type LlmTaskKind,
   type ThinkingMode,
-} from '../services/llm'
+} from '../../../shared/services/llm/llm'
 
 /** React binding for the global LLM model (module store + localStorage). */
 export function useOpenAIModel(): [string, (modelId: string) => void] {

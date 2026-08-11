@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
-} from '../features/map/services/googlePlaceDetails'
+} from '../../map/services/googlePlaceDetails'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -10,19 +10,19 @@ import {
   isLlmConfigured,
   resolveThinkingForTask,
   type HotelDetailCopy,
-} from '../services/llm'
+} from '../../../shared/services/llm/llm'
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,
   placeDetailKeysFromPlace,
-} from '../features/place/services/placeDetailMemo'
+} from '../../place/services/placeDetailMemo'
 import {
   persistHotelState,
   refreshHotelCandidates,
   replaceHotelCandidates,
   replaceOneHotelCandidate,
-} from '../features/hotel/services/hotelRecommend'
-import { candidateToSelected, resolveHotelCandidate } from '../features/hotel/services/hotelResolve'
+} from '../../hotel/services/hotelRecommend'
+import { candidateToSelected, resolveHotelCandidate } from '../../hotel/services/hotelResolve'
 import {
   extractQuotedPlaceNames,
   findReplaceTargetInDay,
@@ -51,13 +51,13 @@ import type {
   Place,
   PlaceType,
   SelectedHotel,
-} from '../types'
+} from '../../../types'
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
-import { CloseIconButton } from './CloseIconButton'
+import { CloseIconButton } from '../../../components/CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
-import { GooglePlacePage } from '../features/place/components/GooglePlacePage'
-import { useGoogleMapsReady } from '../features/map/components/GoogleMapsProvider'
-import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
+import { GooglePlacePage } from '../../place/components/GooglePlacePage'
+import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
+import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
 
 const FALLBACK_IMAGE =

@@ -6,4 +6,4 @@ export {
   loadPopularDestinations,
   refreshPopularDestinations,
 } from './services/destinationSuggest'
-export type { DestinationSuggestion } from '../../services/llm'
+export type { DestinationSuggestion } from '../../shared/services/llm/llm'
