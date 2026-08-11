@@ -1030,7 +1030,7 @@ export async function sendShareInviteEmail(
   inviteeEmail: string,
   role: TripShareRole,
 ): Promise<ShareInviteMailResult> {
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   const res = await authFetch('/api/share-invite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

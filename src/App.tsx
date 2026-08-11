@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAuth } from './auth/AuthProvider'
+import { useAuth } from './features/auth/AuthProvider'
 import {
   DayTimeline,
   TIMELINE_DELETE_TOTAL_MS,

@@ -498,7 +498,7 @@ async function fetchTimetableXml(
     ...query,
   })
   const path = `/api/timetable-lookup/TimeTable/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${encodeURIComponent(yyyymmdd)}/?${params.toString()}`
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   const res = await authFetch(path)
   const text = await res.text().catch(() => '')
   if (!res.ok) {
@@ -686,7 +686,7 @@ async function fetchAeroDataBoxRaw(
   const from = addDaysIso(lookupDate, -1)
   const to = addDaysIso(lookupDate, 1)
   const path = `/api/aerodatabox/flights/Number/${encodeURIComponent(flightNumber)}/${encodeURIComponent(from)}/${encodeURIComponent(to)}?withAircraftImage=false&withLocation=false`
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   const res = await authFetch(path)
   if (res.status === 204 || res.status === 404) {
     return []

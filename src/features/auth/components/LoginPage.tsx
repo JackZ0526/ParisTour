@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { useAuth } from '../auth/AuthProvider'
+import { useAuth } from '../AuthProvider'
 
 function readAuthDeepLink(): { mode: 'signin' | 'signup'; email: string } {
   try {

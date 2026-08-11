@@ -10,7 +10,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { normalizeAuthEmail } from './devTestAccount'
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
+import { getSupabase, isSupabaseConfigured } from '../../lib/supabase'
 import {
   applyAccessibleTripLocally,
   flushTripCloudSave,
@@ -23,8 +23,8 @@ import {
   subscribeTripRealtime,
   type AccessibleTrip,
   type TripRole,
-} from '../services/tripCloud'
-import { subscribeLlmArtifacts } from '../services/llmArtifactStore'
+} from '../../services/tripCloud'
+import { subscribeLlmArtifacts } from '../../services/llmArtifactStore'
 
 type AuthStatus =
   | 'loading'

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { useAuth } from '../auth/AuthProvider'
+import { useAuth } from '../AuthProvider'
 import { LoginPage } from './LoginPage'
-import { LoadingIndicator } from './LoadingIndicator'
+import { LoadingIndicator } from '../../../components/LoadingIndicator'
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { status, tripReady, error } = useAuth()

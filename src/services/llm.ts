@@ -837,7 +837,7 @@ async function readResponseJson<T>(
 async function callGemini(system: string, user: string): Promise<string> {
   // Key injected by /api/gemini (Vite proxy or Vercel) — never send from the browser.
   const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   const res = await authFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1374,7 +1374,7 @@ async function callOpenAIMessages(
     }>
   }
 
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await authFetch(url, {
       method: 'POST',
@@ -1452,7 +1452,7 @@ async function callOpenAIMessagesStream(
     Accept: 'text/event-stream',
   }
 
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await authFetch(url, {
       method: 'POST',
@@ -1733,7 +1733,7 @@ export async function openaiResponsesWithWebSearch(input: {
     throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
   }
 
-  const { authFetch } = await import('./authFetch')
+  const { authFetch } = await import('../features/auth/services/authFetch')
   const model = (input.model && input.model.trim()) || openaiWebSearchModel()
 
   // Pick the right Responses endpoint based on the chosen model.

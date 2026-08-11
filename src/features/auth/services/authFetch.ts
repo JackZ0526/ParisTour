@@ -2,7 +2,7 @@
  * Attach Supabase access token to paid /api/* calls.
  * Server verifies the JWT then replaces Authorization with the provider key.
  */
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
+import { getSupabase, isSupabaseConfigured } from '../../../lib/supabase'
 
 export async function authApiHeaders(
   extra?: HeadersInit,
