@@ -26,8 +26,10 @@ export type LlmBusyVisual = 'thinking' | 'generating'
  * Annotate major LLM entry points so auto mode can pick a sensible default.
  */
 export type LlmTaskKind =
+  | 'default'
   | 'tripChat'
   | 'dayCopy'
+  | 'translate'
   | 'placeRecommend'
   | 'placeDescription'
   | 'placeDetail'
@@ -44,6 +46,12 @@ export type LlmTaskKind =
 export type ResolvedThinking = {
   enabled: boolean
   effort: ResolvedThinkingEffort
+  /**
+   * Where the classifier resolution came from.
+   * - auto: derived from UI mode + task heuristics / classifier
+   * - manual: explicitly chosen by the user (low/medium/high/off)
+   */
+  source?: 'auto' | 'manual'
   /** Classifier-inferred "we should not think" override, even when mode=on. */
   overrideToOff?: boolean
 }
@@ -58,6 +66,16 @@ export type ChatCallOptions = {
   model?: string
   userText?: string
   signal?: AbortSignal
+  /** Explicit thinking resolution; when omitted, derived from UI mode + task. */
+  thinking?: ResolvedThinking
+  /** Skip the semantic preflight router (used by the router itself). */
+  preflight?: boolean
+  /** Context blob for the preflight classifier (trimmed before send). */
+  preflightContext?: unknown
+  /** Force OpenAI-style `response_format: json_object`. */
+  responseFormat?: 'json_object'
+  /** Web research: true force / false forbid / 'auto' let preflight decide. */
+  webSearch?: boolean | 'auto'
   /** Force non-streaming JSON mode for a single call. */
   json?: boolean
   /** Return a `string` body (no SSE) — used for compact classifier. */
@@ -68,6 +86,8 @@ export type ChatCallOptions = {
 
 export type ChatStreamOptions = ChatCallOptions & {
   onDelta?: (delta: string, fullText: string) => void
+  /** Optional reasoning token stream for CoT (separated from visible content). */
+  onReasoningDelta?: (delta: string, fullReasoning: string) => void
   /** Fires once per emitted web search query (OpenAI Responses API). */
   onWebSearchQuery?: (query: string) => void
 }

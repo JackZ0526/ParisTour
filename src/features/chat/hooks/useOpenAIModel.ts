@@ -2,7 +2,6 @@ import { useSyncExternalStore } from 'react'
 import {
   getOpenAIModel,
   getThinkingMode,
-  llmBusyLabel,
   resolveLlmBusyVisual,
   setOpenAIModel,
   setThinkingMode,
@@ -59,6 +58,6 @@ export function useLlmBusyMode(options?: {
     thinkingOn: visual === 'thinking',
     mode: visual === 'thinking' ? ('thinking' as const) : ('generating' as const),
     label: (labels: { thinking: string; generating: string }) =>
-      llmBusyLabel(visual, labels),
+      visual === 'thinking' ? labels.thinking : labels.generating,
   }
 }

@@ -6,6 +6,7 @@
  * React dependency and can be unit-tested in isolation.
  */
 export { isHotelSelected } from './features/hotel/constants/hotels'
+export { dateForTripDay } from './features/itinerary/services/tripDates'
 import { isHotelSelected, PENDING_HOTEL } from './features/hotel/constants/hotels'
 import { loadHotelCache } from './features/hotel/services/hotelCache'
 import { loadFlightSelection } from './features/flight/services/flightSelection'

@@ -14,15 +14,11 @@ export class LlmRequestError extends Error {
   }
 }
 
-export type LlmErrorCode =
-  | 'unknown'
-  | 'missing_key'
-  | 'unconfigured'
-  | 'empty'
-  | 'empty_body'
-  | 'invalid_json'
-  | 'http_error'
-  | 'aborted'
-  | 'unauthorized'
-  | 'rate_limited'
-  | 'upstream'
+/**
+ * Stable error codes surfaced to UI recovery paths.
+ *
+ * During refactors we sometimes forward upstream `error.code` / `error.type`
+ * verbatim; keeping this as `string` avoids compile failures on transient
+ * upstream shapes. UI callers should still treat known values as preferred.
+ */
+export type LlmErrorCode = string

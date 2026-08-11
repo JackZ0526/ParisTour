@@ -1406,7 +1406,7 @@ export function DayTimeline({
         <p className="text-sm text-[var(--copper)]">{day.theme}</p>
         <p className="mt-2 text-sm text-[var(--stone)]">{day.summary}</p>
         {dayRegenError && (
-          <p className="mt-2 rounded-xl border border-[var(--copper)]/30 bg-[var(--mist)]/40 px-3 py-2 text-xs text-[var(--copper)]">
+          <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-[var(--mist)]/40 px-3 py-2 text-left text-xs text-[var(--copper)]">
             {dayRegenError}
           </p>
         )}

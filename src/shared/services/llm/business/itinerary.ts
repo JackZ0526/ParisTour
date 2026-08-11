@@ -104,6 +104,8 @@ export interface GenerateFullItineraryInput {
   tripEndDate: string
   itineraryStartDate: string
   nights?: number
+  /** Optional abort signal to cancel / time out the in-flight LLM call. */
+  signal?: AbortSignal
   hotel: {
     name: string
     address: string
@@ -152,6 +154,8 @@ export interface GenerateSingleDayItineraryInput {
   tripEndDate: string
   itineraryStartDate: string
   nights?: number
+  /** Optional abort signal to cancel / time out the in-flight LLM call. */
+  signal?: AbortSignal
   hotel: GenerateFullItineraryInput['hotel']
   outbound?: GenerateFullItineraryInput['outbound']
   returnFlight?: GenerateFullItineraryInput['returnFlight']
@@ -372,6 +376,7 @@ export async function generateFullItinerary(
     task: 'itineraryGenerate',
     json: true,
     webSearch: false,
+    signal: input.signal,
     preflightContext: {
       destination: input.destination,
       dayCount: input.dayCount,
@@ -385,13 +390,19 @@ export async function generateFullItinerary(
 
   const parsed = extractJsonObject(text)
   if (!parsed) {
-    throw new LlmRequestError('无法解析行程 JSON，请再试一次。')
+    throw new LlmRequestError(
+      `无法解析行程 JSON，请再试一次。\npreview=${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+      'invalid_json',
+    )
   }
 
   const rawPlaces = Array.isArray(parsed.places) ? (parsed.places as unknown[]) : []
   const rawDays = Array.isArray(parsed.days) ? (parsed.days as unknown[]) : []
   if (!rawDays.length) {
-    throw new LlmRequestError('行程天数为空，请再试一次。')
+    throw new LlmRequestError(
+      `行程天数为空，请再试一次。\nkeys=${Object.keys(parsed).join(',') || '(none)'}`,
+      'invalid_json',
+    )
   }
 
   const places: FullItineraryPlaceDraft[] = []
@@ -737,6 +748,7 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
     task: 'itineraryDayGenerate',
     json: true,
     webSearch: false,
+    signal: input.signal,
     preflightContext: {
       destination: input.destination,
       dayNumber: input.dayNumber,
@@ -750,7 +762,10 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
 
   const parsed = extractJsonObject(text)
   if (!parsed) {
-    throw new LlmRequestError('无法解析单日行程 JSON，请再试一次。')
+    throw new LlmRequestError(
+      `无法解析单日行程 JSON，请再试一次。\npreview=${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+      'invalid_json',
+    )
   }
 
   const rawPlaces = Array.isArray(parsed.places) ? (parsed.places as unknown[]) : []

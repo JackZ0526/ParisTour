@@ -6,6 +6,7 @@
  *   - itineraryGenerated + itineraryFingerprint (plan identity)
  *   - itineraryGenerating / itineraryGenError (full-plan status)
  *   - dayRegenerating / dayRegenError / dayRestoring (single-day status)
+ *   - copyRefreshing (day-copy HUD; toggled from App.tsx effect)
  *   - itineraryLoadingLineIndex
  *
  * Effects:
@@ -55,11 +56,9 @@ import {
   hotelAreaShort,
   initialFlightsState,
   itineraryMissingLabels,
-  saveBaselineItinerary,
-  saveItineraryState,
   syncDaysCopyToHotelArea,
-  wipeGeneratedItinerary,
 } from '../appHelpers'
+import { isRemoteQuietPeriodActive } from '../features/cloud-sync/services/tripCloud'
 import {
   clampIsoDate,
   itineraryDayCount,
@@ -74,11 +73,13 @@ import {
   hasBaselineDay,
   hasMatchingBaseline,
   hasUsableGeneratedItinerary,
-  isRemoteQuietPeriodActive,
   loadItineraryState,
   resizeItineraryToLength,
   restoreDayFromBaseline,
   restoreFullFromBaseline,
+  saveBaselineItinerary,
+  saveItineraryState,
+  wipeGeneratedItinerary,
   type ItineraryInputFingerprint,
 } from '../features/itinerary/utils/itineraryState'
 import { getPlace } from '../features/place/constants/places'
@@ -87,10 +88,33 @@ import {
   resolveItineraryStart,
   type ItineraryStartResult,
 } from '../shared/services/llm/llm'
+import { LlmRequestError } from '../shared/services/llm/errors'
+import { getOpenAIModel } from '../shared/services/llm/model-state'
 import type { DayPlan, Place, SelectedHotel } from '../types'
 import type { FlightSelection } from '../features/flight/components/FlightPanel'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
 import type { RecommendationPreferences } from '../features/place/services/recommendationPreferences'
+
+/** User-facing Chinese summary plus concrete debug detail for itinerary failures. */
+function formatItineraryFailure(err: unknown, fallback: string): string {
+  if (err instanceof LlmRequestError) {
+    const lines = [err.message.trim() || fallback]
+    const meta = [
+      err.code ? `code=${err.code}` : '',
+      err.status != null ? `HTTP ${err.status}` : '',
+      `model=${getOpenAIModel()}`,
+    ].filter(Boolean)
+    const alreadyHasMeta = /code=|finish_reason=|model=|HTTP\s+\d+/.test(err.message)
+    if (!alreadyHasMeta && meta.length) {
+      lines.push(meta.join(' · '))
+    }
+    return lines.join('\n')
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return `${err.message.trim()}\nmodel=${getOpenAIModel()}`
+  }
+  return `${fallback}\nmodel=${getOpenAIModel()}`
+}
 
 export interface UseItineraryGenerationDeps {
   tripDates: TripDateRange | null
@@ -124,6 +148,7 @@ export interface UseItineraryGenerationResult {
   dayRegenError: string | null
   dayRestoring: boolean
   itineraryLoadingLine: string
+  itineraryLoadingLineIndex: number
   itineraryStartDate: string | undefined
   numberOfDays: number
   currentFingerprint: ItineraryInputFingerprint | null
@@ -134,11 +159,14 @@ export interface UseItineraryGenerationResult {
   showItineraryLoading: boolean
   showItineraryContent: boolean
   showItineraryError: boolean
+  copyRefreshing: boolean
   runFullItineraryGeneration: () => Promise<void>
   handleResetDay: (dayIndex: number) => Promise<void>
   handleRegenerateItinerary: () => void
   handleRestoreDefault: () => void
   handleRestoreDayDefault: (dayIndex: number) => void
+  /** Bump in-flight full/day generation request ids so stale completions no-op. */
+  cancelInFlightGeneration: () => void
   // External mutation hooks (for useTripSync to call after a remote
   // snapshot reconciliation; no-op wrappers around the setters so
   // App.tsx doesn't have to plumb 10 individual setX through).
@@ -196,6 +224,7 @@ export function useItineraryGeneration(
   const [dayRegenerating, setDayRegenerating] = useState(false)
   const [dayRegenError, setDayRegenError] = useState<string | null>(null)
   const [dayRestoring, setDayRestoring] = useState(false)
+  const [copyRefreshing, setCopyRefreshing] = useState(false)
   const [itineraryLoadingLineIndex, setItineraryLoadingLineIndex] = useState(
     () => Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
   )
@@ -204,6 +233,29 @@ export function useItineraryGeneration(
   const genRequestIdRef = useRef(0)
   const dayRegenRequestIdRef = useRef(0)
   const dayRestoreTimerRef = useRef<number | null>(null)
+  const fullGenAbortRef = useRef<AbortController | null>(null)
+  const dayGenAbortRef = useRef<AbortController | null>(null)
+  const fullGenTimeoutRef = useRef<number | null>(null)
+  const dayGenTimeoutRef = useRef<number | null>(null)
+
+  const cancelInFlightGeneration = useCallback(() => {
+    genRequestIdRef.current += 1
+    dayRegenRequestIdRef.current += 1
+    // Abort in-flight LLM requests (so we never get stuck in "generating"
+    // when the network stalls / server never closes).
+    fullGenAbortRef.current?.abort('itinerary_generation_cancelled')
+    dayGenAbortRef.current?.abort('itinerary_day_cancelled')
+    fullGenAbortRef.current = null
+    dayGenAbortRef.current = null
+    if (fullGenTimeoutRef.current != null) {
+      window.clearTimeout(fullGenTimeoutRef.current)
+      fullGenTimeoutRef.current = null
+    }
+    if (dayGenTimeoutRef.current != null) {
+      window.clearTimeout(dayGenTimeoutRef.current)
+      dayGenTimeoutRef.current = null
+    }
+  }, [])
 
   // -- Computed --------------------------------------------------------------
   const itineraryStartDate = useMemo(() => {
@@ -272,6 +324,18 @@ export function useItineraryGeneration(
     return () => {
       if (dayRestoreTimerRef.current != null) {
         window.clearTimeout(dayRestoreTimerRef.current)
+      }
+      fullGenAbortRef.current?.abort('itinerary_generation_unmount')
+      dayGenAbortRef.current?.abort('itinerary_day_unmount')
+      fullGenAbortRef.current = null
+      dayGenAbortRef.current = null
+      if (fullGenTimeoutRef.current != null) {
+        window.clearTimeout(fullGenTimeoutRef.current)
+        fullGenTimeoutRef.current = null
+      }
+      if (dayGenTimeoutRef.current != null) {
+        window.clearTimeout(dayGenTimeoutRef.current)
+        dayGenTimeoutRef.current = null
       }
     }
   }, [])
@@ -411,6 +475,21 @@ export function useItineraryGeneration(
       return
     }
 
+    // Ensure we can always cancel / time out the in-flight LLM call.
+    fullGenAbortRef.current?.abort('itinerary_generation_overridden')
+    if (fullGenTimeoutRef.current != null) {
+      window.clearTimeout(fullGenTimeoutRef.current)
+      fullGenTimeoutRef.current = null
+    }
+    const abortController = new AbortController()
+    fullGenAbortRef.current = abortController
+    // Upstream proxies (e.g. DeepSeek/OpenAI) have maxDuration around ~120s.
+    // Keep our client-side abort slightly higher to avoid aborting early.
+    const timeoutId = window.setTimeout(() => {
+      abortController.abort('itinerary_generation_timeout')
+    }, 150_000)
+    fullGenTimeoutRef.current = timeoutId
+
     const fingerprint = buildItineraryFingerprint({
       hotelId: hotel.id,
       startDate: tripDates.startDate,
@@ -441,6 +520,7 @@ export function useItineraryGeneration(
         outbound: flightContextBrief(flights.outbound),
         returnFlight: flightContextBrief(flights.returnFlight),
         recommendationPreferences,
+        signal: abortController.signal,
       })
 
       if (requestId !== genRequestIdRef.current) return
@@ -460,10 +540,15 @@ export function useItineraryGeneration(
       setItineraryGenError(null)
     } catch (err) {
       if (requestId !== genRequestIdRef.current) return
-      setItineraryGenError(
-        err instanceof Error ? err.message : '行程生成失败，请再试一次。',
-      )
+      setItineraryGenError(formatItineraryFailure(err, '行程生成失败，请再试一次。'))
     } finally {
+      if (fullGenTimeoutRef.current === timeoutId) {
+        window.clearTimeout(timeoutId)
+        fullGenTimeoutRef.current = null
+      }
+      if (fullGenAbortRef.current === abortController) {
+        fullGenAbortRef.current = null
+      }
       if (requestId === genRequestIdRef.current) {
         setItineraryGenerating(false)
       }
@@ -536,6 +621,20 @@ export function useItineraryGeneration(
       setDayRegenerating(true)
       setDayRegenError(null)
 
+      // Ensure we can cancel / time out single-day regeneration too.
+      dayGenAbortRef.current?.abort('itinerary_day_overridden')
+      if (dayGenTimeoutRef.current != null) {
+        window.clearTimeout(dayGenTimeoutRef.current)
+        dayGenTimeoutRef.current = null
+      }
+      const abortController = new AbortController()
+      dayGenAbortRef.current = abortController
+      // Keep day-level timeout slightly above upstream proxy limit.
+      const timeoutId = window.setTimeout(() => {
+        abortController.abort('itinerary_day_timeout')
+      }, 130_000)
+      dayGenTimeoutRef.current = timeoutId
+
       const occupiedPlaces = days
         .filter((d) => d.day !== active.day)
         .flatMap((d) =>
@@ -578,6 +677,7 @@ export function useItineraryGeneration(
           existingDays: days,
           existingCustomPlaces: customPlaces,
           recommendationPreferences,
+          signal: abortController.signal,
         })
 
         if (requestId !== dayRegenRequestIdRef.current) return
@@ -594,10 +694,15 @@ export function useItineraryGeneration(
         setDayRegenError(null)
       } catch (err) {
         if (requestId !== dayRegenRequestIdRef.current) return
-        setDayRegenError(
-          err instanceof Error ? err.message : '当天行程重新生成失败，请再试一次。',
-        )
+        setDayRegenError(formatItineraryFailure(err, '当天行程重新生成失败，请再试一次。'))
       } finally {
+        if (dayGenTimeoutRef.current === timeoutId) {
+          window.clearTimeout(timeoutId)
+          dayGenTimeoutRef.current = null
+        }
+        if (dayGenAbortRef.current === abortController) {
+          dayGenAbortRef.current = null
+        }
         if (requestId === dayRegenRequestIdRef.current) {
           setDayRegenerating(false)
         }
@@ -628,8 +733,7 @@ export function useItineraryGeneration(
   )
 
   const handleRegenerateItinerary = useCallback(() => {
-    genRequestIdRef.current += 1
-    dayRegenRequestIdRef.current += 1
+    cancelInFlightGeneration()
     wipeGeneratedItinerary()
     clearDayNavCache()
     setDays([])
@@ -642,7 +746,7 @@ export function useItineraryGeneration(
     setDayRegenError(null)
     setSelectedPlaceId(null)
     setDayIndex(0)
-  }, [setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId])
+  }, [cancelInFlightGeneration, setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId])
 
   const handleRestoreDefault = useCallback(() => {
     const restored = restoreFullFromBaseline()
@@ -747,6 +851,7 @@ export function useItineraryGeneration(
     dayRegenError,
     dayRestoring,
     itineraryLoadingLine,
+    itineraryLoadingLineIndex,
     itineraryStartDate,
     numberOfDays,
     currentFingerprint,
@@ -757,11 +862,13 @@ export function useItineraryGeneration(
     showItineraryLoading,
     showItineraryContent,
     showItineraryError,
+    copyRefreshing,
     runFullItineraryGeneration,
     handleResetDay,
     handleRegenerateItinerary,
     handleRestoreDefault,
     handleRestoreDayDefault,
+    cancelInFlightGeneration,
     setItineraryStart,
     setItineraryStartLoading,
     setItineraryGenerated,

@@ -566,6 +566,7 @@ export async function buildGeneratedSingleDay(
     tripEndDate: input.tripEndDate,
     itineraryStartDate: input.itineraryStartDate,
     nights: input.nights,
+    signal: input.signal,
     hotel: {
       name: hotel.name,
       address: hotel.address,

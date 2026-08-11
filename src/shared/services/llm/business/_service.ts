@@ -63,7 +63,7 @@ async function callProvider(
   user: string,
   options?: ChatCallOptions,
 ): Promise<string> {
-  return provider === 'openai' ? callOpenAI(system, user, options) : callGemini(system, user)
+  return provider === 'openai' ? callOpenAI(system, user, options) : callGemini(system, user, options)
 }
 
 /**
@@ -88,6 +88,7 @@ export async function generateText(
     json?: boolean
     webSearch?: boolean | 'auto'
     preflightContext?: unknown
+    signal?: AbortSignal
   },
 ): Promise<string | null> {
   const strict = Boolean(options?.strict)
@@ -97,6 +98,7 @@ export async function generateText(
     responseFormat: options?.json ? 'json_object' : undefined,
     webSearch: options?.webSearch,
     preflightContext: options?.preflightContext,
+    signal: options?.signal,
   }
   const preferred = ENABLE_LLM_PROVIDER_SWITCH ? getLlmProvider() : 'openai'
   const order = providerOrder(preferred)
@@ -131,6 +133,7 @@ export async function generateText(
             preflight: false,
             webSearch: false,
             responseFormat: 'json_object',
+            signal: options.signal,
           },
         )
       }

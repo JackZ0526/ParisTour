@@ -1281,7 +1281,11 @@ export async function planTripChatRequest(input: {
   webSearch?: boolean | 'auto'
 }): Promise<TripChatRequestPlan> {
   const fallbackNeedsWeb = tripChatNeedsWebResearch(input.userMessage)
-  const fallbackThinking = resolveThinkingForTask('tripChat', input.userMessage)
+  const fallbackThinking = resolveThinkingForTask(
+    getThinkingMode(),
+    input.userMessage,
+    'tripChat',
+  )
   let modelNeedsWeb: boolean | null = null
   let modelEffort: ResolvedThinkingEffort | null = null
   let modelIntent: TripChatRequestPlan['intent'] | null = null
@@ -1373,7 +1377,7 @@ false 时（仅根据当前行程即可完成）：
       ? recommendedEffort === 'off'
         ? { enabled: false, effort: 'low' as ThinkingEffortUi, source: 'auto' as const }
         : { enabled: true, effort: recommendedEffort, source: 'auto' as const }
-      : resolveThinkingForTask('tripChat', input.userMessage)
+      : resolveThinkingForTask(thinkingMode, input.userMessage, 'tripChat')
 
   return {
     intent: modelIntent || fallbackTripChatIntent(input.userMessage),

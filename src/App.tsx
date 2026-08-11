@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useAuth } from './features/auth/AuthProvider'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
-import {
-  DayTimeline,
-  TIMELINE_DELETE_TOTAL_MS,
-  TIMELINE_INSERT_TOTAL_MS,
-  TIMELINE_SWAP_TOTAL_MS,
-} from './features/itinerary/components/DayTimeline'
+import { useItineraryDays, useItineraryDaysEffects } from './hooks/useItineraryDays'
+import { useMobilePane } from './hooks/useMobilePane'
+import { useTripDialogs } from './hooks/useTripDialogs'
+import { useTripSync } from './hooks/useTripSync'
+import { DayTimeline } from './features/itinerary/components/DayTimeline'
 import { FlightPanel } from './features/flight/components/FlightPanel'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
@@ -34,79 +33,23 @@ import { clearLlmMemo } from './shared/services/llm/llmMemo'
 import { clearLlmArtifacts } from './shared/services/llm/llmArtifactStore'
 import { clearAllRecommendCache } from './features/place/services/recommendCache'
 import {
-  buildGeneratedItinerary,
-  buildGeneratedSingleDay,
-  flightContextBrief,
-} from './features/itinerary/services/itineraryGenerate'
-import {
-  generateDayCopy,
-  isLlmConfigured,
-  resolveItineraryStart,
-  type ItineraryStartResult,
-} from './shared/services/llm/llm'
-import {
-  clampIsoDate,
   dateForTripDay,
   formatTripDayLabel,
-  itineraryDayCount,
-  loadTripDates,
+  formatDayNightLabel,
   saveTripDates,
 } from './features/itinerary/services/tripDates'
-import type { DayPlan, ItineraryStop, Place } from './types'
 import {
-  getDayOrigin,
-  placeFromHotel,
-  SELECTED_HOTEL_PLACE_ID,
-} from './features/itinerary/utils/dayOrigin'
-import {
-  applyDay1HotelArrivalTimes,
-  computeDay1HotelArrivalHm,
-  recomputeDayStopTimes,
-} from './shared/utils/stopTimes'
-import {
-  buildItineraryFingerprint,
   clearItineraryState,
   ensureBaselineFromGenerated,
-  findBestInsertIndex,
-  fingerprintTripInputsEqual,
-  fingerprintsEqual,
-  hasBaselineDay,
-  hasMatchingBaseline,
-  hasUsableGeneratedItinerary,
-  isPinnedHotelStop,
-  keepFixedHotelPositions,
   loadItineraryState,
-  makeStopId,
-  reorderStops,
-  resizeItineraryToLength,
-  restoreDayFromBaseline,
-  restoreFullFromBaseline,
-  saveBaselineItinerary,
-  saveItineraryState,
-  wipeGeneratedItinerary,
-  type ItineraryInputFingerprint,
 } from './features/itinerary/utils/itineraryState'
-import { flushTripCloudSave, isRemoteQuietPeriodActive } from './features/cloud-sync/services/tripCloud'
 import {
-  loadRecommendationPreferences,
   recommendationPreferencesPrompt,
   saveRecommendationPreferences,
-  type RecommendationPreferences,
 } from './features/place/services/recommendationPreferences'
 import {
-  AREA_KEY_CN,
-  EMPTY_DAY_FALLBACK,
-  ITINERARY_LOADING_LINES,
-  ITINERARY_LOADING_ROTATE_MS,
   buildHeroCopy,
   chineseDayCount,
-  ensureStopId,
-  hotelAreaShort,
-  initialFlightsState,
-  initialHotelState,
-  isHotelSelected,
-  itineraryMissingLabels,
-  syncDaysCopyToHotelArea,
 } from './appHelpers'
 
 export default function App() {
@@ -123,16 +66,17 @@ export default function App() {
     tripSyncEpoch,
   } = useAuth()
   const readOnly = !canEdit
-  const [shareOpen, setShareOpen] = useState(false)
-  const [backupOpen, setBackupOpen] = useState(false)
-  const [recommendationPreferencesOpen, setRecommendationPreferencesOpen] =
-    useState(false)
-  const [recommendationPreferences, setRecommendationPreferences] =
-    useState<RecommendationPreferences>(() => loadRecommendationPreferences())
-  /** Below `lg`, itinerary shows one pane at a time to avoid a tall stacked map. */
-  const [mobileItineraryPane, setMobileItineraryPane] = useState<
-    'timeline' | 'map'
-  >('timeline')
+  const {
+    shareOpen,
+    setShareOpen,
+    backupOpen,
+    setBackupOpen,
+    recommendationPreferencesOpen,
+    setRecommendationPreferencesOpen,
+    recommendationPreferences,
+    setRecommendationPreferences,
+  } = useTripDialogs()
+  const { mobileItineraryPane, setMobileItineraryPane } = useMobilePane()
   const initialItinerary = useMemo(() => {
     const state = loadItineraryState()
     ensureBaselineFromGenerated(state)
@@ -150,25 +94,38 @@ export default function App() {
     viewingHotelDetail,
     setViewingHotelDetail,
     datesReady,
-    outboundReady,
-    returnReady,
-    flightsReady,
     hotelReady,
   } = useTripCore()
   // Destination UI temporarily hidden — lock trip to Paris.
   const destination = '巴黎'
-  const [dayIndex, setDayIndex] = useState(0)
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
-  const [days, setDays] = useState<DayPlan[]>(() => initialItinerary.days)
-  const [customPlaces, setCustomPlaces] = useState<Record<string, Place>>(
-    () => initialItinerary.customPlaces,
-  )
-  const placesWithHotel = useMemo(
-    () => ({
-      ...customPlaces,
-      [SELECTED_HOTEL_PLACE_ID]: placeFromHotel(hotel),
-    }),
-    [customPlaces, hotel],
+  const numberOfDaysRef = useRef(0)
+  const {
+    dayIndex,
+    setDayIndex,
+    selectedPlaceId,
+    setSelectedPlaceId,
+    days,
+    setDays,
+    customPlaces,
+    setCustomPlaces,
+    placesWithHotel,
+    handleReorder,
+    handleReorderOnDay,
+    handleDelete,
+    handleDeleteOnDay,
+    handleAddCustom,
+    handleGoogleIdentityResolved,
+    handleAddOnDay,
+    handleSwitchDay,
+    handleReplaceOnDay,
+    day,
+  } = useItineraryDays(
+    hotel,
+    {
+      days: initialItinerary.days,
+      customPlaces: initialItinerary.customPlaces,
+    },
+    { numberOfDaysRef },
   )
   const {
     itineraryStart,
@@ -192,7 +149,6 @@ export default function App() {
     itineraryLoadingLine,
     itineraryStartDate,
     numberOfDays,
-    currentFingerprint,
     itineraryReady,
     missingForItinerary,
     canRestoreDefault,
@@ -205,7 +161,10 @@ export default function App() {
     handleRegenerateItinerary,
     handleRestoreDefault,
     handleRestoreDayDefault,
+    copyRefreshing,
     setCopyRefreshing,
+    cancelInFlightGeneration,
+    itineraryLoadingLineIndex,
   } = useItineraryGeneration(
     {
       tripDates,
@@ -221,6 +180,7 @@ export default function App() {
     },
     { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
   )
+  numberOfDaysRef.current = numberOfDays
   const [panelResetKey, setPanelResetKey] = useState(0)
   /**
    * Remount input panels / chat after a remote snapshot is reconciled.
@@ -234,151 +194,64 @@ export default function App() {
   const copyRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
-  /** Skip autosave during hydrate + React Strict Mode double-effect. */
-  const cloudSaveSkipRunsRef = useRef(2)
-  const cloudHydratedAtRef = useRef(Date.now())
   /** Nav distance/time recomputes mutate stop clocks — not user content edits. */
   const suppressCloudSaveRef = useRef(false)
-  const dayIndexRef = useRef(dayIndex)
-  const daysRef = useRef(days)
-  const selectedPlaceIdRef = useRef(selectedPlaceId)
-  dayIndexRef.current = dayIndex
-  daysRef.current = days
-  selectedPlaceIdRef.current = selectedPlaceId
-
-  // Live sync: pull cloud-applied localStorage into React state without remounting / jumping to Day 1.
-  useEffect(() => {
-    if (tripSyncEpoch <= 0) return
-
-    const viewingDayNum = daysRef.current[dayIndexRef.current]?.day
-    const prevSelected = selectedPlaceIdRef.current
-
-    const nextHotels = initialHotelState()
-    const nextFlights = initialFlightsState()
-    const nextDates = loadTripDates()
-    const nextItinerary = loadItineraryState()
-    const nextRecommendationPreferences = loadRecommendationPreferences()
-    ensureBaselineFromGenerated(nextItinerary)
-
-    // A remote snapshot replaces the data underneath several stateful children.
-    // Cancel local work first so stale completions/animation timers cannot write
-    // the pre-sync itinerary back into the newly hydrated React state.
-    copyRequestIdRef.current += 1
-    clearDayNavCache()
-    // Trust the remote snapshot already written to localStorage. Resetting this
-    // to false re-enters the first-hydration wipe path and can clear a valid
-    // synced itinerary when FlightPanel/HotelPicker remount mid-settle.
-    tripInputsHydratedRef.current = true
-    suppressCloudSaveRef.current = false
-
-    setHotel(nextHotels.hotel)
-    setHotelCandidates(nextHotels.candidates)
-    setTripDates(nextDates)
-    setFlights(nextFlights)
-    setItineraryStart(null)
-    setItineraryStartLoading(
-      Boolean(nextDates?.startDate && nextFlights.outbound?.flightNumber),
-    )
-    setDays(nextItinerary.days)
-    setCustomPlaces(nextItinerary.customPlaces)
-    setItineraryGenerated(
-      Boolean(nextItinerary.generated && nextItinerary.days.length),
-    )
-    setItineraryFingerprint(nextItinerary.fingerprint || null)
-    setRecommendationPreferences(nextRecommendationPreferences)
-    setItineraryGenerating(false)
-    setItineraryGenError(null)
-    setDayRegenerating(false)
-    setDayRegenError(null)
-    setDayRestoring(false)
-    setCopyRefreshing(false)
-    setViewingHotelDetail(null)
-    setSyncRenderKey((key) => key + 1)
-    prevStopsKeyRef.current = null
-    suppressCopyRef.current = true
-
-    const nextDays = nextItinerary.days
-    let nextIndex = 0
-    if (viewingDayNum != null && nextDays.length) {
-      const byNum = nextDays.findIndex((d) => d.day === viewingDayNum)
-      if (byNum >= 0) nextIndex = byNum
-      else nextIndex = Math.min(dayIndexRef.current, nextDays.length - 1)
-    }
-    setDayIndex(nextIndex)
-
-    const stillOnDay = prevSelected
-      ? nextDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
-      : false
-    const stillInCustom = prevSelected
-      ? Boolean(nextItinerary.customPlaces?.[prevSelected])
-      : false
-    const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
-    setSelectedPlaceId(
-      prevSelected && (stillOnDay || stillInCustom || isHotel)
-        ? prevSelected
-        : null,
-    )
-
-    cloudSaveSkipRunsRef.current = 2
-    cloudHydratedAtRef.current = Date.now()
-  }, [tripSyncEpoch])
-
-  useEffect(() => {
-    if (cloudSaveSkipRunsRef.current > 0) {
-      cloudSaveSkipRunsRef.current -= 1
-      return
-    }
-    // After remount/sync, ignore transient effect noise (do not defer-upload).
-    if (Date.now() - cloudHydratedAtRef.current < 2000) return
-    // Distance / stop-clock recalculation only — keep local UI, skip cloud write.
-    if (suppressCloudSaveRef.current) {
-      suppressCloudSaveRef.current = false
-      return
-    }
-    if (!canEdit) return
-    notifyTripChanged()
-  }, [
-    tripDates,
-    flights,
-    hotel,
-    hotelCandidates,
-    days,
-    customPlaces,
-    itineraryGenerated,
-    itineraryFingerprint,
-    recommendationPreferences,
-    canEdit,
-    notifyTripChanged,
-  ])
-
-  useEffect(() => {
-    const flush = () => {
-      void flushTripCloudSave()
-    }
-    window.addEventListener('beforeunload', flush)
-    return () => window.removeEventListener('beforeunload', flush)
-  }, [])
+  useTripSync(
+    {
+      tripSyncEpoch,
+      canEdit,
+      notifyTripChanged,
+    },
+    {
+      tripDates,
+      flights,
+      hotel,
+      hotelCandidates,
+      days,
+      customPlaces,
+      itineraryGenerated,
+      itineraryFingerprint,
+      recommendationPreferences,
+      dayIndex,
+      selectedPlaceId,
+    },
+    {
+      setTripDates,
+      setFlights,
+      setHotel,
+      setHotelCandidates,
+      setViewingHotelDetail,
+      setItineraryStart,
+      setItineraryStartLoading,
+      setItineraryGenerated,
+      setItineraryFingerprint,
+      setItineraryGenerating,
+      setItineraryGenError,
+      setDayRegenerating,
+      setDayRegenError,
+      setDayRestoring,
+      setCopyRefreshing,
+      setRecommendationPreferences,
+      setDays,
+      setCustomPlaces,
+      setDayIndex,
+      setSelectedPlaceId,
+      setSyncRenderKey,
+    },
+    {
+      prevStopsKeyRef,
+      suppressCopyRef,
+      copyRequestIdRef,
+      tripInputsHydratedRef,
+      suppressCloudSaveRef,
+    },
+    {
+      cancelInFlightGeneration,
+    },
+  )
 
   // (itineraryReady + missingForItinerary are now provided by useItineraryGeneration.)
 
-  // When hotel areaKey is confirmed / re-derived (e.g. 16区 no longer → saintGermain),
-  // rewrite stale LLM day blurbs that still name the wrong 落脚点.
-  const hotelSelectedForCopySync = isHotelSelected(hotel)
-  const hotelAreaKeyForCopySync = hotel.areaKey
-  useEffect(() => {
-    if (!hotelSelectedForCopySync) return
-    if (!itineraryGenerated || !days.length) return
-    const areaKey = hotelAreaKeyForCopySync
-    if (!AREA_KEY_CN[areaKey]) return
-
-    setDays((prev) => {
-      const next = syncDaysCopyToHotelArea(prev, areaKey)
-      return next === prev ? prev : next
-    })
-  }, [hotelSelectedForCopySync, hotelAreaKeyForCopySync, itineraryGenerated, days.length])
-
-  const safeDayIndex = Math.min(dayIndex, Math.max(0, days.length - 1))
-  const day = days[safeDayIndex] ?? EMPTY_DAY_FALLBACK
   const hero = useMemo(
     () => buildHeroCopy(destination, tripDates, hotel, days),
     [destination, tripDates, hotel, days],
@@ -422,19 +295,6 @@ export default function App() {
     }
     return null
   }, [selectedPlaceId, placesWithHotel, day.stops, day.day, viewingHotelDetail])
-  const placesWithHotelRef = useRef(placesWithHotel)
-  placesWithHotelRef.current = placesWithHotel
-  const hotelRef = useRef(hotel)
-  hotelRef.current = hotel
-  const dayStopsRef = useRef(day.stops)
-  dayStopsRef.current = day.stops
-  const dayIndexForCopyRef = useRef(dayIndex)
-  dayIndexForCopyRef.current = dayIndex
-  const dayPlacesKey = useMemo(
-    () => day.stops.map((s) => s.placeId).join(','),
-    [day.stops],
-  )
-  const dayCalendarDate = dateForTripDay(itineraryStartDate, day.day)
   const tripPlaceNames = useMemo(() => {
     const names: string[] = []
     for (const d of days) {
@@ -459,473 +319,36 @@ export default function App() {
   const day1TransitSecondsRef = useRef<number | null>(null)
   /** Skip re-applying clocks when switching back to a day whose nav+times already ran. */
   const navTimesAppliedKeyRef = useRef('')
-  useEffect(() => {
-    if (day.day === 1 && navPlan.hotelToFirst?.durationSeconds) {
-      day1TransitSecondsRef.current = navPlan.hotelToFirst.durationSeconds
-    }
-  }, [day.day, navPlan.hotelToFirst?.durationSeconds])
-
-  // Live stop clocks: cascade from Day-1 hotel arrival (or ~10:00) using Google leg durations.
-  useEffect(() => {
-    if (!itineraryReady || !itineraryGenerated || itineraryGenerating) return
-    if (navLoading) return
-    if (!day.stops.length) return
-    if (!navPlan.stopsKey?.startsWith(`${day.day}|`)) return
-
-    const transitSeconds =
-      day.day === 1
-        ? navPlan.hotelToFirst?.durationSeconds
-        : day1TransitSecondsRef.current ?? undefined
-    const day1HotelHm =
-      day.day === 1 ? computeDay1HotelArrivalHm(flights.outbound, transitSeconds) : null
-
-    const applyKey = `${navPlan.stopsKey}::${day1HotelHm || ''}`
-    if (navTimesAppliedKeyRef.current === applyKey) return
-
-    suppressCloudSaveRef.current = true
-    setDays((prev) => {
-      const idx = prev.findIndex((d) => d.day === day.day)
-      if (idx < 0) return prev
-      let nextDay = prev[idx]
-
-      if (day.day === 1 && day1HotelHm) {
-        nextDay = applyDay1HotelArrivalTimes(nextDay, day1HotelHm)
-      }
-
-      const recomputed = recomputeDayStopTimes(nextDay, {
-        betweenStops: navPlan.betweenStops,
-        firstStopHm: day.day === 1 && day1HotelHm ? day1HotelHm : null,
-        defaultFirstHm: '10:00',
-        placeTypeAt: (placeId) => {
-          try {
-            return getPlace(placeId, placesWithHotel).type
-          } catch {
-            return null
-          }
-        },
-      })
-
-      navTimesAppliedKeyRef.current = applyKey
-
-      if (
-        recomputed.stops.length === prev[idx].stops.length &&
-        recomputed.stops.every((s, i) => s.time === prev[idx].stops[i]?.time)
-      ) {
-        suppressCloudSaveRef.current = false
-        return prev
-      }
-      const next = [...prev]
-      next[idx] = recomputed
-      return next
-    })
-  }, [
-    itineraryReady,
-    itineraryGenerated,
-    itineraryGenerating,
-    navLoading,
-    navPlan.stopsKey,
-    navPlan.betweenStops,
-    navPlan.hotelToFirst?.durationSeconds,
-    day.day,
-    day.stops.length,
-    flights.outbound,
-    placesWithHotel,
-  ])
-
-  // When viewing another day, still refresh Day 1 hotel check-in if flight/transit changes.
-  useEffect(() => {
-    if (day.day === 1) return
-    const transitSeconds = day1TransitSecondsRef.current
-    const hotelHm = computeDay1HotelArrivalHm(flights.outbound, transitSeconds)
-    if (!hotelHm) return
-    suppressCloudSaveRef.current = true
-    setDays((prev) => {
-      const idx = prev.findIndex((d) => d.day === 1)
-      if (idx < 0) {
-        suppressCloudSaveRef.current = false
-        return prev
-      }
-      const nextDay = applyDay1HotelArrivalTimes(prev[idx], hotelHm)
-      if (nextDay === prev[idx]) {
-        suppressCloudSaveRef.current = false
-        return prev
-      }
-      const next = [...prev]
-      next[idx] = nextDay
-      return next
-    })
-  }, [flights.outbound, day.day])
-
-  // Auto-generate day title / theme / summary after itinerary edits.
-  useEffect(() => {
-    if (!itineraryReady || !itineraryGenerated || itineraryGenerating) {
-      setCopyRefreshing(false)
-      return
-    }
-
-    const hotelAreaKey = hotel.areaKey
-    const key = `${day.day}:${dayPlacesKey}:${dayCalendarDate || ''}:${day.pace}:${hotelAreaKey}`
-
-    if (prevStopsKeyRef.current === null) {
-      prevStopsKeyRef.current = key
-      return
-    }
-
-    if (prevStopsKeyRef.current === key) return
-
-    const prevDay = Number(prevStopsKeyRef.current.split(':')[0])
-    prevStopsKeyRef.current = key
-
-    if (suppressCopyRef.current) {
-      suppressCopyRef.current = false
-      setCopyRefreshing(false)
-      return
-    }
-
-    // Switching day tabs should not rewrite copy.
-    if (prevDay !== day.day) {
-      setCopyRefreshing(false)
-      return
-    }
-
-    let cancelled = false
-    const requestId = ++copyRequestIdRef.current
-    const dayNum = day.day
-    const pace = day.pace
-    const calendarDate = dayCalendarDate || undefined
-    const totalDays = numberOfDays
-
-    const timer = window.setTimeout(() => {
-      if (cancelled) return
-      const places = placesWithHotelRef.current
-      const hotelNow = hotelRef.current
-      const areaKey = hotelNow.areaKey
-      const areaLabel =
-        AREA_KEY_CN[areaKey] || hotelAreaShort(hotelNow) || undefined
-      const names = dayStopsRef.current.map((s) => {
-        try {
-          return getPlace(s.placeId, places).name
-        } catch {
-          return s.placeId
-        }
-      })
-
-      setCopyRefreshing(true)
-      void generateDayCopy({
-        day: dayNum,
-        pace,
-        placeNames: names,
-        hotelArea: areaKey,
-        hotelAreaLabel: areaLabel,
-        calendarDate,
-        totalDays,
-      })
-        .then((copy) => {
-          if (cancelled || copyRequestIdRef.current !== requestId || !copy) return
-          const dayIdx = dayIndexForCopyRef.current
-          setDays((prev) =>
-            prev.map((d, i) => {
-              if (i !== dayIdx) return d
-              const next = {
-                ...d,
-                title: copy.title,
-                theme: copy.theme,
-                summary: copy.summary,
-              }
-              // Guard against LLM still naming a stale hotel district.
-              return syncDaysCopyToHotelArea([next], areaKey)[0] || next
-            }),
-          )
-        })
-        .finally(() => {
-          if (!cancelled && copyRequestIdRef.current === requestId) {
-            setCopyRefreshing(false)
-          }
-        })
-    }, 900)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-      // Must clear here: a same-key re-entry used to cancel the in-flight
-      // request (skipping finally) and then early-return, leaving the HUD stuck.
-      if (copyRequestIdRef.current === requestId) {
-        setCopyRefreshing(false)
-      }
-    }
-  }, [
-    dayPlacesKey,
-    day.day,
-    day.pace,
-    dayCalendarDate,
-    hotel.areaKey,
-    itineraryReady,
-    itineraryGenerated,
-    itineraryGenerating,
-    numberOfDays,
-  ])
-
-  const updateDayStops = useCallback(
-    (updater: (stops: ItineraryStop[]) => ItineraryStop[]) => {
-      setDays((prev) =>
-        prev.map((d, i) => (i === dayIndex ? { ...d, stops: updater(d.stops) } : d)),
-      )
+  useItineraryDaysEffects(
+    {
+      hotel,
+      flights,
+      navPlan,
+      navLoading,
+      itineraryReady,
+      itineraryGenerated,
+      itineraryGenerating,
+      days,
+      setDays,
+      placesWithHotel,
+      day,
+      dayIndex,
+      itineraryStartDate,
+      numberOfDays,
+      setCopyRefreshing,
     },
-    [dayIndex],
+    {
+      prevStopsKeyRef,
+      suppressCopyRef,
+      copyRequestIdRef,
+      navTimesAppliedKeyRef,
+      day1TransitSecondsRef,
+      suppressCloudSaveRef,
+    },
   )
 
   const lastDayNum = numberOfDays
-
-  function handleReorder(from: number, to: number) {
-    updateDayStops((stops) =>
-      keepFixedHotelPositions(day.day, reorderStops(stops, from, to), lastDayNum),
-    )
-  }
-
-  function handleReorderOnDay(dayNum: number, from: number, to: number) {
-    setDays((prev) =>
-      prev.map((d) =>
-        d.day === dayNum
-          ? {
-              ...d,
-              stops: keepFixedHotelPositions(
-                d.day,
-                reorderStops(d.stops, from, to),
-                lastDayNum,
-              ),
-            }
-          : d,
-      ),
-    )
-  }
-
-  function handleDelete(stopId: string) {
-    updateDayStops((stops) => {
-      const removedIdx = stops.findIndex((s, i) => ensureStopId(day.day, s, i) === stopId)
-      if (removedIdx < 0) return stops
-      // Pinned hotel check-in / overnight cannot be removed.
-      if (isPinnedHotelStop(day.day, stops, removedIdx, lastDayNum)) {
-        return stops
-      }
-      const removed = stops[removedIdx]
-      const next = stops.filter((_, i) => i !== removedIdx)
-      if (removed && selectedPlaceId === removed.placeId) {
-        setSelectedPlaceId(null)
-      }
-      return next
-    })
-  }
-
-  function handleDeleteOnDay(dayNum: number, stopId: string) {
-    setDays((prev) =>
-      prev.map((d) => {
-        if (d.day !== dayNum) return d
-        const removedIdx = d.stops.findIndex((s, i) => ensureStopId(d.day, s, i) === stopId)
-        if (removedIdx < 0) return d
-        if (isPinnedHotelStop(d.day, d.stops, removedIdx, lastDayNum)) {
-          return d
-        }
-        const removed = d.stops[removedIdx]
-        const next = d.stops.filter((_, i) => i !== removedIdx)
-        if (removed && selectedPlaceId === removed.placeId) {
-          setSelectedPlaceId(null)
-        }
-        return { ...d, stops: next }
-      }),
-    )
-  }
-
-  function handleAddCustom(place: Place, mode: 'best' | 'end') {
-    // Don't auto-open PlacePanel / GooglePlacePage after add-from-dialog.
-    handleAddOnDay(day.day, place, { mode, select: false })
-  }
-
-  function handleGoogleIdentityResolved(
-    placeId: string,
-    googlePlaceId: string,
-    nameOriginal?: string,
-  ) {
-    setCustomPlaces((prev) => {
-      const current = prev[placeId]
-      if (!current) return prev
-      const nextNameLocal = nameOriginal || current.nameLocal
-      if (
-        current.googlePlaceId === googlePlaceId &&
-        current.nameLocal === nextNameLocal
-      ) {
-        return prev
-      }
-      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        nextNameLocal || current.name,
-      )}&query_place_id=${encodeURIComponent(googlePlaceId)}`
-      return {
-        ...prev,
-        [placeId]: {
-          ...current,
-          googlePlaceId,
-          nameLocal: nextNameLocal,
-          googleMapsUrl,
-        },
-      }
-    })
-  }
-
-  function handleAddOnDay(
-    dayNum: number,
-    place: Place,
-    options?: { mode?: 'best' | 'end'; insertAt?: number; select?: boolean },
-  ) {
-    const mode = options?.mode || 'best'
-    setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
-
-    const newStop: ItineraryStop = {
-      id: makeStopId(dayNum, place.id),
-      time: '12:00',
-      placeId: place.id,
-      note: place.description,
-      walkLevel: '短步行',
-      duration: place.durationHint || '60 分钟',
-    }
-
-    setDays((prev) =>
-      prev.map((d) => {
-        if (d.day !== dayNum) return d
-
-        const next = [...d.stops]
-        const endsWithOvernight =
-          d.day !== lastDayNum &&
-          d.stops[d.stops.length - 1]?.placeId === SELECTED_HOTEL_PLACE_ID
-
-        // Explicit index only for rare internal cases; normal adds use 最顺路.
-        if (typeof options?.insertAt === 'number') {
-          let at = Math.max(0, Math.min(options.insertAt, next.length))
-          if (d.day === 1 && d.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID) {
-            at = Math.max(1, at)
-          }
-          if (endsWithOvernight) {
-            at = Math.min(at, d.stops.length - 1)
-          }
-          next.splice(at, 0, newStop)
-          return {
-            ...d,
-            stops: keepFixedHotelPositions(d.day, next, lastDayNum),
-          }
-        }
-
-        if (mode === 'end') {
-          // Insert before pinned overnight hotel when present.
-          if (endsWithOvernight) {
-            const at = Math.max(0, d.stops.length - 1)
-            next.splice(at, 0, newStop)
-            return { ...d, stops: next }
-          }
-          return { ...d, stops: [...d.stops, newStop] }
-        }
-
-        // Default / best: insert where day-origin → stops path is shortest.
-        // Day 1 origin is CDG; other days use the hotel.
-        if (!d.stops.length) {
-          return { ...d, stops: [newStop] }
-        }
-
-        const origin = getDayOrigin(d.day, hotel)
-        const placesLookup = {
-          ...placesWithHotel,
-          [place.id]: place,
-        }
-        const stopLocations = d.stops.map((s) => {
-          try {
-            return getPlace(s.placeId, placesLookup).location
-          } catch {
-            return { lat: origin.lat, lng: origin.lng }
-          }
-        })
-        let insertAt = findBestInsertIndex(
-          { lat: origin.lat, lng: origin.lng },
-          stopLocations,
-          place.location,
-        )
-        // Keep day-1 hotel check-in as the first stop (airport → hotel → …).
-        if (d.day === 1 && d.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID) {
-          insertAt = Math.max(1, insertAt)
-        }
-        // Keep overnight hotel as the last stop on non-last days.
-        if (endsWithOvernight) {
-          insertAt = Math.min(insertAt, d.stops.length - 1)
-        }
-        next.splice(insertAt, 0, newStop)
-        return {
-          ...d,
-          stops: keepFixedHotelPositions(d.day, next, lastDayNum),
-        }
-      }),
-    )
-
-    const targetIndex = days.findIndex((d) => d.day === dayNum)
-    if (targetIndex >= 0) setDayIndex(targetIndex)
-    if (options?.select !== false) {
-      setSelectedPlaceId(place.id)
-    }
-  }
-
-  function handleSwitchDay(dayNum: number) {
-    const idx = days.findIndex((d) => d.day === dayNum)
-    if (idx >= 0) {
-      setDayIndex(idx)
-      setSelectedPlaceId(null)
-    }
-  }
-
-  /** Atomically replace a stop in-place so the new place keeps the old index. */
-  function handleReplaceOnDay(
-    dayNum: number,
-    stopId: string,
-    place: Place,
-    options?: { select?: boolean },
-  ) {
-    setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
-
-    const dayPlan = days.find((d) => d.day === dayNum)
-    const oldIdx =
-      dayPlan?.stops.findIndex((s, i) => ensureStopId(dayNum, s, i) === stopId) ?? -1
-    const replacedPlaceId =
-      dayPlan && oldIdx >= 0 && !isPinnedHotelStop(dayNum, dayPlan.stops, oldIdx, lastDayNum)
-        ? dayPlan.stops[oldIdx]?.placeId ?? null
-        : null
-
-    setDays((prev) =>
-      prev.map((d) => {
-        if (d.day !== dayNum) return d
-        const idx = d.stops.findIndex((s, i) => ensureStopId(d.day, s, i) === stopId)
-        if (idx < 0) return d
-
-        const old = d.stops[idx]
-        // Pinned hotel check-in / overnight cannot be replaced.
-        if (isPinnedHotelStop(d.day, d.stops, idx, lastDayNum)) return d
-
-        const newStop: ItineraryStop = {
-          id: makeStopId(dayNum, place.id),
-          time: old.time || '12:00',
-          placeId: place.id,
-          note: place.description,
-          walkLevel: old.walkLevel || '短步行',
-          duration: place.durationHint || old.duration || '60 分钟',
-          transport: old.transport,
-        }
-        const next = [...d.stops]
-        next[idx] = newStop
-        return { ...d, stops: next }
-      }),
-    )
-
-    const targetIndex = days.findIndex((d) => d.day === dayNum)
-    if (targetIndex >= 0) setDayIndex(targetIndex)
-    if (options?.select !== false) {
-      setSelectedPlaceId(place.id)
-    } else if (replacedPlaceId && selectedPlaceId === replacedPlaceId) {
-      setSelectedPlaceId(null)
-    }
-  }
+  const dayNightLabel = formatDayNightLabel(numberOfDays)
 
   function handleResetAll() {
     handleRegenerateItinerary()
@@ -940,8 +363,7 @@ export default function App() {
     if (!ok) return
 
     suppressCopyRef.current = true
-    genRequestIdRef.current += 1
-    dayRegenRequestIdRef.current += 1
+    cancelInFlightGeneration()
     tripInputsHydratedRef.current = false
 
     clearItineraryState()
@@ -1370,7 +792,9 @@ export default function App() {
                 {showItineraryError && (
                   <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-6 text-center">
                     <p className="font-medium text-[var(--ink)]">行程生成失败</p>
-                    <p className="mt-1 text-sm text-[var(--stone)]">{itineraryGenError}</p>
+                    <p className="mt-1 whitespace-pre-line break-words text-left text-sm text-[var(--stone)] sm:text-center">
+                      {itineraryGenError}
+                    </p>
                     {!readOnly && (
                       <button
                         type="button"
@@ -1482,7 +906,9 @@ export default function App() {
                             void handleResetDay(dayIndex)
                           }}
                           canRestoreDayDefault={canRestoreDayDefault}
-                          onRestoreDayDefault={handleRestoreDayDefault}
+                          onRestoreDayDefault={() => {
+                            handleRestoreDayDefault(dayIndex)
+                          }}
                           tripPlaceNames={tripPlaceNames}
                           readOnly={readOnly}
                           recommendationPreferences={recommendationPreferences}
