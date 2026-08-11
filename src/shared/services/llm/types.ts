@@ -96,14 +96,16 @@ export interface ItineraryStartInput {
 }
 
 export interface ItineraryStartResult {
-  /** Day-1 hotel check-in clock, "HH:MM" or null if not derivable. */
-  day1HotelHm: string | null
-  /** First calendar date for the itinerary (may differ from trip start). */
+  /** Paris local arrival calendar date YYYY-MM-DD */
+  arrivalDateParis: string
+  /** Paris local arrival time if known, e.g. 14:35 */
+  arrivalTimeParis?: string
+  /** Calendar date that itinerary Day 1 should map to */
   itineraryStartDate: string
-  /** Approximate CDG transit duration (seconds) from outbound arrival. */
-  day1TransitSeconds: number | null
-  /** Day-1 outbound arrival clock if known, "HH:MM". */
-  day1ArrivalHm: string | null
+  /** True when Day 1 stays on trip startDate */
+  startsOnTripStartDate: boolean
+  /** Short Chinese explanation for the itinerary section */
+  reasonZh: string
 }
 
 export type RecommendPlaceType = 'cafe' | 'attraction' | 'restaurant'
