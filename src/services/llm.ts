@@ -11,6 +11,30 @@ import {
   buildPrompt,
   jsonContract,
 } from './llm/prompts'
+import {
+  DEEPSEEK_MODEL_IDS,
+  DEEPSEEK_MODEL_OPTIONS,
+  ENABLE_LLM_PROVIDER_SWITCH,
+  GEMINI_MODEL,
+  OPENAI_MODEL_IDS,
+  OPENAI_MODEL_OPTIONS,
+  OPENAI_ONLY_MODEL_OPTIONS,
+  defaultOpenAIModelFromEnv,
+  isLlmConfigured,
+  llmStorageKeys,
+  type OpenAIModelId,
+} from '../config/llmModels'
+
+// Re-export so the 10+ downstream consumers can keep importing from
+// `services/llm` during stage 1; future stages move callers to `config/llmModels`.
+export {
+  DEEPSEEK_MODEL_OPTIONS,
+  ENABLE_LLM_PROVIDER_SWITCH,
+  OPENAI_MODEL_OPTIONS,
+  OPENAI_ONLY_MODEL_OPTIONS,
+  isLlmConfigured,
+  type OpenAIModelId,
+}
 
 /**
  * Lightweight LLM helpers for place blurbs and day titles.
@@ -35,47 +59,11 @@ import {
 
 export type LlmProvider = 'openai' | 'gemini'
 
-/** Temporarily off — set true to re-enable Gemini failover / manual model switch. */
-export const ENABLE_LLM_PROVIDER_SWITCH = false
-
-const PROVIDER_STORAGE_KEY = 'paris-tour-llm-provider'
-/** Bumped so DeepSeek becomes the fresh default when no explicit env model is set. */
-const OPENAI_MODEL_STORAGE_KEY = 'paris-tour-openai-model-v3'
-/** v2: single ThinkingMode (auto|off|low|medium|high); migrates v1 {enabled,effort}. */
-const THINKING_STORAGE_KEY = 'paris-tour-llm-thinking-v2'
-const THINKING_STORAGE_KEY_LEGACY = 'paris-tour-llm-thinking-v1'
-const GEMINI_MODEL = 'gemini-2.0-flash'
-
-/** DeepSeek V4 models shown in the global picker. */
-export const DEEPSEEK_MODEL_OPTIONS = [
-  {
-    id: 'deepseek-v4-flash',
-    label: 'DeepSeek V4 Flash',
-    shortLabel: 'V4 Flash',
-    provider: 'deepseek' as const,
-  },
-  {
-    id: 'deepseek-v4-pro',
-    label: 'DeepSeek V4 Pro',
-    shortLabel: 'V4 Pro',
-    provider: 'deepseek' as const,
-  },
-] as const
-
-/** GPT-5.6 variants kept in the picker (older GPT-5.5/5.4 dropped). */
-export const OPENAI_ONLY_MODEL_OPTIONS = [
-  { id: 'gpt-5.6-luna', label: 'GPT-5.6 luna', shortLabel: '5.6 luna', provider: 'openai' as const },
-  { id: 'gpt-5.6-sol', label: 'GPT-5.6 sol', shortLabel: '5.6 sol', provider: 'openai' as const },
-  { id: 'gpt-5.6-terra', label: 'GPT-5.6 terra', shortLabel: '5.6 terra', provider: 'openai' as const },
-] as const
-
-/** Selectable chat models for the FAB picker. */
-export const OPENAI_MODEL_OPTIONS = [
-  ...DEEPSEEK_MODEL_OPTIONS,
-  ...OPENAI_ONLY_MODEL_OPTIONS,
-] as const
-
-export type OpenAIModelId = (typeof OPENAI_MODEL_OPTIONS)[number]['id']
+/**
+ * Note: the model picker (`OPENAI_MODEL_OPTIONS` etc.), storage keys,
+ * provider switch flag, and `isLlmConfigured` are now defined in
+ * `src/config/llmModels.ts` and re-exported above for backwards compatibility.
+ */
 
 /**
  * User-selected thinking mode (persisted).
@@ -319,22 +307,14 @@ export function llmBusyLabel(
   return visual === 'thinking' ? labels.thinking : labels.generating
 }
 
-const OPENAI_MODEL_IDS = new Set<string>(OPENAI_MODEL_OPTIONS.map((m) => m.id))
-const DEEPSEEK_MODEL_IDS = new Set<string>(DEEPSEEK_MODEL_OPTIONS.map((m) => m.id))
+// OPENAI_MODEL_IDS / DEEPSEEK_MODEL_IDS are now imported from `config/llmModels`.
 
 export function isDeepSeekModel(modelId: string): boolean {
   const id = modelId.trim()
   return DEEPSEEK_MODEL_IDS.has(id) || /^deepseek/i.test(id)
 }
 
-/** Public (non-secret) model id for the UI — not an API key. Prefers DeepSeek. */
-function defaultOpenAIModel(): string {
-  const fromDeepseekEnv = (import.meta.env.VITE_DEEPSEEK_MODEL as string | undefined)?.trim()
-  if (fromDeepseekEnv && OPENAI_MODEL_IDS.has(fromDeepseekEnv)) return fromDeepseekEnv
-  const fromOpenAiEnv = (import.meta.env.VITE_OPENAI_MODEL as string | undefined)?.trim()
-  if (fromOpenAiEnv && OPENAI_MODEL_IDS.has(fromOpenAiEnv)) return fromOpenAiEnv
-  return 'deepseek-v4-flash'
-}
+// `defaultOpenAIModelFromEnv` is imported from `config/llmModels` at the top.
 
 /**
  * Migrate legacy stored ids:
@@ -355,17 +335,17 @@ function migrateStoredModel(raw: string): {
   }
   if (/^gpt-5\.6/i.test(id)) return { model: 'gpt-5.6-luna' }
   if (/^gpt-/i.test(id)) return { model: 'gpt-5.6-luna' }
-  return { model: defaultOpenAIModel() }
+  return { model: defaultOpenAIModelFromEnv() }
 }
 
 function readStoredOpenAIModel(): { model: string | null; thinkingMode?: ThinkingMode } {
   try {
-    const v = localStorage.getItem(OPENAI_MODEL_STORAGE_KEY)?.trim()
+    const v = localStorage.getItem(llmStorageKeys.openaiModel)?.trim()
     if (!v) return { model: null }
     const migrated = migrateStoredModel(v)
     if (migrated.model !== v) {
       try {
-        localStorage.setItem(OPENAI_MODEL_STORAGE_KEY, migrated.model)
+        localStorage.setItem(llmStorageKeys.openaiModel, migrated.model)
       } catch {
         /* ignore */
       }
@@ -451,7 +431,7 @@ function readStoredThinking(preferMode?: ThinkingMode): ThinkingStore {
     return store
   }
   try {
-    const raw = localStorage.getItem(THINKING_STORAGE_KEY)
+    const raw = localStorage.getItem(llmStorageKeys.thinking)
     if (raw) {
       const parsed = JSON.parse(raw) as { mode?: unknown; lastEffort?: unknown }
       const mode = normalizeThinkingMode(parsed.mode)
@@ -461,7 +441,7 @@ function readStoredThinking(preferMode?: ThinkingMode): ThinkingStore {
     /* ignore */
   }
   try {
-    const legacy = localStorage.getItem(THINKING_STORAGE_KEY_LEGACY)
+    const legacy = localStorage.getItem(llmStorageKeys.thinkingLegacy)
     if (legacy) {
       const migrated = migrateLegacyThinking(legacy)
       persistThinking(migrated)
@@ -475,14 +455,14 @@ function readStoredThinking(preferMode?: ThinkingMode): ThinkingStore {
 
 function persistThinking(store: ThinkingStore) {
   try {
-    localStorage.setItem(THINKING_STORAGE_KEY, JSON.stringify(store))
+    localStorage.setItem(llmStorageKeys.thinking, JSON.stringify(store))
   } catch {
     /* ignore */
   }
 }
 
 const storedModelBoot = readStoredOpenAIModel()
-let activeOpenAIModel = storedModelBoot.model || defaultOpenAIModel()
+let activeOpenAIModel = storedModelBoot.model || defaultOpenAIModelFromEnv()
 let activeThinking = readStoredThinking(storedModelBoot.thinkingMode)
 const openaiModelListeners = new Set<() => void>()
 const thinkingListeners = new Set<() => void>()
@@ -496,7 +476,7 @@ function notifyThinkingListeners() {
 }
 
 function openaiModel() {
-  return activeOpenAIModel || defaultOpenAIModel()
+  return activeOpenAIModel || defaultOpenAIModelFromEnv()
 }
 
 export function getOpenAIModel(): string {
@@ -589,7 +569,7 @@ export function setOpenAIModel(modelId: string) {
   }
   activeOpenAIModel = next
   try {
-    localStorage.setItem(OPENAI_MODEL_STORAGE_KEY, next)
+    localStorage.setItem(llmStorageKeys.openaiModel, next)
   } catch {
     /* ignore */
   }
@@ -657,12 +637,7 @@ export function subscribeThinking(listener: () => void): () => void {
   }
 }
 
-export function isLlmConfigured(): boolean {
-  // Keys live only on the server. Opt out with VITE_LLM_ENABLED=false.
-  const flag = (import.meta.env.VITE_LLM_ENABLED as string | undefined)?.trim().toLowerCase()
-  if (flag === '0' || flag === 'false' || flag === 'off') return false
-  return true
-}
+// `isLlmConfigured` is re-exported from `config/llmModels` at the top of this file.
 
 export function isProviderConfigured(provider: LlmProvider): boolean {
   if (provider === 'gemini' && !ENABLE_LLM_PROVIDER_SWITCH) return false
@@ -679,7 +654,7 @@ export function getProviderLabel(provider: LlmProvider): string {
 
 function readStoredProvider(): LlmProvider | null {
   try {
-    const v = localStorage.getItem(PROVIDER_STORAGE_KEY)
+    const v = localStorage.getItem(llmStorageKeys.provider)
     if (v === 'openai' || v === 'gemini') return v
   } catch {
     /* ignore */
@@ -711,7 +686,7 @@ export function setLlmProvider(provider: LlmProvider, options?: { notice?: strin
   const prev = activeProvider
   activeProvider = provider
   try {
-    localStorage.setItem(PROVIDER_STORAGE_KEY, provider)
+    localStorage.setItem(llmStorageKeys.provider, provider)
   } catch {
     /* ignore */
   }
