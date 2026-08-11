@@ -435,6 +435,8 @@ interface Props {
   /** True while this day's stops are being regenerated via LLM. */
   dayRegenerating?: boolean
   dayRegenError?: string | null
+  /** True for days not yet generated in sequential multi-day generation. */
+  dayPending?: boolean
   /** True while a baseline restore is sequencing removals before insertions. */
   dayRestoring?: boolean
   /** True when this day is the trip's return day (hotel origin-only, no overnight pin). */
@@ -495,6 +497,7 @@ export function DayTimeline({
   copyRefreshing,
   dayRegenerating = false,
   dayRegenError = null,
+  dayPending = false,
   dayRestoring = false,
   isLastDay = false,
   onSelectPlace,
@@ -1063,7 +1066,18 @@ export function DayTimeline({
   }
 
   const requestDelete = (stopKey: string, index: number) => {
-    if (readOnly || dayRestoring || isFixedAt(index) || drag || exitAnim || exitGhosts.length || swapAnim || reorderFlip) return
+    if (
+      readOnly ||
+      dayPending ||
+      dayRestoring ||
+      isFixedAt(index) ||
+      drag ||
+      exitAnim ||
+      exitGhosts.length ||
+      swapAnim ||
+      reorderFlip
+    )
+      return
     clearEnterAnim()
     const el = itemRefs.current[index]
     const heightPx = el?.offsetHeight ?? 140
@@ -1271,7 +1285,18 @@ export function DayTimeline({
     e: ReactPointerEvent,
     cardEl: HTMLElement,
   ) => {
-    if (readOnly || dayRestoring || isFixedAt(index) || drag || exitAnim || exitGhosts.length || swapAnim || reorderFlip) return
+    if (
+      readOnly ||
+      dayPending ||
+      dayRestoring ||
+      isFixedAt(index) ||
+      drag ||
+      exitAnim ||
+      exitGhosts.length ||
+      swapAnim ||
+      reorderFlip
+    )
+      return
     e.preventDefault()
     e.stopPropagation()
 
@@ -1345,7 +1370,11 @@ export function DayTimeline({
               Day {day.day}
             </span>
             <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-xs text-[var(--sage)]">
-              {day.pace}
+              {dayPending ? (
+                <span className="inline-block h-3 w-16 animate-pulse rounded-full bg-white/20" />
+              ) : (
+                day.pace
+              )}
             </span>
             <span className="hidden rounded-full bg-[var(--mist)] px-2.5 py-1 text-xs text-[var(--stone)] sm:inline-flex">
               {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
@@ -1379,10 +1408,10 @@ export function DayTimeline({
               <button
                 type="button"
                 onClick={onRestoreDayDefault}
-                disabled={dayRegenerating || dayRestoring}
+                disabled={dayRegenerating || dayRestoring || dayPending}
                 title={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
                 aria-label={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
-                aria-busy={dayRestoring || undefined}
+                aria-busy={dayRestoring || dayPending || undefined}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
               >
                 <RestoreDayIcon busy={dayRestoring} />
@@ -1391,10 +1420,10 @@ export function DayTimeline({
             <button
               type="button"
               onClick={onResetDay}
-              disabled={dayRegenerating || dayRestoring}
+              disabled={dayRegenerating || dayRestoring || dayPending}
               title={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
               aria-label={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
-              aria-busy={dayRegenerating || undefined}
+              aria-busy={dayRegenerating || dayPending || undefined}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
             >
               <RegenerateDayIcon busy={dayRegenerating} />
@@ -1402,9 +1431,27 @@ export function DayTimeline({
           </div>
           )}
         </div>
-        <h3 className="font-display mt-2 text-2xl sm:text-3xl">{day.title}</h3>
-        <p className="text-sm text-[var(--copper)]">{day.theme}</p>
-        <p className="mt-2 text-sm text-[var(--stone)]">{day.summary}</p>
+        <h3 className="font-display mt-2 text-2xl sm:text-3xl">
+          {dayPending ? (
+            <span className="inline-block h-8 w-2/3 animate-pulse rounded bg-white/20" />
+          ) : (
+            day.title
+          )}
+        </h3>
+        <p className="text-sm text-[var(--copper)]">
+          {dayPending ? (
+            <span className="inline-block h-4 w-1/2 animate-pulse rounded bg-white/20" />
+          ) : (
+            day.theme
+          )}
+        </p>
+        <p className="mt-2 text-sm text-[var(--stone)]">
+          {dayPending ? (
+            <span className="inline-block h-4 w-full animate-pulse rounded bg-white/20" />
+          ) : (
+            day.summary
+          )}
+        </p>
         {dayRegenError && (
           <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-[var(--mist)]/40 px-3 py-2 text-left text-xs text-[var(--copper)]">
             {dayRegenError}
@@ -1441,7 +1488,7 @@ export function DayTimeline({
       </div>
 
       {/* Day-1 airport origin chip (not an itinerary stop; matches map plane marker). */}
-      {dayOrigin.kind === 'airport' && (
+      {!dayPending && dayOrigin.kind === 'airport' && (
         <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
           <span
             className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
@@ -1458,7 +1505,8 @@ export function DayTimeline({
       )}
 
       {/* Day origin → first stop (airport on day 1, hotel otherwise) */}
-      {(day.stops.length > 0 || exitGhosts.length > 0) && (
+      {!dayPending &&
+        (day.stops.length > 0 || exitGhosts.length > 0) && (
         <div
           className={legSlotClassName()}
           aria-hidden={collapseLegs || fadeLegs || undefined}
@@ -1481,18 +1529,36 @@ export function DayTimeline({
         </div>
       )}
 
-      <ol
-        className={`space-y-1 ${dragging ? 'select-none' : ''} ${
-          enterAnim ||
-          enteringKeys.length ||
-          exitAnim ||
-          exitGhosts.length ||
-          swapAnim ||
-          reorderFlip
-            ? 'overflow-visible'
-            : ''
-        }`}
-      >
+      {dayPending ? (
+        <div className="space-y-1">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div
+              // eslint-disable-next-line react/no-array-index-key
+              key={i}
+              className="rounded-2xl border border-white/10 bg-[var(--mist)]/25 p-3 animate-pulse"
+            >
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-10 rounded-full bg-white/20" />
+                <div className="h-4 w-24 rounded bg-white/20" />
+              </div>
+              <div className="mt-3 h-4 w-3/4 rounded bg-white/20" />
+              <div className="mt-2 h-3 w-full rounded bg-white/20" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ol
+          className={`space-y-1 ${dragging ? 'select-none' : ''} ${
+            enterAnim ||
+            enteringKeys.length ||
+            exitAnim ||
+            exitGhosts.length ||
+            swapAnim ||
+            reorderFlip
+              ? 'overflow-visible'
+              : ''
+          }`}
+        >
         {displayItems.map((item, displayIndex) => {
           const { stop, stopKey, liveIndex, ghost } = item
           let place: Place
@@ -1896,7 +1962,8 @@ export function DayTimeline({
             </li>
           )
         })}
-      </ol>
+        </ol>
+      )}
 
       {drag && (
         <div
@@ -1991,13 +2058,13 @@ export function DayTimeline({
         </div>
       )}
 
-      {!day.stops.length && !exitGhosts.length && (
+      {!dayPending && !day.stops.length && !exitGhosts.length && (
         <p className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]">
           {readOnly ? '本日还没有地点。' : '本日还没有地点，点击下方添加。'}
         </p>
       )}
 
-      {!readOnly && (
+      {!readOnly && !dayPending && (
         <>
           <button
             type="button"

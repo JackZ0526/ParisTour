@@ -118,7 +118,15 @@ function extractResponsesText(data: OpenAIResponsesPayload): string {
  */
 export function cleanQueryString(s: string): string | null {
   if (!s) return null
-  const noTrail = s.replace(/[?&](?:ws_call_id|ws_id)=[^\s&]*/g, '')
+  // Remove known tracing tokens used by the web_search tool.
+  // Some runtimes include them as query params (?ws_call_id=...&ws_id=...),
+  // others emit them as standalone tokens: "ws_call_id=call_... ws_id=..."
+  const noTrail = s
+    // query-param style
+    .replace(/[?&](?:ws_call_id|ws_id)=[^\s&]*/g, ' ')
+    // standalone tokens
+    .replace(/(?:^|\s)(?:ws_call_id|ws_id)=[^\s&]+/g, ' ')
+
   const trimmed = noTrail.replace(/\s+/g, ' ').trim()
   return trimmed || null
 }

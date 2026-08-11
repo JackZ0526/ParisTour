@@ -138,6 +138,8 @@ export default function App() {
     setItineraryFingerprint,
     itineraryGenerating,
     setItineraryGenerating,
+    itineraryIncrementalGenerating,
+    itineraryGeneratedUpToDay,
     itineraryGenError,
     setItineraryGenError,
     dayRegenerating,
@@ -308,11 +310,24 @@ export default function App() {
     }
     return names
   }, [days, placesWithHotel])
+
+  /**
+   * Sequential multi-day generation: when a later day hasn't finished LLM generation,
+   * we show shimmer UI and avoid nav/route computation for that pending day.
+   */
+  const dayPending =
+    (itineraryGenerating && day.day === 1) ||
+    (itineraryIncrementalGenerating && day.day > itineraryGeneratedUpToDay)
+
   const { plan: navPlan, loading: navLoading } = useDayNav(
     day,
     hotel,
     placesWithHotel,
-    itineraryReady && itineraryGenerated && !itineraryGenerating && days.length > 0,
+    itineraryReady &&
+      (itineraryGenerated || itineraryIncrementalGenerating) &&
+      !dayPending &&
+      days.length > 0 &&
+      day.stops.length > 0,
   )
 
   /** Last known CDG→hotel transit (Day 1), so flight updates can recompute off other days. */
@@ -694,7 +709,8 @@ export default function App() {
                 <RecommendationPreferencesButton
                   onClick={() => setRecommendationPreferencesOpen(true)}
                 />
-                {itineraryReady && itineraryGenerated && (
+                {itineraryReady &&
+                  (itineraryGenerated || itineraryIncrementalGenerating) && (
                   <>
                 {canRestoreDefault && (
                   <button
@@ -897,6 +913,7 @@ export default function App() {
                           dayRegenerating={dayRegenerating}
                           dayRegenError={dayRegenError}
                           dayRestoring={dayRestoring}
+                          dayPending={dayPending}
                           isLastDay={day.day === lastDayNum}
                           onSelectPlace={setSelectedPlaceId}
                           onReorder={handleReorder}

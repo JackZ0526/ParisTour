@@ -2,10 +2,10 @@
 
 @keyframes chat-step-shimmer {
   0% {
-    background-position: 160% 50%;
+    background-position: 180% 50%;
   }
   100% {
-    background-position: -60% 50%;
+    background-position: -100% 50%;
   }
 }
 
@@ -23,7 +23,12 @@
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: chat-step-shimmer 1.8s ease-in-out infinite;
+  animation: chat-step-shimmer 1.8s linear infinite;
+  will-change: background-position;
+}
+
+.chat-step-shimmer-paused {
+  animation-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {

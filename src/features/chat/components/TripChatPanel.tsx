@@ -940,13 +940,31 @@ export function TripChatPanel({
           if (abortRef.current !== ac || phase !== 'done' || !plan) return
           setRequestThinkingEnabled(plan.thinking.enabled)
           setShowReasoningUi(plan.thinking.enabled)
-          setWorkSteps((prev) =>
-            prev.map((step) =>
-              step.id === 'understand'
-                ? { ...step, label: requestPlanStepLabel(plan) }
-                : step,
-            ),
-          )
+          setWorkSteps((prev) => {
+            const relabeled = prev.map((step) => {
+              if (step.id === 'preprocessPlan') {
+                return { ...step, label: requestPlanStepLabel(plan) }
+              }
+              if (step.id === 'preprocessFallback') {
+                return plan.source === 'fallback'
+                  ? { ...step, status: 'done' as const }
+                  : { ...step, status: 'skipped' as const }
+              }
+              return step
+            })
+
+            // Planning must finish before search/generation can begin. We keep
+            // an explicit active step transition so shimmer stays "live".
+            if (plan.needsWeb) {
+              return activateChatWorkStep(relabeled, 'webSearch', {
+                labels: {
+                  webSearch: searchStepLabel(undefined, message),
+                },
+              })
+            }
+
+            return activateChatWorkStep(relabeled, 'generate')
+          })
         },
         onWebSearch: (phase, detail) => {
           if (abortRef.current !== ac) return
@@ -956,13 +974,6 @@ export function TripChatPanel({
                 labels: {
                   webSearch: searchStepLabel(detail, message),
                 },
-                insert: [
-                  {
-                    id: 'webSearch',
-                    label: searchStepLabel(detail, message),
-                    status: 'pending',
-                  },
-                ],
               }),
             )
             return
@@ -972,7 +983,12 @@ export function TripChatPanel({
             return
           }
           if (phase === 'skip') {
-            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+            setWorkSteps((prev) => {
+              const next = prev.map((s) =>
+                s.id === 'webSearch' ? { ...s, status: 'skipped' as const } : s,
+              )
+              return activateChatWorkStep(next, 'generate')
+            })
           }
         },
         onReplyDelta: (reply) => {
@@ -999,35 +1015,24 @@ export function TripChatPanel({
           onProgress: (phase, detail) => {
             if (phase === 'resolvePlaces') {
               setWorkSteps((prev) =>
-                activateChatWorkStep(prev, 'resolvePlaces', {
-                  labels: {
-                    resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                activateChatWorkStep(
+                  prev.map((s) =>
+                    s.id === 'apply'
+                      ? { ...s, status: 'pending' as const, label: '打开确认页…' }
+                      : s,
+                  ),
+                  'resolvePlaces',
+                  {
+                    labels: {
+                      resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                    },
                   },
-                  insert: [
-                    {
-                      id: 'resolvePlaces',
-                      label: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
-                      status: 'pending',
-                    },
-                    {
-                      id: 'apply',
-                      label: '打开确认页…',
-                      status: 'pending',
-                    },
-                  ],
-                }),
+                ),
               )
               return
             }
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'apply', {
-                insert: [
-                  {
-                    id: 'apply',
-                    label: detail?.pending ? '打开确认页…' : '应用改动…',
-                    status: 'pending',
-                  },
-                ],
                 labels: {
                   apply: detail?.pending ? '打开确认页…' : '应用改动…',
                 },
@@ -1485,13 +1490,30 @@ export function TripChatPanel({
           if (abortRef.current !== ac || phase !== 'done' || !plan) return
           setRequestThinkingEnabled(plan.thinking.enabled)
           setShowReasoningUi(plan.thinking.enabled)
-          setWorkSteps((prev) =>
-            prev.map((step) =>
-              step.id === 'understand'
-                ? { ...step, label: requestPlanStepLabel(plan) }
-                : step,
-            ),
-          )
+          setWorkSteps((prev) => {
+            const relabeled = prev.map((step) => {
+              if (step.id === 'preprocessPlan') {
+                return { ...step, label: requestPlanStepLabel(plan) }
+              }
+              if (step.id === 'preprocessFallback') {
+                return plan.source === 'fallback'
+                  ? { ...step, status: 'done' as const }
+                  : { ...step, status: 'skipped' as const }
+              }
+              return step
+            })
+
+            // Planning must finish before search/generation can begin.
+            if (plan.needsWeb) {
+              return activateChatWorkStep(relabeled, 'webSearch', {
+                labels: {
+                  webSearch: searchStepLabel(undefined, message),
+                },
+              })
+            }
+
+            return activateChatWorkStep(relabeled, 'generate')
+          })
         },
         onWebSearch: (phase, detail) => {
           if (abortRef.current !== ac) return
@@ -1501,13 +1523,6 @@ export function TripChatPanel({
                 labels: {
                   webSearch: searchStepLabel(detail, message),
                 },
-                insert: [
-                  {
-                    id: 'webSearch',
-                    label: searchStepLabel(detail, message),
-                    status: 'pending',
-                  },
-                ],
               }),
             )
             return
@@ -1517,7 +1532,12 @@ export function TripChatPanel({
             return
           }
           if (phase === 'skip') {
-            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+            setWorkSteps((prev) => {
+              const next = prev.map((s) =>
+                s.id === 'webSearch' ? { ...s, status: 'skipped' as const } : s,
+              )
+              return activateChatWorkStep(next, 'generate')
+            })
           }
         },
         onReplyDelta: (reply) => {
@@ -1543,35 +1563,24 @@ export function TripChatPanel({
           onProgress: (phase, detail) => {
             if (phase === 'resolvePlaces') {
               setWorkSteps((prev) =>
-                activateChatWorkStep(prev, 'resolvePlaces', {
-                  labels: {
-                    resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                activateChatWorkStep(
+                  prev.map((s) =>
+                    s.id === 'apply'
+                      ? { ...s, status: 'pending' as const, label: '打开确认页…' }
+                      : s,
+                  ),
+                  'resolvePlaces',
+                  {
+                    labels: {
+                      resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                    },
                   },
-                  insert: [
-                    {
-                      id: 'resolvePlaces',
-                      label: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
-                      status: 'pending',
-                    },
-                    {
-                      id: 'apply',
-                      label: '打开确认页…',
-                      status: 'pending',
-                    },
-                  ],
-                }),
+                ),
               )
               return
             }
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'apply', {
-                insert: [
-                  {
-                    id: 'apply',
-                    label: detail?.pending ? '打开确认页…' : '应用改动…',
-                    status: 'pending',
-                  },
-                ],
                 labels: {
                   apply: detail?.pending ? '打开确认页…' : '应用改动…',
                 },
