@@ -1,4 +1,4 @@
-import type { FlightLegTemplate } from '../types'
+import type { FlightLegTemplate } from '../../../types'
 
 /**
  * Recommended autumn routing (mid-Sep to early Oct):

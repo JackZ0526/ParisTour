@@ -1,4 +1,4 @@
-import type { FlightInfo } from '../types'
+import type { FlightInfo } from '../../../types'
 
 const STORAGE_KEY = 'paris-tour-flights-v1'
 

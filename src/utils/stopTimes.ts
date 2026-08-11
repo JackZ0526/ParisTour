@@ -1,5 +1,5 @@
 import type { DayPlan, FlightInfo, ItineraryStop } from '../types'
-import { parseAirportLocalTime } from './flightTime'
+import { parseAirportLocalTime } from '../features/flight/utils/flightTime'
 
 /** CDG immigration + baggage claim buffer before leaving the airport. */
 export const CDG_EXIT_BUFFER_MINUTES = 60

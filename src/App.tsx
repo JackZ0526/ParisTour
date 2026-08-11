@@ -10,7 +10,7 @@ import {
   FlightPanel,
   areFlightsComplete,
   type FlightSelection,
-} from './components/FlightPanel'
+} from './features/flight/components/FlightPanel'
 import { HotelPicker } from './components/HotelPicker'
 import { LoadingIndicator } from './components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
@@ -34,11 +34,11 @@ import {
 } from './data/hotels'
 import { getPlace } from './data/places'
 import { clearDayNavCache, useDayNav } from './hooks/useDayNav'
-import { clearAllFlightCache } from './services/flightCache'
+import { clearAllFlightCache } from './features/flight/services/flightCache'
 import {
   clearFlightSelection,
   loadFlightSelection,
-} from './services/flightSelection'
+} from './features/flight/services/flightSelection'
 import { clearHotelCache, loadHotelCache } from './services/hotelCache'
 import { clearLlmMemo } from './services/llmMemo'
 import { clearLlmArtifacts } from './services/llmArtifactStore'

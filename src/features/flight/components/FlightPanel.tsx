@@ -6,10 +6,10 @@ import {
   saveFlightSelection,
   type PersistedFlightSelection,
 } from '../services/flightSelection'
-import type { TripDateRange } from '../services/tripDates'
-import type { FlightEndpoint, FlightInfo } from '../types'
+import type { TripDateRange } from '../../../services/tripDates'
+import type { FlightEndpoint, FlightInfo } from '../../../types'
 import { formatAirportLocalTime } from '../utils/flightTime'
-import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
+import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 
 function emptyFlightSelection(): PersistedFlightSelection {
   return {

@@ -1,4 +1,4 @@
-import type { FlightInfo } from '../types'
+import type { FlightInfo } from '../../../types'
 const STORAGE_KEY = 'paris-tour-flight-cache-v1'
 /** Schedules for a given flight+date rarely change day-to-day; keep for 14 days. */
 const TTL_MS = 1000 * 60 * 60 * 24 * 14

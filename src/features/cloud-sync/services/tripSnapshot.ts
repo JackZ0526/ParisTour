@@ -1,5 +1,5 @@
 import type { PersistedBaselineState, PersistedItineraryState } from '../../../utils/itineraryState'
-import type { PersistedFlightSelection } from '../../../services/flightSelection'
+import type { PersistedFlightSelection } from '../../flight/services/flightSelection'
 import type { HotelCacheState } from '../../../services/hotelCache'
 import type { TripDateRange } from '../../../services/tripDates'
 import type { LlmArtifactMap } from '../../../services/llmArtifactStore'
@@ -16,7 +16,7 @@ import {
   clearFlightSelection,
   loadFlightSelection,
   saveFlightSelection,
-} from '../../../services/flightSelection'
+} from '../../flight/services/flightSelection'
 import { clearHotelCache, loadHotelCache, saveHotelCache } from '../../../services/hotelCache'
 import { loadDestination, saveDestination } from '../../destination/services/destination'
 import { loadTripDates, saveTripDates } from '../../../services/tripDates'
