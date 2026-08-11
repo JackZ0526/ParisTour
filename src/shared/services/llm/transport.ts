@@ -17,7 +17,6 @@ import {
   getActiveLlmLabel,
   getOpenAIModel,
   isDeepSeekModel,
-  supportsThinkingControls,
 } from './model-state'
 import { getProviderLabel } from './provider-state'
 import { deepSeekThinkingParams, resolveThinkingForTask, uiEffortToOpenAI } from './thinking'
@@ -25,10 +24,8 @@ import type {
   ChatCallOptions,
   ChatStreamOptions,
   LlmProvider,
-  LlmTaskKind,
   OpenAIChatMessage,
   ResolvedThinking,
-  ResolvedThinkingEffort,
 } from './types'
 
 type ChatBackend = 'openai' | 'deepseek' | 'gemini'
@@ -558,8 +555,3 @@ export function providerOrder(preferred: LlmProvider): LlmProvider[] {
   void preferred
   return ['openai']
 }
-
-// Silence unused-import warning when the build reorders things.
-void supportsThinkingControls
-void LlmTaskKind
-void ResolvedThinkingEffort

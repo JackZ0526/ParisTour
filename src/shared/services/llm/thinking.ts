@@ -10,7 +10,6 @@ import type {
   LlmTaskKind,
   OpenAIReasoningEffort,
   ResolvedThinking,
-  ResolvedThinkingEffort,
   ThinkingEffortUi,
   ThinkingMode,
 } from './types'
