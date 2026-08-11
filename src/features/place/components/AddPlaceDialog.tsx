@@ -5,7 +5,7 @@ import {
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
-} from '../../../services/googlePlaceDetails'
+} from '../../map/services/googlePlaceDetails'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -30,7 +30,7 @@ import type { RecommendationPreferences } from '../services/recommendationPrefer
 import { formatPriceLevelLabel } from '../../../utils/priceLevel'
 import { CloseIconButton } from '../../../components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
-import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
 

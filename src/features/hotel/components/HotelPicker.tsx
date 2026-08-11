@@ -18,7 +18,7 @@ import { memoizeLlmCall } from '../../../services/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
-import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 
 interface Props {

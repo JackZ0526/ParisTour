@@ -1,14 +1,14 @@
-import type { Coordinates } from '../types'
+import type { Coordinates } from '../../../types'
 import {
   placeIdentitySimilarity,
   PLACE_NAME_MATCH_MIN,
-} from '../utils/placeTitle'
+} from '../../../utils/placeTitle'
 import {
   getGoogleMapsApiKey,
   withGoogleMapsPhotoKey,
   withoutGoogleMapsPhotoKey,
 } from './googleMapsKey'
-import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
+import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
 
 export interface GoogleReview {
   text: string

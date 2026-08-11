@@ -24,8 +24,8 @@ import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
 import type { TripChatViewingTarget } from './services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
-import { TripMap } from './components/TripMap'
-import { MapErrorBoundary } from './components/MapErrorBoundary'
+import { TripMap } from './features/map/components/TripMap'
+import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import {
   PENDING_HOTEL,
   inferParisAreaLabel,

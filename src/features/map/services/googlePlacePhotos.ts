@@ -1,9 +1,9 @@
-import type { Coordinates } from '../types'
+import type { Coordinates } from '../../../types'
 import {
   withGoogleMapsPhotoKey,
   withoutGoogleMapsPhotoKey,
 } from './googleMapsKey'
-import { getLlmArtifact, setLlmArtifact } from './llmArtifactStore'
+import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
 
 export interface PlacePhotoResult {
   url: string

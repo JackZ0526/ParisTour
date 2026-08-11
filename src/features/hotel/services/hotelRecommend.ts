@@ -8,7 +8,7 @@ import {
   resolveHotelCandidates,
 } from './hotelResolve'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
-import { searchNearbyGooglePlaceCandidates } from '../../../services/googlePlaceDetails'
+import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlaceDetails'
 
 export function persistHotelState(
   candidates: HotelCandidate[],

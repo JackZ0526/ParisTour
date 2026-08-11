@@ -14,7 +14,7 @@ import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
-} from '../../../services/googlePlaceDetails'
+} from '../../map/services/googlePlaceDetails'
 import {
   generateFullItinerary,
   generateSingleDayItinerary,

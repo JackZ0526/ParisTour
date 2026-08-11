@@ -3,7 +3,7 @@ import {
   fetchGooglePlaceDetails,
   peekGooglePlaceDetails,
   placeDetailsQuery,
-} from '../../../services/googlePlaceDetails'
+} from '../../map/services/googlePlaceDetails'
 import { isLlmConfigured } from '../../../services/llm'
 import {
   looksChinese,
@@ -17,7 +17,7 @@ import {
   placeOriginalLabel,
   placeTitleLines,
 } from '../../../utils/placeTitle'
-import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ActivityBars } from '../../../components/LoadingIndicator'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const

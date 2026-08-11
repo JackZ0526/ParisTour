@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { getPlace } from '../../place/constants/places'
-import type { DayNavPlan, ResolvedDayLeg } from '../../../services/googleNav'
-import { PATH_MODE_COLORS } from '../../../services/googleNav'
+import type { DayNavPlan, ResolvedDayLeg } from '../../map/services/googleNav'
+import { PATH_MODE_COLORS } from '../../map/services/googleNav'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../../../types'
 import {
@@ -15,7 +15,7 @@ import { AddPlaceDialog } from '../../place/components/AddPlaceDialog'
 import { GommagePetals } from '../../../components/GommagePetals'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { LoadingIndicator } from '../../../components/LoadingIndicator'
-import { HouseIcon, PlaneIcon } from '../../../components/markerIcons'
+import { HouseIcon, PlaneIcon } from '../../map/components/markerIcons'
 import { PlaceName } from '../../place/components/PlaceName'
 
 /** Dissolve + petal flight before slot collapse. */

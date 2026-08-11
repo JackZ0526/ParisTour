@@ -4,11 +4,11 @@ import {
   planDayNavigation,
   type DayNavPlan,
   type ResolvedDayLeg,
-} from '../../../services/googleNav'
+} from '../../map/services/googleNav'
 import { getLlmArtifact, setLlmArtifact } from '../../../services/llmArtifactStore'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getDayOriginFromHotelFields } from '../utils/dayOrigin'
-import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 
 const emptyPlan = (
   stopsKey = '',

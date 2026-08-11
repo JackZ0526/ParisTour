@@ -1,7 +1,7 @@
 import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../constants/hotels'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
-import { geocodeParisAddress } from '../../../services/geocode'
-import { fetchGooglePlaceDetails } from '../../../services/googlePlaceDetails'
+import { geocodeParisAddress } from '../../map/services/geocode'
+import { fetchGooglePlaceDetails } from '../../map/services/googlePlaceDetails'
 
 const FALLBACK_HOTEL_IMAGE =
   'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'

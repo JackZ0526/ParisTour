@@ -4,8 +4,8 @@ import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
   type GooglePlaceDetails,
-} from '../../../services/googlePlaceDetails'
-import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../../../services/googleMapsKey'
+} from '../../map/services/googlePlaceDetails'
+import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../../map/services/googleMapsKey'
 import { isLlmConfigured } from '../../../services/llm'
 import {
   looksChinese,
@@ -17,7 +17,7 @@ import { placeOriginalLabel, placeTitleLines } from '../../../utils/placeTitle'
 import { formatPriceLevelLabel } from '../../../utils/priceLevel'
 import { CloseIconButton } from '../../../components/CloseIconButton'
 import { GoogleReviewsList } from './GoogleReviewsList'
-import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { LoadingIndicator } from '../../../components/LoadingIndicator'
 
 export interface LlmPlaceNarrative {

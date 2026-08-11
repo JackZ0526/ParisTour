@@ -21,7 +21,7 @@ import {
   type ThinkingEffortUi,
 } from './llm'
 import { dateForTripDay, formatTripDayLabel } from '../features/itinerary/services/tripDates'
-import { searchNearbyGooglePlaceCandidates } from './googlePlaceDetails'
+import { searchNearbyGooglePlaceCandidates } from '../features/map/services/googlePlaceDetails'
 import {
   COMMON_RULES,
   NO_HALLUCINATION,

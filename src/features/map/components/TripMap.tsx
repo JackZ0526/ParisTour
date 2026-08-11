@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
-import { getPlace } from '../features/place/constants/places'
+import { getPlace } from '../../place/constants/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
-import type { DayPlan, Place, SelectedHotel } from '../types'
+import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import {
   getDayOriginFromHotelFields,
   isAirportPlace,
   isHotelPlace,
   numberedStopIndexes,
-} from '../features/itinerary/utils/dayOrigin'
+} from '../../itinerary/utils/dayOrigin'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { googleMapsLoadErrorHelp } from '../services/googleMapsErrors'
-import { LoadingIndicator } from './LoadingIndicator'
+import { LoadingIndicator } from '../../../components/LoadingIndicator'
 import {
   airportIconUrl,
   homeIconUrl,
   numberIconUrl,
 } from './markerIcons'
-import { placeOriginalLabel } from '../utils/placeTitle'
+import { placeOriginalLabel } from '../../../utils/placeTitle'
 import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
 
 const mapContainerStyle = { width: '100%', height: '100%' }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
-} from '../services/googlePlaceDetails'
+} from '../features/map/services/googlePlaceDetails'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -56,7 +56,7 @@ import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from './CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../features/place/components/GooglePlacePage'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
+import { useGoogleMapsReady } from '../features/map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
 
