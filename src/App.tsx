@@ -75,7 +75,7 @@ import {
   applyDay1HotelArrivalTimes,
   computeDay1HotelArrivalHm,
   recomputeDayStopTimes,
-} from './utils/stopTimes'
+} from './shared/utils/stopTimes'
 import {
   blankDay,
   buildItineraryFingerprint,
