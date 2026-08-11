@@ -18,7 +18,7 @@ import {
   saveFlightSelection,
 } from '../../../services/flightSelection'
 import { clearHotelCache, loadHotelCache, saveHotelCache } from '../../../services/hotelCache'
-import { loadDestination, saveDestination } from '../../../services/destination'
+import { loadDestination, saveDestination } from '../../destination/services/destination'
 import { loadTripDates, saveTripDates } from '../../../services/tripDates'
 import {
   clearLlmArtifacts,
