@@ -6,7 +6,7 @@ import type {
   PlaceType,
   SelectedHotel,
 } from '../types'
-import { getPlace } from '../data/places'
+import { getPlace } from '../features/place/constants/places'
 import {
   extractLlmJsonObject,
   extractPartialJsonStringField,

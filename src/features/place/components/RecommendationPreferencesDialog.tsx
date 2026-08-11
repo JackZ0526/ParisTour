@@ -4,8 +4,8 @@ import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   type RecommendationPreferences,
 } from '../services/recommendationPreferences'
-import { CloseIconButton } from './CloseIconButton'
-import { TimePicker } from '../features/itinerary/components/TimePicker'
+import { CloseIconButton } from '../../../components/CloseIconButton'
+import { TimePicker } from '../../itinerary/components/TimePicker'
 
 interface Props {
   open: boolean

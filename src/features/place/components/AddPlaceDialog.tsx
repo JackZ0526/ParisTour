@@ -5,7 +5,7 @@ import {
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
-} from '../services/googlePlaceDetails'
+} from '../../../services/googlePlaceDetails'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -15,7 +15,7 @@ import {
   type HotelDetailCopy,
   type PlaceRecommendation,
   type RecommendPlaceType,
-} from '../services/llm'
+} from '../../../services/llm'
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,
@@ -25,13 +25,13 @@ import {
   getDayRecommendCache,
   setDayRecommendCache,
 } from '../services/recommendCache'
-import type { Place, PlaceType } from '../types'
+import type { Place, PlaceType } from '../../../types'
 import type { RecommendationPreferences } from '../services/recommendationPreferences'
-import { formatPriceLevelLabel } from '../utils/priceLevel'
-import { CloseIconButton } from './CloseIconButton'
+import { formatPriceLevelLabel } from '../../../utils/priceLevel'
+import { CloseIconButton } from '../../../components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
-import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
+import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
 
 interface Props {

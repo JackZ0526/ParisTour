@@ -3,7 +3,7 @@ import { memoizeLlmCall } from './llmMemo'
 import {
   recommendationPreferencesPrompt,
   type RecommendationPreferences,
-} from './recommendationPreferences'
+} from '../features/place/services/recommendationPreferences'
 import {
   CAFE_VS_RESTAURANT_RULE,
   COMMON_RULES,

@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { getPlace } from '../../../data/places'
+import { getPlace } from '../../place/constants/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../../../services/googleNav'
 import { PATH_MODE_COLORS } from '../../../services/googleNav'
-import type { RecommendationPreferences } from '../../../services/recommendationPreferences'
+import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../../../types'
 import {
   getDayOrigin,
@@ -11,12 +11,12 @@ import {
   numberedStopIndexes,
   SELECTED_HOTEL_PLACE_ID,
 } from '../utils/dayOrigin'
-import { AddPlaceDialog } from '../../../components/AddPlaceDialog'
+import { AddPlaceDialog } from '../../place/components/AddPlaceDialog'
 import { GommagePetals } from '../../../components/GommagePetals'
-import { GooglePlacePhoto } from '../../../components/GooglePlacePhoto'
+import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { LoadingIndicator } from '../../../components/LoadingIndicator'
 import { HouseIcon, PlaneIcon } from '../../../components/markerIcons'
-import { PlaceName } from '../../../components/PlaceName'
+import { PlaceName } from '../../place/components/PlaceName'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560

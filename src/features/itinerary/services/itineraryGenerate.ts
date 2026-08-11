@@ -1,4 +1,4 @@
-import { places as catalogPlaces } from '../../../data/places'
+import { places as catalogPlaces } from '../../place/constants/places'
 import type {
   DayPlan,
   FlightInfo,

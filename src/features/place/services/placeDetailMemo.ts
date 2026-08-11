@@ -1,9 +1,9 @@
-import type { HotelDetailCopy } from './llm'
+import type { HotelDetailCopy } from '../../../services/llm'
 import {
   getLlmArtifact,
   setLlmArtifactsForKeys,
-} from './llmArtifactStore'
-import { memoizeLlmCall, peekLlmMemo, seedLlmMemo } from './llmMemo'
+} from '../../../services/llmArtifactStore'
+import { memoizeLlmCall, peekLlmMemo, seedLlmMemo } from '../../../services/llmMemo'
 
 /** PlacePanel / itinerary placeId key (catalog id or `custom-*`). */
 export function placeDetailIdKey(placeId: string) {

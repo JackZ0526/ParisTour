@@ -3,7 +3,7 @@ import type { PersistedFlightSelection } from '../../flight/services/flightSelec
 import type { HotelCacheState } from '../../hotel/services/hotelCache'
 import type { TripDateRange } from '../../itinerary/services/tripDates'
 import type { LlmArtifactMap } from '../../../services/llmArtifactStore'
-import type { RecommendationPreferences } from '../../../services/recommendationPreferences'
+import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
 import {
   clearBaselineItinerary,
   clearItineraryState,
@@ -30,7 +30,7 @@ import {
   clearRecommendationPreferences,
   loadRecommendationPreferences,
   saveRecommendationPreferences,
-} from '../../../services/recommendationPreferences'
+} from '../../place/services/recommendationPreferences'
 
 export const TRIP_SNAPSHOT_VERSION = 1 as const
 

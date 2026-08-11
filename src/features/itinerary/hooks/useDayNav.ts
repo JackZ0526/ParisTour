@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { getPlace } from '../../../data/places'
+import { getPlace } from '../../place/constants/places'
 import {
   planDayNavigation,
   type DayNavPlan,

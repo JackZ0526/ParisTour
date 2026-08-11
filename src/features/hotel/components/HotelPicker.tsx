@@ -16,8 +16,8 @@ import { candidateToSelected, resolveHotelCandidate } from '../services/hotelRes
 import { generateHotelDetailCopy, isLlmConfigured } from '../../../services/llm'
 import { memoizeLlmCall } from '../../../services/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
-import { GooglePlacePage } from '../../../components/GooglePlacePage'
-import { GooglePlacePhoto } from '../../../components/GooglePlacePhoto'
+import { GooglePlacePage } from '../../place/components/GooglePlacePage'
+import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../components/LoadingIndicator'
 

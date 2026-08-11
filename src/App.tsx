@@ -18,8 +18,8 @@ import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {
   RecommendationPreferencesButton,
   RecommendationPreferencesDialog,
-} from './components/RecommendationPreferencesDialog'
-import { PlacePanel } from './components/PlacePanel'
+} from './features/place/components/RecommendationPreferencesDialog'
+import { PlacePanel } from './features/place/components/PlacePanel'
 import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
 import { TripChatPanel } from './components/TripChatPanel'
 import type { TripChatViewingTarget } from './services/tripChat'
@@ -32,7 +32,7 @@ import {
   isHotelSelected,
   isPlaceholderHotelArea,
 } from './features/hotel/constants/hotels'
-import { getPlace } from './data/places'
+import { getPlace } from './features/place/constants/places'
 import { clearDayNavCache, useDayNav } from './features/itinerary/hooks/useDayNav'
 import { clearAllFlightCache } from './features/flight/services/flightCache'
 import {
@@ -42,7 +42,7 @@ import {
 import { clearHotelCache, loadHotelCache } from './features/hotel/services/hotelCache'
 import { clearLlmMemo } from './services/llmMemo'
 import { clearLlmArtifacts } from './services/llmArtifactStore'
-import { clearAllRecommendCache } from './services/recommendCache'
+import { clearAllRecommendCache } from './features/place/services/recommendCache'
 import {
   buildGeneratedItinerary,
   buildGeneratedSingleDay,
@@ -106,7 +106,7 @@ import {
   recommendationPreferencesPrompt,
   saveRecommendationPreferences,
   type RecommendationPreferences,
-} from './services/recommendationPreferences'
+} from './features/place/services/recommendationPreferences'
 
 const ITINERARY_LOADING_LINES = [
   '正在按航班、酒店和推荐偏好拼接日程…',

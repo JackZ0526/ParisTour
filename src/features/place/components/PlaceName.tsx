@@ -3,22 +3,22 @@ import {
   fetchGooglePlaceDetails,
   peekGooglePlaceDetails,
   placeDetailsQuery,
-} from '../services/googlePlaceDetails'
-import { isLlmConfigured } from '../services/llm'
+} from '../../../services/googlePlaceDetails'
+import { isLlmConfigured } from '../../../services/llm'
 import {
   looksChinese,
   peekPlaceNameZh,
   translatePlaceNameToChinese,
-} from '../services/translate'
-import type { Coordinates } from '../types'
+} from '../../../services/translate'
+import type { Coordinates } from '../../../types'
 import {
   formatPlaceLabel,
   placeChineseLabel,
   placeOriginalLabel,
   placeTitleLines,
-} from '../utils/placeTitle'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
-import { ActivityBars } from './LoadingIndicator'
+} from '../../../utils/placeTitle'
+import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { ActivityBars } from '../../../components/LoadingIndicator'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
 

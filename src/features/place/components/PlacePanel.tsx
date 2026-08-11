@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getPlace } from '../data/places'
+import { getPlace } from '../constants/places'
 import {
   generatePlaceDetailCopy,
   isLlmConfigured,
   type HotelDetailCopy,
-} from '../services/llm'
+} from '../../../services/llm'
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,
   placeDetailKeysFromPlace,
 } from '../services/placeDetailMemo'
-import type { DayPlan, Place, SelectedHotel } from '../types'
+import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from './GooglePlacePage'
 
 interface Props {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
-import { fetchGooglePlacePhoto, placePhotoQuery } from '../services/googlePlacePhotos'
-import type { Coordinates } from '../types'
+import { useGoogleMapsReady } from '../../../components/GoogleMapsProvider'
+import { fetchGooglePlacePhoto, placePhotoQuery } from '../../../services/googlePlacePhotos'
+import type { Coordinates } from '../../../types'
 
 interface Props {
   name: string

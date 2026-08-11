@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
-import { getPlace } from '../data/places'
+import { getPlace } from '../features/place/constants/places'
 import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../types'
 import {

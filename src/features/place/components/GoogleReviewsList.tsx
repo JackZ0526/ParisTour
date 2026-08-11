@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { GoogleReview } from '../services/googlePlaceDetails'
-import { looksChinese, translateTextsToChinese } from '../services/translate'
-import { isLlmConfigured } from '../services/llm'
-import { LoadingIndicator } from './LoadingIndicator'
+import type { GoogleReview } from '../../../services/googlePlaceDetails'
+import { looksChinese, translateTextsToChinese } from '../../../services/translate'
+import { isLlmConfigured } from '../../../services/llm'
+import { LoadingIndicator } from '../../../components/LoadingIndicator'
 
 interface Props {
   reviews: GoogleReview[]

@@ -15,7 +15,7 @@ import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,
   placeDetailKeysFromPlace,
-} from '../services/placeDetailMemo'
+} from '../features/place/services/placeDetailMemo'
 import {
   persistHotelState,
   refreshHotelCandidates,
@@ -55,7 +55,7 @@ import type {
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from './CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
-import { GooglePlacePage } from './GooglePlacePage'
+import { GooglePlacePage } from '../features/place/components/GooglePlacePage'
 import { useGoogleMapsReady } from './GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from './LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
