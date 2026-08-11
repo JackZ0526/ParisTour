@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './features/auth/AuthProvider'
+import { useTripCore } from './hooks/useTripCore'
 import {
   DayTimeline,
   TIMELINE_DELETE_TOTAL_MS,
   TIMELINE_INSERT_TOTAL_MS,
   TIMELINE_SWAP_TOTAL_MS,
 } from './features/itinerary/components/DayTimeline'
-import {
-  FlightPanel,
-  areFlightsComplete,
-  type FlightSelection,
-} from './features/flight/components/FlightPanel'
+import { FlightPanel } from './features/flight/components/FlightPanel'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
@@ -54,9 +51,8 @@ import {
   itineraryDayCount,
   loadTripDates,
   saveTripDates,
-  type TripDateRange,
 } from './features/itinerary/services/tripDates'
-import type { DayPlan, HotelCandidate, ItineraryStop, Place, SelectedHotel } from './types'
+import type { DayPlan, ItineraryStop, Place } from './types'
 import {
   getDayOrigin,
   placeFromHotel,
@@ -105,7 +101,6 @@ import {
   buildHeroCopy,
   chineseDayCount,
   ensureStopId,
-  hasTripDates,
   hotelAreaShort,
   initialFlightsState,
   initialHotelState,
@@ -138,30 +133,37 @@ export default function App() {
   const [mobileItineraryPane, setMobileItineraryPane] = useState<
     'timeline' | 'map'
   >('timeline')
-  const initialHotels = useMemo(() => initialHotelState(), [])
-  const initialFlights = useMemo(() => initialFlightsState(), [])
   const initialItinerary = useMemo(() => {
     const state = loadItineraryState()
     ensureBaselineFromGenerated(state)
     return state
   }, [])
-  const [hotel, setHotel] = useState<SelectedHotel>(initialHotels.hotel)
-  const [hotelCandidates, setHotelCandidates] = useState<HotelCandidate[]>(
-    initialHotels.candidates,
-  )
+  const {
+    tripDates,
+    setTripDates,
+    flights,
+    setFlights,
+    hotel,
+    setHotel,
+    hotelCandidates,
+    setHotelCandidates,
+    viewingHotelDetail,
+    setViewingHotelDetail,
+    datesReady,
+    outboundReady,
+    returnReady,
+    flightsReady,
+    hotelReady,
+  } = useTripCore()
   // Destination UI temporarily hidden — lock trip to Paris.
   const destination = '巴黎'
-  const [tripDates, setTripDates] = useState<TripDateRange | null>(() => loadTripDates())
-  const [flights, setFlights] = useState<FlightSelection>(initialFlights)
   const [itineraryStart, setItineraryStart] = useState<ItineraryStartResult | null>(null)
   // True on first paint when outbound+dates exist so fingerprint gates wait for resolve.
   const [itineraryStartLoading, setItineraryStartLoading] = useState(() =>
-    Boolean(loadTripDates()?.startDate && initialFlights.outbound?.flightNumber),
+    Boolean(loadTripDates()?.startDate && flights.outbound?.flightNumber),
   )
   const [dayIndex, setDayIndex] = useState(0)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
-  /** Hotel GooglePlacePage currently open in HotelPicker (trip chat context). */
-  const [viewingHotelDetail, setViewingHotelDetail] = useState<HotelCandidate | null>(null)
   const [days, setDays] = useState<DayPlan[]>(() => initialItinerary.days)
   const [customPlaces, setCustomPlaces] = useState<Record<string, Place>>(
     () => initialItinerary.customPlaces,
@@ -335,19 +337,6 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', flush)
   }, [])
 
-  const handleFlightsChange = useCallback((next: FlightSelection) => {
-    setFlights((prev) =>
-      prev.outbound === next.outbound && prev.returnFlight === next.returnFlight
-        ? prev
-        : next,
-    )
-  }, [])
-
-  const datesReady = hasTripDates(tripDates)
-  const outboundReady = Boolean(flights.outbound?.flightNumber?.trim())
-  const returnReady = Boolean(flights.returnFlight?.flightNumber?.trim())
-  const flightsReady = areFlightsComplete(flights)
-  const hotelReady = isHotelSelected(hotel)
   const itineraryReady = datesReady && flightsReady && hotelReady
   const missingForItinerary = itineraryMissingLabels({
     datesReady,
@@ -1750,7 +1739,7 @@ export default function App() {
           key={`flights-${panelResetKey}-${syncRenderKey}`}
           tripDates={tripDates}
           destination={destination}
-          onFlightsChange={handleFlightsChange}
+          onFlightsChange={setFlights}
           readOnly={readOnly}
         />
         <HotelPicker
