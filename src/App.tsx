@@ -47,7 +47,6 @@ import {
 import {
   clampIsoDate,
   dateForTripDay,
-  formatDayNightLabel,
   formatTripDayLabel,
   itineraryDayCount,
   loadTripDates,

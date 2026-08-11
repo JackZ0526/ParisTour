@@ -51,7 +51,6 @@ import {
   AREA_KEY_CN,
   ITINERARY_LOADING_LINES,
   ITINERARY_LOADING_ROTATE_MS,
-  clampIsoDate,
   dateForTripDay,
   hotelAreaShort,
   initialFlightsState,
@@ -62,6 +61,7 @@ import {
   wipeGeneratedItinerary,
 } from '../appHelpers'
 import {
+  clampIsoDate,
   itineraryDayCount,
   loadTripDates,
 } from '../features/itinerary/services/tripDates'
