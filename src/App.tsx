@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './features/auth/AuthProvider'
 import { useTripCore } from './hooks/useTripCore'
+import { useItineraryGeneration } from './hooks/useItineraryGeneration'
 import {
   DayTimeline,
   TIMELINE_DELETE_TOTAL_MS,
@@ -157,29 +158,69 @@ export default function App() {
   } = useTripCore()
   // Destination UI temporarily hidden — lock trip to Paris.
   const destination = '巴黎'
-  const [itineraryStart, setItineraryStart] = useState<ItineraryStartResult | null>(null)
-  // True on first paint when outbound+dates exist so fingerprint gates wait for resolve.
-  const [itineraryStartLoading, setItineraryStartLoading] = useState(() =>
-    Boolean(loadTripDates()?.startDate && flights.outbound?.flightNumber),
-  )
   const [dayIndex, setDayIndex] = useState(0)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
   const [days, setDays] = useState<DayPlan[]>(() => initialItinerary.days)
   const [customPlaces, setCustomPlaces] = useState<Record<string, Place>>(
     () => initialItinerary.customPlaces,
   )
-  const [itineraryGenerated, setItineraryGenerated] = useState(
-    () => Boolean(initialItinerary.generated && initialItinerary.days.length),
+  const placesWithHotel = useMemo(
+    () => ({
+      ...customPlaces,
+      [SELECTED_HOTEL_PLACE_ID]: placeFromHotel(hotel),
+    }),
+    [customPlaces, hotel],
   )
-  const [itineraryFingerprint, setItineraryFingerprint] =
-    useState<ItineraryInputFingerprint | null>(() => initialItinerary.fingerprint || null)
-  const [itineraryGenerating, setItineraryGenerating] = useState(false)
-  const [itineraryGenError, setItineraryGenError] = useState<string | null>(null)
-  const [dayRegenerating, setDayRegenerating] = useState(false)
-  const [dayRegenError, setDayRegenError] = useState<string | null>(null)
-  const [dayRestoring, setDayRestoring] = useState(false)
-  const [itineraryLoadingLineIndex, setItineraryLoadingLineIndex] = useState(
-    () => Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
+  const {
+    itineraryStart,
+    setItineraryStart,
+    itineraryStartLoading,
+    setItineraryStartLoading,
+    itineraryGenerated,
+    setItineraryGenerated,
+    itineraryFingerprint,
+    setItineraryFingerprint,
+    itineraryGenerating,
+    setItineraryGenerating,
+    itineraryGenError,
+    setItineraryGenError,
+    dayRegenerating,
+    setDayRegenerating,
+    dayRegenError,
+    setDayRegenError,
+    dayRestoring,
+    setDayRestoring,
+    itineraryLoadingLine,
+    itineraryStartDate,
+    numberOfDays,
+    currentFingerprint,
+    itineraryReady,
+    missingForItinerary,
+    canRestoreDefault,
+    canRestoreDayDefault,
+    showItineraryLoading,
+    showItineraryContent,
+    showItineraryError,
+    runFullItineraryGeneration,
+    handleResetDay,
+    handleRegenerateItinerary,
+    handleRestoreDefault,
+    handleRestoreDayDefault,
+    setCopyRefreshing,
+  } = useItineraryGeneration(
+    {
+      tripDates,
+      flights,
+      hotel,
+      hotelReady,
+      destination,
+      readOnly,
+      days,
+      customPlaces,
+      placesWithHotel,
+      recommendationPreferences,
+    },
+    { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
   )
   const [panelResetKey, setPanelResetKey] = useState(0)
   /**
@@ -188,14 +229,10 @@ export default function App() {
    * state; remounting on every soft-sync kills in-flight and future anims.
    */
   const [syncRenderKey, setSyncRenderKey] = useState(0)
-  const [copyRefreshing, setCopyRefreshing] = useState(false)
   const prevStopsKeyRef = useRef<string | null>(null)
   const suppressCopyRef = useRef(false)
   /** Bumps on each day-copy request so cancelled runs can't leave the HUD stuck. */
   const copyRequestIdRef = useRef(0)
-  const genRequestIdRef = useRef(0)
-  const dayRegenRequestIdRef = useRef(0)
-  const dayRestoreTimerRef = useRef<number | null>(null)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
   /** Skip autosave during hydrate + React Strict Mode double-effect. */
@@ -209,14 +246,6 @@ export default function App() {
   dayIndexRef.current = dayIndex
   daysRef.current = days
   selectedPlaceIdRef.current = selectedPlaceId
-
-  useEffect(() => {
-    return () => {
-      if (dayRestoreTimerRef.current != null) {
-        window.clearTimeout(dayRestoreTimerRef.current)
-      }
-    }
-  }, [])
 
   // Live sync: pull cloud-applied localStorage into React state without remounting / jumping to Day 1.
   useEffect(() => {
@@ -235,13 +264,7 @@ export default function App() {
     // A remote snapshot replaces the data underneath several stateful children.
     // Cancel local work first so stale completions/animation timers cannot write
     // the pre-sync itinerary back into the newly hydrated React state.
-    genRequestIdRef.current += 1
-    dayRegenRequestIdRef.current += 1
     copyRequestIdRef.current += 1
-    if (dayRestoreTimerRef.current != null) {
-      window.clearTimeout(dayRestoreTimerRef.current)
-      dayRestoreTimerRef.current = null
-    }
     clearDayNavCache()
     // Trust the remote snapshot already written to localStorage. Resetting this
     // to false re-enters the first-hydration wipe path and can clear a valid
@@ -337,143 +360,7 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', flush)
   }, [])
 
-  const itineraryReady = datesReady && flightsReady && hotelReady
-  const missingForItinerary = itineraryMissingLabels({
-    datesReady,
-    outboundReady,
-    returnReady,
-    hotelReady,
-  })
-
-  /**
-   * Day-tab calendar base: resolved Paris itinerary start when ready,
-   * else provisional trip startDate. Clamped to endDate if arrival slips past return.
-   */
-  const itineraryStartDate = useMemo(() => {
-    if (!tripDates?.endDate) {
-      return itineraryStart?.itineraryStartDate || tripDates?.startDate || undefined
-    }
-    const raw =
-      itineraryStart?.itineraryStartDate || tripDates.startDate || undefined
-    if (!raw) return undefined
-    return clampIsoDate(raw, tripDates.startDate || raw, tripDates.endDate)
-  }, [
-    itineraryStart?.itineraryStartDate,
-    tripDates?.startDate,
-    tripDates?.endDate,
-  ])
-
-  /**
-   * Inclusive daytime days from itinerary Day 1 → trip endDate.
-   * Before dates exist, keep whatever length is loaded (or 1).
-   */
-  const numberOfDays = useMemo(() => {
-    if (!tripDates?.startDate || !tripDates?.endDate) {
-      return Math.max(1, days.length || 1)
-    }
-    const start = itineraryStartDate || tripDates.startDate
-    return itineraryDayCount(start, tripDates.endDate)
-  }, [tripDates?.startDate, tripDates?.endDate, itineraryStartDate, days.length])
-
-  const dayNightLabel = formatDayNightLabel(numberOfDays)
-
-  const currentFingerprint = useMemo(() => {
-    if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return null
-    // Require both legs so we never compare/wipe against empty flights during hydrate.
-    if (
-      !flights.outbound?.flightNumber?.trim() ||
-      !flights.returnFlight?.flightNumber?.trim()
-    ) {
-      return null
-    }
-    return buildItineraryFingerprint({
-      hotelId: hotel.id,
-      startDate: tripDates.startDate,
-      endDate: tripDates.endDate,
-      itineraryStartDate: itineraryStartDate || tripDates.startDate,
-      outboundFlight: flights.outbound.flightNumber,
-      returnFlight: flights.returnFlight.flightNumber,
-    })
-  }, [
-    tripDates?.startDate,
-    tripDates?.endDate,
-    hotelReady,
-    hotel.id,
-    itineraryStartDate,
-    flights.outbound?.flightNumber,
-    flights.returnFlight?.flightNumber,
-  ])
-
-  useEffect(() => {
-    // Avoid writing null fingerprint over a saved one while state is mid-wipe/hydrate.
-    saveItineraryState(days, customPlaces, {
-      generated: itineraryGenerated,
-      fingerprint: itineraryFingerprint ?? undefined,
-    })
-  }, [days, customPlaces, itineraryGenerated, itineraryFingerprint])
-
-  // When hotel / dates / flights change after a plan was generated, wipe so next expand regenerates.
-  // Wait until trip inputs (+ itinerary start resolve) are hydrated — never wipe on the brief
-  // null-flights / provisional-startDate window after refresh.
-  useEffect(() => {
-    if (!itineraryReady || itineraryStartLoading || !currentFingerprint) return
-    // Remote soft-sync remounts panels and briefly churns inputs; do not wipe the
-    // itinerary we just applied from the cloud.
-    if (isRemoteQuietPeriodActive()) return
-
-    const wipePlan = () => {
-      genRequestIdRef.current += 1
-      dayRegenRequestIdRef.current += 1
-      wipeGeneratedItinerary()
-      clearDayNavCache()
-      navTimesAppliedKeyRef.current = ''
-      setDays([])
-      setCustomPlaces({})
-      setItineraryGenerated(false)
-      setItineraryFingerprint(null)
-      setItineraryGenError(null)
-      setItineraryGenerating(false)
-      setDayRegenerating(false)
-      setDayRegenError(null)
-      setSelectedPlaceId(null)
-      setDayIndex(0)
-    }
-
-    if (!tripInputsHydratedRef.current) {
-      tripInputsHydratedRef.current = true
-      if (!itineraryGenerated) return
-      if (!itineraryFingerprint) {
-        // Legacy plan without fingerprint — keep and stamp current inputs.
-        setItineraryFingerprint(currentFingerprint)
-        return
-      }
-      if (fingerprintsEqual(itineraryFingerprint, currentFingerprint)) return
-      // Async start-date resolve can drift slightly; hotel/dates/flights still match → keep plan.
-      if (fingerprintTripInputsEqual(itineraryFingerprint, currentFingerprint)) {
-        setItineraryFingerprint(currentFingerprint)
-        return
-      }
-      wipePlan()
-      return
-    }
-
-    if (!itineraryGenerated) return
-    if (fingerprintsEqual(itineraryFingerprint, currentFingerprint)) return
-    if (
-      itineraryFingerprint &&
-      fingerprintTripInputsEqual(itineraryFingerprint, currentFingerprint)
-    ) {
-      setItineraryFingerprint(currentFingerprint)
-      return
-    }
-    wipePlan()
-  }, [
-    currentFingerprint,
-    itineraryGenerated,
-    itineraryFingerprint,
-    itineraryReady,
-    itineraryStartLoading,
-  ])
+  // (itineraryReady + missingForItinerary are now provided by useItineraryGeneration.)
 
   // When hotel areaKey is confirmed / re-derived (e.g. 16区 no longer → saintGermain),
   // rewrite stale LLM day blurbs that still name the wrong 落脚点.
@@ -491,198 +378,12 @@ export default function App() {
     })
   }, [hotelSelectedForCopySync, hotelAreaKeyForCopySync, itineraryGenerated, days.length])
 
-  // Keep day tabs in sync with computed itinerary length (only after a plan exists).
-  useEffect(() => {
-    if (!tripDates?.startDate || !tripDates?.endDate) return
-    if (!itineraryGenerated) return
-    setDays((prev) => {
-      if (!prev.length) return prev
-      const next = resizeItineraryToLength(prev, numberOfDays)
-      return next === prev ? prev : next
-    })
-    setDayIndex((i) => {
-      const max = Math.max(0, numberOfDays - 1)
-      return i > max ? max : i
-    })
-  }, [numberOfDays, tripDates?.startDate, tripDates?.endDate, itineraryGenerated])
-
-  // Resolve Paris arrival / Day 1 calendar start from outbound flight + dates.
-  useEffect(() => {
-    if (!tripDates?.startDate || !flights.outbound?.flightNumber) {
-      setItineraryStart(null)
-      setItineraryStartLoading(false)
-      return
-    }
-
-    let cancelled = false
-    setItineraryStartLoading(true)
-    const timer = window.setTimeout(() => {
-      void resolveItineraryStart({
-        tripStartDate: tripDates.startDate,
-        tripEndDate: tripDates.endDate,
-        destination,
-        hotelName: hotelReady ? hotel.name : null,
-        outbound: {
-          flightNumber: flights.outbound!.flightNumber,
-          airline: flights.outbound!.airline,
-          from: flights.outbound!.from,
-          to: flights.outbound!.to,
-          duration: flights.outbound!.duration,
-          status: flights.outbound!.status,
-          rawNote: flights.outbound!.rawNote,
-        },
-      })
-        .then((result) => {
-          if (cancelled) return
-          setItineraryStart(result)
-        })
-        .catch(() => {
-          if (cancelled) return
-          setItineraryStart(null)
-        })
-        .finally(() => {
-          if (!cancelled) setItineraryStartLoading(false)
-        })
-    }, 280)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [
-    tripDates?.startDate,
-    tripDates?.endDate,
-    flights.outbound,
-    destination,
-    hotelReady,
-    hotel.name,
-  ])
-
-  const runFullItineraryGeneration = useCallback(async () => {
-    if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
-    if (!isLlmConfigured()) {
-      setItineraryGenError('暂时无法生成行程，请稍后再试。')
-      return
-    }
-
-    const fingerprint = buildItineraryFingerprint({
-      hotelId: hotel.id,
-      startDate: tripDates.startDate,
-      endDate: tripDates.endDate,
-      itineraryStartDate: itineraryStartDate || tripDates.startDate,
-      outboundFlight: flights.outbound?.flightNumber,
-      returnFlight: flights.returnFlight?.flightNumber,
-    })
-
-    const requestId = ++genRequestIdRef.current
-    setItineraryGenerating(true)
-    setItineraryGenError(null)
-    suppressCopyRef.current = true
-
-    try {
-      const areaLabel =
-        AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || hotel.areaKey
-      const result = await buildGeneratedItinerary({
-        destination,
-        dayCount: numberOfDays,
-        tripStartDate: tripDates.startDate,
-        tripEndDate: tripDates.endDate,
-        itineraryStartDate: itineraryStartDate || tripDates.startDate,
-        nights: Math.max(0, numberOfDays - 1),
-        hotel: {
-          ...hotel,
-          area: areaLabel || undefined,
-        },
-        outbound: flightContextBrief(flights.outbound),
-        returnFlight: flightContextBrief(flights.returnFlight),
-        recommendationPreferences,
-      })
-
-      if (requestId !== genRequestIdRef.current) return
-
-      const synced = syncDaysCopyToHotelArea(result.days, hotel.areaKey)
-      setDays(synced)
-      setCustomPlaces(result.customPlaces)
-      setItineraryGenerated(true)
-      setItineraryFingerprint(fingerprint)
-      saveBaselineItinerary(synced, result.customPlaces, fingerprint)
-      saveItineraryState(synced, result.customPlaces, {
-        generated: true,
-        fingerprint,
-      })
-      setDayIndex(0)
-      setSelectedPlaceId(null)
-      setItineraryGenError(null)
-      prevStopsKeyRef.current = null
-    } catch (err) {
-      if (requestId !== genRequestIdRef.current) return
-      setItineraryGenError(
-        err instanceof Error ? err.message : '行程生成失败，请再试一次。',
-      )
-    } finally {
-      if (requestId === genRequestIdRef.current) {
-        setItineraryGenerating(false)
-      }
-    }
-  }, [
-    tripDates?.startDate,
-    tripDates?.endDate,
-    hotelReady,
-    hotel,
-    itineraryStartDate,
-    flights.outbound,
-    flights.returnFlight,
-    numberOfDays,
-    destination,
-    recommendationPreferences,
-  ])
-
-  // First expand (dates + flights + hotel ready): generate full itinerary if none saved.
-  useEffect(() => {
-    if (readOnly) return
-    if (!itineraryReady) return
-    if (itineraryStartLoading) return
-    if (itineraryGenerating) return
-    if (itineraryGenError) return
-
-    const usable = hasUsableGeneratedItinerary(
-      {
-        days,
-        customPlaces,
-        generated: itineraryGenerated,
-        fingerprint: itineraryFingerprint || undefined,
-      },
-      currentFingerprint,
-    )
-    if (usable) return
-
-    void runFullItineraryGeneration()
-  }, [
-    readOnly,
-    itineraryReady,
-    itineraryStartLoading,
-    itineraryGenerating,
-    itineraryGenError,
-    days,
-    customPlaces,
-    itineraryGenerated,
-    itineraryFingerprint,
-    currentFingerprint,
-    runFullItineraryGeneration,
-  ])
-
   const safeDayIndex = Math.min(dayIndex, Math.max(0, days.length - 1))
   const day = days[safeDayIndex] ?? EMPTY_DAY_FALLBACK
   const hero = useMemo(
     () => buildHeroCopy(destination, tripDates, hotel, days),
     [destination, tripDates, hotel, days],
   )
-  const placesWithHotel = useMemo(
-    () => ({
-      ...customPlaces,
-      [SELECTED_HOTEL_PLACE_ID]: placeFromHotel(hotel),
-    }),
-    [customPlaces, hotel],
   )
   /** Detail overlay for trip chat: PlacePanel selection wins over hotel popup. */
   const tripChatViewing = useMemo((): TripChatViewingTarget | null => {
@@ -1501,36 +1202,12 @@ export default function App() {
     )
   }
 
-  const canRestoreDefault = hasMatchingBaseline(
-    itineraryFingerprint || currentFingerprint,
-  )
-  const canRestoreDayDefault = hasBaselineDay(
-    days[safeDayIndex]?.day ?? day.day,
-    itineraryFingerprint || currentFingerprint,
-  )
-
   const showItineraryContent =
     itineraryReady && itineraryGenerated && days.length > 0 && !itineraryGenerating
   const showItineraryLoading =
     itineraryReady && (itineraryGenerating || (itineraryStartLoading && !itineraryGenerated))
   const showItineraryError =
     itineraryReady && !itineraryGenerating && Boolean(itineraryGenError) && !itineraryGenerated
-
-  useEffect(() => {
-    if (!showItineraryLoading) return
-    setItineraryLoadingLineIndex(
-      Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
-    )
-    const id = window.setInterval(() => {
-      setItineraryLoadingLineIndex(
-        (i) => (i + 1) % ITINERARY_LOADING_LINES.length,
-      )
-    }, ITINERARY_LOADING_ROTATE_MS)
-    return () => window.clearInterval(id)
-  }, [showItineraryLoading])
-
-  const itineraryLoadingLine =
-    ITINERARY_LOADING_LINES[itineraryLoadingLineIndex] ?? ITINERARY_LOADING_LINES[0]
 
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
