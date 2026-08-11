@@ -384,7 +384,6 @@ export default function App() {
     () => buildHeroCopy(destination, tripDates, hotel, days),
     [destination, tripDates, hotel, days],
   )
-  )
   /** Detail overlay for trip chat: PlacePanel selection wins over hotel popup. */
   const tripChatViewing = useMemo((): TripChatViewingTarget | null => {
     if (selectedPlaceId) {
@@ -929,113 +928,6 @@ export default function App() {
     }
   }
 
-  async function handleResetDay() {
-    if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
-    if (!itineraryGenerated || !days.length) return
-    if (dayRegenerating || itineraryGenerating) return
-    if (!isLlmConfigured()) {
-      setDayRegenError('暂时无法重新生成当天行程，请稍后再试。')
-      return
-    }
-
-    const active = days[dayIndex] || days.find((d) => d.day === day.day)
-    if (!active) return
-
-    const requestId = ++dayRegenRequestIdRef.current
-    setDayRegenerating(true)
-    setDayRegenError(null)
-    suppressCopyRef.current = true
-
-    const occupiedPlaces = days
-      .filter((d) => d.day !== active.day)
-      .flatMap((d) =>
-        d.stops
-          .map((s) => {
-            try {
-              const place = getPlace(s.placeId, placesWithHotel)
-              return {
-                day: d.day,
-                name: place.name,
-                placeId: s.placeId,
-                type: place.type,
-              }
-            } catch {
-              return null
-            }
-          })
-          .filter((row): row is NonNullable<typeof row> => Boolean(row)),
-      )
-
-    try {
-      const areaLabel =
-        AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || hotel.areaKey
-      const calendarDate =
-        dateForTripDay(itineraryStartDate, active.day) || undefined
-      const result = await buildGeneratedSingleDay({
-        destination,
-        dayCount: numberOfDays,
-        dayNumber: active.day,
-        calendarDate,
-        tripStartDate: tripDates.startDate,
-        tripEndDate: tripDates.endDate,
-        itineraryStartDate: itineraryStartDate || tripDates.startDate,
-        nights: Math.max(0, numberOfDays - 1),
-        hotel,
-        hotelAreaLabel: areaLabel || undefined,
-        outbound: flightContextBrief(flights.outbound),
-        returnFlight: flightContextBrief(flights.returnFlight),
-        occupiedPlaces,
-        existingDays: days,
-        existingCustomPlaces: customPlaces,
-        recommendationPreferences,
-      })
-
-      if (requestId !== dayRegenRequestIdRef.current) return
-
-      const synced = syncDaysCopyToHotelArea(result.days, hotel.areaKey)
-      setDays(synced)
-      setCustomPlaces(result.customPlaces)
-      // Keep full-plan flags: do not collapse section or wipe fingerprint.
-      setItineraryGenerated(true)
-      saveItineraryState(synced, result.customPlaces, {
-        generated: true,
-        fingerprint: itineraryFingerprint,
-      })
-      setSelectedPlaceId(null)
-      setDayRegenError(null)
-      prevStopsKeyRef.current = null
-    } catch (err) {
-      if (requestId !== dayRegenRequestIdRef.current) return
-      setDayRegenError(
-        err instanceof Error ? err.message : '当天行程重新生成失败，请再试一次。',
-      )
-    } finally {
-      if (requestId === dayRegenRequestIdRef.current) {
-        setDayRegenerating(false)
-      }
-    }
-  }
-
-  function handleRegenerateItinerary() {
-    suppressCopyRef.current = true
-    genRequestIdRef.current += 1
-    dayRegenRequestIdRef.current += 1
-    wipeGeneratedItinerary()
-    clearDayNavCache()
-    navTimesAppliedKeyRef.current = ''
-    setDays([])
-    setCustomPlaces({})
-    setItineraryGenerated(false)
-    setItineraryFingerprint(null)
-    setItineraryGenError(null)
-    setItineraryGenerating(false)
-    setDayRegenerating(false)
-    setDayRegenError(null)
-    setSelectedPlaceId(null)
-    setDayIndex(0)
-    // Effect will re-run generation when generated=false and no usable plan.
-  }
-
   function handleResetAll() {
     handleRegenerateItinerary()
   }
@@ -1094,120 +986,6 @@ export default function App() {
     setPanelResetKey((k) => k + 1)
     notifyTripChanged({ force: true, allowEmptyTrip: true })
   }
-
-  function handleRestoreDefault() {
-    const restored = restoreFullFromBaseline()
-    if (!restored) return
-    suppressCopyRef.current = true
-    setDays(restored.days)
-    setCustomPlaces(restored.customPlaces)
-    setItineraryGenerated(true)
-    const fp = restored.fingerprint || itineraryFingerprint || currentFingerprint
-    if (fp) setItineraryFingerprint(fp)
-    saveItineraryState(restored.days, restored.customPlaces, {
-      generated: true,
-      fingerprint: fp,
-    })
-    setSelectedPlaceId(null)
-    setDayIndex((i) => Math.min(i, Math.max(0, restored.days.length - 1)))
-    setItineraryGenError(null)
-    setDayRegenError(null)
-    prevStopsKeyRef.current = null
-    // Bypass hydrate skip window — restore must upload even if effect is muted.
-    if (canEdit) notifyTripChanged({ force: true })
-  }
-
-  function handleRestoreDayDefault() {
-    if (dayRestoring || dayRestoreTimerRef.current != null) return
-    const dayNum = days[safeDayIndex]?.day ?? day.day
-    const restored = restoreDayFromBaseline(dayNum, days, customPlaces)
-    if (!restored) return
-    const currentDay = days.find((d) => d.day === dayNum)
-    const targetDay = restored.days.find((d) => d.day === dayNum)
-    if (!currentDay || !targetDay) return
-
-    const currentKeyList = currentDay.stops.map((stop, index) =>
-      ensureStopId(dayNum, stop, index),
-    )
-    const targetKeyList = targetDay.stops.map((stop, index) =>
-      ensureStopId(dayNum, stop, index),
-    )
-    const targetKeys = new Set(targetKeyList)
-    const keptStops = currentDay.stops.filter((stop, index) =>
-      targetKeys.has(ensureStopId(dayNum, stop, index)),
-    )
-    const hasRemovals = keptStops.length !== currentDay.stops.length
-    const mismatchedIndexes = currentKeyList
-      .map((key, index) => (key !== targetKeyList[index] ? index : -1))
-      .filter((index) => index >= 0)
-    const isSingleSameSlotReplacement =
-      currentKeyList.length === targetKeyList.length &&
-      mismatchedIndexes.length === 1
-
-    const applyRestoredDay = (
-      settleMs = TIMELINE_INSERT_TOTAL_MS,
-      preserveOutgoingPlaces = false,
-    ) => {
-      dayRestoreTimerRef.current = null
-      suppressCopyRef.current = true
-      setDays(restored.days)
-      setCustomPlaces(
-        preserveOutgoingPlaces
-          ? { ...customPlaces, ...restored.customPlaces }
-          : restored.customPlaces,
-      )
-      saveItineraryState(restored.days, restored.customPlaces, {
-        generated: true,
-        fingerprint: itineraryFingerprint,
-      })
-      setSelectedPlaceId(null)
-      setDayRegenError(null)
-      prevStopsKeyRef.current = null
-      // Bypass hydrate skip window — restore must upload even if effect is muted.
-      if (canEdit) notifyTripChanged({ force: true })
-      dayRestoreTimerRef.current = window.setTimeout(() => {
-        dayRestoreTimerRef.current = null
-        if (preserveOutgoingPlaces) {
-          setCustomPlaces(restored.customPlaces)
-        }
-        setDayRestoring(false)
-      }, settleMs)
-    }
-
-    setDayRestoring(true)
-    if (isSingleSameSlotReplacement) {
-      // Let DayTimeline use its in-place wipe/height morph. The slot never
-      // collapses to zero, so a one-for-one replacement stays continuous.
-      applyRestoredDay(TIMELINE_SWAP_TOTAL_MS, true)
-      return
-    }
-    if (!hasRemovals) {
-      applyRestoredDay()
-      return
-    }
-
-    // Phase 1: remove obsolete cards with the normal gommage/collapse animation.
-    // Phase 2 starts only after the exit slots have fully collapsed.
-    setSelectedPlaceId(null)
-    setDays((prev) =>
-      prev.map((candidate) =>
-        candidate.day === dayNum
-          ? { ...candidate, stops: keptStops }
-          : candidate,
-      ),
-    )
-    dayRestoreTimerRef.current = window.setTimeout(
-      applyRestoredDay,
-      TIMELINE_DELETE_TOTAL_MS + 60,
-    )
-  }
-
-  const showItineraryContent =
-    itineraryReady && itineraryGenerated && days.length > 0 && !itineraryGenerating
-  const showItineraryLoading =
-    itineraryReady && (itineraryGenerating || (itineraryStartLoading && !itineraryGenerated))
-  const showItineraryError =
-    itineraryReady && !itineraryGenerating && Boolean(itineraryGenError) && !itineraryGenerated
 
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
@@ -1702,7 +1480,7 @@ export default function App() {
                           onDelete={handleDelete}
                           onAddCustom={handleAddCustom}
                           onResetDay={() => {
-                            void handleResetDay()
+                            void handleResetDay(dayIndex)
                           }}
                           canRestoreDayDefault={canRestoreDayDefault}
                           onRestoreDayDefault={handleRestoreDayDefault}
