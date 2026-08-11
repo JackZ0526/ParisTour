@@ -5,7 +5,7 @@
  * callers import from `llm.ts`; `types.ts` has older/different shapes
  * left over from earlier refactors — this module is the source of truth).
  */
-import type { FlightInfo } from '../../../types'
+import type { FlightInfo } from '../../../../types'
 import {
   CAFE_VS_RESTAURANT_RULE,
   COMMON_RULES,

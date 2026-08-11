@@ -185,4 +185,7 @@ export {
   type SingleDayItineraryDraft,
 } from './business/itinerary'
 
-export { suggestPopularDestinations } from './business/destination'
+export {
+  suggestPopularDestinations,
+  type DestinationSuggestion,
+} from './business/destination'
