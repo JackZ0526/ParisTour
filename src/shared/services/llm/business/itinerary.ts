@@ -164,6 +164,8 @@ export interface GenerateSingleDayItineraryInput {
   preferences?: string
   recommendationPreferences: RecommendationPreferences
   verifiedCandidates: VerifiedPlaceCandidate[]
+  /** Fired as soon as streaming JSON exposes title/theme. */
+  onDayPreview?: (preview: { day: number; title?: string; theme?: string }) => void
 }
 
 export interface SingleDayItineraryDraft {
@@ -306,8 +308,8 @@ export async function generateFullItinerary(
     }
 - ${
       disneyDay
-        ? `软偏好：若航班、天数和用户明确要求没有冲突，优先把倒数第二天（Day ${disneyDay}）安排为巴黎迪士尼全日。若选择迪士尼日，则 pace=乐园日，出游站只保留一个 "attr-disney" 与末站回酒店，不另列园内餐饮或其它景点。`
-        : '行程不足 3 天时可不安排独立迪士尼日。'
+        ? `硬规则：倒数第二天（Day ${disneyDay}）必须为巴黎迪士尼全日：pace=乐园日，出游站只保留一个 "attr-disney" 与末站回酒店，不另列园内餐饮或其它景点；其它天禁止安排迪士尼。`
+        : '行程不足 3 天或未开启迪士尼偏好时，不安排独立迪士尼日。'
     }
 - ${
       prefs.includeChampsAndArc
@@ -375,7 +377,9 @@ export async function generateFullItinerary(
     strict: true,
     task: 'itineraryGenerate',
     json: true,
-    webSearch: false,
+    // DeepSeek Responses: expose web_search; model decides (tool_choice auto).
+    // OpenAI chat path still skips generic research injection for this task.
+    webSearch: 'auto',
     signal: input.signal,
     preflightContext: {
       destination: input.destination,
@@ -606,6 +610,60 @@ function parseItineraryDay(
   }
 }
 
+function pickJsonStringField(text: string, field: string): string | undefined {
+  const re = new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`)
+  const match = text.match(re)
+  if (!match?.[1]) return undefined
+  try {
+    return JSON.parse(`"${match[1]}"`) as string
+  } catch {
+    return match[1]
+  }
+}
+
+function extractStreamingDayPreview(
+  text: string,
+  fallbackDay: number,
+): { day: number; title?: string; theme?: string } | null {
+  const title = pickJsonStringField(text, 'title')
+  const theme = pickJsonStringField(text, 'theme')
+  if (!title && !theme) return null
+  return {
+    day: fallbackDay,
+    title: title?.trim().slice(0, 16) || undefined,
+    theme: theme?.trim() || undefined,
+  }
+}
+
+/**
+ * Models sometimes return the day as a nested object, a `days[]` item, or
+ * flattened onto the root (`day: 3` + `title`/`stops` siblings). Accept all.
+ */
+function pickSingleDayRow(
+  parsed: Record<string, unknown>,
+  fallbackDay: number,
+): Record<string, unknown> | null {
+  const nested = parsed.day
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>
+  }
+  if (Array.isArray(parsed.days)) {
+    const first = parsed.days.find(
+      (row) => row && typeof row === 'object' && !Array.isArray(row),
+    )
+    if (first) return first as Record<string, unknown>
+  }
+  // Flattened root: day is a number/string, stops live beside it.
+  if (Array.isArray(parsed.stops)) {
+    const dayNum = Number(parsed.day)
+    return {
+      ...parsed,
+      day: Number.isFinite(dayNum) && dayNum >= 1 ? dayNum : fallbackDay,
+    }
+  }
+  return null
+}
+
 /**
  * Regenerate a single itinerary day with the same hard rules as full generation,
  * while avoiding places already used on other days.
@@ -635,19 +693,28 @@ export async function generateSingleDayItinerary(
       '今天是 Day 1 抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；不强制咖啡馆开场。',
       '若 Day 1 还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）。',
       'Day 1 餐饮：抵达办入住后若仍有空档，再安排午餐和/或晚餐；落地过晚可只安排晚餐。',
+      disneyDay != null
+        ? `硬规则：迪士尼全日已固定在 Day ${disneyDay}，今天禁止安排迪士尼。`
+        : '今天不安排独立迪士尼日。',
     )
   } else if (isLast) {
     roleRules.push(
       '今天是最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。',
       '国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆（咖啡/甜点/brunch，非正餐 brasserie）。',
+      disneyDay != null
+        ? `硬规则：迪士尼全日已固定在 Day ${disneyDay}，今天禁止安排迪士尼。`
+        : '今天不安排独立迪士尼日。',
     )
   } else if (isDisney) {
     roleRules.push(
-      `软偏好：若航班、当天时间和用户明确要求没有冲突，可把 Day ${dayNumber} 安排为巴黎迪士尼全日。若选择迪士尼日，则 pace=乐园日，出游站只保留一个 "attr-disney" 与末站回酒店，不另列园内餐饮或其它景点。`,
+      `硬规则：Day ${dayNumber} 是倒数第二天，必须安排为巴黎迪士尼全日。pace 必须为「乐园日」；出游站只保留一个 "attr-disney"，末站回酒店过夜（placeKey "hotel-selected"）；不另列园内餐饮、咖啡馆或其它景点。`,
     )
   } else {
     roleRules.push(
       '中间日：早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站必须回酒店过夜（placeKey "hotel-selected"，type hotel）。',
+      disneyDay != null
+        ? `硬规则：迪士尼全日已固定在 Day ${disneyDay}，今天禁止安排 "attr-disney" 或任何迪士尼相关站点。`
+        : '今天不安排独立迪士尼日。',
       prefs.preferCafeStart
         ? '软偏好：普通游览日优先以 verifiedCandidates 中的 cafe 开始；路线不合适时可不安排。'
         : '不要求以咖啡馆开始。',
@@ -676,6 +743,7 @@ export async function generateSingleDayItinerary(
     '<output_format>只输出 JSON，不要 markdown，不要解释。文案用简体中文。</output_format>',
     `<hard_rules>
 - 只输出 Day ${dayNumber} 这一天（day 字段必须为 ${dayNumber}），以及 places[] 中当天用到的非特殊地点。
+- 输出结构硬规则：顶层必须包含对象字段 "day"（含 title/theme/pace/summary/stops），不要把 title/stops 直接摊在根上；"day.day" 必须是数字 ${dayNumber}。
 ${roleRules.map((r) => `- ${r}`).join('\n')}
 - 去重（硬规则）：不要使用 occupiedElsewhere 中已出现的景点/地标（同一正式名或同一 placeId）；当天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。
 - 软偏好：普通游览日约 ${prefs.dayStartTime} 开始；航班、预约、营业时间和用户明确要求优先。
@@ -721,7 +789,7 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
         : isLast
           ? 'return'
           : isDisney
-            ? 'disney-preferred'
+            ? 'disney'
             : 'mid',
     },
     hotel: {
@@ -747,7 +815,8 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
     strict: true,
     task: 'itineraryDayGenerate',
     json: true,
-    webSearch: false,
+    // Arrival / return / Disney: skip web_search for speed. Mid days: model chooses.
+    webSearch: isFirst || isLast || isDisney ? false : 'auto',
     signal: input.signal,
     preflightContext: {
       destination: input.destination,
@@ -755,6 +824,12 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
       recommendationPreferences: input.recommendationPreferences,
     },
     userText: input.preferences || input.destination,
+    onDelta: input.onDayPreview
+      ? (_delta, full) => {
+          const preview = extractStreamingDayPreview(full, dayNumber)
+          if (preview) input.onDayPreview?.(preview)
+        }
+      : undefined,
   })
   if (!text) {
     throw new LlmRequestError('大模型没有返回单日行程。')
@@ -771,14 +846,12 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
   const rawPlaces = Array.isArray(parsed.places) ? (parsed.places as unknown[]) : []
   const places = parseItineraryPlaces(rawPlaces, input.verifiedCandidates)
 
-  let dayRow: Record<string, unknown> | null = null
-  if (parsed.day && typeof parsed.day === 'object' && !Array.isArray(parsed.day)) {
-    dayRow = parsed.day as Record<string, unknown>
-  } else if (Array.isArray(parsed.days) && parsed.days[0] && typeof parsed.days[0] === 'object') {
-    dayRow = parsed.days[0] as Record<string, unknown>
-  }
+  const dayRow = pickSingleDayRow(parsed, dayNumber)
   if (!dayRow) {
-    throw new LlmRequestError('单日行程为空，请再试一次。')
+    throw new LlmRequestError(
+      `单日行程为空，请再试一次。\npreview=${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+      'empty_day',
+    )
   }
 
   const parsedDay = parseItineraryDay(dayRow, dayNumber)

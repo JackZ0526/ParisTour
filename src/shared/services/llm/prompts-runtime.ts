@@ -34,6 +34,8 @@ const PREFLIGHT_FREE_TASKS = new Set<LlmTaskKind>([
   'placeDetail',
   'hotelDetail',
   'itineraryStart',
+  'itineraryGenerate',
+  'itineraryDayGenerate',
 ])
 
 const TASK_THINKING: Record<
@@ -51,10 +53,9 @@ const TASK_THINKING: Record<
   placeReviews: { baseline: 'low', min: 'off', max: 'medium' },
   hotelRecommend: { baseline: 'low', min: 'off', max: 'medium' },
   hotelDetail: { baseline: 'low', min: 'off', max: 'medium' },
-  // Cap at medium → DeepSeek `high` (not UI-high→`max`); max CoT often
-  // exhausts max_tokens before the multi-day JSON body is emitted.
-  itineraryGenerate: { baseline: 'medium', min: 'low', max: 'medium' },
-  itineraryDayGenerate: { baseline: 'medium', min: 'low', max: 'medium' },
+  // Structured JSON: thinking CoT shares max_tokens and often yields empty content.
+  itineraryGenerate: { baseline: 'off', min: 'off', max: 'off' },
+  itineraryDayGenerate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryStart: { baseline: 'low', min: 'off', max: 'low' },
   destinationSuggest: { baseline: 'low', min: 'off', max: 'low' },
   router: { baseline: 'low', min: 'off', max: 'low' },
@@ -176,6 +177,17 @@ export async function resolveModelCallPreflight(
   }
 
   if (PREFLIGHT_FREE_TASKS.has(options?.task || 'default')) {
+    const task = options?.task || 'default'
+    // Itinerary JSON tasks: always force thinking off (Responses/chat CoT
+    // otherwise burns the shared output budget). Web search for itinerary is
+    // handled natively on DeepSeek Responses (`tools: web_search`), not via
+    // the generic research-injection path — keep needsWeb false here.
+    if (task === 'itineraryGenerate' || task === 'itineraryDayGenerate') {
+      return {
+        thinking: { enabled: false, effort: 'off', source: 'auto' },
+        needsWeb: false,
+      }
+    }
     return {
       thinking: options?.thinking || fallback,
       needsWeb: false,

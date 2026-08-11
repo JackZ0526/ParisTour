@@ -46,6 +46,7 @@ import {
 import {
   buildGeneratedSingleDay,
   flightContextBrief,
+  getSharedItineraryCandidates,
 } from '../features/itinerary/services/itineraryGenerate'
 import {
   AREA_KEY_CN,
@@ -161,11 +162,15 @@ export interface UseItineraryGenerationResult {
   missingForItinerary: string[]
   canRestoreDefault: boolean
   canRestoreDayDefault: boolean
+  /** True while a given day is still waiting on LLM generation. */
+  isDayGenerationPending: (dayNumber: number) => boolean
   showItineraryLoading: boolean
   showItineraryContent: boolean
   showItineraryError: boolean
+  /** Day 1+ succeeded but a later day failed mid sequential generation. */
+  showItineraryPartialError: boolean
   copyRefreshing: boolean
-  runFullItineraryGeneration: () => Promise<void>
+  runFullItineraryGeneration: (options?: { resume?: boolean }) => Promise<void>
   handleResetDay: (dayIndex: number) => Promise<void>
   handleRegenerateItinerary: () => void
   handleRestoreDefault: () => void
@@ -480,246 +485,357 @@ export function useItineraryGeneration(
   ])
 
   // -- Handlers --------------------------------------------------------------
-  const runFullItineraryGeneration = useCallback(async () => {
-    if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
-    if (!isLlmConfigured()) {
-      setItineraryGenError('暂时无法生成行程，请稍后再试。')
-      return
-    }
-
-    // Ensure we can always cancel / time out the in-flight LLM call.
-    fullGenAbortRef.current?.abort('itinerary_generation_overridden')
-    if (fullGenTimeoutRef.current != null) {
-      window.clearTimeout(fullGenTimeoutRef.current)
-      fullGenTimeoutRef.current = null
-    }
-    const abortController = new AbortController()
-    fullGenAbortRef.current = abortController
-
-    const fingerprint = buildItineraryFingerprint({
-      hotelId: hotel.id,
-      startDate: tripDates.startDate,
-      endDate: tripDates.endDate,
-      itineraryStartDate: itineraryStartDate || tripDates.startDate,
-      outboundFlight: flights.outbound?.flightNumber,
-      returnFlight: flights.returnFlight?.flightNumber,
-    })
-
-    const requestId = ++genRequestIdRef.current
-    setItineraryGenerating(true)
-    // Day 1 first (local shimmer). Background generation starts at Day 2.
-    setItineraryIncrementalGenerating(false)
-    setItineraryGeneratedUpToDay(1)
-    setItineraryGenError(null)
-
-    try {
-      const areaLabel =
-        AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || hotel.areaKey
-
-      // Start by showing an empty N-day template immediately.
-      // This keeps the timeline visible and allows Day 2+ shimmer.
-      const dayCount = Math.max(1, numberOfDays)
-      let currentDays = emptyItinerary(dayCount)
-      let currentCustomPlaces: Record<string, Place> = {}
-
-      // Provide hotel-as-place in the local place dictionary so occupiedPlaces
-      // can be typed via getPlace (matches handleResetDay's behavior).
-      const currentPlacesWithHotel = () => ({
-        ...currentCustomPlaces,
-        [SELECTED_HOTEL_PLACE_ID]: placeFromHotel(hotel),
-      })
-
-      setDays(currentDays)
-      setCustomPlaces(currentCustomPlaces)
-      setSelectedPlaceId(null)
-      setDayIndex(0)
-
-      // ---- Day 1 (awaited, blocks only within this handler) --------------
-      {
-        const dayNumber = 1
-        if (requestId !== genRequestIdRef.current) return
-        if (abortController.signal.aborted) return
-
-        // Day 1 has no earlier generated days yet.
-        const occupiedPlaces: Array<{
-          day: number
-          name: string
-          placeId?: string
-          type?: string
-        }> = []
-
-        const dayTimeoutId = window.setTimeout(() => {
-          abortController.abort('itinerary_day_timeout')
-        }, 135_000)
-        fullGenTimeoutRef.current = dayTimeoutId
-
-        try {
-          const calendarDate =
-            dateForTripDay(itineraryStartDate, dayNumber) || undefined
-
-          const result = await buildGeneratedSingleDay({
-            destination,
-            dayCount,
-            dayNumber,
-            calendarDate,
-            tripStartDate: tripDates.startDate,
-            tripEndDate: tripDates.endDate,
-            itineraryStartDate: itineraryStartDate || tripDates.startDate,
-            nights: Math.max(0, dayCount - 1),
-            hotel,
-            hotelAreaLabel: areaLabel || undefined,
-            outbound: flightContextBrief(flights.outbound),
-            returnFlight: flightContextBrief(flights.returnFlight),
-            occupiedPlaces,
-            existingDays: currentDays,
-            existingCustomPlaces: currentCustomPlaces,
-            recommendationPreferences,
-            signal: abortController.signal,
-          })
-
-          if (requestId !== genRequestIdRef.current) return
-
-          const synced = syncDaysCopyToHotelArea(result.days, hotel.areaKey)
-          const syncedDay1 = synced.find((d) => d.day === 1) || synced[0]
-
-          currentDays = currentDays.map((d) => (d.day === 1 ? syncedDay1 : d))
-          currentCustomPlaces = result.customPlaces
-          setDays(currentDays)
-          setCustomPlaces(currentCustomPlaces)
-
-          setItineraryGeneratedUpToDay(1)
-        } finally {
-          if (fullGenTimeoutRef.current === dayTimeoutId) {
-            window.clearTimeout(dayTimeoutId)
-            fullGenTimeoutRef.current = null
-          }
-        }
+  const runFullItineraryGeneration = useCallback(
+    async (options?: { resume?: boolean }) => {
+      if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
+      if (!isLlmConfigured()) {
+        setItineraryGenError('暂时无法生成行程，请稍后再试。')
+        return
       }
 
-      // ---- Day 2..N background (sequential awaited in this async handler) --
-      if (requestId !== genRequestIdRef.current) return
-      setItineraryGenerating(false)
-      setItineraryIncrementalGenerating(true)
+      fullGenAbortRef.current?.abort('itinerary_generation_overridden')
+      if (fullGenTimeoutRef.current != null) {
+        window.clearTimeout(fullGenTimeoutRef.current)
+        fullGenTimeoutRef.current = null
+      }
+      const abortController = new AbortController()
+      fullGenAbortRef.current = abortController
 
-      for (let dayNumber = 2; dayNumber <= dayCount; dayNumber++) {
-        if (requestId !== genRequestIdRef.current) return
-        if (abortController.signal.aborted) return
+      const fingerprint = buildItineraryFingerprint({
+        hotelId: hotel.id,
+        startDate: tripDates.startDate,
+        endDate: tripDates.endDate,
+        itineraryStartDate: itineraryStartDate || tripDates.startDate,
+        outboundFlight: flights.outbound?.flightNumber,
+        returnFlight: flights.returnFlight?.flightNumber,
+      })
 
-        const occupiedPlaces = currentDays
-          .filter((d) => d.day !== dayNumber)
-          .flatMap((d) =>
-            d.stops
-              .map((s) => {
-                try {
-                  const place = getPlace(s.placeId, currentPlacesWithHotel())
-                  return {
-                    day: d.day,
-                    name: place.name,
-                    placeId: s.placeId,
-                    type: place.type,
+      const requestId = ++genRequestIdRef.current
+      const dayCount = Math.max(1, numberOfDays)
+      const disneyDay =
+        recommendationPreferences.includeDisneyDay && dayCount >= 3
+          ? dayCount - 1
+          : null
+      const PARALLEL_WINDOW = 2
+
+      const canResume =
+        Boolean(options?.resume) &&
+        itineraryGeneratedUpToDay >= 1 &&
+        days.length >= dayCount &&
+        days.some((d) => d.day === 1 && d.stops.length > 0)
+
+      const resumeFrom = canResume ? itineraryGeneratedUpToDay + 1 : 1
+
+      setItineraryGenError(null)
+      if (resumeFrom <= 1) {
+        setItineraryGenerating(true)
+        setItineraryIncrementalGenerating(false)
+        setItineraryGeneratedUpToDay(0)
+      } else {
+        setItineraryGenerating(false)
+        setItineraryIncrementalGenerating(true)
+      }
+
+      try {
+        const areaLabel =
+          AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || hotel.areaKey
+
+        let currentDays = canResume
+          ? days.map((d) => ({ ...d, stops: [...d.stops] }))
+          : emptyItinerary(dayCount)
+        let currentCustomPlaces: Record<string, Place> = canResume
+          ? { ...customPlaces }
+          : {}
+
+        const currentPlacesWithHotel = () => ({
+          ...currentCustomPlaces,
+          [SELECTED_HOTEL_PLACE_ID]: placeFromHotel(hotel),
+        })
+
+        const buildOccupied = (excludeDay?: number) =>
+          currentDays
+            .filter((d) => d.day !== excludeDay && d.stops.length > 0)
+            .flatMap((d) =>
+              d.stops
+                .map((s) => {
+                  try {
+                    const place = getPlace(s.placeId, currentPlacesWithHotel())
+                    return {
+                      day: d.day,
+                      name: place.name,
+                      placeId: s.placeId,
+                      type: place.type,
+                    }
+                  } catch {
+                    return null
                   }
-                } catch {
-                  return null
-                }
-              })
-              .filter(
-                (row): row is NonNullable<typeof row> => Boolean(row),
-              ),
-          )
+                })
+                .filter((row): row is NonNullable<typeof row> => Boolean(row)),
+            )
 
-        const dayTimeoutId = window.setTimeout(() => {
-          abortController.abort('itinerary_day_timeout')
-        }, 135_000)
-        fullGenTimeoutRef.current = dayTimeoutId
-
-        try {
-          const calendarDate =
-            dateForTripDay(itineraryStartDate, dayNumber) || undefined
-
-          const result = await buildGeneratedSingleDay({
-            destination,
-            dayCount,
-            dayNumber,
-            calendarDate,
-            tripStartDate: tripDates.startDate,
-            tripEndDate: tripDates.endDate,
-            itineraryStartDate: itineraryStartDate || tripDates.startDate,
-            nights: Math.max(0, dayCount - 1),
-            hotel,
-            hotelAreaLabel: areaLabel || undefined,
-            outbound: flightContextBrief(flights.outbound),
-            returnFlight: flightContextBrief(flights.returnFlight),
-            occupiedPlaces,
-            existingDays: currentDays,
-            existingCustomPlaces: currentCustomPlaces,
-            recommendationPreferences,
-            signal: abortController.signal,
-          })
-
+        const applyDayPreview = (preview: {
+          day: number
+          title?: string
+          theme?: string
+        }) => {
           if (requestId !== genRequestIdRef.current) return
+          setDays((prev) =>
+            prev.map((d) =>
+              d.day === preview.day
+                ? {
+                    ...d,
+                    title: preview.title || d.title,
+                    theme: preview.theme || d.theme,
+                  }
+                : d,
+            ),
+          )
+        }
 
+        const mergeDayResult = (
+          result: Awaited<ReturnType<typeof buildGeneratedSingleDay>>,
+          dayNumber: number,
+        ) => {
           const synced = syncDaysCopyToHotelArea(result.days, hotel.areaKey)
-          const syncedDay = synced.find((d) => d.day === dayNumber) || synced[0]
-
+          const syncedDay =
+            synced.find((d) => d.day === dayNumber) || synced[0]
           currentDays = currentDays.map((d) =>
             d.day === dayNumber ? syncedDay : d,
           )
-          currentCustomPlaces = result.customPlaces
+          // Union places so parallel batch results don't clobber each other.
+          currentCustomPlaces = {
+            ...currentCustomPlaces,
+            ...result.customPlaces,
+          }
           setDays(currentDays)
           setCustomPlaces(currentCustomPlaces)
-          setItineraryGeneratedUpToDay(dayNumber)
-        } finally {
-          if (fullGenTimeoutRef.current === dayTimeoutId) {
-            window.clearTimeout(dayTimeoutId)
-            fullGenTimeoutRef.current = null
+          setItineraryGeneratedUpToDay((prev) => Math.max(prev, dayNumber))
+        }
+
+        if (!canResume) {
+          setDays(currentDays)
+          setCustomPlaces(currentCustomPlaces)
+          setSelectedPlaceId(null)
+          setDayIndex(0)
+        }
+
+        // Shared Google candidates once per run.
+        const sharedCandidates = await getSharedItineraryCandidates(hotel)
+        if (!sharedCandidates.length) {
+          throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+        }
+
+        const generateDayWithRetry = async (dayNumber: number) => {
+          const occupiedPlaces = buildOccupied(dayNumber)
+          const calendarDate =
+            dateForTripDay(itineraryStartDate, dayNumber) || undefined
+          let result: Awaited<ReturnType<typeof buildGeneratedSingleDay>> | null =
+            null
+          let lastDayError: unknown = null
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              result = await buildGeneratedSingleDay({
+                destination,
+                dayCount,
+                dayNumber,
+                calendarDate,
+                tripStartDate: tripDates.startDate!,
+                tripEndDate: tripDates.endDate!,
+                itineraryStartDate: itineraryStartDate || tripDates.startDate!,
+                nights: Math.max(0, dayCount - 1),
+                hotel,
+                hotelAreaLabel: areaLabel || undefined,
+                outbound: flightContextBrief(flights.outbound),
+                returnFlight: flightContextBrief(flights.returnFlight),
+                occupiedPlaces,
+                existingDays: currentDays,
+                existingCustomPlaces: currentCustomPlaces,
+                recommendationPreferences,
+                verifiedCandidates: sharedCandidates,
+                signal: abortController.signal,
+                onDayPreview: applyDayPreview,
+              })
+              lastDayError = null
+              break
+            } catch (err) {
+              lastDayError = err
+              if (abortController.signal.aborted) throw err
+              if (attempt === 0) {
+                await new Promise((r) => setTimeout(r, 400))
+                continue
+              }
+            }
+          }
+          if (!result) throw lastDayError
+          return result
+        }
+
+        // ---- Day 1 (serial) ------------------------------------------------
+        if (resumeFrom <= 1) {
+          if (requestId !== genRequestIdRef.current) return
+          if (abortController.signal.aborted) return
+          const dayTimeoutId = window.setTimeout(() => {
+            abortController.abort('itinerary_day_timeout')
+          }, 135_000)
+          fullGenTimeoutRef.current = dayTimeoutId
+          try {
+            const result = await generateDayWithRetry(1)
+            if (requestId !== genRequestIdRef.current) return
+            mergeDayResult(result, 1)
+          } finally {
+            if (fullGenTimeoutRef.current === dayTimeoutId) {
+              window.clearTimeout(dayTimeoutId)
+              fullGenTimeoutRef.current = null
+            }
           }
         }
-      }
 
-      if (requestId !== genRequestIdRef.current) return
-
-      setItineraryIncrementalGenerating(false)
-      setItineraryGenerated(true)
-      setItineraryFingerprint(fingerprint)
-      saveBaselineItinerary(currentDays, currentCustomPlaces, fingerprint)
-      saveItineraryState(currentDays, currentCustomPlaces, {
-        generated: true,
-        fingerprint,
-      })
-      setDayIndex(0)
-      setSelectedPlaceId(null)
-      setItineraryGenError(null)
-    } catch (err) {
-      if (requestId !== genRequestIdRef.current) return
-      if (abortController.signal.aborted) return
-      setItineraryGenError(
-        formatItineraryFailure(err, '行程生成失败，请再试一次。'),
-      )
-    } finally {
-      if (fullGenAbortRef.current === abortController) {
-        fullGenAbortRef.current = null
-      }
-      if (requestId === genRequestIdRef.current) {
+        if (requestId !== genRequestIdRef.current) return
         setItineraryGenerating(false)
+        setItineraryIncrementalGenerating(true)
+
+        // ---- Remaining days: disney template + parallel mid window + return --
+        const remaining: number[] = []
+        for (let d = Math.max(2, resumeFrom); d <= dayCount; d++) {
+          remaining.push(d)
+        }
+
+        while (remaining.length) {
+          if (requestId !== genRequestIdRef.current) return
+          if (abortController.signal.aborted) return
+
+          const next = remaining[0]
+
+          // Disney day: instant local template.
+          if (disneyDay != null && next === disneyDay) {
+            remaining.shift()
+            const result = await buildGeneratedSingleDay({
+              destination,
+              dayCount,
+              dayNumber: next,
+              calendarDate: dateForTripDay(itineraryStartDate, next) || undefined,
+              tripStartDate: tripDates.startDate!,
+              tripEndDate: tripDates.endDate!,
+              itineraryStartDate: itineraryStartDate || tripDates.startDate!,
+              nights: Math.max(0, dayCount - 1),
+              hotel,
+              hotelAreaLabel: areaLabel || undefined,
+              outbound: flightContextBrief(flights.outbound),
+              returnFlight: flightContextBrief(flights.returnFlight),
+              occupiedPlaces: buildOccupied(next),
+              existingDays: currentDays,
+              existingCustomPlaces: currentCustomPlaces,
+              recommendationPreferences,
+              verifiedCandidates: sharedCandidates,
+              signal: abortController.signal,
+            })
+            if (requestId !== genRequestIdRef.current) return
+            mergeDayResult(result, next)
+            continue
+          }
+
+          // Return day: always serial.
+          if (next === dayCount && dayCount > 1) {
+            remaining.shift()
+            const dayTimeoutId = window.setTimeout(() => {
+              abortController.abort('itinerary_day_timeout')
+            }, 135_000)
+            fullGenTimeoutRef.current = dayTimeoutId
+            try {
+              const result = await generateDayWithRetry(next)
+              if (requestId !== genRequestIdRef.current) return
+              mergeDayResult(result, next)
+            } finally {
+              if (fullGenTimeoutRef.current === dayTimeoutId) {
+                window.clearTimeout(dayTimeoutId)
+                fullGenTimeoutRef.current = null
+              }
+            }
+            continue
+          }
+
+          // Mid days: parallel window of 2 (shared occupied snapshot).
+          const batch: number[] = []
+          while (batch.length < PARALLEL_WINDOW && remaining.length) {
+            const d = remaining[0]
+            if (disneyDay != null && d === disneyDay) break
+            if (d === dayCount && dayCount > 1) break
+            batch.push(remaining.shift()!)
+          }
+          if (!batch.length) {
+            remaining.shift()
+            continue
+          }
+
+          const dayTimeoutId = window.setTimeout(() => {
+            abortController.abort('itinerary_day_timeout')
+          }, 135_000)
+          fullGenTimeoutRef.current = dayTimeoutId
+          try {
+            const results = await Promise.all(
+              batch.map((dayNumber) => generateDayWithRetry(dayNumber)),
+            )
+            if (requestId !== genRequestIdRef.current) return
+            for (let i = 0; i < batch.length; i++) {
+              mergeDayResult(results[i], batch[i])
+            }
+          } finally {
+            if (fullGenTimeoutRef.current === dayTimeoutId) {
+              window.clearTimeout(dayTimeoutId)
+              fullGenTimeoutRef.current = null
+            }
+          }
+        }
+
+        if (requestId !== genRequestIdRef.current) return
+
         setItineraryIncrementalGenerating(false)
+        setItineraryGenerated(true)
+        setItineraryFingerprint(fingerprint)
+        saveBaselineItinerary(currentDays, currentCustomPlaces, fingerprint)
+        saveItineraryState(currentDays, currentCustomPlaces, {
+          generated: true,
+          fingerprint,
+        })
+        setDayIndex(0)
+        setSelectedPlaceId(null)
+        setItineraryGenError(null)
+      } catch (err) {
+        if (requestId !== genRequestIdRef.current) return
+        if (abortController.signal.aborted) return
+        setItineraryGenError(
+          formatItineraryFailure(err, '行程生成失败，请再试一次。'),
+        )
+      } finally {
+        if (fullGenAbortRef.current === abortController) {
+          fullGenAbortRef.current = null
+        }
+        if (requestId === genRequestIdRef.current) {
+          setItineraryGenerating(false)
+          setItineraryIncrementalGenerating(false)
+        }
       }
-    }
-  }, [
-    tripDates?.startDate,
-    tripDates?.endDate,
-    hotelReady,
-    hotel,
-    itineraryStartDate,
-    flights.outbound,
-    flights.returnFlight,
-    numberOfDays,
-    destination,
-    recommendationPreferences,
-    setDays,
-    setCustomPlaces,
-    setDayIndex,
-    setSelectedPlaceId,
-  ])
+    },
+    [
+      tripDates?.startDate,
+      tripDates?.endDate,
+      hotelReady,
+      hotel,
+      itineraryStartDate,
+      flights.outbound,
+      flights.returnFlight,
+      numberOfDays,
+      destination,
+      recommendationPreferences,
+      itineraryGeneratedUpToDay,
+      days,
+      customPlaces,
+      setDays,
+      setCustomPlaces,
+      setDayIndex,
+      setSelectedPlaceId,
+    ],
+  )
 
   // First expand: auto-generate full itinerary if none saved.
   useEffect(() => {
@@ -727,6 +843,7 @@ export function useItineraryGeneration(
     if (!itineraryReady) return
     if (itineraryStartLoading) return
     if (itineraryGenerating) return
+    if (itineraryIncrementalGenerating) return
     if (itineraryGenError) return
 
     const usable = hasUsableGeneratedItinerary(
@@ -746,6 +863,7 @@ export function useItineraryGeneration(
     itineraryReady,
     itineraryStartLoading,
     itineraryGenerating,
+    itineraryIncrementalGenerating,
     itineraryGenError,
     days,
     customPlaces,
@@ -971,10 +1089,31 @@ export function useItineraryGeneration(
   )
 
   // -- Loading line rotation --------------------------------------------------
+  const dayOneReady = itineraryGenerated || itineraryGeneratedUpToDay >= 1
+
+  const isDayGenerationPending = useCallback(
+    (dayNumber: number) =>
+      (itineraryGenerating && dayNumber === 1) ||
+      // Keep unfinished days in pending after a mid-run failure so tabs
+      // don't suddenly look "ready" with empty placeholder titles.
+      (!itineraryGenerated &&
+        itineraryGeneratedUpToDay >= 1 &&
+        dayNumber > itineraryGeneratedUpToDay &&
+        (itineraryIncrementalGenerating || Boolean(itineraryGenError))),
+    [
+      itineraryGenerating,
+      itineraryIncrementalGenerating,
+      itineraryGenerated,
+      itineraryGeneratedUpToDay,
+      itineraryGenError,
+    ],
+  )
+
+  // Full-screen loader only until Day 1 is ready; later days load in-tab.
   const showItineraryLoading =
     itineraryReady &&
-    !days.length &&
-    ((itineraryGenerating && !itineraryIncrementalGenerating) ||
+    !dayOneReady &&
+    (itineraryGenerating ||
       (itineraryStartLoading &&
         !itineraryGenerated &&
         !itineraryIncrementalGenerating))
@@ -1004,17 +1143,21 @@ export function useItineraryGeneration(
   )
 
   const showItineraryContent =
-    itineraryReady &&
-    days.length > 0 &&
-    (itineraryGenerated ||
-      itineraryIncrementalGenerating ||
-      itineraryGeneratedUpToDay > 0)
+    itineraryReady && days.length > 0 && dayOneReady
   const showItineraryError =
     itineraryReady &&
     !itineraryGenerating &&
     !itineraryIncrementalGenerating &&
     Boolean(itineraryGenError) &&
-    !itineraryGenerated
+    !itineraryGenerated &&
+    !dayOneReady
+  const showItineraryPartialError =
+    itineraryReady &&
+    !itineraryGenerating &&
+    !itineraryIncrementalGenerating &&
+    Boolean(itineraryGenError) &&
+    !itineraryGenerated &&
+    dayOneReady
 
   return {
     itineraryStart,
@@ -1037,9 +1180,11 @@ export function useItineraryGeneration(
     missingForItinerary,
     canRestoreDefault,
     canRestoreDayDefault,
+    isDayGenerationPending,
     showItineraryLoading,
     showItineraryContent,
     showItineraryError,
+    showItineraryPartialError,
     copyRefreshing,
     runFullItineraryGeneration,
     handleResetDay,

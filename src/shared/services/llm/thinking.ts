@@ -55,6 +55,17 @@ export function deepSeekThinkingParams(thinking: ResolvedThinking): {
   }
 }
 
+/**
+ * DeepSeek Responses API thinking control (`reasoning.effort`).
+ * Docs: omit → thinking ON by default; `none` forces thinking off.
+ */
+export function deepSeekResponsesReasoning(
+  thinking: ResolvedThinking,
+): { effort: 'none' | 'low' | 'high' | 'max' } {
+  if (!thinking.enabled) return { effort: 'none' }
+  return { effort: resolvedThinkingToDeepSeekApi(thinking) }
+}
+
 export function uiEffortToOpenAI(
   effort: ThinkingEffortUi | 'off',
 ): OpenAIReasoningEffort {

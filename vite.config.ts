@@ -283,11 +283,16 @@ export default defineConfig(({ mode }) => {
           },
         },
         // DeepSeek (OpenAI-compatible) — key injected server-side from DEEPSEEK_API_KEY
+        // Chat: /api/deepseek/chat/completions → {base}/chat/completions (usually /v1/...)
+        // Responses: /api/deepseek/responses → https://api.deepseek.com/responses (no /v1)
         '/api/deepseek': {
           target: deepseekTarget,
           changeOrigin: true,
           rewrite: (path) => {
             const rest = path.replace(/^\/api\/deepseek/, '')
+            if (rest === '/responses' || rest.startsWith('/responses/') || rest.startsWith('/responses?')) {
+              return rest
+            }
             return `${deepseekPrefix}${rest}`
           },
           configure: (proxy) => {

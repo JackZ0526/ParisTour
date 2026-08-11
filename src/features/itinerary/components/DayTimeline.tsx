@@ -1361,6 +1361,27 @@ export function DayTimeline({
       .filter(Boolean)
       .join(' ')
 
+  if (dayPending) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
+          <LoadingIndicator
+            variant="block"
+            mode="thinking"
+            task="itineraryDayGenerate"
+            thinkingLabel={`正在生成第 ${day.day} 天行程…`}
+            generatingLabel={`正在生成第 ${day.day} 天行程…`}
+            showDots
+            size="md"
+          />
+          <p className="mt-2 text-center text-xs text-[var(--stone)]">
+            其他天可先查看，这一天生成好后会自动更新。
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="animate-fade-up rounded-2xl border border-white/70 bg-[var(--card)] p-4">

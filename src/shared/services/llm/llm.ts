@@ -64,6 +64,7 @@ export {
   THINKING_EFFORT_OPTIONS,
   THINKING_MODE_OPTIONS,
   autoEffortToDeepSeekApi,
+  deepSeekResponsesReasoning,
   deepSeekThinkingParams,
   isLockedThinkingMode,
   llmBusyDefaultLabel,
@@ -127,6 +128,7 @@ export {
 
 // ── HTTP transport (chat-completions / streaming / provider dispatch) ──
 export {
+  buildDeepSeekResponsesBody,
   buildOpenAIChatBody,
   callGemini,
   callOpenAIMessages,
@@ -138,6 +140,7 @@ export {
   openaiUsesRestrictedSampling,
   prepareOpenAIChatBody,
   readResponseJson,
+  shouldUseDeepSeekResponses,
 } from './transport'
 
 // ── Prompts ─────────────────────────────────────────────────────────────

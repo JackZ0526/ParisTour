@@ -39,6 +39,68 @@
   }
 }
 
+@keyframes day-tab-shimmer {
+  0% {
+    background-position: 180% 50%;
+  }
+  100% {
+    background-position: -100% 50%;
+  }
+}
+
+/* Block skeleton shimmer for pending day tabs (not text-clip). */
+.day-tab-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--mist) 55%, transparent) 12%,
+    color-mix(in srgb, var(--stone) 22%, var(--mist)) 40%,
+    color-mix(in srgb, white 78%, var(--mist)) 50%,
+    color-mix(in srgb, var(--stone) 22%, var(--mist)) 60%,
+    color-mix(in srgb, var(--mist) 55%, transparent) 88%
+  );
+  background-size: 220% 100%;
+  animation: day-tab-shimmer 1.6s linear infinite;
+  will-change: background-position;
+}
+
+.day-tab-shimmer-on-ink {
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, white 12%, transparent) 12%,
+    color-mix(in srgb, white 28%, transparent) 40%,
+    color-mix(in srgb, white 55%, transparent) 50%,
+    color-mix(in srgb, white 28%, transparent) 60%,
+    color-mix(in srgb, white 12%, transparent) 88%
+  );
+  background-size: 220% 100%;
+  animation: day-tab-shimmer 1.6s linear infinite;
+  will-change: background-position;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-tab-shimmer,
+  .day-tab-shimmer-on-ink {
+    animation: none;
+  }
+}
+
+/* Smooth non-linear resize when a day tab leaves shimmer for real title. */
+.day-tab-button {
+  transition:
+    width 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-tab-button {
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+}
+
 :root {
   --ink: #1c2420;
   --paper: #e8ebe4;

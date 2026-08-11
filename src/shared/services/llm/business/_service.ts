@@ -89,6 +89,7 @@ export async function generateText(
     webSearch?: boolean | 'auto'
     preflightContext?: unknown
     signal?: AbortSignal
+    onDelta?: (delta: string, fullText: string) => void
   },
 ): Promise<string | null> {
   const strict = Boolean(options?.strict)
@@ -99,6 +100,7 @@ export async function generateText(
     webSearch: options?.webSearch,
     preflightContext: options?.preflightContext,
     signal: options?.signal,
+    onDelta: options?.onDelta,
   }
   const preferred = ENABLE_LLM_PROVIDER_SWITCH ? getLlmProvider() : 'openai'
   const order = providerOrder(preferred)

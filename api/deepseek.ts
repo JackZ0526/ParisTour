@@ -41,7 +41,23 @@ async function handle(req: Request): Promise<Response> {
       : url.pathname.replace(/^\//, '')
   }
 
-  const target = `${base.replace(/\/$/, '')}/${rest}${url.search}`
+  // Responses API docs use base_url https://api.deepseek.com (no /v1).
+  // Chat completions keep the configured /v1 base.
+  let upstreamBase = base.replace(/\/$/, '')
+  const restPath = rest.replace(/^\//, '')
+  if (restPath === 'responses' || restPath.startsWith('responses/')) {
+    try {
+      const u = new URL(upstreamBase)
+      // Strip trailing /v1 so POST lands on /responses, not /v1/responses.
+      if (u.pathname.replace(/\/$/, '') === '/v1') {
+        upstreamBase = u.origin
+      }
+    } catch {
+      /* keep upstreamBase */
+    }
+  }
+
+  const target = `${upstreamBase}/${restPath}${url.search}`
 
   try {
     return await proxyRequest(target, req, {

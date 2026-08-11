@@ -7,6 +7,7 @@ import { useMobilePane } from './hooks/useMobilePane'
 import { useTripDialogs } from './hooks/useTripDialogs'
 import { useTripSync } from './hooks/useTripSync'
 import { DayTimeline } from './features/itinerary/components/DayTimeline'
+import { DayTabButton } from './features/itinerary/components/DayTabButton'
 import { FlightPanel } from './features/flight/components/FlightPanel'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
@@ -139,7 +140,6 @@ export default function App() {
     itineraryGenerating,
     setItineraryGenerating,
     itineraryIncrementalGenerating,
-    itineraryGeneratedUpToDay,
     itineraryGenError,
     setItineraryGenError,
     dayRegenerating,
@@ -155,9 +155,11 @@ export default function App() {
     missingForItinerary,
     canRestoreDefault,
     canRestoreDayDefault,
+    isDayGenerationPending,
     showItineraryLoading,
     showItineraryContent,
     showItineraryError,
+    showItineraryPartialError,
     runFullItineraryGeneration,
     handleResetDay,
     handleRegenerateItinerary,
@@ -311,13 +313,7 @@ export default function App() {
     return names
   }, [days, placesWithHotel])
 
-  /**
-   * Sequential multi-day generation: when a later day hasn't finished LLM generation,
-   * we show shimmer UI and avoid nav/route computation for that pending day.
-   */
-  const dayPending =
-    (itineraryGenerating && day.day === 1) ||
-    (itineraryIncrementalGenerating && day.day > itineraryGeneratedUpToDay)
+  const dayPending = isDayGenerationPending(day.day)
 
   const { plan: navPlan, loading: navLoading } = useDayNav(
     day,
@@ -826,6 +822,31 @@ export default function App() {
                   </div>
                 )}
 
+                {showItineraryPartialError && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-3">
+                    <div className="min-w-0 text-left">
+                      <p className="text-sm font-medium text-[var(--ink)]">
+                        后续天数生成中断
+                      </p>
+                      <p className="mt-0.5 whitespace-pre-line break-words text-xs text-[var(--stone)]">
+                        {itineraryGenError}
+                      </p>
+                    </div>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItineraryGenError(null)
+                          void runFullItineraryGeneration({ resume: true })
+                        }}
+                        className="shrink-0 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] hover:opacity-90"
+                      >
+                        继续生成
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {showItineraryContent && (
                   <>
                     <div className="sticky top-0 z-20 -mx-3 space-y-2 bg-[color-mix(in_srgb,var(--paper)_92%,transparent)] px-3 py-2 backdrop-blur-md sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
@@ -833,28 +854,21 @@ export default function App() {
                         {days.map((d, i) => {
                           const cal = dateForTripDay(itineraryStartDate, d.day)
                           return (
-                            <button
+                            <DayTabButton
                               key={d.day}
-                              type="button"
-                              onClick={() => {
+                              dayNumber={d.day}
+                              dateLabel={
+                                cal ? formatTripDayLabel(cal) : undefined
+                              }
+                              title={d.title}
+                              pending={isDayGenerationPending(d.day)}
+                              active={i === dayIndex}
+                              onSelect={() => {
                                 setDayIndex(i)
                                 setSelectedPlaceId(null)
                                 setDayRegenError(null)
                               }}
-                              className={`shrink-0 rounded-full px-3 py-2 text-sm transition sm:px-4 ${
-                                i === dayIndex
-                                  ? 'bg-[var(--ink)] text-[var(--paper)]'
-                                  : 'bg-white/70 text-[var(--ink)] hover:bg-white'
-                              }`}
-                            >
-                              <span className="block leading-tight">
-                                D{d.day}
-                                {cal ? ` · ${formatTripDayLabel(cal)}` : ''}
-                              </span>
-                              <span className="block max-w-[9.5rem] truncate text-[11px] opacity-80 sm:max-w-none">
-                                {d.title}
-                              </span>
-                            </button>
+                            />
                           )
                         })}
                       </div>

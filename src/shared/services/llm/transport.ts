@@ -20,7 +20,12 @@ import {
   isDeepSeekModel,
 } from './model-state'
 import { getProviderLabel } from './provider-state'
-import { deepSeekThinkingParams, resolveThinkingForTask, uiEffortToOpenAI } from './thinking'
+import {
+  deepSeekResponsesReasoning,
+  deepSeekThinkingParams,
+  resolveThinkingForTask,
+  uiEffortToOpenAI,
+} from './thinking'
 import type {
   ChatCallOptions,
   ChatStreamOptions,
@@ -29,6 +34,15 @@ import type {
   OpenAIChatMessage,
   ResolvedThinking,
 } from './types'
+
+/** Itinerary tasks that use DeepSeek Responses API (thinking off + web_search). */
+const DEEPSEEK_RESPONSES_ITINERARY_TASKS = new Set<LlmTaskKind>([
+  'itineraryGenerate',
+  'itineraryDayGenerate',
+])
+
+/** Responses API currently only supports deepseek-v4-flash. */
+const DEEPSEEK_RESPONSES_MODEL = 'deepseek-v4-flash'
 
 /** Shared completion budget: thinking CoT counts toward the same cap as visible content. */
 function completionTokenBudget(
@@ -59,6 +73,20 @@ function applyCompletionBudget(
     delete body.max_tokens
     body.max_completion_tokens = tokens
   }
+}
+
+/** After reasoning-only empty reply: disable thinking so tokens go to visible JSON. */
+function adaptBodyAfterReasoningOnlyEmpty(
+  body: Record<string, unknown>,
+  backend: ChatBackend,
+): void {
+  if (backend === 'deepseek') {
+    body.thinking = { type: 'disabled' }
+    delete body.reasoning_effort
+  } else {
+    body.reasoning_effort = 'none'
+  }
+  applyCompletionBudget(body, backend, 24576)
 }
 
 /** After a length truncation: raise budget and soften / disable thinking so content can finish. */
@@ -116,6 +144,239 @@ function chatCompletionsUrl(modelId = getOpenAIModel()): string {
   return chatBackendForModel(modelId) === 'deepseek'
     ? '/api/deepseek/chat/completions'
     : '/api/openai/chat/completions'
+}
+
+function deepSeekResponsesUrl(): string {
+  return '/api/deepseek/responses'
+}
+
+export function shouldUseDeepSeekResponses(task?: LlmTaskKind, modelId = getOpenAIModel()): boolean {
+  return (
+    chatBackendForModel(modelId) === 'deepseek' &&
+    Boolean(task && DEEPSEEK_RESPONSES_ITINERARY_TASKS.has(task))
+  )
+}
+
+/**
+ * Split chat messages into Responses `instructions` + `input`.
+ * System/developer → instructions; remaining turns → input item list (or a
+ * plain user string when there is a single user message).
+ */
+function splitMessagesForResponses(messages: OpenAIChatMessage[]): {
+  instructions?: string
+  input: string | Array<{ type: 'message'; role: string; content: string }>
+} {
+  const systemParts: string[] = []
+  const rest: Array<{ type: 'message'; role: string; content: string }> = []
+  for (const message of messages) {
+    if (message.role === 'tool') continue
+    const content = typeof message.content === 'string' ? message.content : ''
+    if (message.role === 'system') {
+      if (content.trim()) systemParts.push(content)
+      continue
+    }
+    rest.push({ type: 'message', role: message.role, content })
+  }
+  const instructions = systemParts.length ? systemParts.join('\n\n') : undefined
+  if (rest.length === 1 && rest[0]!.role === 'user') {
+    return { instructions, input: rest[0]!.content }
+  }
+  if (rest.length === 0) {
+    return { instructions, input: instructions ? '' : ' ' }
+  }
+  return { instructions, input: rest }
+}
+
+/**
+ * Build a DeepSeek Responses API body for itinerary generation.
+ * - thinking forced off via `reasoning.effort: "none"` (default is ON)
+ * - optional server-side `web_search` with `tool_choice: "auto"` (model chooses; never required)
+ * - JSON mode via `text.format.type: "json_object"`
+ */
+export function buildDeepSeekResponsesBody(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+): Record<string, unknown> {
+  const thinking: ResolvedThinking =
+    options?.thinking ??
+    ({ enabled: false, effort: 'off', source: 'auto' } satisfies ResolvedThinking)
+  const { instructions, input } = splitMessagesForResponses(messages)
+  const budget = completionTokenBudget(thinking, options?.task)
+  // true | 'auto' | undefined → allow tool; false → omit. Never force via tool_choice.
+  const allowWeb = options?.webSearch !== false
+
+  const body: Record<string, unknown> = {
+    model: DEEPSEEK_RESPONSES_MODEL,
+    input,
+    // Critical: omit → thinking ON; itinerary must force none.
+    reasoning: deepSeekResponsesReasoning(thinking),
+    max_output_tokens: budget,
+    temperature: 0.7,
+  }
+  if (instructions) body.instructions = instructions
+  if (options?.responseFormat === 'json_object' || options?.json) {
+    body.text = { format: { type: 'json_object' } }
+  }
+  if (allowWeb) {
+    body.tools = [{ type: 'web_search' }]
+    // Explicit auto — do not use "required" or { type: "web_search" }.
+    body.tool_choice = 'auto'
+  }
+  return body
+}
+
+async function callDeepSeekResponses(
+  messages: OpenAIChatMessage[],
+  options?: ChatCallOptions,
+): Promise<string> {
+  const { extractResponsesText, consumeResponsesStream } = await import('./stream')
+  type ResponsesPayload = import('./stream').OpenAIResponsesPayload
+
+  // Force thinking off for itinerary Responses calls regardless of UI mode.
+  const forcedThinking: ResolvedThinking = {
+    enabled: false,
+    effort: 'off',
+    source: 'auto',
+  }
+  const body = buildDeepSeekResponsesBody(messages, {
+    ...options,
+    thinking: forcedThinking,
+    // Default allow (model decides); only false forbids the tool.
+    webSearch: options?.webSearch === false ? false : (options?.webSearch ?? 'auto'),
+  })
+  const useStream = typeof options?.onDelta === 'function'
+  if (useStream) body.stream = true
+  const url = deepSeekResponsesUrl()
+  const { authFetch } = await import('../../../features/auth/services/authFetch')
+
+  let attempt = 0
+  let lastError: unknown = null
+  while (attempt < 3) {
+    let res: Response
+    try {
+      res = await authFetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(useStream ? { Accept: 'text/event-stream' } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: options?.signal,
+      })
+    } catch (err) {
+      const sig = options?.signal
+      const reason = sig ? (sig as { reason?: unknown }).reason : undefined
+      const reasonStr = reason ? String(reason) : ''
+      if (sig?.aborted || /timeout/i.test(reasonStr)) {
+        const isTimeout = /timeout/i.test(reasonStr)
+        throw new LlmRequestError(
+          isTimeout ? '请求超时（已终止）。' : '请求已取消。',
+          isTimeout ? 'timeout' : 'aborted',
+        )
+      }
+      throw err
+    }
+
+    if (res.ok) {
+      try {
+        if (useStream) {
+          const { text } = await consumeResponsesStream(
+            res,
+            options?.signal,
+            undefined,
+            (full) => options?.onDelta?.('', full),
+          )
+          if (text) {
+            options?.onDelta?.('', text)
+            return text
+          }
+          lastError = new LlmRequestError(
+            'deepseek Responses 流式没有返回内容。',
+            'empty',
+          )
+        } else {
+          const data = await readResponseJson<ResponsesPayload>(res, 'deepseek')
+          if (data.error?.message) {
+            throw new LlmRequestError(
+              data.error.message,
+              data.error.code || data.error.type || 'responses_error',
+            )
+          }
+          if (data.status === 'failed') {
+            throw new LlmRequestError(
+              data.error?.message || 'DeepSeek Responses 请求失败。',
+              data.error?.code || 'failed',
+            )
+          }
+
+          const text = extractResponsesText(data)
+          const reasoningTok = data.usage?.output_tokens_details?.reasoning_tokens ?? 0
+          const outputTok = data.usage?.output_tokens ?? 0
+          const usageBits = [
+            outputTok ? `output_tokens=${outputTok}` : '',
+            reasoningTok ? `reasoning_tokens=${reasoningTok}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+
+          if (data.status === 'incomplete') {
+            const reason = data.incomplete_details?.reason || 'unknown'
+            if (attempt < 2 && reason === 'max_output_tokens') {
+              const current = Number(body.max_output_tokens ?? 24576) || 24576
+              body.max_output_tokens = Math.min(Math.max(current * 2, 65536), 131072)
+              // Keep thinking off on retry.
+              body.reasoning = { effort: 'none' }
+              attempt++
+              await new Promise((r) => setTimeout(r, 200 * attempt))
+              continue
+            }
+            throw new LlmRequestError(
+              `模型输出不完整（incomplete · reason=${reason}${usageBits ? ` · ${usageBits}` : ''}）。`,
+              'truncated',
+            )
+          }
+
+          if (text) return text
+
+          lastError = new LlmRequestError(
+            `deepseek Responses 没有返回内容（status=${data.status || 'unknown'} · model=${body.model}${usageBits ? ` · ${usageBits}` : ''}）。`,
+            'empty',
+          )
+        }
+      } catch (parseError) {
+        if (parseError instanceof LlmRequestError) throw parseError
+        lastError = parseError
+      }
+    } else {
+      const errText = await res.text().catch(() => '')
+      if (
+        attempt < 2 &&
+        (res.status === 408 ||
+          res.status === 425 ||
+          res.status === 502 ||
+          res.status === 503 ||
+          res.status === 504)
+      ) {
+        attempt++
+        await new Promise((r) => setTimeout(r, 250 * attempt))
+        continue
+      }
+      const mapped = friendlyLlmError(res.status, errText, 'deepseek')
+      throw new LlmRequestError(
+        `${mapped.message}\nHTTP ${res.status} · model=${body.model} · backend=deepseek-responses${errText ? ` · body=${errText.slice(0, 180)}` : ''}`,
+        mapped.code,
+        res.status,
+      )
+    }
+    attempt++
+    if (attempt < 3) {
+      await new Promise((r) => setTimeout(r, 250 * attempt))
+    }
+  }
+  throw (
+    lastError ??
+    new LlmRequestError('DeepSeek Responses 没有返回内容。', 'empty')
+  )
 }
 
 export function friendlyLlmError(
@@ -352,6 +613,19 @@ export async function callOpenAIMessages(
   if (options?.signal?.aborted) {
     throw new LlmRequestError('请求已取消。', 'aborted')
   }
+
+  // DeepSeek itinerary: Responses API with thinking off + optional web_search.
+  // Skip chat-completions preflight / generic research injection entirely.
+  if (shouldUseDeepSeekResponses(options?.task)) {
+    return callDeepSeekResponses(messages, {
+      ...options,
+      thinking: { enabled: false, effort: 'off', source: 'auto' },
+      preflight: false,
+      // Allow tool by default; model chooses via tool_choice auto (not forced).
+      webSearch: options?.webSearch === false ? false : (options?.webSearch ?? 'auto'),
+    })
+  }
+
   const { resolveModelCallPreflight, addGenericWebResearch } = await import('./prompts-runtime')
   const preflight = await resolveModelCallPreflight(messages, options)
   const effectiveOptions: ChatCallOptions = { ...options, thinking: preflight.thinking }
@@ -450,8 +724,34 @@ export async function callOpenAIMessages(
         }
 
         if (text) return text
+
+        const thinkingState = body.thinking as { type?: string } | undefined
+        const thinkingAlreadyOff =
+          backend === 'deepseek'
+            ? thinkingState?.type === 'disabled'
+            : body.reasoning_effort === 'none'
+
+        if (attempt < 2 && !thinkingAlreadyOff) {
+          adaptBodyAfterReasoningOnlyEmpty(body, backend)
+          attempt++
+          await new Promise((r) => setTimeout(r, 200 * attempt))
+          continue
+        }
+
+        const reasoningTok =
+          data.usage?.completion_tokens_details?.reasoning_tokens ?? 0
+        const completionTok = data.usage?.completion_tokens ?? 0
+        const usageBitsExtended = [
+          usageBits,
+          reasoningTok > 0 && completionTok > 0 && reasoningTok >= completionTok
+            ? '（推理占满输出额度，未生成正文）'
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+
         lastError = new LlmRequestError(
-          `${backend} 没有返回内容（finish_reason=${finish || 'unknown'} · model=${body.model || getOpenAIModel()}${usageBits ? ` · ${usageBits}` : ''}）。`,
+          `${backend} 没有返回内容（finish_reason=${finish || 'unknown'} · model=${body.model || getOpenAIModel()}${usageBitsExtended ? ` · ${usageBitsExtended}` : ''}）。`,
           'empty',
         )
       } catch (parseError) {

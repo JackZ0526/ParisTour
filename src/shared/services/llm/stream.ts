@@ -82,7 +82,7 @@ export function extractPartialJsonStringField(
 
 // ── OpenAI Responses API payload shape ──
 
-type OpenAIResponsesPayload = {
+export type OpenAIResponsesPayload = {
   output_text?: string
   output?: Array<{
     type?: string
@@ -94,9 +94,17 @@ type OpenAIResponsesPayload = {
     [k: string]: unknown
   }>
   error?: { message?: string; code?: string; type?: string }
+  status?: string
+  incomplete_details?: { reason?: string }
+  usage?: {
+    input_tokens?: number
+    output_tokens?: number
+    output_tokens_details?: { reasoning_tokens?: number }
+  }
 }
 
-function extractResponsesText(data: OpenAIResponsesPayload): string {
+/** Pull assistant text from a Responses API payload (`output_text` or message parts). */
+export function extractResponsesText(data: OpenAIResponsesPayload): string {
   if (typeof data.output_text === 'string' && data.output_text.trim()) {
     return data.output_text.trim()
   }
@@ -249,6 +257,7 @@ export async function consumeResponsesStream(
   res: Response,
   signal?: AbortSignal,
   onWebSearchQuery?: (q: string) => void,
+  onTextDelta?: (fullText: string) => void,
 ): Promise<{ text: string; webSearchQueries: string[] }> {
   const body = res.body
   if (!body) {
@@ -308,7 +317,10 @@ export async function consumeResponsesStream(
           event.type === 'response.text.delta'
         ) {
           const delta = (event as { delta?: string }).delta
-          if (typeof delta === 'string') text += delta
+          if (typeof delta === 'string') {
+            text += delta
+            onTextDelta?.(text)
+          }
         } else if (event.type === 'response.output_item.added') {
           const item = (event as { item?: Record<string, unknown> }).item
           if (item && item.type === 'web_search_call') {
@@ -376,11 +388,10 @@ export function openaiWebSearchModel(): string {
 }
 
 /**
- * OpenAI Responses API with built-in web_search tool.
+ * OpenAI / DeepSeek Responses API with built-in web_search tool.
  * Used for fresher public web data (prices, hours, weather detail, etc.).
- * Always routes through `/api/openai/responses` with an OpenAI model, even when
- * the global picker is on DeepSeek (DeepSeek has no first-party web_search on
- * the OpenAI-compatible chat Completions path used by this app).
+ * Routes to `/api/openai/responses` or `/api/deepseek/responses` based on model.
+ * DeepSeek Responses currently requires `deepseek-v4-flash` (see openaiWebSearchModel).
  */
 export async function openaiResponsesWithWebSearch(input: {
   instructions: string
@@ -418,6 +429,8 @@ export async function openaiResponsesWithWebSearch(input: {
       instructions: input.instructions,
       input: input.user,
       stream: true,
+      // DeepSeek defaults thinking ON; research step only needs factual text.
+      ...(isDs ? { reasoning: { effort: 'none' } } : {}),
     }),
     signal: input.signal,
   })

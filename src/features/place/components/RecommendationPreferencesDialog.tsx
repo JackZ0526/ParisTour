@@ -40,7 +40,7 @@ const options: Array<{
   {
     key: 'includeDisneyDay',
     label: '安排迪士尼日',
-    description: '行程天数允许时预留一天巴黎迪士尼。',
+    description: '行程≥3 天时，倒数第二天固定为巴黎迪士尼全日。',
   },
   {
     key: 'includeChampsAndArc',

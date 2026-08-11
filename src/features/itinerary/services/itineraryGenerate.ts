@@ -134,6 +134,19 @@ async function resolveDraftPlace(
     return { id: special, place: catalog ? { ...catalog } : undefined }
   }
 
+  const cacheKey =
+    draft.googlePlaceId?.trim() ||
+    `${draft.type}:${normalizePlaceName(draft.name)}:${String(draft.area || '')
+      .trim()
+      .toLowerCase()}`
+  const cached = placeResolveCache.get(cacheKey)
+  if (cached) {
+    return {
+      id: cached.id,
+      place: cached.place ? { ...cached.place } : undefined,
+    }
+  }
+
   const query = placeDetailsQuery(
     draft.area ? `${draft.name} ${draft.area}` : draft.name,
     draft.nameLocal,
@@ -172,7 +185,25 @@ async function resolveDraftPlace(
     googleMapsUrl: mapsUrl(details?.name || `${draft.name} Paris`),
     durationHint: draft.durationHint || '60 分钟',
   }
+  placeResolveCache.set(cacheKey, { id, place })
+  if (place.googlePlaceId) {
+    placeResolveCache.set(place.googlePlaceId, { id, place })
+  }
   return { id, place }
+}
+
+type CandidateCacheEntry = {
+  hotelKey: string
+  candidates: VerifiedPlaceCandidate[]
+  at: number
+}
+
+let sessionCandidateCache: CandidateCacheEntry | null = null
+const placeResolveCache = new Map<string, { id: string; place?: Place }>()
+const CANDIDATE_CACHE_TTL_MS = 30 * 60 * 1000
+
+function hotelCandidateKey(hotel: SelectedHotel): string {
+  return `${hotel.id}:${hotel.lat.toFixed(3)}:${hotel.lng.toFixed(3)}`
 }
 
 async function loadItineraryCandidates(
@@ -209,6 +240,27 @@ async function loadItineraryCandidates(
     seen.add(key)
     return true
   })
+}
+
+/** One Google candidate pull per hotel/session; filter occupied names per day. */
+export async function getSharedItineraryCandidates(
+  hotel: SelectedHotel,
+  occupiedNames: string[] = [],
+): Promise<VerifiedPlaceCandidate[]> {
+  const key = hotelCandidateKey(hotel)
+  const now = Date.now()
+  if (
+    !sessionCandidateCache ||
+    sessionCandidateCache.hotelKey !== key ||
+    now - sessionCandidateCache.at > CANDIDATE_CACHE_TTL_MS
+  ) {
+    const candidates = await loadItineraryCandidates(hotel, [])
+    sessionCandidateCache = { hotelKey: key, candidates, at: now }
+  }
+  const excluded = new Set(occupiedNames.map(normalizePlaceName))
+  return sessionCandidateCache.candidates.filter(
+    (row) => !excluded.has(normalizePlaceName(row.name)),
+  )
 }
 
 function blankMetroHints(): Record<string, string> {
@@ -315,6 +367,7 @@ export function validateAndFixGeneratedDays(
   days: DayPlan[],
   places: Record<string, Place>,
   dayCount: number,
+  options?: { forceDisneyDay?: number | null },
 ): DayPlan[] {
   const n = Math.max(1, dayCount)
   let next = days
@@ -349,13 +402,22 @@ export function validateAndFixGeneratedDays(
     )
   }
 
-  // If the generated plan chose Disney, keep that day structurally coherent.
-  const disneyIdx = filled.findIndex(
-    (day) =>
-      day.pace === '乐园日' ||
-      /迪士尼|disney/i.test(`${day.title} ${day.theme}`) ||
-      day.stops.some((stop) => isDisneyStop(stop, places)),
-  )
+  // Prefer forced penultimate Disney day; otherwise collapse whichever day chose Disney.
+  const forcedDisneyDay =
+    options?.forceDisneyDay != null &&
+    options.forceDisneyDay >= 1 &&
+    options.forceDisneyDay <= n
+      ? options.forceDisneyDay
+      : null
+  let disneyIdx = forcedDisneyDay != null ? forcedDisneyDay - 1 : -1
+  if (disneyIdx < 0) {
+    disneyIdx = filled.findIndex(
+      (day) =>
+        day.pace === '乐园日' ||
+        /迪士尼|disney/i.test(`${day.title} ${day.theme}`) ||
+        day.stops.some((stop) => isDisneyStop(stop, places)),
+    )
+  }
   if (disneyIdx >= 0) {
     const d = filled[disneyIdx]
     filled[disneyIdx] = collapseDisneyStopsOnDay(
@@ -433,6 +495,7 @@ function softFixSingleDay(
   day: DayPlan,
   places: Record<string, Place>,
   dayCount: number,
+  options?: { forceDisneyDay?: number | null },
 ): DayPlan {
   const n = Math.max(1, dayCount)
   let next: DayPlan = {
@@ -444,21 +507,37 @@ function softFixSingleDay(
     })),
   }
 
+  const forcedDisney =
+    options?.forceDisneyDay != null && next.day === options.forceDisneyDay
   const choseDisney =
+    forcedDisney ||
     next.pace === '乐园日' ||
     /迪士尼|disney/i.test(`${next.title} ${next.theme}`) ||
     next.stops.some((stop) => isDisneyStop(stop, places))
-  if (choseDisney) {
-    next = collapseDisneyStopsOnDay(
-      {
-        ...next,
-        title: next.title.includes('迪士尼') ? next.title : '巴黎迪士尼',
-        theme: next.theme || 'RER A 乐园日',
-        pace: '乐园日',
-        summary: next.summary || '今天只去迪士尼，不安排其他景点。',
-      },
-      places,
-    )
+
+  if (forcedDisney || choseDisney) {
+    // When a Disney day is forced (penultimate), always collapse onto that day.
+    // If the model put Disney on the wrong day, strip it unless this is the forced day.
+    if (
+      options?.forceDisneyDay != null &&
+      next.day !== options.forceDisneyDay
+    ) {
+      const filtered = next.stops.filter((s) => !isDisneyStop(s, places))
+      if (filtered.length !== next.stops.length) {
+        next = { ...next, stops: filtered }
+      }
+    } else {
+      next = collapseDisneyStopsOnDay(
+        {
+          ...next,
+          title: next.title.includes('迪士尼') ? next.title : '巴黎迪士尼',
+          theme: next.theme || 'RER A 乐园日',
+          pace: '乐园日',
+          summary: next.summary || '今天只去迪士尼，不安排其他景点。',
+        },
+        places,
+      )
+    }
   } else {
     // Non-Disney days must not keep a Disney stop.
     const filtered = next.stops.filter((s) => !isDisneyStop(s, places))
@@ -534,6 +613,54 @@ function stripDupesAgainstOccupied(
   return stops.length === day.stops.length ? day : { ...day, stops }
 }
 
+/** Instant Disney day — no LLM. Structure matches hard Disney rules. */
+export function buildDisneyDayResult(input: {
+  dayNumber: number
+  dayCount: number
+  existingDays: DayPlan[]
+  existingCustomPlaces: Record<string, Place>
+}): GeneratedItineraryResult {
+  const customPlaces: Record<string, Place> = { ...input.existingCustomPlaces }
+  if (catalogPlaces[DISNEY_PLACE_ID]) {
+    customPlaces[DISNEY_PLACE_ID] = {
+      ...catalogPlaces[DISNEY_PLACE_ID],
+      ...customPlaces[DISNEY_PLACE_ID],
+    }
+  }
+  const seeded: DayPlan = {
+    day: input.dayNumber,
+    title: '巴黎迪士尼',
+    theme: 'RER A 乐园日',
+    pace: '乐园日',
+    summary: '今天只去迪士尼，不安排其他景点；园内玩够再回酒店。',
+    metroHintFromArea: {
+      custom: 'RER A 直达 Marne-la-Vallée–Chessy（约 45–60 分钟）。',
+    },
+    stops: [],
+  }
+  const newDay = collapseDisneyStopsOnDay(seeded, customPlaces)
+  const byDay = new Map(input.existingDays.map((d) => [d.day, d]))
+  byDay.set(input.dayNumber, newDay)
+  const merged: DayPlan[] = []
+  for (let i = 1; i <= input.dayCount; i++) {
+    const existing = byDay.get(i)
+    merged.push(
+      existing
+        ? { ...existing, day: i }
+        : {
+            day: i,
+            title: `第 ${i} 天`,
+            theme: '自由安排',
+            pace: '适中',
+            summary: '今天行程待补全。',
+            metroHintFromArea: blankMetroHints(),
+            stops: [],
+          },
+    )
+  }
+  return { days: ensureDay1HotelFirst(merged), customPlaces }
+}
+
 /**
  * Regenerate one day: LLM draft → Google resolve → merge into existing plan.
  * Keeps other days intact; preserves generated fingerprint at the App layer.
@@ -545,13 +672,40 @@ export async function buildGeneratedSingleDay(
     hotelAreaLabel?: string
     existingDays: DayPlan[]
     existingCustomPlaces: Record<string, Place>
+    /** Shared candidate pool (skip per-day Google nearby). */
+    verifiedCandidates?: VerifiedPlaceCandidate[]
+    onDayPreview?: (preview: { day: number; title?: string; theme?: string }) => void
   },
 ): Promise<GeneratedItineraryResult> {
   const hotel = input.hotel
-  const verifiedCandidates = await loadItineraryCandidates(
-    hotel,
-    (input.occupiedPlaces || []).map((place) => place.name),
-  )
+  const dayNumber = Math.max(1, Math.min(input.dayCount, input.dayNumber))
+  const forceDisneyDay =
+    input.recommendationPreferences.includeDisneyDay && input.dayCount >= 3
+      ? input.dayCount - 1
+      : null
+
+  // Disney day: local template, no LLM.
+  if (forceDisneyDay != null && dayNumber === forceDisneyDay) {
+    return buildDisneyDayResult({
+      dayNumber,
+      dayCount: input.dayCount,
+      existingDays: input.existingDays,
+      existingCustomPlaces: input.existingCustomPlaces,
+    })
+  }
+
+  const verifiedCandidates =
+    input.verifiedCandidates && input.verifiedCandidates.length
+      ? input.verifiedCandidates.filter(
+          (row) =>
+            !(input.occupiedPlaces || []).some(
+              (p) => normalizePlaceName(p.name) === normalizePlaceName(row.name),
+            ),
+        )
+      : await getSharedItineraryCandidates(
+          hotel,
+          (input.occupiedPlaces || []).map((place) => place.name),
+        )
   if (!verifiedCandidates.length) {
     throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
   }
@@ -582,8 +736,8 @@ export async function buildGeneratedSingleDay(
     preferences: input.preferences,
     recommendationPreferences: input.recommendationPreferences,
     verifiedCandidates,
+    onDayPreview: input.onDayPreview,
   })
-  const dayNumber = Math.max(1, Math.min(input.dayCount, input.dayNumber))
 
   const draftByKey = new Map(draft.places.map((p) => [p.key, p]))
   for (const stop of draft.day.stops) {
@@ -666,11 +820,9 @@ export async function buildGeneratedSingleDay(
     stops,
   }
 
-  newDay = softFixSingleDay(
-    newDay,
-    customPlaces,
-    input.dayCount,
-  )
+  newDay = softFixSingleDay(newDay, customPlaces, input.dayCount, {
+    forceDisneyDay,
+  })
   newDay = stripDupesAgainstOccupied(
     newDay,
     customPlaces,
@@ -801,10 +953,15 @@ export async function buildGeneratedItinerary(
     }
   })
 
+  const forceDisneyDay =
+    input.recommendationPreferences.includeDisneyDay && input.dayCount >= 3
+      ? input.dayCount - 1
+      : null
   const fixed = validateAndFixGeneratedDays(
     days,
     customPlaces,
     input.dayCount,
+    { forceDisneyDay },
   )
   return { days: fixed, customPlaces }
 }

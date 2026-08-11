@@ -74,7 +74,11 @@ export type ChatCallOptions = {
   preflightContext?: unknown
   /** Force OpenAI-style `response_format: json_object`. */
   responseFormat?: 'json_object'
-  /** Web research: true force / false forbid / 'auto' let preflight decide. */
+  /**
+   * Web research:
+   * - chat Completions + preflight: true force research injection / false forbid / 'auto' let preflight decide
+   * - DeepSeek Responses itinerary: true|'auto'|omit = expose `web_search` with `tool_choice: "auto"` (never forced); false = no tool
+   */
   webSearch?: boolean | 'auto'
   /** Force non-streaming JSON mode for a single call. */
   json?: boolean
@@ -82,6 +86,8 @@ export type ChatCallOptions = {
   plainText?: boolean
   /** Auto-retry on empty / invalid JSON body (default true). */
   retryEmpty?: boolean
+  /** Incremental assistant text (Responses / chat stream). */
+  onDelta?: (delta: string, fullText: string) => void
 }
 
 export type ChatStreamOptions = ChatCallOptions & {

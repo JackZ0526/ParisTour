@@ -107,7 +107,7 @@ export function recommendationPreferencesPrompt(
       ? '时间允许时优先安排午餐和晚餐'
       : '餐饮站按当天节奏灵活安排',
     prefs.includeDisneyDay
-      ? '行程天数允许时安排一天巴黎迪士尼'
+      ? '行程天数≥3 时，倒数第二天必须为巴黎迪士尼全日'
       : '不主动安排巴黎迪士尼',
     prefs.includeChampsAndArc
       ? '优先包含香榭丽舍大街与凯旋门'
