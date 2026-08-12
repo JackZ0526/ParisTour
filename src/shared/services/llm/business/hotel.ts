@@ -135,6 +135,81 @@ export async function generateHotelDetailCopy(input: {
   }
 }
 
+/** One-line Chinese blurb for a custom hotel picker card. */
+export async function generateHotelCardBlurb(input: {
+  name: string
+  area?: string
+  address?: string
+  description?: string
+  locationDescription?: string
+  starRating?: number
+  propertyType?: string
+  rating?: number
+  facilities?: string[]
+  onPartial?: (blurb: string) => void
+  signal?: AbortSignal
+}): Promise<string | null> {
+  if (!isLlmConfigured()) return null
+
+  const system = buildPrompt(
+    '旅行住宿顾问。为酒店候选项卡片写一句中文简介。',
+    null,
+    `<hard_rules>
+- 只输出 blurb 一个字段：恰好 1 句中文，约 18–40 字，不要句号堆砌，不要分点。
+- 抓住最有辨识度的 1–2 个点：区位/星级/一两个设施或交通，不要翻译或压缩 Booking 英文长简介。
+- 不要编造房价、评分或距离；资料没有的信息不要写。
+- 不要出现「自定义」「推荐理由」等元叙述。
+</hard_rules>`,
+    jsonContract(
+      '{ blurb: "string" }',
+      '{ "blurb": "特罗卡德罗四星酒店，步行可到埃菲尔铁塔，住客评分很高。" }',
+    ),
+  )
+  const user = JSON.stringify({
+    name: input.name,
+    area: input.area || '',
+    address: input.address || '',
+    starRating: input.starRating ?? null,
+    propertyType: input.propertyType || '',
+    rating: input.rating ?? null,
+    facilities: (input.facilities || []).slice(0, 8),
+    description: (input.description || '').slice(0, 500),
+    locationDescription: (input.locationDescription || '').slice(0, 400),
+  })
+
+  let lastBlurb = ''
+  const text = await (async () => {
+    try {
+      return await callOpenAIMessagesStream(
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        {
+          task: 'hotelDetail',
+          userText: input.name,
+          signal: input.signal,
+          onDelta: (_delta, fullText) => {
+            if (!input.onPartial) return
+            const blurb = extractPartialJsonStringField(fullText, 'blurb')
+            if (blurb == null || blurb === lastBlurb) return
+            lastBlurb = blurb
+            input.onPartial(blurb)
+          },
+        },
+      )
+    } catch {
+      return ''
+    }
+  })()
+  if (!text) return null
+  const parsed = extractJsonObject(text)
+  const blurb = String(parsed?.blurb || parsed?.reason || lastBlurb || '').trim()
+  if (!blurb) return null
+  if (input.onPartial && blurb !== lastBlurb) input.onPartial(blurb)
+  return blurb
+}
+
 /**
  * Recommend Paris stay options via LLM (no local hotel catalog).
  * Caller should resolve names with Booking afterwards.

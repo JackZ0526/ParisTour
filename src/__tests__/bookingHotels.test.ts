@@ -123,6 +123,29 @@ describe('Booking hotel adapter', () => {
     ])
   })
 
+  it('recovers official stars from description when class is missing', () => {
+    const hotel = normalizeBookingDetailResponse({
+      data: {
+        hotel_id: 8913188,
+        hotel_name: 'Padam Hôtel',
+        latitude: 48.868668,
+        longitude: 2.297871,
+        review_score: 9.2,
+        review_nr: 762,
+        description:
+          'Stay in the heart of Paris. This 4-star hotel offers room service and a restaurant.',
+        accommodation_type_name: 'Hotels',
+      },
+    })
+
+    expect(hotel).toMatchObject({
+      id: '8913188',
+      stars: 4,
+      rating: 9.2,
+      reviewCount: 762,
+    })
+  })
+
   it('extracts regular stays detail photos, top_ufi_benefits, and location', () => {
     const hotel = normalizeBookingDetailResponse({
       data: {

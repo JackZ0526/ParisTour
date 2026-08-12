@@ -1,23 +1,29 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import {
   looksChinese,
   translateHotelLocationTextsToChinese,
   translateTextsToChinese,
 } from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
-import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import { ShimmerLines } from '../../../shared/components/ShimmerLines'
+
+type TranslateFn = (
+  texts: string[],
+  options?: { onPartial?: (map: Map<string, string>) => void },
+) => Promise<Map<string, string>>
 
 function useBatchTranslation(
   texts: string[],
-  translateFn: (texts: string[]) => Promise<Map<string, string>> = translateTextsToChinese,
+  translateFn: TranslateFn = translateTextsToChinese,
 ) {
   const originals = useMemo(
     () => [...new Set(texts.map((text) => text.trim()).filter(Boolean))],
     [texts],
   )
   const sourceKey = originals.join('\n---\n')
+  const needsTranslate = originals.some((text) => !looksChinese(text)) && isLlmConfigured()
   const [translations, setTranslations] = useState<Record<string, string>>({})
-  const [translating, setTranslating] = useState(false)
+  const [translating, setTranslating] = useState(needsTranslate)
   const [translationFailed, setTranslationFailed] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
 
@@ -35,17 +41,21 @@ function useBatchTranslation(
     setTranslationFailed(false)
     setTranslating(true)
 
-    void translateFn(needTranslate)
+    const applyMap = (map: Map<string, string>) => {
+      const next: Record<string, string> = {}
+      for (const [original, translated] of map) {
+        const zh = translated.trim()
+        if (zh && zh !== original) next[original] = zh
+      }
+      setTranslations(next)
+    }
+
+    void translateFn(needTranslate, { onPartial: (map) => {
+      if (!cancelled) applyMap(map)
+    } })
       .then((map) => {
         if (cancelled) return
-        const next: Record<string, string> = {}
-        for (const [original, translated] of map) {
-          const zh = translated.trim()
-          if (zh && zh !== original && looksChinese(zh)) {
-            next[original] = zh
-          }
-        }
-        setTranslations(next)
+        applyMap(map)
       })
       .catch(() => {
         if (!cancelled) setTranslationFailed(true)
@@ -60,6 +70,7 @@ function useBatchTranslation(
   }, [sourceKey, retryCount, translateFn])
 
   const hasTranslation = originals.some((text) => translations[text])
+  const pending = Boolean(needsTranslate && translating && !hasTranslation && !translationFailed)
 
   return {
     originals,
@@ -67,48 +78,39 @@ function useBatchTranslation(
     translating,
     translationFailed,
     hasTranslation,
+    pending,
     retry: () => setRetryCount((count) => count + 1),
   }
 }
 
+function usePendingNotify(
+  pending: boolean,
+  onPendingChange?: (pending: boolean) => void,
+) {
+  useLayoutEffect(() => {
+    onPendingChange?.(pending)
+  }, [pending, onPendingChange])
+}
+
 function TranslationStatus({
-  loadingLabel,
-  sampleText,
   translating,
   translationFailed,
   onRetry,
 }: {
-  loadingLabel: string
-  sampleText: string
   translating: boolean
   translationFailed: boolean
   onRetry: () => void
 }) {
-  if (!translating && !translationFailed) return null
+  if (translating || !translationFailed) return null
 
   return (
-    <div className="flex items-center gap-2">
-      {translating && (
-        <LoadingIndicator
-          thinkingLabel={loadingLabel}
-          generatingLabel={loadingLabel}
-          mode="thinking"
-          task="translate"
-          userText={sampleText.slice(0, 120)}
-          size="sm"
-          showDots
-        />
-      )}
-      {translationFailed && !translating && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
-        >
-          翻译暂不可用，点击重试
-        </button>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onRetry}
+      className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
+    >
+      翻译暂不可用，点击重试
+    </button>
   )
 }
 
@@ -197,11 +199,15 @@ export function HotelTranslatedText({
   loadingLabel = '正在翻译…',
   className,
   layout = 'plain',
+  showShimmer = true,
+  onPendingChange,
 }: {
   text: string
   loadingLabel?: string
   className?: string
   layout?: 'plain' | 'hotelLocation'
+  showShimmer?: boolean
+  onPendingChange?: (pending: boolean) => void
 }) {
   const translateFn = useMemo(
     () => (layout === 'hotelLocation' ? translateHotelLocationTextsToChinese : translateTextsToChinese),
@@ -213,29 +219,31 @@ export function HotelTranslatedText({
     translating,
     translationFailed,
     hasTranslation,
+    pending,
     retry,
   } = useBatchTranslation([original], translateFn)
+  usePendingNotify(pending, onPendingChange)
 
   const body = hasTranslation ? translations[original] || original : original
+  const showLocalShimmer = showShimmer && pending
 
   if (!original) return null
 
-  const statusVisible = translating || translationFailed
-
   return (
     <>
-      {statusVisible ? (
-        <div className={layout === 'plain' ? className : undefined}>
-          <TranslationStatus
-            loadingLabel={loadingLabel}
-            sampleText={original}
-            translating={translating}
-            translationFailed={translationFailed}
-            onRetry={retry}
-          />
+      <TranslationStatus
+        translating={translating}
+        translationFailed={translationFailed}
+        onRetry={retry}
+      />
+      {showLocalShimmer ? (
+        <div>
+          <ShimmerLines lines={layout === 'hotelLocation' ? 4 : 2} className={className} />
+          <span className="sr-only">{loadingLabel}</span>
         </div>
-      ) : null}
-      {layout === 'hotelLocation' ? (
+      ) : pending ? (
+        <span className="sr-only">{loadingLabel}</span>
+      ) : layout === 'hotelLocation' ? (
         <FormattedHotelLocationText text={body} className={className || 'text-[var(--ink)]/85'} />
       ) : (
         <p className={`m-0 whitespace-pre-line${className ? ` ${className}` : ' text-[var(--ink)]/80'}`}>
@@ -270,19 +278,24 @@ function PolicyParagraph({
 export function HotelExpandablePolicyList({
   policies,
   expanded,
+  showShimmer = true,
+  onPendingChange,
 }: {
   policies: string[]
   expanded: boolean
+  showShimmer?: boolean
+  onPendingChange?: (pending: boolean) => void
 }) {
   const {
     translations,
     translating,
     translationFailed,
     hasTranslation,
+    pending,
     retry,
   } = useBatchTranslation(policies)
+  usePendingNotify(pending, onPendingChange)
 
-  const sampleText = policies[0] || ''
   const headPolicies = policies.slice(0, 2)
   const tailPolicies = policies.slice(2)
 
@@ -291,27 +304,31 @@ export function HotelExpandablePolicyList({
   const renderBody = (original: string) =>
     hasTranslation && translations[original] ? translations[original] : original
 
+  const renderPolicy = (original: string, index: number, clamp: boolean) => {
+    if (showShimmer && translating && !translations[original]) {
+      return <ShimmerLines key={`${original}-${index}`} lines={clamp ? 3 : 2} />
+    }
+    return (
+      <PolicyParagraph
+        key={`${original}-${index}`}
+        original={original}
+        body={renderBody(original)}
+        clamp={clamp}
+      />
+    )
+  }
+
   return (
     <div className="space-y-2">
       <TranslationStatus
-        loadingLabel="正在翻译重要须知…"
-        sampleText={sampleText}
         translating={translating}
         translationFailed={translationFailed}
         onRetry={retry}
       />
       <div className="space-y-2 text-[var(--ink)]/80">
-        {headPolicies.map((policy, index) => {
-          const original = policy.trim()
-          return (
-            <PolicyParagraph
-              key={`${original}-${index}`}
-              original={original}
-              body={renderBody(original)}
-              clamp={!expanded && index === 0}
-            />
-          )
-        })}
+        {headPolicies.map((policy, index) =>
+          renderPolicy(policy.trim(), index, !expanded && index === 0),
+        )}
         {tailPolicies.length > 0 && (
           <div
             className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
@@ -320,14 +337,9 @@ export function HotelExpandablePolicyList({
             aria-hidden={!expanded}
           >
             <div className="min-h-0 space-y-2 overflow-hidden">
-              {tailPolicies.map((policy, index) => {
-                const original = policy.trim()
-                return (
-                  <p key={`${original}-${index + 2}`} className="leading-relaxed">
-                    {renderBody(original)}
-                  </p>
-                )
-              })}
+              {tailPolicies.map((policy, index) =>
+                renderPolicy(policy.trim(), index + 2, false),
+              )}
             </div>
           </div>
         )}

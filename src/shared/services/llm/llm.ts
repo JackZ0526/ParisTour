@@ -120,6 +120,7 @@ export { extractLlmJsonObject, extractJsonObject } from './json'
 export {
   cleanQueryString,
   consumeResponsesStream,
+  extractPartialJsonStringArray,
   extractPartialJsonStringField,
   extractWebSearchQueries,
   openaiResponsesWithWebSearch,
@@ -170,6 +171,7 @@ export {
 
 export {
   generateHotelDetailCopy,
+  generateHotelCardBlurb,
   recommendHotelsForTrip,
   type HotelRecommendation,
 } from './business/hotel'

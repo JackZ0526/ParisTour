@@ -92,6 +92,42 @@ function number(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+function parseStarRatingFromText(value: string): number | undefined {
+  const match =
+    value.match(/(\d)\s*[-–]?\s*stars?(?:\s+hotel)?/i) ||
+    value.match(/(\d)\s*星(?:级)?/)
+  if (!match) return undefined
+  const stars = Number(match[1])
+  return stars >= 1 && stars <= 5 ? stars : undefined
+}
+
+/** Official 1–5 star class. Ignores 0 / unrated and nested Booking payloads. */
+export function parseBookingStarRating(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (value == null || value === '') continue
+    if (typeof value === 'string') {
+      const fromText = parseStarRatingFromText(value)
+      if (fromText != null) return fromText
+      const asNumber = number(value)
+      if (asNumber != null && asNumber >= 1 && asNumber <= 5) return Math.round(asNumber)
+      continue
+    }
+    const asNumber = number(value)
+    if (asNumber != null && asNumber >= 1 && asNumber <= 5) return Math.round(asNumber)
+    const record = firstRecord(value)
+    if (!record) continue
+    const nested = parseBookingStarRating(
+      record.value,
+      record.stars,
+      record.starRating,
+      record.rating,
+      record.class,
+    )
+    if (nested != null) return nested
+  }
+  return undefined
+}
+
 function uniqueStrings(values: unknown[]): string[] {
   return [...new Set(values.map(text).filter(Boolean))]
 }
@@ -436,12 +472,15 @@ export function normalizeBookingSearchResponse(payload: unknown): BookingHotelRe
         number(reviews?.reviewsCount) ??
         number(row.reviewCount) ??
         number(legacyProperty?.reviewCount),
-      stars:
-        number(starRating?.value) ??
-        number(row.accuratePropertyClass) ??
-        number(row.propertyClass) ??
-        number(row.qualityClass) ??
-        number(legacyProperty?.propertyClass),
+      stars: parseBookingStarRating(
+        starRating,
+        row.accuratePropertyClass,
+        row.propertyClass,
+        row.qualityClass,
+        row.class,
+        legacyProperty?.propertyClass,
+        legacyProperty?.class,
+      ),
       area:
         text(displayLocation?.displayLocation) ||
         text(basicLocation?.city) ||
@@ -589,10 +628,16 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
       location: { lat: regularLat, lng: regularLng },
       rating: number(data.review_score) ?? number(data.reviewScore),
       reviewCount: number(data.review_nr) ?? number(data.review_count),
-      stars:
-        number(data.class) ??
-        number(data.accurate_property_class) ??
-        number(data.property_class),
+      stars: parseBookingStarRating(
+        data.class,
+        data.accurate_property_class,
+        data.property_class,
+        data.stars,
+        data.star_rating,
+        data.starRating,
+        data.hotel_text,
+        data.description,
+      ),
       area: text(data.district) || text(data.city),
       districtLabel: text(data.district) || undefined,
       distanceToCityCenterKm: number(data.distance_to_cc),
@@ -716,7 +761,12 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
     location: { lat, lng },
     rating: number(totalScore?.score) ?? number(propertyReviews?.score),
     reviewCount: number(totalScore?.reviewsCount) ?? number(propertyReviews?.reviewsCount),
-    stars: number(starRating?.value),
+    stars: parseBookingStarRating(
+      starRating,
+      property?.starRating,
+      property?.class,
+      translation?.description,
+    ),
     area: text(location?.city),
     image: photos[0],
     photos,
@@ -1036,6 +1086,11 @@ function mergeBookingDetailRecord(
       ...(merged.policies || []),
       ...(description?.policies || []),
     ]),
+    stars: parseBookingStarRating(
+      merged.stars,
+      merged.description || description?.description,
+      merged.locationDescription || description?.locationDescription,
+    ),
   }
 }
 

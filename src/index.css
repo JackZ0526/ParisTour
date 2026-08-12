@@ -39,47 +39,60 @@
   }
 }
 
-@keyframes day-tab-shimmer {
-  0% {
-    background-position: 180% 50%;
-  }
+@keyframes day-tab-shimmer-slide {
   100% {
-    background-position: -100% 50%;
+    transform: translateX(100%);
   }
 }
 
-/* Block skeleton shimmer for pending day tabs (not text-clip). */
+/* Block skeleton: transform on a child layer so it can keep moving if JS is busy. */
+.day-tab-shimmer,
+.day-tab-shimmer-on-ink {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
 .day-tab-shimmer {
-  background-image: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--mist) 55%, transparent) 12%,
-    color-mix(in srgb, var(--stone) 22%, var(--mist)) 40%,
-    color-mix(in srgb, white 78%, var(--mist)) 50%,
-    color-mix(in srgb, var(--stone) 22%, var(--mist)) 60%,
-    color-mix(in srgb, var(--mist) 55%, transparent) 88%
-  );
-  background-size: 220% 100%;
-  animation: day-tab-shimmer 1.6s linear infinite;
-  will-change: background-position;
+  background-color: color-mix(in srgb, var(--mist) 70%, transparent);
 }
 
 .day-tab-shimmer-on-ink {
-  background-image: linear-gradient(
+  background-color: color-mix(in srgb, white 14%, transparent);
+}
+
+.day-tab-shimmer::after,
+.day-tab-shimmer-on-ink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  animation: day-tab-shimmer-slide 1.6s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.day-tab-shimmer::after {
+  background: linear-gradient(
     100deg,
-    color-mix(in srgb, white 12%, transparent) 12%,
-    color-mix(in srgb, white 28%, transparent) 40%,
-    color-mix(in srgb, white 55%, transparent) 50%,
-    color-mix(in srgb, white 28%, transparent) 60%,
-    color-mix(in srgb, white 12%, transparent) 88%
+    transparent 15%,
+    color-mix(in srgb, white 78%, var(--mist)) 50%,
+    transparent 85%
   );
-  background-size: 220% 100%;
-  animation: day-tab-shimmer 1.6s linear infinite;
-  will-change: background-position;
+}
+
+.day-tab-shimmer-on-ink::after {
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    color-mix(in srgb, white 55%, transparent) 50%,
+    transparent 85%
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .day-tab-shimmer,
-  .day-tab-shimmer-on-ink {
+  .day-tab-shimmer::after,
+  .day-tab-shimmer-on-ink::after {
     animation: none;
   }
 }

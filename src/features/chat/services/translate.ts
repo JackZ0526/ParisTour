@@ -1,8 +1,8 @@
 import {
   extractLlmJsonObject,
+  extractPartialJsonStringArray,
   extractPartialJsonStringField,
   isLlmConfigured,
-  openaiChat,
   openaiChatStream,
 } from '../../../shared/services/llm/llm'
 import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
@@ -44,9 +44,7 @@ function cacheSet(
 ) {
   const memKey = `${artifactKey}|${original}`
   MEMORY_CACHE.set(memKey, translated)
-  const map = readDurableCache(artifactKey)
-  map[original] = translated
-  writeDurableCache(map, artifactKey)
+  writeDurableCache({ ...readDurableCache(artifactKey), [original]: translated }, artifactKey)
 }
 
 /** True when the text is already mostly Chinese (or has no Latin letters to translate). */
@@ -62,83 +60,27 @@ export function looksChinese(text: string): boolean {
   return cjk >= latin * 0.6
 }
 
+type TranslateOptions = {
+  onPartial?: (map: Map<string, string>) => void
+}
+
 /**
  * Translate non-Chinese texts to Simplified Chinese.
  * Dedupes in-flight batches and caches results in memory + durable trip artifacts.
  */
 export async function translateTextsToChinese(
   texts: string[],
+  options?: TranslateOptions,
 ): Promise<Map<string, string>> {
-  const result = new Map<string, string>()
-  const unique = [...new Set(texts.map((t) => t.trim()).filter(Boolean))]
-
-  const needTranslate: string[] = []
-  for (const text of unique) {
-    if (looksChinese(text)) {
-      result.set(text, text)
-      continue
-    }
-    const cached = cacheGet(text)
-    if (cached) {
-      result.set(text, cached)
-      continue
-    }
-    needTranslate.push(text)
-  }
-
-  if (!needTranslate.length) return result
-
-  if (!isLlmConfigured()) {
-    for (const text of needTranslate) result.set(text, text)
-    return result
-  }
-
-  // Stable key so overlapping UI mounts share one request.
-  const batchKey = `translate:${needTranslate.slice().sort().join('\n')}`
-
-  const translatedBatch = await memoizeLlmCall(batchKey, async () => {
-    const raw = await openaiChat(
-      [
-        {
-          role: 'system',
-          content: buildPrompt(
-            '翻译助手。把用户给出的 Google 评论译成简洁通顺的简体中文。',
-            null,
-            jsonContract(
-              '{ translations: ["..."] }',
-              '{ "translations": ["这家咖啡馆的拿铁口感非常顺滑，店员也很热情。", "位置便利，出门就是地铁站。"] }',
-            ),
-            '<output_format>数组顺序与输入 texts 一致，长度必须相同。不要解释。</output_format>',
-          ),
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({ texts: needTranslate }),
-        },
-      ],
-      {
-        task: 'translate',
-        userText: needTranslate[0],
-        webSearch: false,
-        responseFormat: 'json_object',
-      },
-    )
-
-    const parsed = extractLlmJsonObject(raw)
-    const list = (parsed?.translations as unknown[]) || []
-    return needTranslate.map((original, i) => {
-      const translated = String(list[i] || '').trim()
-      return translated || original
-    })
+  return translateWithPrompt(texts, {
+    artifactKey: TRANSLATIONS_ARTIFACT_KEY,
+    batchKeyPrefix: 'translate',
+    systemPrompt: '翻译助手。把用户给出的文本译成简洁通顺的简体中文。',
+    example:
+      '{ "translations": ["这家咖啡馆的拿铁口感非常顺滑，店员也很热情。", "位置便利，出门就是地铁站。"] }',
+    outputRules: '<output_format>数组顺序与输入 texts 一致，长度必须相同。不要解释。为便于流式展示：尽快开始输出 translations 数组。</output_format>',
+    onPartial: options?.onPartial,
   })
-
-  needTranslate.forEach((original, i) => {
-    const translated = translatedBatch[i] || original
-    if (translated !== original) cacheSet(original, translated)
-    result.set(original, translated)
-  })
-
-  return result
 }
 
 async function translateWithPrompt(
@@ -149,6 +91,7 @@ async function translateWithPrompt(
     systemPrompt: string
     example: string
     outputRules: string
+    onPartial?: (map: Map<string, string>) => void
   },
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>()
@@ -168,7 +111,10 @@ async function translateWithPrompt(
     needTranslate.push(text)
   }
 
-  if (!needTranslate.length) return result
+  if (!needTranslate.length) {
+    options.onPartial?.(new Map(result))
+    return result
+  }
 
   if (!isLlmConfigured()) {
     for (const text of needTranslate) result.set(text, text)
@@ -178,7 +124,7 @@ async function translateWithPrompt(
   const batchKey = `${options.batchKeyPrefix}:${needTranslate.slice().sort().join('\n')}`
 
   const translatedBatch = await memoizeLlmCall(batchKey, async () => {
-    const raw = await openaiChat(
+    const raw = await openaiChatStream(
       [
         {
           role: 'system',
@@ -199,6 +145,17 @@ async function translateWithPrompt(
         userText: needTranslate[0],
         webSearch: false,
         responseFormat: 'json_object',
+        onDelta: (_delta, fullText) => {
+          if (!options.onPartial) return
+          const list = extractPartialJsonStringArray(fullText, 'translations')
+          if (!list?.length) return
+          const partial = new Map(result)
+          needTranslate.forEach((original, i) => {
+            const translated = String(list[i] || '').trim()
+            if (translated) partial.set(original, translated)
+          })
+          options.onPartial(partial)
+        },
       },
     )
 
@@ -216,6 +173,7 @@ async function translateWithPrompt(
     result.set(original, translated)
   })
 
+  options.onPartial?.(new Map(result))
   return result
 }
 
@@ -224,6 +182,7 @@ async function translateWithPrompt(
  */
 export async function translateHotelLocationTextsToChinese(
   texts: string[],
+  options?: TranslateOptions,
 ): Promise<Map<string, string>> {
   return translateWithPrompt(texts, {
     artifactKey: HOTEL_LOCATION_ARTIFACT_KEY,
@@ -239,7 +198,9 @@ export async function translateHotelLocationTextsToChinese(
 - 餐饮、设施、服务用「• 」开头的列表，每项一行。
 - 段与段之间用空一行（\\n\\n）分隔；不要标题、不要 markdown、不要编号。
 - 语气简洁通顺，适合酒店详情页快速扫读。
+- 为便于流式展示：尽快开始输出 translations 数组。
 </output_format>`,
+    onPartial: options?.onPartial,
   })
 }
 

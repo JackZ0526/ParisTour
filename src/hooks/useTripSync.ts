@@ -261,7 +261,7 @@ export function useTripSync(
 
   useEffect(() => {
     const flush = () => {
-      void flushTripCloudSave()
+      void flushTripCloudSave({ urgent: true })
     }
     window.addEventListener('beforeunload', flush)
     return () => window.removeEventListener('beforeunload', flush)

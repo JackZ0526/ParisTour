@@ -104,10 +104,15 @@ function LlmNarrativeSingleBody({
   const bodyRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
   const showShimmer = loading && !reason
+  const streaming = loading && Boolean(reason?.trim())
 
   useLayoutEffect(() => {
     const el = bodyRef.current
     if (!el) return
+    if (streaming) {
+      setHeight(null)
+      return
+    }
 
     const prevHeight = el.style.height
     el.style.height = 'auto'
@@ -115,13 +120,13 @@ function LlmNarrativeSingleBody({
     el.style.height = prevHeight
 
     setHeight((prev) => (prev === nextHeight ? prev : nextHeight))
-  }, [reason, loading, showShimmer])
+  }, [reason, loading, showShimmer, streaming])
 
   return (
     <div
       ref={bodyRef}
-      className="llm-narrative-body overflow-hidden"
-      style={height != null ? { height } : undefined}
+      className={`llm-narrative-body ${streaming ? 'overflow-visible' : 'overflow-hidden'}`}
+      style={height != null && !streaming ? { height } : undefined}
       aria-busy={loading || undefined}
     >
       {showShimmer ? (
@@ -133,6 +138,12 @@ function LlmNarrativeSingleBody({
       ) : reason ? (
         <p className="text-sm leading-relaxed text-[var(--ink)]/90">
           {reason}
+          {streaming ? (
+            <span
+              className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+              aria-hidden
+            />
+          ) : null}
         </p>
       ) : null}
       {showShimmer && loadingLabel ? (
@@ -206,6 +217,8 @@ export function GooglePlacePage({
         : []
   const photos = rawPhotos.filter((url) => !failedPhotos.includes(url))
   const activePhoto = photos[photoIndex] || photos[0]
+  const showThumbStrip = photos.length > 1
+  const [thumbStripExpanded, setThumbStripExpanded] = useState(false)
   const googleMapsPlaceUrl = details?.id
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         details.nameOriginal || details.name || query,
@@ -276,6 +289,15 @@ export function GooglePlacePage({
     pendingGalleryAdvanceRef.current = false
     setPhotoIndex((i) => Math.min(i + 1, photos.length - 1))
   }, [photos.length])
+
+  useEffect(() => {
+    if (!showThumbStrip) {
+      setThumbStripExpanded(false)
+      return
+    }
+    const frame = requestAnimationFrame(() => setThumbStripExpanded(true))
+    return () => cancelAnimationFrame(frame)
+  }, [showThumbStrip])
 
   useEffect(() => {
     thumbRefs.current[photoIndex]?.scrollIntoView({
@@ -636,35 +658,46 @@ export function GooglePlacePage({
               {bookingGalleryPhotosError && !bookingGalleryPhotosLoading && (
                 <p className="text-xs text-amber-800">{bookingGalleryPhotosError}</p>
               )}
-              {photos.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {photos.map((url, i) => (
-                    <button
-                      key={url + i}
-                      ref={(el) => {
-                        thumbRefs.current[i] = el
-                      }}
-                      type="button"
-                      onClick={() => setPhotoIndex(i)}
-                      className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
-                        i === photoIndex ? 'border-[var(--copper)]' : 'border-transparent'
-                      }`}
-                    >
-                      <img
-                        src={url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        onError={() =>
-                          setFailedPhotos((current) =>
-                            current.includes(url) ? current : [...current, url],
-                          )
-                        }
-                      />
-                    </button>
-                  ))}
+              <div
+                className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  showThumbStrip && thumbStripExpanded
+                    ? 'grid-rows-[1fr] opacity-100'
+                    : 'grid-rows-[0fr] opacity-0'
+                }`}
+                aria-hidden={!showThumbStrip}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  {showThumbStrip && (
+                    <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {photos.map((url, i) => (
+                        <button
+                          key={url + i}
+                          ref={(el) => {
+                            thumbRefs.current[i] = el
+                          }}
+                          type="button"
+                          onClick={() => setPhotoIndex(i)}
+                          className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
+                            i === photoIndex ? 'border-[var(--copper)]' : 'border-transparent'
+                          }`}
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            onError={() =>
+                              setFailedPhotos((current) =>
+                                current.includes(url) ? current : [...current, url],
+                              )
+                            }
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
 

@@ -153,13 +153,18 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
 
   const artifacts = snap.llmArtifacts
   if (artifacts && typeof artifacts === 'object') {
-    // Present in snapshot (including explicit empty) — replace local durable store.
-    saveLlmArtifacts(artifacts, { silent: true })
-    seedMemoFromArtifacts(artifacts)
+    hydrateTripArtifacts(artifacts)
   } else {
     // Legacy snapshot without llmArtifacts — keep whatever is already local.
     seedMemoFromArtifacts(loadLlmArtifacts())
   }
+}
+
+/** Replace local durable artifacts from a cloud row without treating it as a local edit. */
+export function hydrateTripArtifacts(map: LlmArtifactMap | null | undefined) {
+  const artifacts = map && typeof map === 'object' ? map : {}
+  saveLlmArtifacts(artifacts, { silent: true })
+  seedMemoFromArtifacts(artifacts)
 }
 
 export function clearLocalTripStorage() {

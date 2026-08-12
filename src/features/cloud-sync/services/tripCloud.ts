@@ -1,8 +1,23 @@
 import { getSupabase } from '../../../shared/lib/supabase'
+import { yieldToMain } from '../../../shared/lib/yieldToMain'
+import {
+  flushHotelCacheToStorage,
+  type HotelCacheState,
+} from '../../hotel/services/hotelCache'
+import {
+  ackArtifactCloudDiff,
+  artifactCloudDiffIsEmpty,
+  flushLlmArtifactsToStorage,
+  hasArtifactCloudDiff,
+  markArtifactsCloudSynced,
+  peekArtifactCloudDiff,
+  type LlmArtifactMap,
+} from '../../../shared/services/llm/llmArtifactStore'
 import {
   applyTripSnapshot,
   collectTripSnapshot,
   emptyTripSnapshot,
+  hydrateTripArtifacts,
   type TripSnapshot,
 } from './tripSnapshot'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -110,6 +125,64 @@ function asSnapshot(raw: unknown): TripSnapshot {
   }
 }
 
+function asArtifactMap(raw: unknown): LlmArtifactMap {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  return raw as LlmArtifactMap
+}
+
+function asHotelState(raw: unknown): HotelCacheState | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  return raw as HotelCacheState
+}
+
+const TRIP_LIVE_COLUMNS =
+  'id, owner_id, is_primary, title, snapshot, hotel, artifacts, updated_at'
+
+/** Join split cloud columns (and legacy embedded snapshot fields) into one trip snapshot. */
+function snapshotFromCloudRow(row: {
+  snapshot?: unknown
+  hotel?: unknown
+  artifacts?: unknown
+}): TripSnapshot {
+  const base = asSnapshot(row.snapshot)
+  const hotel = row.hotel === undefined ? base.hotel : asHotelState(row.hotel)
+  const artifacts =
+    row.artifacts === undefined
+      ? base.llmArtifacts && typeof base.llmArtifacts === 'object'
+        ? base.llmArtifacts
+        : {}
+      : asArtifactMap(row.artifacts)
+  return {
+    ...base,
+    hotel: hotel ?? null,
+    llmArtifacts: artifacts,
+  }
+}
+
+function coreSnapshotForCloud(snapshot: TripSnapshot): TripSnapshot {
+  const clean = asSnapshot(snapshot)
+  return {
+    ...clean,
+    hotel: null,
+    llmArtifacts: {},
+  }
+}
+
+type CloudPartsJson = {
+  core: string
+  hotel: string
+}
+
+function cloudPartsJson(snapshot: TripSnapshot): CloudPartsJson {
+  const clean = asSnapshot(snapshot)
+  return {
+    core: JSON.stringify(coreSnapshotForCloud(clean)),
+    hotel: JSON.stringify(clean.hotel ?? null),
+  }
+}
+
+type CloudSavePart = 'core' | 'hotel' | 'artifacts'
+
 const MAX_TRIP_BACKUPS = 5
 
 /** Archive copy without bulky LLM caches / nested history. */
@@ -128,7 +201,14 @@ function substantiveSnapshotJson(snapshot: TripSnapshot): string {
     dates: clean.dates,
     destination: clean.destination,
     flights: clean.flights,
-    hotel: clean.hotel,
+    hotel: clean.hotel
+      ? {
+          selectedId: clean.hotel.selected?.id ?? null,
+          candidateIds: (clean.hotel.candidates || []).map(
+            (card) => card.bookingHotelId || card.id,
+          ),
+        }
+      : null,
     itinerary: clean.itinerary,
     baseline: clean.baseline,
     recommendationPreferences: clean.recommendationPreferences,
@@ -204,7 +284,7 @@ export async function ensurePrimaryTrip(userId: string): Promise<TripRow> {
   const sb = getSupabase()
   const { data: existing, error: selectError } = await sb
     .from('trips')
-    .select('id, owner_id, is_primary, title, snapshot, updated_at')
+    .select(TRIP_LIVE_COLUMNS)
     .eq('owner_id', userId)
     .eq('is_primary', true)
     .maybeSingle()
@@ -213,37 +293,40 @@ export async function ensurePrimaryTrip(userId: string): Promise<TripRow> {
   if (existing) {
     return {
       ...existing,
-      snapshot: asSnapshot(existing.snapshot),
+      snapshot: snapshotFromCloudRow(existing),
     }
   }
 
+  const empty = emptyTripSnapshot()
   const { data: created, error: insertError } = await sb
     .from('trips')
     .insert({
       owner_id: userId,
       is_primary: true,
       title: '我的巴黎行程',
-      snapshot: emptyTripSnapshot(),
+      snapshot: coreSnapshotForCloud(empty),
+      hotel: null,
+      artifacts: {},
     })
-    .select('id, owner_id, is_primary, title, snapshot, updated_at')
+    .select(TRIP_LIVE_COLUMNS)
     .single()
 
   if (insertError) {
     // Race: another tab created primary; re-read.
     const { data: raced, error: raceError } = await sb
       .from('trips')
-      .select('id, owner_id, is_primary, title, snapshot, updated_at')
+      .select(TRIP_LIVE_COLUMNS)
       .eq('owner_id', userId)
       .eq('is_primary', true)
       .maybeSingle()
     if (raced) {
-      return { ...raced, snapshot: asSnapshot(raced.snapshot) }
+      return { ...raced, snapshot: snapshotFromCloudRow(raced) }
     }
     throw insertError || raceError
   }
   return {
     ...created,
-    snapshot: asSnapshot(created.snapshot),
+    snapshot: snapshotFromCloudRow(created),
   }
 }
 
@@ -269,7 +352,7 @@ export async function listAccessibleTrips(
 
   const { data: shares, error: shareError } = await sb
     .from('trip_shares')
-    .select('trip_id, role, trips(id, owner_id, is_primary, title, snapshot, updated_at)')
+    .select('trip_id, role, trips(id, owner_id, is_primary, title, snapshot, hotel, artifacts, updated_at)')
     .eq('invitee_email', email)
 
   if (shareError) throw shareError
@@ -297,7 +380,7 @@ export async function listAccessibleTrips(
       isPrimary: Boolean(t.is_primary),
       role,
       updatedAt: t.updated_at,
-      snapshot: asSnapshot(t.snapshot),
+      snapshot: snapshotFromCloudRow(t),
       label: `来自 ${ownerLabel} · ${perm}`,
     })
   }
@@ -309,50 +392,124 @@ export async function loadTripById(tripId: string): Promise<TripRow | null> {
   const sb = getSupabase()
   const { data, error } = await sb
     .from('trips')
-    .select('id, owner_id, is_primary, title, snapshot, updated_at')
+    .select(TRIP_LIVE_COLUMNS)
     .eq('id', tripId)
     .maybeSingle()
   if (error) throw error
   if (!data) return null
-  return { ...data, snapshot: asSnapshot(data.snapshot) }
+  return { ...data, snapshot: snapshotFromCloudRow(data) }
 }
 
 export async function saveTripSnapshot(
   tripId: string,
   snapshot: TripSnapshot,
-  options?: { archivePrevious?: boolean },
+  options?: {
+    archivePrevious?: boolean
+    parts?: CloudSavePart[]
+    /** Write the snapshot's artifacts blob as-is (restore / RPC fallback). */
+    replaceArtifacts?: boolean
+  },
 ): Promise<string | null> {
   const sb = getSupabase()
-  const { data: current, error: currentError } = await sb
-    .from('trips')
-    .select('snapshot, updated_at')
-    .eq('id', tripId)
-    .maybeSingle()
-  if (currentError) throw currentError
-
-  const previous = asSnapshot(current?.snapshot)
-  // Never persist the old embedded backupHistory key on the live row.
+  const parts = options?.parts?.length
+    ? options.parts
+    : (['core', 'hotel', 'artifacts'] as CloudSavePart[])
   const nextSnapshot = asSnapshot(snapshot)
+  const nextParts = cloudPartsJson(nextSnapshot)
+  const prevParts = lastSavedPartsByTrip.get(tripId)
 
-  if (
-    options?.archivePrevious !== false &&
-    substantiveSnapshotJson(previous) !== substantiveSnapshotJson(nextSnapshot)
-  ) {
-    await archiveTripSnapshot(
-      tripId,
-      previous,
-      typeof current?.updated_at === 'string' ? current.updated_at : null,
-    )
+  const patch: Record<string, unknown> = {}
+  if (parts.includes('core') && nextParts.core !== prevParts?.core) {
+    patch.snapshot = coreSnapshotForCloud(nextSnapshot)
+  }
+  if (parts.includes('hotel') && nextParts.hotel !== prevParts?.hotel) {
+    patch.hotel = nextSnapshot.hotel ?? null
+  }
+
+  let latestUpdatedAt: string | null = lastAppliedUpdatedAtByTrip.get(tripId) ?? null
+
+  if (parts.includes('artifacts')) {
+    if (options?.replaceArtifacts) {
+      patch.artifacts =
+        nextSnapshot.llmArtifacts && typeof nextSnapshot.llmArtifacts === 'object'
+          ? nextSnapshot.llmArtifacts
+          : {}
+    } else {
+      const patchedAt = await patchTripArtifactsOrFallback(tripId, nextSnapshot, patch)
+      if (patchedAt) latestUpdatedAt = patchedAt
+    }
+  }
+
+  if (!Object.keys(patch).length) {
+    return latestUpdatedAt
+  }
+
+  if (options?.archivePrevious !== false && (patch.snapshot || patch.hotel)) {
+    const { data: current, error: currentError } = await sb
+      .from('trips')
+      .select('snapshot, hotel, updated_at')
+      .eq('id', tripId)
+      .maybeSingle()
+    if (currentError) throw currentError
+    const previous = snapshotFromCloudRow(current || {})
+    if (substantiveSnapshotJson(previous) !== substantiveSnapshotJson(nextSnapshot)) {
+      await archiveTripSnapshot(
+        tripId,
+        previous,
+        typeof current?.updated_at === 'string' ? current.updated_at : null,
+      )
+    }
   }
 
   const { data, error } = await sb
     .from('trips')
-    .update({ snapshot: nextSnapshot })
+    .update(patch)
     .eq('id', tripId)
     .select('updated_at')
     .maybeSingle()
   if (error) throw error
-  return typeof data?.updated_at === 'string' ? data.updated_at : null
+  if (patch.artifacts !== undefined) markArtifactsCloudSynced()
+  return typeof data?.updated_at === 'string' ? data.updated_at : latestUpdatedAt
+}
+
+function isMissingPatchRpc(err: unknown): boolean {
+  const rec = asRecord(err)
+  const code = rec && typeof rec.code === 'string' ? rec.code : ''
+  const raw = extractErrorText(err).toLowerCase()
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    (/patch_trip_artifacts/.test(raw) &&
+      /does not exist|could not find|schema cache/.test(raw))
+  )
+}
+
+async function patchTripArtifactsOrFallback(
+  tripId: string,
+  snapshot: TripSnapshot,
+  patch: Record<string, unknown>,
+): Promise<string | null> {
+  const diff = peekArtifactCloudDiff()
+  if (artifactCloudDiffIsEmpty(diff)) return null
+
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.rpc('patch_trip_artifacts', {
+      p_trip_id: tripId,
+      p_upserts: diff.upserts,
+      p_deletes: diff.deletes,
+    })
+    if (error) throw error
+    ackArtifactCloudDiff(diff)
+    return typeof data === 'string' && data.trim() ? data : null
+  } catch (err) {
+    if (!isMissingPatchRpc(err)) throw err
+    patch.artifacts =
+      snapshot.llmArtifacts && typeof snapshot.llmArtifacts === 'object'
+        ? snapshot.llmArtifacts
+        : {}
+    return null
+  }
 }
 
 /** List server-side backups for a trip (newest first, max 5). */
@@ -394,19 +551,26 @@ export async function restoreTripSnapshotBackup(
   // Keep restored artifacts empty if backup was stripped; do not invent old caches.
   if (!restored.llmArtifacts) restored.llmArtifacts = {}
 
-  return saveTripSnapshot(tripId, restored, { archivePrevious: true })
+  return saveTripSnapshot(tripId, restored, {
+    archivePrevious: true,
+    replaceArtifacts: true,
+  })
 }
 
 /** Debounced cloud writer — only persists when the snapshot actually changed. */
+const SAVE_DEBOUNCE_MS = 2000
+const MIN_SAVE_INTERVAL_MS = 8000
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveTripId: string | null = null
 let saveInFlight = false
-let queuedSnapshot: TripSnapshot | null = null
 let queuedSaveMode: 'none' | 'artifacts' | 'full' = 'none'
 let queuedAllowEmptyTrip = false
-/** Exact snapshot currently being uploaded, for no-op checks during a save. */
-let inFlightJson: string | null = null
 let pendingAfterFlight = false
+/** Last time a cloud write actually started (network). */
+let lastSaveStartedAt = 0
+/** Pause uploads during bursty work (itinerary generation); flush once on release. */
+let saveHoldCount = 0
 /** Ignore mirrored realtime events right after our own save. */
 let suppressRemoteUntil = 0
 let suppressFlushTimer: ReturnType<typeof setTimeout> | null = null
@@ -415,6 +579,8 @@ let suppressFlushTimer: ReturnType<typeof setTimeout> | null = null
  * Used to skip no-op local uploads — not to reject re-applying historical remote states.
  */
 const lastSavedJsonByTrip = new Map<string, string>()
+/** Per-blob fingerprints so we can PATCH only the columns that changed. */
+const lastSavedPartsByTrip = new Map<string, CloudPartsJson>()
 /** Last known generated itinerary, retained as a safety baseline across an empty regression. */
 const lastGeneratedJsonByTrip = new Map<string, string>()
 /** Last trip.updated_at we reconciled (save or remote apply). */
@@ -469,6 +635,55 @@ export function subscribeCloudSyncStatus(listener: () => void): () => void {
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+function extractErrorText(err: unknown): string {
+  if (!err) return ''
+  if (typeof err === 'string') return err.trim()
+  if (err instanceof Error && err.message.trim()) return err.message.trim()
+  const rec = asRecord(err)
+  if (!rec) return ''
+  const parts = [rec.message, rec.details, rec.hint]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+  if (parts.length) return parts.join(' · ')
+  if (rec.cause) return extractErrorText(rec.cause)
+  return ''
+}
+
+function describeCloudSaveError(err: unknown): string {
+  const rec = asRecord(err)
+  const code = rec && typeof rec.code === 'string' ? rec.code : ''
+  const raw = extractErrorText(err)
+  const haystack = `${code} ${raw}`.toLowerCase()
+
+  if (/row-level security|rls|42501|permission denied|not authorized/.test(haystack)) {
+    return '没有写入权限（当前可能是只读共享）'
+  }
+  if (/jwt|not authenticated|invalid claim|401/.test(haystack)) {
+    return '登录已过期，请重新登录'
+  }
+  if (/payload too large|too large|413|54000|value too long/.test(haystack)) {
+    return '行程数据过大，无法写入云端'
+  }
+  if (/failed to fetch|networkerror|network request|load failed/.test(haystack)) {
+    return '网络中断，请检查连接后重试'
+  }
+  if (/timeout|timed out|57014/.test(haystack)) {
+    return '云端响应超时，请稍后重试'
+  }
+  if (/duplicate|23505|conflict|409/.test(haystack)) {
+    return '云端记录冲突，请刷新后重试'
+  }
+  if (code && raw && raw !== '保存失败') {
+    return `${raw}（${code}）`
+  }
+  if (raw && raw !== '保存失败') return raw
+  return code ? `云端返回错误 ${code}` : '未知错误，请稍后重试'
+}
+
 function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) {
   cloudSaveStatus = next
   cloudSaveError = error
@@ -506,7 +721,13 @@ function setCloudSyncStatus(next: CloudSyncStatus) {
 }
 
 function snapshotJson(snapshot: TripSnapshot): string {
-  return JSON.stringify(snapshot)
+  const { llmArtifacts: _artifacts, ...rest } = snapshot
+  return JSON.stringify(rest)
+}
+
+function trackSavedSnapshot(tripId: string, snapshot: TripSnapshot, json?: string) {
+  lastSavedJsonByTrip.set(tripId, json ?? snapshotJson(snapshot))
+  lastSavedPartsByTrip.set(tripId, cloudPartsJson(snapshot))
 }
 
 function hasGeneratedTrip(snapshot: TripSnapshot): boolean {
@@ -597,7 +818,8 @@ function beginRemoteQuietPeriod(ms: number) {
     const tripId = saveTripId
     if (!tripId) return
     try {
-      lastSavedJsonByTrip.set(tripId, snapshotJson(collectTripSnapshot()))
+      const settled = collectTripSnapshot()
+      trackSavedSnapshot(tripId, settled)
     } catch {
       /* ignore */
     }
@@ -641,7 +863,7 @@ export function rememberSavedSnapshot(
   updatedAt?: string | null,
 ): void {
   if (!tripId) return
-  lastSavedJsonByTrip.set(tripId, snapshotJson(snapshot))
+  trackSavedSnapshot(tripId, snapshot)
   rememberGeneratedSnapshot(tripId, snapshot)
   if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
 }
@@ -703,7 +925,14 @@ export function applyRemoteTripSnapshot(
   // snapshot must still remount when updated_at is newer.
   try {
     if (snapshotJson(collectTripSnapshot()) === json) {
-      lastSavedJsonByTrip.set(tripId, json)
+      if (trustSnapshot) {
+        hydrateTripArtifacts(
+          snapshot.llmArtifacts && typeof snapshot.llmArtifacts === 'object'
+            ? snapshot.llmArtifacts
+            : {},
+        )
+      }
+      trackSavedSnapshot(tripId, snapshot, json)
       rememberGeneratedSnapshot(tripId, snapshot)
       if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
       return false
@@ -719,7 +948,6 @@ export function applyRemoteTripSnapshot(
     clearTimeout(saveTimer)
     saveTimer = null
   }
-  queuedSnapshot = null
   queuedSaveMode = 'none'
   queuedAllowEmptyTrip = false
   pendingAfterFlight = false
@@ -730,10 +958,10 @@ export function applyRemoteTripSnapshot(
   // Reconcile against *local* round-trip form so remount autosave does not re-upload.
   try {
     const reconciled = collectTripSnapshot()
-    lastSavedJsonByTrip.set(tripId, snapshotJson(reconciled))
+    trackSavedSnapshot(tripId, reconciled)
     rememberGeneratedSnapshot(tripId, reconciled)
   } catch {
-    lastSavedJsonByTrip.set(tripId, json)
+    trackSavedSnapshot(tripId, snapshot, json)
     rememberGeneratedSnapshot(tripId, snapshot)
   }
   if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
@@ -860,46 +1088,43 @@ export function scheduleTripCloudSave(
   }
   if (opts?.allowEmptyTrip) queuedAllowEmptyTrip = true
 
-  if (saveTimer) clearTimeout(saveTimer)
-  // React's persistence effects run after the change-notification effect. Wait
-  // one task so localStorage reflects this render before deciding it is dirty.
-  saveTimer = setTimeout(() => {
-    saveTimer = null
-    const mode = queuedSaveMode === 'artifacts' ? 'artifacts' : 'full'
-    let snapshot: TripSnapshot | null
-    let json: string
-    try {
-      snapshot = collectSnapshotForMode(tripId, mode)
-      if (!snapshot) return
-      json = snapshotJson(snapshot)
-    } catch {
-      return
-    }
+  if (saveHoldCount > 0) return
 
-    queuedSnapshot = snapshot
-
-    // During an upload compare with that upload, not the older saved baseline:
-    // reverting while A is uploading must still queue B to restore the cloud.
-    const unchanged = saveInFlight
-      ? json === inFlightJson
-      : json === lastSavedJsonByTrip.get(tripId)
-    if (unchanged) {
-      queuedSnapshot = null
-      queuedSaveMode = 'none'
-      queuedAllowEmptyTrip = false
-      if (cloudSaveStatus === 'pending') setCloudSaveStatus('idle')
-      return
-    }
-
-    setCloudSaveStatus('pending')
-    // Coalesce substantive edits into one write ~1.5s after the last change.
-    saveTimer = setTimeout(() => {
-      void flushTripCloudSave()
-    }, 1500)
-  }, 0)
+  setCloudSaveStatus('pending')
+  armSaveTimer(SAVE_DEBOUNCE_MS)
 }
 
-export async function flushTripCloudSave(): Promise<void> {
+function msUntilNextSaveAllowed() {
+  if (!lastSaveStartedAt) return 0
+  return Math.max(0, MIN_SAVE_INTERVAL_MS - (Date.now() - lastSaveStartedAt))
+}
+
+function armSaveTimer(delayMs: number) {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    void flushTripCloudSave()
+  }, delayMs)
+}
+
+/** Defer cloud uploads during a burst (first itinerary gen, day regen). */
+export function holdTripCloudSaves() {
+  saveHoldCount += 1
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+}
+
+export function releaseTripCloudSaves() {
+  saveHoldCount = Math.max(0, saveHoldCount - 1)
+  if (saveHoldCount > 0 || !saveTripId) return
+  if (queuedSaveMode === 'none') return
+  setCloudSaveStatus('pending')
+  armSaveTimer(SAVE_DEBOUNCE_MS)
+}
+
+export async function flushTripCloudSave(options?: { urgent?: boolean }): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
@@ -911,14 +1136,60 @@ export async function flushTripCloudSave(): Promise<void> {
     return
   }
 
+  if (!options?.urgent) {
+    if (saveHoldCount > 0) return
+    const wait = msUntilNextSaveAllowed()
+    if (wait > 0) {
+      setCloudSaveStatus('pending')
+      armSaveTimer(wait)
+      return
+    }
+    await yieldToMain()
+    if (saveInFlight) {
+      pendingAfterFlight = true
+      return
+    }
+    if (saveTimer) return
+    if (saveHoldCount > 0) return
+  }
+
+  flushLlmArtifactsToStorage()
+  flushHotelCacheToStorage()
+
   const saveMode = queuedSaveMode === 'artifacts' ? 'artifacts' : 'full'
-  const snapshot = queuedSnapshot || collectTripSnapshot()
   const allowEmptyTrip = queuedAllowEmptyTrip
-  queuedSnapshot = null
   queuedSaveMode = 'none'
   queuedAllowEmptyTrip = false
-  const json = snapshotJson(snapshot)
-  if (lastSavedJsonByTrip.get(tripId) === json) {
+
+  let snapshot: TripSnapshot | null
+  let json: string
+  try {
+    snapshot = collectSnapshotForMode(tripId, saveMode)
+    if (!snapshot) {
+      if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
+        setCloudSaveStatus('idle')
+      }
+      flushQueuedRemote()
+      return
+    }
+    json = snapshotJson(snapshot)
+  } catch (err) {
+    console.warn('[tripCloud] snapshot serialize failed', err)
+    setCloudSaveStatus('error', '行程数据过大，无法写入云端')
+    flushQueuedRemote()
+    return
+  }
+  const coreUnchanged = lastSavedJsonByTrip.get(tripId) === json
+  const artifactsChanged = hasArtifactCloudDiff()
+  if (saveMode === 'artifacts') {
+    if (!artifactsChanged) {
+      if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
+        setCloudSaveStatus('idle')
+      }
+      flushQueuedRemote()
+      return
+    }
+  } else if (coreUnchanged && !artifactsChanged) {
     if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
       setCloudSaveStatus('idle')
     }
@@ -938,14 +1209,28 @@ export async function flushTripCloudSave(): Promise<void> {
     return
   }
 
+  const parts: CloudSavePart[] = []
+  if (saveMode === 'full' && !coreUnchanged) {
+    parts.push('core', 'hotel')
+  }
+  if (artifactsChanged) parts.push('artifacts')
+  if (!parts.length) {
+    if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
+      setCloudSaveStatus('idle')
+    }
+    flushQueuedRemote()
+    return
+  }
+
   saveInFlight = true
-  inFlightJson = json
+  lastSaveStartedAt = Date.now()
   setCloudSaveStatus('saving')
   try {
     const updatedAt = await saveTripSnapshot(tripId, snapshot, {
-      archivePrevious: saveMode === 'full',
+      archivePrevious: saveMode === 'full' && !coreUnchanged,
+      parts,
     })
-    lastSavedJsonByTrip.set(tripId, json)
+    trackSavedSnapshot(tripId, snapshot, json)
     rememberGeneratedSnapshot(tripId, snapshot)
     if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
     // Swallow our own realtime echo.
@@ -953,16 +1238,17 @@ export async function flushTripCloudSave(): Promise<void> {
     setCloudSaveStatus('saved')
   } catch (err) {
     console.warn('[tripCloud] save failed', err)
-    setCloudSaveStatus(
-      'error',
-      err instanceof Error ? err.message : '保存失败',
-    )
+    setCloudSaveStatus('error', describeCloudSaveError(err))
   } finally {
     saveInFlight = false
-    inFlightJson = null
     if (pendingAfterFlight) {
       pendingAfterFlight = false
-      void flushTripCloudSave()
+      if (saveHoldCount > 0) {
+        if (queuedSaveMode === 'none') queuedSaveMode = 'full'
+      } else {
+        setCloudSaveStatus('pending')
+        armSaveTimer(Math.max(SAVE_DEBOUNCE_MS, msUntilNextSaveAllowed()))
+      }
     } else {
       flushQueuedRemote()
     }

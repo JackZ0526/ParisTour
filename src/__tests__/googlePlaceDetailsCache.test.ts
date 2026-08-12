@@ -9,11 +9,13 @@ import {
   peekGooglePlaceDetails,
 } from '../features/map/services/googlePlaceDetails'
 import { resetGoogleRequestBudgetForTests } from '../features/map/services/googleRequestBudget'
+import { resetLlmArtifactStoreForTests } from '../shared/services/llm/llmArtifactStore'
 
 describe('RapidAPI place cache', () => {
   beforeEach(() => {
     authFetch.mockReset()
     resetGoogleRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
   })
 
   it('reuses a complete Text Search result for later ID and component reads', async () => {

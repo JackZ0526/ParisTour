@@ -9,6 +9,7 @@ import {
 describe('hotelDisplay', () => {
   it('localizes property types and facilities', () => {
     expect(localizePropertyType('Hotels')).toBe('酒店')
+    expect(localizePropertyType('Apartments')).toBe('公寓')
     expect(localizeFacility('Private bathroom')).toBe('独立浴室')
     expect(localizeFacility('Hot tub')).toBe('按摩浴缸')
     expect(localizeFacility('Free Wifi')).toBe('免费 Wi-Fi')

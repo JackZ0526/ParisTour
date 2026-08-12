@@ -1,30 +1,45 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import type { GoogleReview } from '../../map/services/googlePlaceDetails'
 import { looksChinese, translateTextsToChinese } from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
-import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import { ShimmerLines } from '../../../shared/components/ShimmerLines'
 
 interface Props {
   reviews: GoogleReview[]
   sourceLabel?: string
   showHeader?: boolean
+  showShimmer?: boolean
+  onPendingChange?: (pending: boolean) => void
 }
 
 export function GoogleReviewsList({
   reviews,
   sourceLabel = 'Google 评论',
   showHeader = true,
+  showShimmer = true,
+  onPendingChange,
 }: Props) {
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [showOriginal, setShowOriginal] = useState<Record<number, boolean>>({})
-  const [translating, setTranslating] = useState(false)
   const [translationFailed, setTranslationFailed] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const nonChinese = useMemo(
+    () =>
+      reviews.map((r) => r.text.trim()).filter((t) => t && !looksChinese(t)),
+    [reviews],
+  )
+  const needsTranslate = nonChinese.length > 0 && isLlmConfigured()
+  const [translating, setTranslating] = useState(needsTranslate)
 
   const reviewKey = useMemo(
     () => reviews.map((r) => r.text).join('\n---\n'),
     [reviews],
   )
+  const pending = Boolean(needsTranslate && translating && !Object.keys(translations).length && !translationFailed)
+
+  useLayoutEffect(() => {
+    onPendingChange?.(pending)
+  }, [pending, onPendingChange])
 
   useEffect(() => {
     let cancelled = false
@@ -39,17 +54,25 @@ export function GoogleReviewsList({
       return
     }
 
+    const applyMap = (map: Map<string, string>) => {
+      const next: Record<string, string> = {}
+      for (const [k, v] of map) {
+        if (v && v !== k) next[k] = v
+      }
+      setTranslations(next)
+    }
+
     setTranslations({})
     setTranslationFailed(false)
     setTranslating(true)
-    void translateTextsToChinese(nonChinese)
+    void translateTextsToChinese(nonChinese, {
+      onPartial: (map) => {
+        if (!cancelled) applyMap(map)
+      },
+    })
       .then((map) => {
         if (cancelled) return
-        const next: Record<string, string> = {}
-        for (const [k, v] of map) {
-          if (v && v !== k) next[k] = v
-        }
-        setTranslations(next)
+        applyMap(map)
       })
       .catch(() => {
         if (!cancelled) setTranslationFailed(true)
@@ -70,16 +93,6 @@ export function GoogleReviewsList({
     <div>
       <div className={`${showHeader ? 'mb-2' : 'mb-3'} flex flex-wrap items-center justify-between gap-2`}>
         {showHeader && <p className="text-sm font-medium">{sourceLabel}</p>}
-        {translating && (
-          <LoadingIndicator
-            thinkingLabel="正在翻译非中文评论…"
-            generatingLabel="正在翻译非中文评论…"
-            size="sm"
-            showDots
-            mode="thinking"
-            task="translate"
-          />
-        )}
         {translationFailed && !translating && (
           <button
             type="button"
@@ -97,6 +110,7 @@ export function GoogleReviewsList({
           const isTranslated = Boolean(translated)
           const showingOriginal = Boolean(showOriginal[i])
           const body = isTranslated && !showingOriginal ? translated : original
+          const showItemShimmer = showShimmer && translating && !translated && !looksChinese(original)
 
           return (
             <article key={`${original.slice(0, 24)}-${i}`} className="rounded-xl bg-white/70 px-3 py-2 text-sm">
@@ -110,7 +124,11 @@ export function GoogleReviewsList({
                   </span>
                 )}
               </div>
-              <p className="leading-relaxed text-[var(--ink)]">{body}</p>
+              {showItemShimmer ? (
+                <ShimmerLines lines={3} />
+              ) : (
+                <p className="leading-relaxed text-[var(--ink)]">{body}</p>
+              )}
               {isTranslated && (
                 <div className="mt-1.5 flex justify-end">
                   <button

@@ -15,12 +15,19 @@ import {
   refreshHotelCandidates,
 } from '../services/hotelRecommend'
 import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
-import { generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
+import {
+  hydrateHotelAdvisorFromCache,
+  memoizeHotelAdvisorCopy,
+  rememberHotelAdvisorCopy,
+} from '../services/hotelAdvisorMemo'
+import { generateHotelCardBlurb, generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
+import { looksChinese } from '../../chat/services/translate'
 import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { HotelLocationDescription } from './HotelLocationDescription'
-import { HotelExpandablePolicyList } from './hotelTranslation'
+import { HotelExpandablePolicyList, HotelTranslatedText } from './hotelTranslation'
+import { ShimmerLines } from '../../../shared/components/ShimmerLines'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { GoogleReviewsList } from '../../place/components/GoogleReviewsList'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
@@ -89,6 +96,7 @@ interface Props {
 
 /** Match DayTimeline float settle. */
 const HOTEL_DRAG_SETTLE_MS = 200
+const BOOKING_DETAILS_VERSION = 6
 /** Start float after this pointer travel so clicks still open the card. */
 const HOTEL_DRAG_THRESHOLD_PX = 6
 /** Viscous follow — same language as DayTimeline tickFloat. */
@@ -117,7 +125,25 @@ function pointInRect(x: number, y: number, rect: DOMRect) {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 }
 
-function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
+function needsCustomCardBlurb(hotel: HotelCandidate): boolean {
+  if (hotel.source !== 'custom') return false
+  const reason = hotel.reason?.trim() || ''
+  if (!reason) return true
+  return /^替换[「『"]/.test(reason)
+}
+
+function HotelCardFace({
+  hotel,
+  blurb,
+  blurbLoading,
+}: {
+  hotel: HotelCandidate
+  blurb?: string
+  blurbLoading?: boolean
+}) {
+  const customText = (blurb || hotel.reason || '').trim()
+  const showCustomShimmer = hotel.source === 'custom' && blurbLoading && !customText
+
   return (
     <>
       <GooglePlacePhoto
@@ -128,25 +154,48 @@ function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
         asBackground
         className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
       />
-      <div className="space-y-1 p-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
-          {hotel.isBest && (
-            <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
-              最优推荐
-            </span>
-          )}
-          {hotel.source === 'custom' && (
-            <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
-              自定义
-            </span>
+      <div className="flex min-h-[7.75rem] flex-col p-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
+            {hotel.isBest && (
+              <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
+                最优推荐
+              </span>
+            )}
+            {hotel.source === 'custom' && (
+              <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
+                自定义
+              </span>
+            )}
+          </div>
+          <p className="font-medium leading-snug">{hotel.name}</p>
+          {showCustomShimmer ? (
+            <ShimmerLines lines={2} />
+          ) : hotel.source === 'custom' ? (
+            <p className="m-0 line-clamp-2 text-xs text-[var(--stone)]">{customText}</p>
+          ) : (
+            <HotelTranslatedText
+              text={hotel.reason || hotel.description}
+              loadingLabel="正在翻译酒店简介…"
+              className="line-clamp-2 text-xs text-[var(--stone)]"
+            />
           )}
         </div>
-        <p className="font-medium leading-snug">{hotel.name}</p>
-        <p className="line-clamp-2 text-xs text-[var(--stone)]">
-          {hotel.reason || hotel.description}
-        </p>
-        <p className="text-xs text-[var(--stone)]">{hotel.priceHint}</p>
+        {hotel.rating != null && (
+          <p className="mt-auto flex justify-end pt-2 text-right text-xs leading-tight text-[var(--stone)]">
+            <span>
+              <span className="font-medium">
+                <span className="text-[#003580]">Booking</span>
+                <span className="text-[#006ce4]">.com</span>
+              </span>
+              <span className="ml-1 tabular-nums">
+                {hotel.rating.toFixed(1)}/10
+                {hotel.reviewCount != null ? `（${hotel.reviewCount}）` : ''}
+              </span>
+            </span>
+          </p>
+        )}
       </div>
     </>
   )
@@ -542,16 +591,43 @@ function BookingHotelFacts({
   onRetry: () => void
 }) {
   const [policiesExpanded, setPoliciesExpanded] = useState(false)
+  const [locationRevealed, setLocationRevealed] = useState(false)
+  const [policiesRevealed, setPoliciesRevealed] = useState(false)
   const popularFacilities = hotel.facilities || []
   const visibleLanguages = (hotel.languages || []).map(localizeLanguage)
   const reviewScores = (hotel.reviewScores || []).filter((item) => item.score > 0)
   const policies = hotel.policies || []
   const paymentMethods = (hotel.paymentMethods || []).map(localizePaymentMethod)
   const hasLocationDetails = Boolean(hotel.locationDescription)
+  const factsPending = identityLoading || loading
+  const locationNeedsTranslate = Boolean(
+    hotel.locationDescription &&
+      !looksChinese(hotel.locationDescription) &&
+      isLlmConfigured(),
+  )
+  const policiesNeedTranslate =
+    policies.some((policy) => !looksChinese(policy)) && isLlmConfigured()
+  const showLocationShimmer =
+    (factsPending && !hasLocationDetails) || (locationNeedsTranslate && !locationRevealed)
+  const showPolicySkeleton =
+    (factsPending && policies.length === 0) || (policiesNeedTranslate && !policiesRevealed)
+  const policiesKey = policies.join('\n---\n')
+
+  useLayoutEffect(() => {
+    setLocationRevealed(!locationNeedsTranslate)
+  }, [hotel.id, hotel.locationDescription, locationNeedsTranslate])
+
+  useLayoutEffect(() => {
+    setPoliciesRevealed(!policiesNeedTranslate)
+  }, [hotel.id, policiesKey, policiesNeedTranslate])
+  const starCount =
+    hotel.starRating != null && hotel.starRating > 0
+      ? Math.min(5, Math.round(hotel.starRating))
+      : 0
   const showHotelOverview = Boolean(
     hotel.name ||
       hotel.propertyType ||
-      hotel.starRating != null ||
+      starCount > 0 ||
       hotel.sustainability ||
       hotel.address ||
       hotel.area ||
@@ -574,10 +650,21 @@ function BookingHotelFacts({
                 <h3 className="text-base font-semibold leading-snug text-[var(--ink)]">
                   {hotel.name}
                 </h3>
-                {hotel.propertyType && (
-                  <span className="rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
-                    {localizePropertyType(hotel.propertyType)}
+                {(hotel.propertyType || starCount > 0) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
+                    {starCount > 0 && (
+                      <span
+                        className="text-[12px] leading-none tracking-[0.08em] text-[#f5a623]"
+                        aria-label={`${starCount} 星酒店`}
+                      >
+                        {'★'.repeat(starCount)}
+                      </span>
+                    )}
+                    {hotel.propertyType ? localizePropertyType(hotel.propertyType) : '酒店'}
                   </span>
+                )}
+                {factsPending && !hotel.propertyType && starCount === 0 && (
+                  <span className="h-6 w-24 rounded-md day-tab-shimmer" aria-hidden />
                 )}
               </div>
               {hotel.address && (
@@ -602,29 +689,29 @@ function BookingHotelFacts({
             )}
           </div>
 
-          {(hotel.starRating != null || hotel.sustainability) && (
+          {hotel.sustainability && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              {hotel.starRating != null && (
-                <span className="text-sm tracking-[0.12em] text-[#f5a623]" aria-label={`${hotel.starRating} 星酒店`}>
-                  {'★'.repeat(Math.max(1, Math.min(5, Math.round(hotel.starRating))))}
-                </span>
-              )}
-              {hotel.sustainability && (
-                <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
-                  可持续住宿 · {hotel.sustainability}
-                </span>
-              )}
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
+                可持续住宿 · {hotel.sustainability}
+              </span>
             </div>
           )}
 
-          {hasLocationDetails && (
+          {hasLocationDetails || showLocationShimmer ? (
             <div className="mt-2 text-sm leading-relaxed">
-              <HotelLocationDescription
-                text={hotel.locationDescription!}
-                className="min-w-0 text-[var(--ink)]/85"
-              />
+              {showLocationShimmer && <ShimmerLines lines={4} />}
+              {hasLocationDetails && (
+                <div className={showLocationShimmer ? 'hidden' : undefined}>
+                  <HotelLocationDescription
+                    text={hotel.locationDescription!}
+                    className="min-w-0 text-[var(--ink)]/85"
+                    showShimmer={false}
+                    onPendingChange={(pending) => setLocationRevealed(!pending)}
+                  />
+                </div>
+              )}
             </div>
-          )}
+          ) : null}
 
           {hasValidParisBookingIdentity(hotel) && hotel.bookingUrl && (
             <div className="mt-2 flex justify-end">
@@ -647,12 +734,6 @@ function BookingHotelFacts({
       )}
 
       <div className="space-y-4">
-        {identityLoading && (
-          <LoadingIndicator label="正在识别 Booking.com 酒店" showDots size="sm" />
-        )}
-        {loading && (
-          <LoadingIndicator label="正在加载酒店完整资料" showDots size="sm" />
-        )}
         {identityError && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <span>{identityError}</span>
@@ -678,6 +759,36 @@ function BookingHotelFacts({
           </div>
         )}
 
+        {factsPending && (
+          <>
+            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+              <ShimmerLines lines={1} className="mb-3 max-w-[8rem]" />
+              <div className="flex flex-wrap gap-x-5 gap-y-3">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <span key={index} className="h-5 w-24 rounded-full day-tab-shimmer" />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+              <ShimmerLines lines={1} className="mb-3 max-w-[8rem]" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <span className="h-3 w-16 rounded-full day-tab-shimmer" />
+                    <span className="h-2 flex-1 rounded-full day-tab-shimmer" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        {showPolicySkeleton && (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+            <ShimmerLines lines={1} className="mb-3 max-w-[10rem]" />
+            <ShimmerLines lines={4} />
+          </div>
+        )}
+
         {popularFacilities.length ? (
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
             <BookingSectionHeader icon={Building2} title="热门设施" />
@@ -690,7 +801,7 @@ function BookingHotelFacts({
               ))}
             </div>
           </div>
-        ) : !loading && !error && hotel.bookingDetailsLoaded ? (
+        ) : !factsPending && !error && hotel.bookingDetailsLoaded ? (
           <p className="text-xs text-[var(--stone)]">该酒店没有返回可展示的设施信息。</p>
         ) : null}
 
@@ -710,6 +821,7 @@ function BookingHotelFacts({
         )}
 
         {(hotel.checkIn || hotel.checkOut || visibleLanguages.length > 0 || policies.length > 0 || paymentMethods.length > 0) && (
+          <div className={showPolicySkeleton && !hotel.checkIn && !hotel.checkOut && !visibleLanguages.length && !paymentMethods.length ? 'hidden' : undefined}>
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
             <BookingSectionHeader icon={Info} title="住宿规定与实用信息" />
             <div className="divide-y divide-[var(--mist)] text-sm">
@@ -717,12 +829,14 @@ function BookingHotelFacts({
               {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">服务语言</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
               {paymentMethods.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">付款方式</span><span className="text-[var(--ink)]/80">{paymentMethods.join('、')}</span></div>}
               {policies.length > 0 && (
-                <div className="py-3">
+                <div className={showPolicySkeleton ? 'hidden' : 'py-3'}>
                   <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
                     <span className="font-medium">重要须知</span>
                     <HotelExpandablePolicyList
                       policies={policies}
                       expanded={policiesExpanded}
+                      showShimmer={false}
+                      onPendingChange={(pending) => setPoliciesRevealed(!pending)}
                     />
                   </div>
                   {policies.length > 2 && (
@@ -737,6 +851,7 @@ function BookingHotelFacts({
                 </div>
               )}
             </div>
+          </div>
           </div>
         )}
 
@@ -759,6 +874,7 @@ function BookingReviewsPanel({
   error: string | null
   onRetry: () => void
 }) {
+  const [reviewsRevealed, setReviewsRevealed] = useState(false)
   const reviews = (hotel.reviews || []).map((review) => ({
     text: review.negativeText
       ? `${review.text}\n\n不足：${review.negativeText}`
@@ -767,6 +883,13 @@ function BookingReviewsPanel({
     author: review.author,
     relativeTime: review.relativeTime,
   }))
+  const reviewsNeedTranslate =
+    reviews.some((review) => !looksChinese(review.text)) && isLlmConfigured()
+  const showReviewShimmer = loading || (reviewsNeedTranslate && !reviewsRevealed)
+
+  useLayoutEffect(() => {
+    setReviewsRevealed(!reviewsNeedTranslate)
+  }, [hotel.id, reviewsNeedTranslate, reviews.map((review) => review.text).join('\n---\n')])
 
   return (
     <section className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
@@ -774,8 +897,15 @@ function BookingReviewsPanel({
         icon={MessageSquareQuote}
         title="住客精选评论"
       />
-      {loading && (
-        <LoadingIndicator label="正在加载精选住客评论" showDots size="sm" />
+      {showReviewShimmer && (
+        <div className="space-y-3" aria-busy>
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="rounded-xl bg-white/70 px-3 py-2">
+              <ShimmerLines lines={1} className="mb-2 max-w-[10rem]" />
+              <ShimmerLines lines={3} />
+            </div>
+          ))}
+        </div>
       )}
       {error && !loading && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -789,8 +919,16 @@ function BookingReviewsPanel({
           </button>
         </div>
       )}
-      {!loading && !error && reviews.length > 0 && (
-        <GoogleReviewsList reviews={reviews} sourceLabel="Booking.com 精选评论" showHeader={false} />
+      {reviews.length > 0 && (
+        <div className={showReviewShimmer ? 'hidden' : undefined}>
+          <GoogleReviewsList
+            reviews={reviews}
+            sourceLabel="Booking.com 精选评论"
+            showHeader={false}
+            showShimmer={false}
+            onPendingChange={(pending) => setReviewsRevealed(!pending)}
+          />
+        </div>
       )}
       {!loading && !error && hotel.bookingReviewsLoaded && !reviews.length && (
         <p className="text-sm text-[var(--stone)]">暂无可展示的精选住客评论。</p>
@@ -828,6 +966,7 @@ export function HotelPicker({
   const [pendingCustom, setPendingCustom] = useState<HotelCandidate | null>(null)
   const [storyLoadingId, setStoryLoadingId] = useState<string | null>(null)
   const [streamingAdvisorReason, setStreamingAdvisorReason] = useState('')
+  const [cardBlurbStream, setCardBlurbStream] = useState<Record<string, string>>({})
   const [hotelStoryRegenToken, setHotelStoryRegenToken] = useState(0)
   /** null = closed; choose = pick mode; prefer = type preferences */
   const [refreshPanel, setRefreshPanel] = useState<'choose' | 'prefer' | null>(null)
@@ -859,6 +998,8 @@ export function HotelPicker({
     cardEl: HTMLElement
     pointerId: number
   } | null>(null)
+  const cardBlurbInflightRef = useRef(new Set<string>())
+  const cardBlurbFailedRef = useRef(new Set<string>())
   candidatesRef.current = candidates
   daysRef.current = days
   selectedRef.current = selected
@@ -1002,7 +1143,7 @@ export function HotelPicker({
       setDetailsError(null)
       return
     }
-    if (card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= 5) {
+    if (card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= BOOKING_DETAILS_VERSION) {
       setDetailsLoadingId(null)
       setDetailsError(null)
       return
@@ -1061,7 +1202,7 @@ export function HotelPicker({
                 checkOut: details.checkOut || hotel.checkOut,
                 bookingUrl: details.sourceUrl || hotel.bookingUrl,
                 bookingDetailsLoaded: true,
-                bookingDetailsVersion: 5,
+                bookingDetailsVersion: BOOKING_DETAILS_VERSION,
                 bookingPhotosLoaded: hotel.bookingPhotosLoaded,
                 bookingReviewsLoaded:
                   details.reviews.length > 0 ? true : hotel.bookingReviewsLoaded,
@@ -1190,8 +1331,35 @@ export function HotelPicker({
     if (!popupCandidate) return
     const card = popupCandidate
     const bypass = hotelStoryRegenToken > 0
-    // Already enriched on the candidate — do not call the model again.
-    if ((!bypass && card.tripFit?.trim() && card.hotelAdvisorVersion === 2) || !isLlmConfigured()) return
+
+    if (!bypass && card.tripFit?.trim() && card.hotelAdvisorVersion === 2) {
+      rememberHotelAdvisorCopy(card, card.tripFit)
+      return
+    }
+
+    if (!bypass) {
+      const hydrated = hydrateHotelAdvisorFromCache(card)
+      if (hydrated.tripFit?.trim() && hydrated.hotelAdvisorVersion === 2) {
+        if (hydrated.tripFit !== card.tripFit) {
+          const enrich = (h: HotelCandidate): HotelCandidate =>
+            h.id === card.id ? hydrated : h
+          if (pendingCustomRef.current?.id === card.id) {
+            setPendingCustom((prev) => (prev && prev.id === card.id ? enrich(prev) : prev))
+          } else if (candidatesRef.current.some((h) => h.id === card.id)) {
+            const next = candidatesRef.current.map(enrich)
+            onCandidatesChange(next)
+            const stillSelected = next.find((h) => h.id === selectedRef.current.id)
+            persistHotelState(
+              next,
+              stillSelected ? candidateToSelected(stillSelected) : selectedRef.current,
+            )
+          }
+        }
+        return
+      }
+    }
+
+    if (!isLlmConfigured()) return
 
     const needsBookingDetails =
       Boolean(card.bookingHotelId) &&
@@ -1199,7 +1367,7 @@ export function HotelPicker({
       isBookingApiEnabled()
     if (
       needsBookingDetails &&
-      (!(card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= 5) ||
+      (!(card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= BOOKING_DETAILS_VERSION) ||
         detailsLoadingId === card.id)
     ) {
       return
@@ -1216,8 +1384,6 @@ export function HotelPicker({
       pace: d.pace,
       theme: d.theme,
     }))
-    const artifactKey = `hotel-detail:v2:${card.id}`
-
     const runStory = async () => {
       const latest =
         pendingCustomRef.current?.id === card.id
@@ -1230,8 +1396,8 @@ export function HotelPicker({
         author: review.author,
       }))
 
-      const copy = await memoizeLlmCall(
-        artifactKey,
+      const copy = await memoizeHotelAdvisorCopy(
+        latest,
         () =>
           generateHotelDetailCopy({
             name: latest.name,
@@ -1257,7 +1423,7 @@ export function HotelPicker({
               setStreamingAdvisorReason(partial.reason)
             },
           }),
-        { durable: true, bypass },
+        { bypass },
       )
 
       if (cancelled || !copy?.reason) return
@@ -1305,6 +1471,8 @@ export function HotelPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     popupCandidate?.id,
+    popupCandidate?.bookingHotelId,
+    popupCandidate?.name,
     popupCandidate?.bookingDetailsLoaded,
     popupCandidate?.bookingDetailsVersion,
     detailsLoadingId,
@@ -1315,6 +1483,86 @@ export function HotelPicker({
     setHotelStoryRegenToken(0)
     setStreamingAdvisorReason('')
   }, [popupCandidate?.id])
+
+  useEffect(() => {
+    if (readOnly || !isLlmConfigured()) return
+
+    const hotels = [pendingCustom, ...candidates].filter(
+      (hotel): hotel is HotelCandidate => Boolean(hotel),
+    )
+
+    for (const hotel of hotels) {
+      if (!needsCustomCardBlurb(hotel)) continue
+      if (cardBlurbInflightRef.current.has(hotel.id)) continue
+      if (cardBlurbFailedRef.current.has(hotel.id)) continue
+      if (identityLoadingId === hotel.id || detailsLoadingId === hotel.id) continue
+      const waitingForDetails =
+        Boolean(hotel.bookingHotelId) &&
+        hasValidParisBookingIdentity(hotel) &&
+        isBookingApiEnabled() &&
+        !hotel.bookingDetailsLoaded
+      if (waitingForDetails) continue
+
+      cardBlurbInflightRef.current.add(hotel.id)
+      const artifactKey = `hotel-card-blurb:v1:${hotel.bookingHotelId || hotel.name}`
+      void memoizeLlmCall(
+        artifactKey,
+        () =>
+          generateHotelCardBlurb({
+            name: hotel.name,
+            area: hotel.area,
+            address: hotel.address,
+            description: hotel.description,
+            locationDescription: hotel.locationDescription,
+            starRating: hotel.starRating,
+            propertyType: hotel.propertyType,
+            rating: hotel.rating,
+            facilities: hotel.facilities,
+            onPartial: (blurb) => {
+              setCardBlurbStream((current) =>
+                current[hotel.id] === blurb ? current : { ...current, [hotel.id]: blurb },
+              )
+            },
+          }),
+        { durable: true },
+      )
+        .then((blurb) => {
+          if (!blurb) {
+            cardBlurbFailedRef.current.add(hotel.id)
+            return
+          }
+          const enrich = (item: HotelCandidate): HotelCandidate =>
+            item.id === hotel.id ? { ...item, reason: blurb } : item
+          if (pendingCustomRef.current?.id === hotel.id) {
+            setPendingCustom((current) => (current ? enrich(current) : current))
+          }
+          if (candidatesRef.current.some((item) => item.id === hotel.id)) {
+            const next = candidatesRef.current.map(enrich)
+            onCandidatesChange(next)
+            persistHotelState(next, selectedRef.current)
+          }
+          setCardBlurbStream((current) => {
+            if (!(hotel.id in current)) return current
+            const next = { ...current }
+            delete next[hotel.id]
+            return next
+          })
+        })
+        .catch(() => {
+          cardBlurbFailedRef.current.add(hotel.id)
+        })
+        .finally(() => {
+          cardBlurbInflightRef.current.delete(hotel.id)
+        })
+    }
+  }, [
+    candidates,
+    pendingCustom,
+    identityLoadingId,
+    detailsLoadingId,
+    readOnly,
+    onCandidatesChange,
+  ])
 
   async function bootstrapRecommendations() {
     if (!isLlmConfigured()) {
@@ -1398,7 +1646,7 @@ export function HotelPicker({
       })
       setCustomQuery('')
       setPopupHotelId(null)
-      setPendingCustom(card)
+      setPendingCustom(hydrateHotelAdvisorFromCache(card))
     } catch (e) {
       setError(e instanceof Error ? e.message : '解析失败')
     } finally {
@@ -1710,11 +1958,6 @@ export function HotelPicker({
       cardEl: e.currentTarget,
       pointerId: e.pointerId,
     }
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {
-      /* ignore */
-    }
   }
 
   useEffect(() => {
@@ -1752,7 +1995,13 @@ export function HotelPicker({
         endDrag(true)
         return
       }
+      const pending = pendingPointerRef.current
       pendingPointerRef.current = null
+      if (!pending || suppressClickRef.current) return
+      const hotel =
+        candidatesRef.current.find((item) => item.id === pending.hotelId) ||
+        candidates.find((item) => item.id === pending.hotelId)
+      if (hotel) openHotelCard(hotel)
     }
     const onCancel = () => {
       if (settlingRef.current) {
@@ -2012,7 +2261,13 @@ export function HotelPicker({
                   onClick={() => openHotelCard(selectedCandidate)}
                   className="w-full text-left"
                 >
-                  <HotelCardFace hotel={selectedCandidate} />
+                  <HotelCardFace
+                    hotel={selectedCandidate}
+                    blurb={cardBlurbStream[selectedCandidate.id]}
+                    blurbLoading={
+                      needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
+                    }
+                  />
                 </button>
               </div>
             ) : (
@@ -2113,7 +2368,7 @@ export function HotelPicker({
                     <div
                       key={hotel.id}
                       onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
-                      className={`group relative cursor-grab overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] active:cursor-grabbing ${
+                      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                         dragHotelId === hotel.id
                           ? 'pointer-events-none border-transparent opacity-0'
                           : 'border-white/60 hover:border-[var(--gold)]'
@@ -2134,16 +2389,11 @@ export function HotelPicker({
                           <TrashIcon />
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (suppressClickRef.current || dragging) return
-                          openHotelCard(hotel)
-                        }}
-                        className="w-full cursor-grab text-left active:cursor-grabbing"
-                      >
-                        <HotelCardFace hotel={hotel} />
-                      </button>
+                      <HotelCardFace
+                        hotel={hotel}
+                        blurb={cardBlurbStream[hotel.id]}
+                        blurbLoading={needsCustomCardBlurb(hotel) && isLlmConfigured()}
+                      />
                     </div>
                   ))}
                 </div>
@@ -2177,7 +2427,13 @@ export function HotelPicker({
                   candidates.find((h) => h.id === drag.hotelId) ||
                   candidatesRef.current.find((h) => h.id === drag.hotelId)
                 if (!hotel) return null
-                return <HotelCardFace hotel={hotel} />
+                return (
+                  <HotelCardFace
+                    hotel={hotel}
+                    blurb={cardBlurbStream[hotel.id]}
+                    blurbLoading={needsCustomCardBlurb(hotel) && isLlmConfigured()}
+                  />
+                )
               })()}
             </div>
           </div>

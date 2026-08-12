@@ -1,6 +1,5 @@
 import { getOpenAIModel, recommendHotelsForTrip } from '../../../shared/services/llm/llm'
 import { clearLlmMemo } from '../../../shared/services/llm/llmMemo'
-import { removeLlmArtifactsByPrefix } from '../../../shared/services/llm/llmArtifactStore'
 import { loadHotelCache, saveHotelCache } from './hotelCache'
 import {
   candidateToSelected,
@@ -114,9 +113,9 @@ export async function refreshHotelCandidates(input: {
     ...customs.filter((c) => !llmCards.some((l) => l.name === c.name)),
   ]
   const selected = candidateToSelected(best)
-  // New batch → allow detail enrichment for new hotel ids; clear only hotel-detail memos.
+  // New batch uses new candidate ids; drop in-memory memos only.
+  // Keep durable hotel-detail artifacts so a deleted custom hotel can reuse its advisor copy.
   clearLlmMemo('hotel-detail:')
-  removeLlmArtifactsByPrefix('hotel-detail:')
   persistHotelState(candidates, selected, {
     lastPreferences: input.preferences?.trim() || null,
   })

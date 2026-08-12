@@ -21,8 +21,10 @@ function saveLabel(status: CloudSaveStatus, error: string | null): string {
       return '正在保存…'
     case 'saved':
       return '行程已保存'
-    case 'error':
-      return error ? `保存失败：${error}` : '保存失败'
+    case 'error': {
+      const reason = (error || '').replace(/^保存失败[:：]?\s*/, '').trim()
+      return reason && reason !== '保存失败' ? `保存失败：${reason}` : '保存失败'
+    }
     default:
       return ''
   }

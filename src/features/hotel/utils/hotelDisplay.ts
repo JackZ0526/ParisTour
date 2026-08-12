@@ -11,6 +11,7 @@ export const PROPERTY_TYPE_LABELS: Record<string, string> = {
   resort: '度假村',
   villa: '别墅',
   apartment: '公寓',
+  apartments: '公寓',
   'serviced apartment': '服务式公寓',
 }
 
@@ -111,7 +112,13 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 
 export function localizePropertyType(value: string): string {
   const key = value.trim().toLowerCase()
-  return PROPERTY_TYPE_LABELS[key] || value
+  const direct = PROPERTY_TYPE_LABELS[key]
+  if (direct) return direct
+  if (key.endsWith('s')) {
+    const singular = PROPERTY_TYPE_LABELS[key.slice(0, -1)]
+    if (singular) return singular
+  }
+  return value
 }
 
 export function localizeFacility(value: string): string {
