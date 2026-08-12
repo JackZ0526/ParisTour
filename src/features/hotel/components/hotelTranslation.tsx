@@ -1,54 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { looksChinese, translateTextsToChinese } from '../../chat/services/translate'
+import {
+  looksChinese,
+  translateHotelLocationTextsToChinese,
+  translateTextsToChinese,
+} from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
-function TranslateIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m5 8 6 6" />
-      <path d="m4 14 6-6 2-3" />
-      <path d="M2 5h12" />
-      <path d="M7 2h1" />
-      <path d="m22 22-5-10-5 10" />
-      <path d="M14 18h6" />
-    </svg>
-  )
-}
-
-function LanguageToggleButton({
-  showOriginal,
-  onToggle,
-}: {
-  showOriginal: boolean
-  onToggle: () => void
-}) {
-  const label = showOriginal ? '查看译文' : '查看原文'
-
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--mist)] text-[var(--stone)] transition-colors hover:bg-[var(--mist)]/70"
-      title={label}
-      aria-label={label}
-    >
-      <TranslateIcon />
-    </button>
-  )
-}
-
-function useBatchTranslation(texts: string[]) {
+function useBatchTranslation(
+  texts: string[],
+  translateFn: (texts: string[]) => Promise<Map<string, string>> = translateTextsToChinese,
+) {
   const originals = useMemo(
     () => [...new Set(texts.map((text) => text.trim()).filter(Boolean))],
     [texts],
@@ -73,7 +35,7 @@ function useBatchTranslation(texts: string[]) {
     setTranslationFailed(false)
     setTranslating(true)
 
-    void translateTextsToChinese(needTranslate)
+    void translateFn(needTranslate)
       .then((map) => {
         if (cancelled) return
         const next: Record<string, string> = {}
@@ -95,7 +57,7 @@ function useBatchTranslation(texts: string[]) {
     return () => {
       cancelled = true
     }
-  }, [sourceKey, retryCount])
+  }, [sourceKey, retryCount, translateFn])
 
   const hasTranslation = originals.some((text) => translations[text])
 
@@ -150,60 +112,168 @@ function TranslationStatus({
   )
 }
 
+type HotelLocationSection =
+  | { type: 'paragraph'; text: string }
+  | { type: 'list'; items: string[] }
+
+function normalizeHotelLocationSource(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\\n/g, '\n').trim()
+}
+
+function parseHotelLocationSections(text: string): HotelLocationSection[] {
+  const normalized = normalizeHotelLocationSource(text)
+  if (!normalized) return []
+
+  const prepared = normalized
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s*·\s*/g, '\n• ')
+
+  const lines = prepared.split('\n').map((line) => line.trim()).filter(Boolean)
+  const sections: HotelLocationSection[] = []
+  let listItems: string[] = []
+
+  const flushList = () => {
+    if (!listItems.length) return
+    sections.push({ type: 'list', items: listItems })
+    listItems = []
+  }
+
+  for (const line of lines) {
+    const isBullet = /^[•\-–·]/.test(line)
+    if (isBullet) {
+      listItems.push(line.replace(/^[•\-–·]\s*/, ''))
+      continue
+    }
+
+    flushList()
+    sections.push({ type: 'paragraph', text: line })
+  }
+
+  flushList()
+  return sections
+}
+
+function FormattedHotelLocationText({
+  text,
+  className,
+}: {
+  text: string
+  className?: string
+}) {
+  const sections = parseHotelLocationSections(text)
+
+  if (!sections.length) return null
+
+  return (
+    <div className={`flex flex-col gap-3${className ? ` ${className}` : ''}`}>
+      {sections.map((section, index) => {
+        if (section.type === 'list') {
+          return (
+            <ul key={index} className="m-0 list-none space-y-1.5">
+              {section.items.map((item, itemIndex) => (
+                <li key={itemIndex} className="flex gap-2">
+                  <span className="shrink-0 text-[var(--sage)]" aria-hidden>
+                    •
+                  </span>
+                  <span className="min-w-0">{item}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+
+        return (
+          <p key={index} className="m-0">
+            {section.text}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 export function HotelTranslatedText({
   text,
   loadingLabel = '正在翻译…',
+  className,
+  layout = 'plain',
 }: {
   text: string
   loadingLabel?: string
+  className?: string
+  layout?: 'plain' | 'hotelLocation'
 }) {
+  const translateFn = useMemo(
+    () => (layout === 'hotelLocation' ? translateHotelLocationTextsToChinese : translateTextsToChinese),
+    [layout],
+  )
   const original = text.trim()
-  const [showOriginal, setShowOriginal] = useState(false)
   const {
     translations,
     translating,
     translationFailed,
     hasTranslation,
     retry,
-  } = useBatchTranslation([original])
+  } = useBatchTranslation([original], translateFn)
 
-  const showingTranslation = hasTranslation && !showOriginal
-  const body = showingTranslation ? translations[original] || original : original
+  const body = hasTranslation ? translations[original] || original : original
 
   if (!original) return null
 
+  const statusVisible = translating || translationFailed
+
   return (
-    <div className="space-y-2">
-      <TranslationStatus
-        loadingLabel={loadingLabel}
-        sampleText={original}
-        translating={translating}
-        translationFailed={translationFailed}
-        onRetry={retry}
-      />
-      <div className="relative">
-        <p className="whitespace-pre-line text-[var(--ink)]/80">{body}</p>
-        {hasTranslation && (
-          <div className="mt-1 flex justify-end">
-            <LanguageToggleButton
-              showOriginal={showOriginal}
-              onToggle={() => setShowOriginal((current) => !current)}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+    <>
+      {statusVisible ? (
+        <div className={layout === 'plain' ? className : undefined}>
+          <TranslationStatus
+            loadingLabel={loadingLabel}
+            sampleText={original}
+            translating={translating}
+            translationFailed={translationFailed}
+            onRetry={retry}
+          />
+        </div>
+      ) : null}
+      {layout === 'hotelLocation' ? (
+        <FormattedHotelLocationText text={body} className={className || 'text-[var(--ink)]/85'} />
+      ) : (
+        <p className={`m-0 whitespace-pre-line${className ? ` ${className}` : ' text-[var(--ink)]/80'}`}>
+          {body}
+        </p>
+      )}
+    </>
   )
 }
 
-export function HotelTranslatedPolicyList({
+function PolicyParagraph({
+  original,
+  body,
+  clamp,
+}: {
+  original: string
+  body: string
+  clamp: boolean
+}) {
+  const isLong = original.length > 160
+  return (
+    <p
+      className={`leading-relaxed overflow-hidden motion-safe:transition-[max-height] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        clamp && isLong ? 'line-clamp-3 max-h-[4.5rem]' : 'max-h-[1000px]'
+      }`}
+    >
+      {body}
+    </p>
+  )
+}
+
+export function HotelExpandablePolicyList({
   policies,
-  lineClampFirst = false,
+  expanded,
 }: {
   policies: string[]
-  lineClampFirst?: boolean
+  expanded: boolean
 }) {
-  const [showOriginal, setShowOriginal] = useState(false)
   const {
     translations,
     translating,
@@ -212,10 +282,14 @@ export function HotelTranslatedPolicyList({
     retry,
   } = useBatchTranslation(policies)
 
-  const showingTranslation = hasTranslation && !showOriginal
   const sampleText = policies[0] || ''
+  const headPolicies = policies.slice(0, 2)
+  const tailPolicies = policies.slice(2)
 
   if (!policies.length) return null
+
+  const renderBody = (original: string) =>
+    hasTranslation && translations[original] ? translations[original] : original
 
   return (
     <div className="space-y-2">
@@ -226,30 +300,35 @@ export function HotelTranslatedPolicyList({
         translationFailed={translationFailed}
         onRetry={retry}
       />
-      <div className="relative">
-        <div className="space-y-2 text-[var(--ink)]/80">
-          {policies.map((policy, index) => {
-            const original = policy.trim()
-            const body =
-              showingTranslation && translations[original]
-                ? translations[original]
-                : original
-            return (
-              <p
-                key={`${original}-${index}`}
-                className={`leading-relaxed ${lineClampFirst && index === 0 && original.length > 160 ? 'line-clamp-3' : ''}`}
-              >
-                {body}
-              </p>
-            )
-          })}
-        </div>
-        {hasTranslation && (
-          <div className="mt-1 flex justify-end">
-            <LanguageToggleButton
-              showOriginal={showOriginal}
-              onToggle={() => setShowOriginal((current) => !current)}
+      <div className="space-y-2 text-[var(--ink)]/80">
+        {headPolicies.map((policy, index) => {
+          const original = policy.trim()
+          return (
+            <PolicyParagraph
+              key={`${original}-${index}`}
+              original={original}
+              body={renderBody(original)}
+              clamp={!expanded && index === 0}
             />
+          )
+        })}
+        {tailPolicies.length > 0 && (
+          <div
+            className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+            }`}
+            aria-hidden={!expanded}
+          >
+            <div className="min-h-0 space-y-2 overflow-hidden">
+              {tailPolicies.map((policy, index) => {
+                const original = policy.trim()
+                return (
+                  <p key={`${original}-${index + 2}`} className="leading-relaxed">
+                    {renderBody(original)}
+                  </p>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>

@@ -52,13 +52,13 @@ export interface BookingHotelRecord {
 type CachedValue<T> = { value: T; fetchedAt: number }
 
 const SEARCH_PREFIX = 'booking-hotels-search:v3:'
-const DETAIL_PREFIX = 'booking-hotel-detail:v5:'
+const DETAIL_PREFIX = 'booking-hotel-detail:v6:'
 const PHOTOS_PREFIX = 'booking-hotel-photos:v3:'
 const FEATURED_REVIEWS_PREFIX = 'booking-hotel-featured-reviews:v1:'
 const REVIEW_SCORES_PREFIX = 'booking-hotel-review-scores:v1:'
 const DESCRIPTION_PREFIX = 'booking-hotel-description:v1:'
 const IDENTITY_PREFIX = 'booking-hotel-identity:v1:'
-const CANDIDATE_PREFIX = 'booking-hotel-candidate:v3:'
+const CANDIDATE_PREFIX = 'booking-hotel-candidate:v4:'
 const SEARCH_TTL_MS = 24 * 60 * 60 * 1_000
 const DETAIL_TTL_MS = 30 * 24 * 60 * 60 * 1_000
 const PARIS = { lat: 48.8566, lng: 2.3522 }
@@ -549,16 +549,7 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
         ].map(bookingPhotoUrl)
       }),
     )
-    const facilitiesBlock = asRecord(data.facilities_block)
-    const regularFacilities = Array.isArray(data.facilities)
-      ? data.facilities
-      : Array.isArray(facilitiesBlock?.facilities)
-        ? facilitiesBlock.facilities
-        : []
-    const topBenefits = Array.isArray(data.top_ufi_benefits) ? data.top_ufi_benefits : []
-    const highlightStrip = Array.isArray(data.property_highlight_strip)
-      ? data.property_highlight_strip
-      : []
+    const topUfiBenefits = Array.isArray(data.top_ufi_benefits) ? data.top_ufi_benefits : []
     const hotelText = asRecord(data.hotel_text)
     const checkIn = asRecord(data.checkin)
     const checkOut = asRecord(data.checkout)
@@ -612,7 +603,7 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
         text(hotelText?.summary) ||
         text(data.description),
       facilities: uniqueStrings(
-        [...regularFacilities, ...topBenefits, ...highlightStrip].flatMap((item) => {
+        topUfiBenefits.flatMap((item) => {
           const facility = asRecord(item)
           return [facility?.translated_name, facility?.name, facility?.title, item]
         }),
@@ -1077,9 +1068,11 @@ export async function fetchBookingHotelDetails(input: {
       const candidate = peekBookingHotel(input.id)
       const needsReviewScores =
         record.rating == null || (record.reviewScores?.length || 0) < 3
+      const needsDescription =
+        !record.locationDescription || !(record.policies?.length)
       const [reviewScores, description] = await Promise.all([
         needsReviewScores ? fetchBookingReviewScores(input.id) : null,
-        fetchBookingDescription(input.id),
+        needsDescription ? fetchBookingDescription(input.id) : null,
       ])
       const merged = mergeBookingDetailRecord(record, candidate, {
         reviewScores,

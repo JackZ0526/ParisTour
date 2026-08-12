@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
@@ -90,6 +90,56 @@ interface Props {
   /** Persist a recovered Google identity in the owning trip record. */
   onDetailsResolved?: (details: GooglePlaceDetails) => void
   onClose: () => void
+}
+
+function LlmNarrativeSingleBody({
+  reason,
+  loading,
+  loadingLabel,
+}: {
+  reason?: string
+  loading: boolean
+  loadingLabel?: string
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState<number | null>(null)
+  const showShimmer = loading && !reason
+
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+
+    const prevHeight = el.style.height
+    el.style.height = 'auto'
+    const nextHeight = Math.ceil(el.getBoundingClientRect().height)
+    el.style.height = prevHeight
+
+    setHeight((prev) => (prev === nextHeight ? prev : nextHeight))
+  }, [reason, loading, showShimmer])
+
+  return (
+    <div
+      ref={bodyRef}
+      className="llm-narrative-body overflow-hidden"
+      style={height != null ? { height } : undefined}
+      aria-busy={loading || undefined}
+    >
+      {showShimmer ? (
+        <div className="space-y-2" aria-hidden>
+          <span className="block h-3.5 w-full rounded-full day-tab-shimmer" />
+          <span className="block h-3.5 w-[92%] rounded-full day-tab-shimmer" />
+          <span className="block h-3.5 w-[78%] rounded-full day-tab-shimmer" />
+        </div>
+      ) : reason ? (
+        <p className="text-sm leading-relaxed text-[var(--ink)]/90">
+          {reason}
+        </p>
+      ) : null}
+      {showShimmer && loadingLabel ? (
+        <span className="sr-only">{loadingLabel}</span>
+      ) : null}
+    </div>
+  )
 }
 
 export function GooglePlacePage({
@@ -664,31 +714,11 @@ export function GooglePlacePage({
                     )}
                 </div>
                 {llmNarrative.variant === 'single' ? (
-                  <>
-                    {llmNarrative.loading && !llmNarrative.reason && (
-                      <LoadingIndicator
-                        thinkingLabel="正在生成推荐理由…"
-                        generatingLabel={
-                          llmNarrative.labels?.loadingText || '正在生成推荐理由…'
-                        }
-                        showDots
-                        size="sm"
-                        mode="thinking"
-                        task="hotelDetail"
-                      />
-                    )}
-                    {llmNarrative.reason && (
-                      <p className="text-sm leading-relaxed text-[var(--ink)]/90">
-                        {llmNarrative.reason}
-                        {llmNarrative.loading ? (
-                          <span
-                            className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
-                            aria-hidden
-                          />
-                        ) : null}
-                      </p>
-                    )}
-                  </>
+                  <LlmNarrativeSingleBody
+                    reason={llmNarrative.reason}
+                    loading={Boolean(llmNarrative.loading)}
+                    loadingLabel={llmNarrative.labels?.loadingText}
+                  />
                 ) : (
                   <>
                 {llmNarrative.loading && !llmNarrative.intro && !llmNarrative.reason && (

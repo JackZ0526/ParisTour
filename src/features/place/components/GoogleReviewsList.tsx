@@ -112,15 +112,17 @@ export function GoogleReviewsList({
               </div>
               <p className="leading-relaxed text-[var(--ink)]">{body}</p>
               {isTranslated && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowOriginal((prev) => ({ ...prev, [i]: !prev[i] }))
-                  }
-                  className="mt-1.5 text-xs text-[var(--sage)] underline-offset-2 hover:underline"
-                >
-                  {showingOriginal ? '查看译文' : '查看原文'}
-                </button>
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowOriginal((prev) => ({ ...prev, [i]: !prev[i] }))
+                    }
+                    className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
+                  >
+                    {showingOriginal ? '查看译文' : '查看原文'}
+                  </button>
+                </div>
               )}
             </article>
           )

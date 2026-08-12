@@ -123,7 +123,7 @@ describe('Booking hotel adapter', () => {
     ])
   })
 
-  it('extracts regular stays detail photos, facilities, and location', () => {
+  it('extracts regular stays detail photos, top_ufi_benefits, and location', () => {
     const hotel = normalizeBookingDetailResponse({
       data: {
         hotel_id: 186118,
@@ -141,6 +141,10 @@ describe('Booking hotel adapter', () => {
             url_original: 'https://cf.bstatic.com/hotel/highres.jpg',
             url_max300: 'https://cf.bstatic.com/hotel/thumb.jpg',
           },
+        ],
+        top_ufi_benefits: [
+          { translated_name: 'Wifi' },
+          { translated_name: 'Non-smoking rooms' },
         ],
         facilities: [
           { translated_name: 'Air conditioning' },
@@ -167,7 +171,7 @@ describe('Booking hotel adapter', () => {
       reviewCount: 1186,
       stars: 4,
       image: 'https://cf.bstatic.com/hotel/highres.jpg',
-      facilities: ['Air conditioning', 'Baggage storage'],
+      facilities: ['Wifi', 'Non-smoking rooms'],
       propertyType: 'Hotel',
       reviewScores: [
         { label: '位置', score: 9.4 },
@@ -491,7 +495,7 @@ describe('Booking hotel adapter', () => {
             longitude: 2.3523,
             address: '1 Rue de Test',
             city: 'Paris',
-            facilities: [{ translated_name: 'Free WiFi' }],
+            top_ufi_benefits: [{ translated_name: 'Free WiFi' }],
           },
           status: true,
         })

@@ -11,6 +11,8 @@ import { LlmRequestError } from '../errors'
 import { extractJsonObject } from '../json'
 import type { HotelDetailCopy, HotelRecommendation } from '../types'
 import { generateText, isLlmConfigured } from './_service'
+import { callOpenAIMessagesStream } from '../transport'
+import { extractPartialJsonStringField } from '../stream'
 
 export type { HotelDetailCopy, HotelRecommendation }
 
@@ -43,6 +45,9 @@ export async function generateHotelDetailCopy(input: {
   isBest?: boolean
   userPreferences?: string
   tripDays?: Array<{ day: number; title: string; pace: string; theme: string }>
+  /** Progressive `reason` while JSON streams (omit on cache hits). */
+  onPartial?: (partial: { reason?: string }) => void
+  signal?: AbortSignal
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
@@ -89,17 +94,39 @@ export async function generateHotelDetailCopy(input: {
     trip: input.tripDays || [],
   })
 
-  const text = await generateText(system, user, {
-    task: 'hotelDetail',
-    json: true,
-    userText: input.userPreferences || input.name,
-  })
+  const text = await (async () => {
+    let lastReason = ''
+    try {
+      return await callOpenAIMessagesStream(
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        {
+          task: 'hotelDetail',
+          userText: input.userPreferences || input.name,
+          signal: input.signal,
+          onDelta: (_delta, fullText) => {
+            if (!input.onPartial) return
+            const reason = extractPartialJsonStringField(fullText, 'reason')
+            if (reason == null || reason === lastReason) return
+            lastReason = reason
+            input.onPartial({ reason })
+          },
+        },
+      )
+    } catch {
+      return ''
+    }
+  })()
   if (!text) return null
   const parsed = extractJsonObject(text)
   if (!parsed) return null
 
   const reason = String(parsed.reason || parsed.recommendation || '').trim()
   if (!reason) return null
+
+  if (input.onPartial) input.onPartial({ reason })
 
   return {
     intro: '',

@@ -20,7 +20,7 @@ import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { HotelLocationDescription } from './HotelLocationDescription'
-import { HotelTranslatedPolicyList } from './hotelTranslation'
+import { HotelExpandablePolicyList } from './hotelTranslation'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { GoogleReviewsList } from '../../place/components/GoogleReviewsList'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
@@ -34,11 +34,46 @@ import {
   resolveBookingHotelIdentity,
 } from '../services/bookingHotels'
 import {
-  categorizeFacilities,
   hotelScoreText,
+  localizeFacility,
   localizePaymentMethod,
   localizePropertyType,
 } from '../utils/hotelDisplay'
+import {
+  Accessibility,
+  ArrowUpDown,
+  BarChart3,
+  Bath,
+  Bed,
+  Bell,
+  Building2,
+  Check,
+  CircleParking,
+  CigaretteOff,
+  Coffee,
+  Dumbbell,
+  ExternalLink,
+  Flame,
+  Info,
+  Lock,
+  Luggage,
+  MapPin,
+  MessageSquareQuote,
+  PawPrint,
+  Refrigerator,
+  ShowerHead,
+  Snowflake,
+  Sparkles,
+  Trees,
+  Tv,
+  Utensils,
+  WashingMachine,
+  Waves,
+  Wifi,
+  Wind,
+  Wine,
+  type LucideIcon,
+} from 'lucide-react'
 import { loadTripDates } from '../../itinerary/services/tripDates'
 
 interface Props {
@@ -197,14 +232,296 @@ function localizeLanguage(value: string): string {
   return LANGUAGE_LABELS[value.trim().toLowerCase()] || value
 }
 
-function HotelFactIcon({ type }: { type: 'location' | 'clock' | 'facility' | 'info' }) {
-  const paths = {
-    location: <><path d="M12 21s6-5.3 6-11a6 6 0 1 0-12 0c0 5.7 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></>,
-    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-    facility: <><path d="M4 12h16M6 8h12M7 16h10" /><path d="M5 5h14v14H5z" /></>,
-    info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
+function BookingSectionHeader({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: LucideIcon
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div className="mb-3 flex items-start gap-2">
+      <span className="mt-0.5 text-[#003b95]">
+        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <h4 className="text-base font-semibold">{title}</h4>
+        {subtitle ? <p className="mt-0.5 text-xs text-[var(--stone)]">{subtitle}</p> : null}
+      </div>
+    </div>
+  )
+}
+
+const HOTEL_FACT_ICONS = {
+  location: MapPin,
+} as const satisfies Record<string, LucideIcon>
+
+function HotelFactIcon({ type }: { type: keyof typeof HOTEL_FACT_ICONS }) {
+  const Icon = HOTEL_FACT_ICONS[type]
+  return (
+    <Icon
+      className="h-[18px] w-[18px] shrink-0"
+      strokeWidth={1.8}
+      aria-hidden
+    />
+  )
+}
+
+function resolveFacilityIcon(facility: string): LucideIcon {
+  const key = facility.trim().toLowerCase()
+  const label = localizeFacility(facility)
+  const haystack = `${key} ${label}`
+  if (/wifi|wi-fi|internet|网络/.test(haystack)) return Wifi
+  if (/restaurant|dining|kitchen|餐厅/.test(haystack)) return Utensils
+  if (/minibar|迷你吧/.test(haystack)) return Wine
+  if (/bar|酒吧/.test(haystack)) return Wine
+  if (/breakfast|早餐/.test(haystack)) return Coffee
+  if (/non-smoking|smoke-free|禁烟/.test(haystack)) return CigaretteOff
+  if (/disabled|wheelchair|无障碍/.test(haystack)) return Accessibility
+  if (/front desk|24-hour|reception|前台/.test(haystack)) return Bell
+  if (/elevator|lift|电梯/.test(haystack)) return ArrowUpDown
+  if (/heating|暖气/.test(haystack)) return Flame
+  if (/laundry|洗衣/.test(haystack)) return WashingMachine
+  if (/parking|停车/.test(haystack)) return CircleParking
+  if (/pool|swimming|游泳/.test(haystack)) return Waves
+  if (/fitness|gym|健身/.test(haystack)) return Dumbbell
+  if (/air conditioning|空调/.test(haystack)) return Snowflake
+  if (/pet|宠物/.test(haystack)) return PawPrint
+  if (/hot tub|jacuzzi|按摩浴缸/.test(haystack)) return Sparkles
+  if (/shower|淋浴/.test(haystack)) return ShowerHead
+  if (/private bathroom|attached bathroom|独立浴室|\bbath\b|浴缸/.test(haystack)) return Bath
+  if (/flat-screen|television|\btv\b|电视/.test(haystack)) return Tv
+  if (/refrigerator|fridge|冰箱/.test(haystack)) return Refrigerator
+  if (/family room|bed|客房|床/.test(haystack)) return Bed
+  if (/safe|deposit box|保险箱/.test(haystack)) return Lock
+  if (/hairdryer|hair dryer|吹风机/.test(haystack)) return Wind
+  if (/baggage storage|行李寄存/.test(haystack)) return Luggage
+  if (/room service|客房服务/.test(haystack)) return Bell
+  if (/sauna|spa|水疗|桑拿/.test(haystack)) return Sparkles
+  if (/terrace|garden|露台|花园/.test(haystack)) return Trees
+  return Check
+}
+
+function FacilityItemIcon({ facility }: { facility: string }) {
+  const Icon = resolveFacilityIcon(facility)
+  return (
+    <Icon
+      className="h-[18px] w-[18px] shrink-0 text-[#008009]"
+      strokeWidth={1.8}
+      aria-hidden
+    />
+  )
+}
+
+const REVIEW_SCORE_ANIM_DURATION_MS = 1500
+const REVIEW_SCORE_ANIM_STAGGER_MS = 100
+const reviewScoreEase = cubicBezier(0.22, 1, 0.36, 1)
+
+function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  return (t: number): number => {
+    let cx = t
+    for (let i = 0; i < 8; i++) {
+      const currentX =
+        3 * x1 * (1 - cx) * (1 - cx) * cx +
+        3 * x2 * (1 - cx) * cx * cx +
+        cx * cx * cx
+      const slope =
+        3 * x1 * (1 - cx) * (1 - cx) -
+        6 * x1 * (1 - cx) * cx +
+        6 * x2 * (1 - cx) * cx -
+        3 * x2 * cx * cx +
+        3 * cx * cx
+      const delta = currentX - t
+      if (Math.abs(delta) < 1e-6) break
+      cx -= delta / slope
+    }
+    return (
+      3 * y1 * (1 - cx) * (1 - cx) * cx +
+      3 * y2 * (1 - cx) * cx * cx +
+      cx * cx * cx
+    )
   }
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths[type]}</svg>
+}
+
+function ReviewScoreBarItem({
+  label,
+  score,
+  start,
+  delayMs,
+  highlighted,
+  className,
+}: {
+  label: string
+  score: number
+  start: boolean
+  delayMs: number
+  highlighted: boolean
+  className: string
+}) {
+  const [displayScore, setDisplayScore] = useState(0)
+  const [widthPct, setWidthPct] = useState(0)
+  const completedRef = useRef(false)
+
+  useEffect(() => {
+    completedRef.current = false
+  }, [score, delayMs])
+
+  useEffect(() => {
+    if (!start) {
+      if (!completedRef.current) {
+        setDisplayScore(0)
+        setWidthPct(0)
+      }
+      return
+    }
+
+    if (completedRef.current) return
+
+    const targetWidth = Math.min(100, score * 10)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplayScore(score)
+      setWidthPct(targetWidth)
+      completedRef.current = true
+      return
+    }
+
+    let raf = 0
+    const timeout = window.setTimeout(() => {
+      const startTime = performance.now()
+      const tick = (now: number) => {
+        const progress = Math.min(1, (now - startTime) / REVIEW_SCORE_ANIM_DURATION_MS)
+        const eased = reviewScoreEase(progress)
+        setDisplayScore(score * eased)
+        setWidthPct(targetWidth * eased)
+        if (progress < 1) {
+          raf = requestAnimationFrame(tick)
+        } else {
+          completedRef.current = true
+        }
+      }
+      raf = requestAnimationFrame(tick)
+    }, delayMs)
+
+    return () => {
+      clearTimeout(timeout)
+      cancelAnimationFrame(raf)
+    }
+  }, [start, score, delayMs])
+
+  return (
+    <div className={className}>
+      <div className="mb-1 flex justify-between text-xs">
+        <span>{label}</span>
+        <span
+          className={`inline-block origin-right font-semibold tabular-nums transition-all duration-500 ease-out ${
+            highlighted ? 'scale-125 text-[var(--gold)]' : 'scale-100'
+          }`}
+        >
+          {displayScore.toFixed(1)}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-[#dbe7f6]">
+        <div
+          className={`h-full rounded-full transition-colors duration-500 ease-out ${
+            highlighted ? 'bg-[var(--gold)]' : 'bg-[#006ce4]'
+          }`}
+          style={{ width: `${widthPct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ReviewScoreBars({
+  items,
+  layoutClassName,
+  itemClassName,
+}: {
+  items: Array<{ label: string; score: number }>
+  layoutClassName: string
+  itemClassName: string
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const animatedKeyRef = useRef<string | null>(null)
+  const [animate, setAnimate] = useState(false)
+  const [highlightTop, setHighlightTop] = useState(false)
+  const itemsKey = items.map((item) => `${item.label}:${item.score}`).join('|')
+
+  const topLabel = useMemo(() => {
+    if (items.length === 0) return null
+    const maxScore = Math.max(...items.map((item) => item.score))
+    return items.find((item) => item.score === maxScore)?.label ?? null
+  }, [itemsKey])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    if (animatedKeyRef.current === itemsKey) {
+      setAnimate(true)
+      setHighlightTop(true)
+      return
+    }
+
+    setAnimate(false)
+    setHighlightTop(false)
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setAnimate(true)
+      setHighlightTop(true)
+      animatedKeyRef.current = itemsKey
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setAnimate(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -24px 0px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [itemsKey])
+
+  useEffect(() => {
+    if (!animate || !topLabel) return
+    if (animatedKeyRef.current === itemsKey) return
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setHighlightTop(true)
+      animatedKeyRef.current = itemsKey
+      return
+    }
+
+    const totalMs =
+      (items.length - 1) * REVIEW_SCORE_ANIM_STAGGER_MS + REVIEW_SCORE_ANIM_DURATION_MS
+    const timeout = window.setTimeout(() => {
+      setHighlightTop(true)
+      animatedKeyRef.current = itemsKey
+    }, totalMs)
+    return () => clearTimeout(timeout)
+  }, [animate, items.length, itemsKey, topLabel])
+
+  return (
+    <div ref={containerRef} className={layoutClassName}>
+      {items.map((item, index) => (
+        <ReviewScoreBarItem
+          key={item.label}
+          label={item.label}
+          score={item.score}
+          start={animate}
+          delayMs={index * REVIEW_SCORE_ANIM_STAGGER_MS}
+          highlighted={highlightTop && item.label === topLabel}
+          className={itemClassName}
+        />
+      ))}
+    </div>
+  )
 }
 
 function BookingHotelFacts({
@@ -225,86 +542,109 @@ function BookingHotelFacts({
   onRetry: () => void
 }) {
   const [policiesExpanded, setPoliciesExpanded] = useState(false)
-  const facts = [
-    hotel.starRating != null
-      ? { label: '酒店星级', value: `${hotel.starRating} 星` }
-      : null,
-    hotel.checkIn ? { label: '最早入住', value: hotel.checkIn } : null,
-    hotel.checkOut ? { label: '最晚退房', value: hotel.checkOut } : null,
-    hotel.area ? { label: '所在区域', value: hotel.area } : null,
-    hotel.rating != null
-      ? { label: '住客评分', value: `${hotel.rating.toFixed(1)} / 10` }
-      : hotel.reviewCount
-        ? { label: '住客评价', value: `${hotel.reviewCount.toLocaleString('zh-CN')} 条` }
-        : null,
-  ].filter((item): item is { label: string; value: string } => Boolean(item))
-
-  const facilityGroups = categorizeFacilities((hotel.facilities || []).slice(0, 12))
+  const popularFacilities = hotel.facilities || []
   const visibleLanguages = (hotel.languages || []).map(localizeLanguage)
   const reviewScores = (hotel.reviewScores || []).filter((item) => item.score > 0)
   const policies = hotel.policies || []
-  const visiblePolicies = policiesExpanded ? policies : policies.slice(0, 2)
   const paymentMethods = (hotel.paymentMethods || []).map(localizePaymentMethod)
-  const hasLocationInfo = Boolean(
-    hotel.area ||
-      hotel.districtLabel ||
-      hotel.distanceToCityCenterKm != null ||
-      hotel.locationDescription,
+  const hasLocationDetails = Boolean(hotel.locationDescription)
+  const showHotelOverview = Boolean(
+    hotel.name ||
+      hotel.propertyType ||
+      hotel.starRating != null ||
+      hotel.sustainability ||
+      hotel.address ||
+      hotel.area ||
+      hotel.rating != null ||
+      hasLocationDetails ||
+      (hasValidParisBookingIdentity(hotel) && hotel.bookingUrl),
   )
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[var(--mist)] bg-white/65 p-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {hotel.starRating != null && (
-              <span className="text-sm tracking-[0.12em] text-[#f5a623]" aria-label={`${hotel.starRating} 星酒店`}>
-                {'★'.repeat(Math.max(1, Math.min(5, Math.round(hotel.starRating))))}
-              </span>
-            )}
-            {hotel.propertyType && (
-              <span className="rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
-                {localizePropertyType(hotel.propertyType)}
-              </span>
-            )}
-            {hotel.sustainability && (
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
-                可持续住宿 · {hotel.sustainability}
-              </span>
-            )}
-          </div>
-          <div className="mt-3 flex items-start gap-2 text-sm leading-relaxed">
-            <span className="mt-0.5 text-[#003b95]"><HotelFactIcon type="location" /></span>
-            <div>
-              <p>{hotel.address || `${hotel.name}, Paris`}</p>
-              {hotel.area && <p className="mt-0.5 text-xs text-[var(--stone)]">{hotel.area}</p>}
+      {showHotelOverview && (
+        <div className="rounded-2xl border border-[var(--mist)] bg-white/65 p-4">
+          <div className="flex items-stretch justify-between gap-3">
+            <div
+              className={`flex min-w-0 flex-1 flex-col ${
+                hotel.address ? 'justify-between' : ''
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold leading-snug text-[var(--ink)]">
+                  {hotel.name}
+                </h3>
+                {hotel.propertyType && (
+                  <span className="rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
+                    {localizePropertyType(hotel.propertyType)}
+                  </span>
+                )}
+              </div>
+              {hotel.address && (
+                <div className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-1 text-sm leading-relaxed">
+                  <span className="mt-0.5 text-[#003b95]">
+                    <HotelFactIcon type="location" />
+                  </span>
+                  <p className="min-w-0">{hotel.address}</p>
+                </div>
+              )}
             </div>
+            {hotel.rating != null && (
+              <div className="flex shrink-0 items-center gap-2 text-right">
+                <div>
+                  <p className="text-sm font-semibold">{hotelScoreText(hotel.rating)}</p>
+                  {hotel.reviewCount != null && <p className="text-[11px] text-[var(--stone)]">{hotel.reviewCount.toLocaleString('zh-CN')} 条住客点评</p>}
+                </div>
+                <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] px-2 text-sm font-semibold text-white">
+                  {hotel.rating.toFixed(1)}
+                </span>
+              </div>
+            )}
           </div>
+
+          {(hotel.starRating != null || hotel.sustainability) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {hotel.starRating != null && (
+                <span className="text-sm tracking-[0.12em] text-[#f5a623]" aria-label={`${hotel.starRating} 星酒店`}>
+                  {'★'.repeat(Math.max(1, Math.min(5, Math.round(hotel.starRating))))}
+                </span>
+              )}
+              {hotel.sustainability && (
+                <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
+                  可持续住宿 · {hotel.sustainability}
+                </span>
+              )}
+            </div>
+          )}
+
+          {hasLocationDetails && (
+            <div className="mt-2 text-sm leading-relaxed">
+              <HotelLocationDescription
+                text={hotel.locationDescription!}
+                className="min-w-0 text-[var(--ink)]/85"
+              />
+            </div>
+          )}
+
+          {hasValidParisBookingIdentity(hotel) && hotel.bookingUrl && (
+            <div className="mt-2 flex justify-end">
+              <a
+                href={hotel.bookingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-[var(--mist)] bg-white/70 px-2.5 py-1.5 text-xs font-medium text-[#003b95]/85 transition hover:border-[#003b95]/20 hover:bg-[#003b95]/5 hover:text-[#003b95]"
+              >
+                前往{' '}
+                <span>
+                  <span className="text-[#003580]">Booking</span>
+                  <span className="text-[#006ce4]">.com</span>
+                </span>
+                <ExternalLink className="h-3 w-3" strokeWidth={2} aria-hidden />
+              </a>
+            </div>
+          )}
         </div>
-        {hotel.rating != null && (
-          <div className="flex shrink-0 items-center gap-2 text-right">
-            <div>
-              <p className="text-sm font-semibold">{hotelScoreText(hotel.rating)}</p>
-              {hotel.reviewCount != null && <p className="text-[11px] text-[var(--stone)]">{hotel.reviewCount.toLocaleString('zh-CN')} 条住客点评</p>}
-            </div>
-            <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] px-2 text-sm font-semibold text-white">
-              {hotel.rating.toFixed(1)}
-            </span>
-          </div>
-        )}
-        {hasValidParisBookingIdentity(hotel) && hotel.bookingUrl && (
-          <a
-            href={hotel.bookingUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 rounded-lg bg-[#006ce4] px-3 py-2 text-xs font-semibold transition duration-300 ease-out hover:-translate-y-0.5 hover:bg-[#0057b8] active:translate-y-0"
-            style={{ color: '#fff' }}
-          >
-            查看酒店
-            <span aria-hidden>↗</span>
-          </a>
-        )}
-      </div>
+      )}
 
       <div className="space-y-4">
         {identityLoading && (
@@ -338,63 +678,15 @@ function BookingHotelFacts({
           </div>
         )}
 
-        {facts.length > 0 && (
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {facts.map((fact) => (
-              <div key={fact.label} className="rounded-xl border border-[var(--mist)] bg-white/60 px-3 py-2.5">
-                <dt className="text-[11px] text-[var(--stone)]">{fact.label}</dt>
-                <dd className="mt-0.5 text-sm font-medium">{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-
-        {hasLocationInfo && (
+        {popularFacilities.length ? (
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-[#003b95]"><HotelFactIcon type="location" /></span>
-              <h4 className="text-base font-semibold">位置与周边</h4>
-            </div>
-            <div className="space-y-2 text-sm leading-relaxed text-[var(--ink)]/85">
-              {hotel.area && (
-                <p><span className="font-medium text-[var(--ink)]">所在区域：</span>{hotel.area}</p>
-              )}
-              {hotel.districtLabel && hotel.districtLabel !== hotel.area && (
-                <p><span className="font-medium text-[var(--ink)]">街区：</span>{hotel.districtLabel}</p>
-              )}
-              {hotel.distanceToCityCenterKm != null && (
-                <p>
-                  <span className="font-medium text-[var(--ink)]">距市中心：</span>
-                  约 {hotel.distanceToCityCenterKm < 1
-                    ? `${Math.round(hotel.distanceToCityCenterKm * 1000)} 米`
-                    : `${hotel.distanceToCityCenterKm.toFixed(1)} 公里`}
-                </p>
-              )}
-              {hotel.locationDescription && (
-                <HotelLocationDescription text={hotel.locationDescription} />
-              )}
-            </div>
-          </div>
-        )}
-
-        {facilityGroups.length ? (
-          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-[#003b95]"><HotelFactIcon type="facility" /></span>
-              <p className="text-base font-semibold">热门设施</p>
-            </div>
-            <div className="space-y-4">
-              {facilityGroups.map(({ category, items }) => (
-                <div key={category}>
-                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--stone)]">{category}</p>
-                  <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2">
-                    {items.map((facility) => (
-                      <span key={`${category}-${facility}`} className="flex items-center gap-2 text-sm">
-                        <span className="text-emerald-700">✓</span>{facility}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+            <BookingSectionHeader icon={Building2} title="热门设施" />
+            <div className="flex flex-wrap gap-x-5 gap-y-3">
+              {popularFacilities.map((facility) => (
+                <span key={facility} className="inline-flex items-center gap-2 text-sm">
+                  <FacilityItemIcon facility={facility} />
+                  {localizeFacility(facility)}
+                </span>
               ))}
             </div>
           </div>
@@ -404,38 +696,33 @@ function BookingHotelFacts({
 
         {reviewScores.length > 0 && (
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
-            <h4 className="text-base font-semibold">住客评分细项</h4>
-            <div
-              className={`mt-3 gap-x-5 gap-y-3 ${
+            <BookingSectionHeader icon={BarChart3} title="住客评分细项" />
+            <ReviewScoreBars
+              items={reviewScores}
+              layoutClassName={
                 reviewScores.length <= 3
-                  ? 'flex flex-wrap'
-                  : 'grid sm:grid-cols-2'
-              }`}
-            >
-              {reviewScores.map((item) => (
-                <div key={item.label} className={reviewScores.length <= 3 ? 'min-w-[9rem] flex-1' : ''}>
-                  <div className="mb-1 flex justify-between text-xs"><span>{item.label}</span><span className="font-semibold">{item.score.toFixed(1)}</span></div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-[#dbe7f6]"><div className="h-full rounded-full bg-[#006ce4]" style={{ width: `${Math.min(100, item.score * 10)}%` }} /></div>
-                </div>
-              ))}
-            </div>
+                  ? 'flex flex-wrap gap-x-5 gap-y-3'
+                  : 'grid gap-x-5 gap-y-3 sm:grid-cols-2'
+              }
+              itemClassName={reviewScores.length <= 3 ? 'min-w-[9rem] flex-1' : ''}
+            />
           </div>
         )}
 
         {(hotel.checkIn || hotel.checkOut || visibleLanguages.length > 0 || policies.length > 0 || paymentMethods.length > 0) && (
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
-            <div className="mb-3 flex items-center gap-2"><span className="text-[#003b95]"><HotelFactIcon type="info" /></span><h4 className="text-base font-semibold">住宿规定与实用信息</h4></div>
+            <BookingSectionHeader icon={Info} title="住宿规定与实用信息" />
             <div className="divide-y divide-[var(--mist)] text-sm">
               {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">入住与退房</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
               {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">服务语言</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
               {paymentMethods.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">付款方式</span><span className="text-[var(--ink)]/80">{paymentMethods.join('、')}</span></div>}
-              {visiblePolicies.length > 0 && (
+              {policies.length > 0 && (
                 <div className="py-3">
                   <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
                     <span className="font-medium">重要须知</span>
-                    <HotelTranslatedPolicyList
-                      policies={visiblePolicies}
-                      lineClampFirst={!policiesExpanded}
+                    <HotelExpandablePolicyList
+                      policies={policies}
+                      expanded={policiesExpanded}
                     />
                   </div>
                   {policies.length > 2 && (
@@ -454,7 +741,7 @@ function BookingHotelFacts({
         )}
 
         <p className="text-[11px] leading-relaxed text-[var(--stone)]">
-          房型、实时价格、早餐与取消政策会随日期变化，请通过「查看酒店」确认当前可订状态。
+          房型、实时价格、早餐与取消政策会随日期变化，请前往 Booking.com 确认当前可订状态。
         </p>
       </div>
     </section>
@@ -482,15 +769,11 @@ function BookingReviewsPanel({
   }))
 
   return (
-    <section className="rounded-2xl border border-[var(--mist)] bg-white/45 px-4 py-3.5">
-      <div className="mb-3">
-        <p className="text-sm font-medium">Booking.com 住客精选评论</p>
-        <p className="mt-0.5 text-xs text-[var(--stone)]">
-          {hotel.reviewCount
-            ? `共 ${hotel.reviewCount.toLocaleString('zh-CN')} 条评价`
-            : '精选住客评论'}
-        </p>
-      </div>
+    <section className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+      <BookingSectionHeader
+        icon={MessageSquareQuote}
+        title="住客精选评论"
+      />
       {loading && (
         <LoadingIndicator label="正在加载精选住客评论" showDots size="sm" />
       )}
@@ -544,6 +827,7 @@ export function HotelPicker({
   /** Custom hotel awaiting stay / consider / cancel decision. */
   const [pendingCustom, setPendingCustom] = useState<HotelCandidate | null>(null)
   const [storyLoadingId, setStoryLoadingId] = useState<string | null>(null)
+  const [streamingAdvisorReason, setStreamingAdvisorReason] = useState('')
   const [hotelStoryRegenToken, setHotelStoryRegenToken] = useState(0)
   /** null = closed; choose = pick mode; prefer = type preferences */
   const [refreshPanel, setRefreshPanel] = useState<'choose' | 'prefer' | null>(null)
@@ -718,7 +1002,7 @@ export function HotelPicker({
       setDetailsError(null)
       return
     }
-    if (card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= 4) {
+    if (card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= 5) {
       setDetailsLoadingId(null)
       setDetailsError(null)
       return
@@ -756,9 +1040,7 @@ export function HotelPicker({
                 rating: details.rating ?? hotel.rating,
                 reviewCount: details.reviewCount ?? hotel.reviewCount,
                 starRating: details.stars ?? hotel.starRating,
-                facilities: details.facilities.length
-                  ? details.facilities
-                  : hotel.facilities,
+                facilities: details.facilities,
                 propertyType: details.propertyType || hotel.propertyType,
                 reviewScores: details.reviewScores?.length
                   ? details.reviewScores
@@ -779,7 +1061,7 @@ export function HotelPicker({
                 checkOut: details.checkOut || hotel.checkOut,
                 bookingUrl: details.sourceUrl || hotel.bookingUrl,
                 bookingDetailsLoaded: true,
-                bookingDetailsVersion: 4,
+                bookingDetailsVersion: 5,
                 bookingPhotosLoaded: hotel.bookingPhotosLoaded,
                 bookingReviewsLoaded:
                   details.reviews.length > 0 ? true : hotel.bookingReviewsLoaded,
@@ -824,6 +1106,17 @@ export function HotelPicker({
       cancelled = true
     }
   }, [popupId, onCandidatesChange, onSelect, detailsRetryToken])
+
+  useEffect(() => {
+    if (!popupId) return
+    const card =
+      pendingCustomRef.current?.id === popupId
+        ? pendingCustomRef.current
+        : candidatesRef.current.find((hotel) => hotel.id === popupId)
+    if (!card) return
+    loadFeaturedReviews(card)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popupId])
 
   useEffect(() => {
     onDetailChange?.(popupCandidate)
@@ -900,8 +1193,21 @@ export function HotelPicker({
     // Already enriched on the candidate — do not call the model again.
     if ((!bypass && card.tripFit?.trim() && card.hotelAdvisorVersion === 2) || !isLlmConfigured()) return
 
+    const needsBookingDetails =
+      Boolean(card.bookingHotelId) &&
+      hasValidParisBookingIdentity(card) &&
+      isBookingApiEnabled()
+    if (
+      needsBookingDetails &&
+      (!(card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= 5) ||
+        detailsLoadingId === card.id)
+    ) {
+      return
+    }
+
     let cancelled = false
     setStoryLoadingId(card.id)
+    setStreamingAdvisorReason('')
 
     const prefs = loadHotelCache()?.lastPreferences
     const tripDays = daysRef.current.map((d) => ({
@@ -917,79 +1223,39 @@ export function HotelPicker({
         pendingCustomRef.current?.id === card.id
           ? pendingCustomRef.current
           : candidatesRef.current.find((hotel) => hotel.id === card.id) || card
-      let featuredReviews = (latest.reviews || []).map((review) => ({
+      const featuredReviews = (latest.reviews || []).map((review) => ({
         text: review.text,
         negativeText: review.negativeText,
         rating: review.rating,
         author: review.author,
       }))
 
-      if (
-        !featuredReviews.length &&
-        !latest.bookingReviewsLoaded &&
-        latest.bookingHotelId &&
-        hasValidParisBookingIdentity(latest) &&
-        isBookingApiEnabled()
-      ) {
-        try {
-          const result = await fetchBookingHotelFeaturedReviews({
-            id: latest.bookingHotelId,
-          })
-          if (cancelled) return
-          featuredReviews = result.reviews.map((review) => ({
-            text: review.text,
-            negativeText: review.negativeText,
-            rating: review.rating,
-            author: review.author,
-          }))
-          if (featuredReviews.length) {
-            const withReviews = (hotel: HotelCandidate): HotelCandidate =>
-              hotel.id !== card.id
-                ? hotel
-                : {
-                    ...hotel,
-                    bookingReviewsLoaded: true,
-                    reviews: featuredReviews.map((review) => ({
-                      text: review.text,
-                      negativeText: review.negativeText,
-                      rating: review.rating,
-                      author: review.author,
-                    })),
-                  }
-            if (pendingCustomRef.current?.id === card.id) {
-              setPendingCustom((current) => (current ? withReviews(current) : current))
-            } else {
-              const next = candidatesRef.current.map(withReviews)
-              onCandidatesChange(next)
-            }
-          }
-        } catch {
-          // Continue without featured reviews.
-        }
-      }
-
       const copy = await memoizeLlmCall(
         artifactKey,
         () =>
           generateHotelDetailCopy({
-            name: card.name,
-            area: card.area,
-            address: card.address,
-            nearestMetro: card.nearestMetro,
-            rating: card.rating,
-            reviewCount: card.reviewCount,
-            starRating: card.starRating,
-            propertyType: card.propertyType,
-            facilities: card.facilities,
-            reviewScores: card.reviewScores,
-            locationDescription: card.locationDescription,
-            districtLabel: card.districtLabel,
-            distanceToCityCenterKm: card.distanceToCityCenterKm,
+            name: latest.name,
+            area: latest.area,
+            address: latest.address,
+            nearestMetro: latest.nearestMetro,
+            rating: latest.rating,
+            reviewCount: latest.reviewCount,
+            starRating: latest.starRating,
+            propertyType: latest.propertyType,
+            facilities: latest.facilities,
+            reviewScores: latest.reviewScores,
+            locationDescription: latest.locationDescription,
+            districtLabel: latest.districtLabel,
+            distanceToCityCenterKm: latest.distanceToCityCenterKm,
             featuredReviews,
-            existingReason: card.reason,
-            isBest: card.isBest,
+            existingReason: latest.reason,
+            isBest: latest.isBest,
             userPreferences: prefs,
             tripDays,
+            onPartial: (partial) => {
+              if (cancelled || !partial.reason) return
+              setStreamingAdvisorReason(partial.reason)
+            },
           }),
         { durable: true, bypass },
       )
@@ -1027,17 +1293,27 @@ export function HotelPicker({
         // Silent failure — advisor copy is optional.
       })
       .finally(() => {
-        if (!cancelled) setStoryLoadingId((id) => (id === card.id ? null : id))
+        if (!cancelled) {
+          setStoryLoadingId((id) => (id === card.id ? null : id))
+          setStreamingAdvisorReason('')
+        }
       })
 
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [popupCandidate?.id, hotelStoryRegenToken])
+  }, [
+    popupCandidate?.id,
+    popupCandidate?.bookingDetailsLoaded,
+    popupCandidate?.bookingDetailsVersion,
+    detailsLoadingId,
+    hotelStoryRegenToken,
+  ])
 
   useEffect(() => {
     setHotelStoryRegenToken(0)
+    setStreamingAdvisorReason('')
   }, [popupCandidate?.id])
 
   async function bootstrapRecommendations() {
@@ -1962,7 +2238,11 @@ export function HotelPicker({
           popupCandidate
             ? {
                 variant: 'single',
-                reason: popupCandidate.tripFit,
+                reason:
+                  storyLoadingId === popupCandidate.id
+                    ? streamingAdvisorReason ||
+                      (hotelStoryRegenToken > 0 ? undefined : popupCandidate.tripFit)
+                    : popupCandidate.tripFit,
                 loading: storyLoadingId === popupCandidate.id,
                 labels: {
                   title: '行程顾问点评',
