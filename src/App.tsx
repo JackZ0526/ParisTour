@@ -922,7 +922,6 @@ export default function App() {
                           customPlaces={placesWithHotel}
                           selectedPlaceId={selectedPlaceId}
                           navPlan={navPlan}
-                          navLoading={navLoading}
                           copyRefreshing={copyRefreshing}
                           dayRegenerating={dayRegenerating}
                           dayRegenError={dayRegenError}
@@ -959,8 +958,6 @@ export default function App() {
                             hotel={hotel}
                             day={day}
                             customPlaces={placesWithHotel}
-                            navPlan={navPlan}
-                            navLoading={navLoading}
                             selectedPlaceId={selectedPlaceId}
                             onSelectPlace={setSelectedPlaceId}
                           />

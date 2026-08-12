@@ -10,6 +10,7 @@ const PAID_API_PREFIXES = [
   '/api/gemini',
   '/api/aerodatabox',
   '/api/timetable-lookup',
+  '/api/booking',
 ]
 
 function readBearer(req: IncomingMessage): string | null {
@@ -168,6 +169,11 @@ export default defineConfig(({ mode }) => {
     if (process.env[k] === undefined) process.env[k] = v
   }
   const rapidApiKey = env.RAPIDAPI_KEY || env.AERODATABOX_RAPIDAPI_KEY || ''
+  const googlePlacesRapidHost =
+    env.RAPIDAPI_GOOGLE_PLACES_HOST ||
+    'google-map-places-new-v2.p.rapidapi.com'
+  const bookingRapidHost =
+    env.RAPIDAPI_BOOKING_HOST || 'booking-com18.p.rapidapi.com'
   const openaiKey = env.OPENAI_API_KEY || ''
   const deepseekKey = env.DEEPSEEK_API_KEY || ''
   const geminiKey = env.GEMINI_API_KEY || ''
@@ -209,6 +215,51 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: {
+        // Booking COM hotel endpoints. Client-side code has an additional
+        // disabled-by-default switch, so development consumes no quota until
+        // VITE_BOOKING_API_ENABLED=true is explicitly configured.
+        '/api/booking': {
+          target: `https://${bookingRapidHost}`,
+          changeOrigin: true,
+          rewrite: (path) => {
+            const url = new URL(path, 'http://localhost')
+            const rest = (url.searchParams.get('rest') || '').replace(/^\/+/, '')
+            url.searchParams.delete('rest')
+            return `/${rest}${url.search}`
+          },
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('authorization')
+              if (rapidApiKey) proxyReq.setHeader('X-RapidAPI-Key', rapidApiKey)
+              proxyReq.setHeader('X-RapidAPI-Host', bookingRapidHost)
+              proxyReq.setHeader('Accept', 'application/json')
+            })
+          },
+        },
+        // Google Map Places (New V2) on RapidAPI. `rest` selects one
+        // allowlisted upstream endpoint; the API key remains server-side.
+        '/api/google-places': {
+          target: `https://${googlePlacesRapidHost}`,
+          changeOrigin: true,
+          rewrite: (path) => {
+            const url = new URL(path, 'http://localhost')
+            const rest = (url.searchParams.get('rest') || '').replace(/^\/+/, '')
+            url.searchParams.delete('rest')
+            return `/${rest}${url.search}`
+          },
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('authorization')
+              if (rapidApiKey) {
+                proxyReq.setHeader('X-RapidAPI-Key', rapidApiKey)
+              }
+              proxyReq.setHeader('X-RapidAPI-Host', googlePlacesRapidHost)
+              proxyReq.setHeader('X-Goog-FieldMask', '*')
+              proxyReq.setHeader('Accept', 'application/json')
+              proxyReq.setHeader('Content-Type', 'application/json')
+            })
+          },
+        },
         // AeroDataBox (RapidAPI) — key injected server-side, never exposed to the browser
         '/api/aerodatabox': {
           target: 'https://aerodatabox.p.rapidapi.com',

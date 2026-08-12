@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { fetchGooglePlacePhoto, placePhotoQuery } from '../../map/services/googlePlacePhotos'
-import type { Coordinates } from '../../../types'
+import {
+  fetchGooglePlacePhoto,
+  peekGooglePlacePhoto,
+  placePhotoQuery,
+} from '../../map/services/googlePlacePhotos'
+import {
+  fetchWikimediaPlacePhoto,
+  peekWikimediaPlacePhoto,
+  type WikimediaPlacePhoto,
+} from '../../map/services/wikimediaPlacePhotos'
+import type { Coordinates, PlaceType } from '../../../types'
 
 interface Props {
   name: string
   nameLocal?: string
   location?: Coordinates
+  type?: PlaceType
   /** Static fallback (Unsplash etc.) while loading or if Places fails */
   fallback: string
   alt: string
@@ -29,25 +38,26 @@ export function GooglePlacePhoto({
   name,
   nameLocal,
   location,
+  type,
   fallback,
   alt,
   className = '',
   asBackground = false,
   showBadge = true,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [src, setSrc] = useState(fallback)
   const [attribution, setAttribution] = useState<string | undefined>()
   const [fromGoogle, setFromGoogle] = useState(false)
+  const [wikimedia, setWikimedia] = useState<WikimediaPlacePhoto | null>(null)
   const [retried, setRetried] = useState(false)
   const locationLat = location?.lat
   const locationLng = location?.lng
 
   useEffect(() => {
-    if (!isLoaded) return
     let cancelled = false
     setSrc(fallback)
     setFromGoogle(false)
+    setWikimedia(null)
     setAttribution(undefined)
     setRetried(false)
     const query = placePhotoQuery(name, nameLocal)
@@ -55,6 +65,38 @@ export function GooglePlacePhoto({
       locationLat != null && locationLng != null
         ? { lat: locationLat, lng: locationLng }
         : undefined
+
+    if (type === 'attraction' && queryLocation) {
+      const originalName = name.trim() || nameLocal?.trim() || ''
+      if (!originalName) return
+      const cached = peekWikimediaPlacePhoto(originalName, queryLocation)
+      if (cached?.url) {
+        setSrc(cached.url)
+        setWikimedia(cached)
+        return
+      }
+      void fetchWikimediaPlacePhoto(originalName, queryLocation).then((result) => {
+        if (cancelled || !result?.url) return
+        setSrc(result.url)
+        setWikimedia(result)
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // Timeline and hotel cards already have a usable static image. Do not turn
+    // every card mount/tab switch (or a cached Places URL reload) into a paid
+    // photo-media request.
+    if (fallback) return
+
+    const cached = peekGooglePlacePhoto(query, queryLocation)
+    if (cached?.url) {
+      setSrc(cached.url)
+      setAttribution(cached.attribution)
+      setFromGoogle(true)
+      return
+    }
 
     void fetchGooglePlacePhoto(query, queryLocation).then((result) => {
       if (cancelled || !result?.url) return
@@ -66,7 +108,7 @@ export function GooglePlacePhoto({
     return () => {
       cancelled = true
     }
-  }, [isLoaded, name, nameLocal, locationLat, locationLng, fallback])
+  }, [name, nameLocal, locationLat, locationLng, fallback, type])
 
   function handleImgError() {
     if (fromGoogle && !retried && src !== fallback) {
@@ -78,6 +120,7 @@ export function GooglePlacePhoto({
     if (src !== fallback) {
       setSrc(fallback)
       setFromGoogle(false)
+      setWikimedia(null)
       setAttribution(undefined)
     }
   }
@@ -89,7 +132,13 @@ export function GooglePlacePhoto({
         style={{ backgroundImage: src ? `url(${src})` : undefined }}
         role="img"
         aria-label={alt}
-        title={fromGoogle ? `Google Maps 照片${attribution ? ` · ${attribution}` : ''}` : alt}
+        title={
+          wikimedia
+            ? `Wikimedia Commons${wikimedia.attribution ? ` · ${wikimedia.attribution}` : ''}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`
+            : fromGoogle
+              ? `地图照片${attribution ? ` · ${attribution}` : ''}`
+              : alt
+        }
       />
     )
   }
@@ -110,8 +159,19 @@ export function GooglePlacePhoto({
       )}
       {fromGoogle && showBadge && src !== fallback && (
         <span className="absolute bottom-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-          Google{attribution ? ` · ${attribution}` : ''}
+          地图{attribution ? ` · ${attribution}` : ''}
         </span>
+      )}
+      {wikimedia && showBadge && src !== fallback && (
+        <a
+          href={wikimedia.sourcePage}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm"
+          title={`${wikimedia.attribution || 'Wikimedia Commons'}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`}
+        >
+          Wikimedia Commons{wikimedia.license ? ` · ${wikimedia.license}` : ''}
+        </a>
       )}
     </div>
   )

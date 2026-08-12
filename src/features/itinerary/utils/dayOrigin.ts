@@ -10,6 +10,7 @@ export const SELECTED_HOTEL_PLACE_ID = 'hotel-selected'
 export function placeFromHotel(hotel: SelectedHotel): Place {
   return {
     id: SELECTED_HOTEL_PLACE_ID,
+    googlePlaceId: hotel.googlePlaceId,
     name: hotel.name,
     type: 'hotel',
     description:

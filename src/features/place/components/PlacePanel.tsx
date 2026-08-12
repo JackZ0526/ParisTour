@@ -161,6 +161,7 @@ export function PlacePanel({
       nameLocal={place?.nameLocal}
       googlePlaceId={place?.googlePlaceId}
       location={place?.location}
+      placeType={place?.type}
       fallbackImage={place?.image}
       showMap={false}
       llmNarrative={

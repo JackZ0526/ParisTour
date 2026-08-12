@@ -12,13 +12,17 @@ import {
   peekPlaceNameZh,
   translatePlaceNameToChinese,
 } from '../../chat/services/translate'
-import type { Coordinates } from '../../../types'
+import type { Coordinates, PlaceType } from '../../../types'
 import { placeOriginalLabel, placeTitleLines } from '../../../shared/utils/placeTitle'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GoogleReviewsList } from './GoogleReviewsList'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import {
+  fetchWikimediaPlacePhoto,
+  peekWikimediaPlacePhoto,
+  type WikimediaPlacePhoto,
+} from '../../map/services/wikimediaPlacePhotos'
 
 export interface LlmPlaceNarrative {
   intro?: string
@@ -45,8 +49,22 @@ interface Props {
   nameLocal?: string
   googlePlaceId?: string
   location?: Coordinates
+  placeType?: PlaceType
   fallbackImage?: string
   showMap?: boolean
+  /** Booking-style asymmetric photo mosaic when enough provider photos exist. */
+  galleryVariant?: 'carousel' | 'booking'
+  /** Provider block renders rating/address; suppress generic summary above it. */
+  providerOwnsSummary?: boolean
+  /** Pre-resolved provider payload (used by Booking hotel details). */
+  detailsOverride?: GooglePlaceDetails | null
+  /** Never query Google Places when an alternate provider owns this record. */
+  skipProviderLookup?: boolean
+  reviewSourceLabel?: string
+  /** Provider-specific facts inserted after the address. */
+  providerDetails?: ReactNode
+  /** Provider-owned lazy review UI. Suppresses the default review rendering. */
+  reviewsSection?: ReactNode
   /** Optional LLM story block (used for hotel detail). */
   llmNarrative?: LlmPlaceNarrative | null
   /** Sticky footer (e.g. custom-hotel decision buttons). */
@@ -72,8 +90,16 @@ export function GooglePlacePage({
   nameLocal,
   googlePlaceId,
   location,
+  placeType,
   fallbackImage,
   showMap = true,
+  galleryVariant = 'carousel',
+  providerOwnsSummary = false,
+  detailsOverride,
+  skipProviderLookup = false,
+  reviewSourceLabel = 'Google 评论',
+  providerDetails,
+  reviewsSection,
   llmNarrative,
   footer,
   closeOnBackdrop = true,
@@ -82,11 +108,14 @@ export function GooglePlacePage({
   onDetailsResolved,
   onClose,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = useState(0)
+  const [galleryExpanded, setGalleryExpanded] = useState(false)
+  const [failedPhotos, setFailedPhotos] = useState<string[]>([])
+  const [wikimediaPhoto, setWikimediaPhoto] =
+    useState<WikimediaPlacePhoto | null>(null)
   const [llmZh, setLlmZh] = useState<string | null>(null)
   /** idle = not finished; loading = in flight; done = success or gave up */
   const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
@@ -106,8 +135,14 @@ export function GooglePlacePage({
     setNameZhPhase('idle')
   }
 
-  const photos =
-    details?.photos?.length ? details.photos : fallbackImage ? [fallbackImage] : []
+  const rawPhotos = wikimediaPhoto?.url
+    ? [wikimediaPhoto.url]
+    : details?.photos?.length
+      ? details.photos
+      : fallbackImage
+        ? [fallbackImage]
+        : []
+  const photos = rawPhotos.filter((url) => !failedPhotos.includes(url))
   const activePhoto = photos[photoIndex] || photos[0]
   const googleMapsPlaceUrl = details?.id
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -119,6 +154,32 @@ export function GooglePlacePage({
     if (photos.length < 2) return
     setPhotoIndex((i) => (i + delta + photos.length) % photos.length)
   }
+
+  useEffect(() => {
+    if (!open || placeType !== 'attraction' || !location) {
+      setWikimediaPhoto(null)
+      return
+    }
+    const originalName = name.trim() || nameLocal?.trim() || ''
+    if (!originalName) return
+    const cached = peekWikimediaPlacePhoto(originalName, location)
+    if (cached) {
+      setWikimediaPhoto(cached)
+      return
+    }
+    let cancelled = false
+    void fetchWikimediaPlacePhoto(originalName, location).then((photo) => {
+      if (!cancelled) setWikimediaPhoto(photo)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, placeType, name, nameLocal, location])
+
+  useEffect(() => {
+    setFailedPhotos([])
+    setGalleryExpanded(false)
+  }, [open, name, detailsOverride])
 
   useEffect(() => {
     thumbRefs.current[photoIndex]?.scrollIntoView({
@@ -149,7 +210,21 @@ export function GooglePlacePage({
   }, [open, onClose, closeOnBackdrop, photos.length])
 
   useEffect(() => {
-    if (!open || !isLoaded) return
+    if (!open) return
+    if (detailsOverride) {
+      setDetails(detailsOverride)
+      setLoading(false)
+      setError(null)
+      setPhotoIndex(0)
+      return
+    }
+    if (skipProviderLookup) {
+      setDetails(null)
+      setLoading(false)
+      setError(null)
+      setPhotoIndex(0)
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -179,7 +254,7 @@ export function GooglePlacePage({
     return () => {
       cancelled = true
     }
-  }, [open, isLoaded, query, googlePlaceId, location])
+  }, [open, query, googlePlaceId, location, detailsOverride, skipProviderLookup])
 
   // When Google / trip data has no Chinese display name, LLM-translate the original.
   useEffect(() => {
@@ -378,7 +453,38 @@ export function GooglePlacePage({
           )}
           {error && <p className="text-sm text-amber-800">{error}</p>}
 
-          {activePhoto && (
+          {activePhoto && galleryVariant === 'booking' && photos.length >= 3 && !galleryExpanded ? (
+            <div className="relative grid h-64 grid-cols-[1.55fr_1fr] grid-rows-2 gap-1 overflow-hidden rounded-2xl sm:h-80">
+              {photos.slice(0, 3).map((url, i) => (
+                <button
+                  type="button"
+                  key={url}
+                  onClick={() => {
+                    setPhotoIndex(i)
+                    setGalleryExpanded(true)
+                  }}
+                  className={`group relative overflow-hidden bg-[var(--mist)] ${i === 0 ? 'row-span-2' : ''}`}
+                  aria-label={`查看第 ${i + 1} 张酒店照片`}
+                >
+                  <img
+                    src={url}
+                    alt={i === 0 ? details?.name || name : ''}
+                    className="h-full w-full object-cover transition duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.025]"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    onError={() => setFailedPhotos((current) => current.includes(url) ? current : [...current, url])}
+                  />
+                </button>
+              ))}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 to-transparent" />
+              <button
+                type="button"
+                onClick={() => setGalleryExpanded(true)}
+                className="absolute bottom-3 right-3 rounded-xl border border-white/65 bg-white/90 px-3 py-2 text-xs font-medium text-[var(--ink)] shadow-sm backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:bg-white"
+              >
+                查看全部 {photos.length} 张照片
+              </button>
+            </div>
+          ) : activePhoto && (
             <div className="space-y-2">
               <div
                 className="relative overflow-hidden rounded-2xl select-none"
@@ -403,7 +509,26 @@ export function GooglePlacePage({
                   className="h-56 w-full object-cover sm:h-72"
                   referrerPolicy="no-referrer-when-downgrade"
                   draggable={false}
+                  onError={() =>
+                    setFailedPhotos((current) =>
+                      current.includes(activePhoto)
+                        ? current
+                        : [...current, activePhoto],
+                    )
+                  }
                 />
+                {wikimediaPhoto && activePhoto === wikimediaPhoto.url && (
+                  <a
+                    href={wikimediaPhoto.sourcePage}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
+                    title={`${wikimediaPhoto.attribution || 'Wikimedia Commons'}${wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}`}
+                  >
+                    图片：{wikimediaPhoto.attribution || 'Wikimedia Commons'}
+                    {wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}
+                  </a>
+                )}
                 {photos.length > 1 && (
                   <>
                     <button
@@ -446,15 +571,34 @@ export function GooglePlacePage({
                         i === photoIndex ? 'border-[var(--copper)]' : 'border-transparent'
                       }`}
                     >
-                      <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer-when-downgrade" />
+                      <img
+                        src={url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        onError={() =>
+                          setFailedPhotos((current) =>
+                            current.includes(url) ? current : [...current, url],
+                          )
+                        }
+                      />
                     </button>
                   ))}
                 </div>
               )}
+              {galleryVariant === 'booking' && galleryExpanded && photos.length >= 3 && (
+                <button
+                  type="button"
+                  onClick={() => setGalleryExpanded(false)}
+                  className="text-xs font-medium text-[var(--sage)] hover:underline"
+                >
+                  返回酒店图集
+                </button>
+              )}
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 text-sm">
+          {!providerOwnsSummary && <div className="flex flex-wrap gap-2 text-sm">
             {details?.rating != null && (
               <span className="rounded-full bg-[var(--gold)]/25 px-3 py-1">
                 ★ {details.rating.toFixed(1)}
@@ -467,9 +611,11 @@ export function GooglePlacePage({
             {details?.phone && (
               <span className="rounded-full bg-[var(--mist)] px-3 py-1">{details.phone}</span>
             )}
-          </div>
+          </div>}
 
-          {details?.address && <p className="text-sm text-[var(--stone)]">{details.address}</p>}
+          {!providerOwnsSummary && details?.address && <p className="text-sm text-[var(--stone)]">{details.address}</p>}
+
+          {providerDetails}
 
           {llmNarrative &&
             (llmNarrative.loading ||
@@ -589,14 +735,19 @@ export function GooglePlacePage({
               </div>
             )}
 
-          {details?.reviews?.length ? <GoogleReviewsList reviews={details.reviews} /> : null}
+          {reviewsSection !== undefined ? reviewsSection : details?.reviews?.length ? (
+            <GoogleReviewsList
+              reviews={details.reviews}
+              sourceLabel={reviewSourceLabel}
+            />
+          ) : null}
 
-          {details &&
+          {reviewsSection === undefined && details &&
             !loading &&
             !details.reviews.length &&
             (details.userRatingCount || 0) > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium">Google 评论</p>
+                <p className="mb-2 text-sm font-medium">{reviewSourceLabel}</p>
                 <div className="rounded-xl bg-white/70 px-3 py-2 text-sm">
                   <p className="leading-relaxed text-[var(--stone)]">
                     Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。

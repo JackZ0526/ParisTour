@@ -87,7 +87,7 @@ export async function generateHotelDetailCopy(input: {
 
 /**
  * Recommend Paris stay options via LLM (no local hotel catalog).
- * Caller should resolve names with Google Places afterwards.
+ * Caller should resolve names with Booking afterwards.
  */
 export async function recommendHotelsForTrip(input?: {
   batch?: number
@@ -127,8 +127,8 @@ export async function recommendHotelsForTrip(input?: {
 - area 统一写成「N区 (Français / 中文)」格式，例如「4区 (Marais / 玛黑)」「9区 (Opéra / 歌剧院)」「16区 (Trocadéro / 特罗卡德罗)」。
 - 优先 3–4区玛黑 / 2区大林荫道 / 9区歌剧院 / 6区圣日耳曼 / 5区拉丁区 等地铁便利区。
 - 若提供 userPreferences，必须优先满足（区位、预算、风格、安静/便利等）。
-- name 用 Google Maps 可搜到的正式店名；尽量附带含邮编的 address（如 75004 Paris）。
-- 只能从 verifiedCandidates 中选择；name、googlePlaceId 与 address 必须原样复制，不得编造酒店或评分。
+- name 使用 Booking 返回的正式店名；尽量附带含邮编的 address（如 75004 Paris）。
+- 只能从 verifiedCandidates 中选择；name、bookingHotelId 与 address 必须原样复制，不得编造酒店或评分。
 - ${
     count === 1
       ? '仅 1 家时 isBest 必须为 true。'
@@ -138,8 +138,8 @@ export async function recommendHotelsForTrip(input?: {
 - description：2 句中文；reason：一句话为何适合本次行程/用户偏好。
 </hard_rules>`,
     jsonContract(
-      '{ hotels: [{ name, googlePlaceId?, area: "N区 (Français / 中文)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }',
-      '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "googlePlaceId": "...", "area": "4区 (Marais / 玛黑)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "nearestMetro": "Saint-Sébastien – Froissart (8号线)", "priceHint": "€€€", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。", "isBest": true }] }',
+      '{ hotels: [{ name, bookingHotelId?, area: "N区 (Français / 中文)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }',
+      '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "bookingHotelId": "...", "area": "4区 (Marais / 玛黑)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "nearestMetro": "Saint-Sébastien – Froissart (8号线)", "priceHint": "€€€", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。", "isBest": true }] }',
     ),
   )
   const user = JSON.stringify({
@@ -194,7 +194,7 @@ export async function recommendHotelsForTrip(input?: {
     if (!item || typeof item !== 'object') continue
     const row = item as Record<string, unknown>
     const proposedName = String(row.name || '').trim()
-    const proposedId = String(row.googlePlaceId || '').trim()
+    const proposedId = String(row.bookingHotelId || '').trim()
     const verified =
       (proposedId ? verifiedById.get(proposedId) : undefined) ||
       verifiedByName.get(proposedName.toLowerCase())
@@ -203,7 +203,7 @@ export async function recommendHotelsForTrip(input?: {
     const key = name.toLowerCase()
     if (exclude.has(key) || seen.has(key)) continue
     out.push({
-      googlePlaceId: verified.id,
+      bookingHotelId: verified.id,
       name,
       area: String(row.area || '巴黎市区').trim() || '巴黎市区',
       address: verified.address || String(row.address || '').trim() || undefined,

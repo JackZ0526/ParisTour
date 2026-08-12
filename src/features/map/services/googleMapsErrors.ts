@@ -25,7 +25,7 @@ export function googleMapsLoadErrorHelp(error: unknown): {
   if (/apinotactivatedmaperror|apinotactivated/i.test(msg) || /not activated/i.test(lower)) {
     return {
       title: 'Google Maps 加载失败：尚未启用所需 API',
-      detail: '请启用 Maps JavaScript API、Places API (New)、Directions API。',
+      detail: '请启用 Maps JavaScript API。',
     }
   }
 

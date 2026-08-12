@@ -30,9 +30,12 @@ import type { RecommendationPreferences } from '../services/recommendationPrefer
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
+import {
+  fetchWikimediaPlacePhoto,
+  type WikimediaPlacePhoto,
+} from '../../map/services/wikimediaPlacePhotos'
 
 interface Props {
   open: boolean
@@ -87,7 +90,6 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -113,6 +115,9 @@ export function AddPlaceDialog({
   >({})
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
+  const [wikimediaByKey, setWikimediaByKey] = useState<
+    Record<string, WikimediaPlacePhoto>
+  >({})
   const [loadingDetailsKey, setLoadingDetailsKey] = useState<string | null>(null)
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
   const chromeRef = useRef<HTMLDivElement>(null)
@@ -209,6 +214,7 @@ export function AddPlaceDialog({
     setError(null)
     setExpandedKey(null)
     setDetailsByKey({})
+    setWikimediaByKey({})
     setPhotoIndexByKey({})
   }
 
@@ -275,6 +281,7 @@ export function AddPlaceDialog({
     if (options.resetDetails) {
       setExpandedKey(null)
       setDetailsByKey({})
+      setWikimediaByKey({})
       setPhotoIndexByKey({})
     }
 
@@ -547,10 +554,6 @@ export function AddPlaceDialog({
   async function ensureDetails(item: PlaceRecommendation) {
     const key = itemKey(item)
     if (detailsByKey[key] !== undefined) return detailsByKey[key]
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return null
-    }
 
     setLoadingDetailsKey(key)
     setError(null)
@@ -564,9 +567,20 @@ export function AddPlaceDialog({
       const details = await fetchGooglePlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
       })
-      setDetailsByKey((prev) => ({ ...prev, [key]: details }))
+      const wikimedia =
+        item.type === 'attraction' && details?.location
+          ? await fetchWikimediaPlacePhoto(details.name || item.name, details.location)
+          : null
+      const resolved =
+        details && wikimedia
+          ? { ...details, photos: [wikimedia.url] }
+          : details
+      setDetailsByKey((prev) => ({ ...prev, [key]: resolved }))
+      if (wikimedia) {
+        setWikimediaByKey((prev) => ({ ...prev, [key]: wikimedia }))
+      }
       setPhotoIndexByKey((prev) => ({ ...prev, [key]: 0 }))
-      return details
+      return resolved
     } catch {
       setDetailsByKey((prev) => ({ ...prev, [key]: null }))
       setError('加载 Google 地点详情失败。')
@@ -595,10 +609,6 @@ export function AddPlaceDialog({
     intro?: string,
     cached?: GooglePlaceDetails | null,
   ) {
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return
-    }
     setAddingName(`${name}:${mode}`)
     setSearching(true)
     setError(null)
@@ -609,7 +619,7 @@ export function AddPlaceDialog({
       }
       const details = cached?.location
         ? cached
-        : await fetchGooglePlaceDetails(query)
+        : await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -628,10 +638,15 @@ export function AddPlaceDialog({
         if (blurb) description = blurb
       }
 
+      const wikimediaPhoto =
+        type === 'attraction'
+          ? await fetchWikimediaPlacePhoto(details.name, details.location)
+          : null
+
       const place: Place = {
         id: `custom-${Date.now()}`,
         googlePlaceId: details.id,
-        name: details.name,
+        name: /[\u3400-\u9fff]/.test(name) ? name : details.name,
         nameLocal: details.nameOriginal,
         type,
         description,
@@ -640,7 +655,7 @@ export function AddPlaceDialog({
             ? `Google ★ ${details.rating.toFixed(1)}`
             : 'AI 推荐 / Google 地点',
         priceHint: details.priceLevel,
-        image: details.photos[0] || FALLBACK_IMAGE,
+        image: wikimediaPhoto?.url || details.photos[0] || FALLBACK_IMAGE,
         location: details.location,
         googleMapsUrl: details.id
           ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -667,10 +682,6 @@ export function AddPlaceDialog({
   async function searchGooglePlace() {
     const q = googleQuery.trim()
     if (!q || searching) return
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return
-    }
     setSearching(true)
     setError(null)
     try {
@@ -678,7 +689,7 @@ export function AddPlaceDialog({
       if (!query) {
         throw new Error('请使用地点的原文名称搜索。')
       }
-      const details = await fetchGooglePlaceDetails(query)
+      const details = await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -897,6 +908,7 @@ export function AddPlaceDialog({
                     const key = itemKey(item)
                     const expanded = expandedKey === key
                     const details = detailsByKey[key]
+                    const wikimedia = wikimediaByKey[key]
                     const loadingDetails = loadingDetailsKey === key
                     const busyBest = addingName === `${item.name}:best`
                     const busyEnd = addingName === `${item.name}:end`
@@ -976,6 +988,18 @@ export function AddPlaceDialog({
                                           referrerPolicy="no-referrer-when-downgrade"
                                           draggable={false}
                                         />
+                                        {wikimedia && activePhoto === wikimedia.url && (
+                                          <a
+                                            href={wikimedia.sourcePage}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
+                                            title={`${wikimedia.attribution || 'Wikimedia Commons'}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`}
+                                          >
+                                            图片：{wikimedia.attribution || 'Wikimedia Commons'}
+                                            {wikimedia.license ? ` · ${wikimedia.license}` : ''}
+                                          </a>
+                                        )}
                                         {photos.length > 1 && (
                                           <>
                                             <button
@@ -1221,6 +1245,7 @@ export function AddPlaceDialog({
         nameLocal={googleDetail?.details.nameOriginal}
         googlePlaceId={googleDetail?.details.id}
         location={googleDetail?.details.location}
+        placeType={googleDetail?.type}
         fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
         showMap={false}
         overlayClassName="z-[2200]"

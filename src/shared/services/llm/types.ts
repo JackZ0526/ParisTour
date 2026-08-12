@@ -158,7 +158,7 @@ export interface VerifiedPlaceCandidate {
 }
 
 export interface HotelRecommendation {
-  googlePlaceId?: string
+  bookingHotelId?: string
   name: string
   area: string
   address?: string

@@ -8,12 +8,12 @@ import { GoogleMapsProvider } from './features/map/components/GoogleMapsProvider
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GoogleMapsProvider>
-      <AuthProvider>
-        <AuthGate>
+    <AuthProvider>
+      <AuthGate>
+        <GoogleMapsProvider>
           <App />
-        </AuthGate>
-      </AuthProvider>
-    </GoogleMapsProvider>
+        </GoogleMapsProvider>
+      </AuthGate>
+    </AuthProvider>
   </StrictMode>,
 )

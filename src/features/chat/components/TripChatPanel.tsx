@@ -53,6 +53,7 @@ import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
+import { fetchWikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
@@ -505,13 +506,18 @@ export function TripChatPanel({
       if (blurb) description = blurb
     }
 
+    const wikimediaPhoto =
+      placeType === 'attraction'
+        ? await fetchWikimediaPlacePhoto(details.name, details.location)
+        : null
+
     return {
       id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: details.name,
       type: placeType,
       description,
       ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
-      image: details.photos[0] || FALLBACK_IMAGE,
+      image: wikimediaPhoto?.url || details.photos[0] || FALLBACK_IMAGE,
       location: details.location,
       googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
       durationHint: placeType === 'cafe' ? '45 分钟' : '90 分钟',
@@ -1905,6 +1911,7 @@ export function TripChatPanel({
         nameLocal={activePending?.place.nameLocal}
         googlePlaceId={activePending?.place.googlePlaceId}
         location={activePending?.place.location}
+        placeType={activePending?.place.type}
         fallbackImage={activePending?.place.image}
         showMap={false}
         overlayClassName="z-[2300]"

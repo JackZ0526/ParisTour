@@ -18,8 +18,18 @@ import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
+import { GoogleReviewsList } from '../../place/components/GoogleReviewsList'
 import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import {
+  fetchBookingHotelFeaturedReviews,
+  fetchBookingHotelDetails,
+  fetchBookingHotelPhotos,
+  isBookingApiEnabled,
+  bookingPhotoUrl,
+  resolveBookingHotelIdentity,
+} from '../services/bookingHotels'
+import { loadTripDates } from '../../itinerary/services/tripDates'
 
 interface Props {
   selected: SelectedHotel
@@ -68,7 +78,7 @@ function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
       <GooglePlacePhoto
         name={hotel.name}
         location={{ lat: hotel.lat, lng: hotel.lng }}
-        fallback={hotel.image}
+        fallback={bookingPhotoUrl(hotel.image)}
         alt={hotel.name}
         asBackground
         className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
@@ -157,6 +167,369 @@ function ChevronIcon({ up }: { up?: boolean }) {
   )
 }
 
+function hasValidParisBookingIdentity(hotel: HotelCandidate): boolean {
+  return Boolean(
+    hotel.bookingHotelId &&
+      hotel.lat >= 48.65 &&
+      hotel.lat <= 49.05 &&
+      hotel.lng >= 1.95 &&
+      hotel.lng <= 2.7,
+  )
+}
+
+const FACILITY_LABELS: Record<string, string> = {
+  'non-smoking rooms': '禁烟客房',
+  'facilities for disabled guests': '无障碍设施',
+  restaurant: '餐厅',
+  'wifi in all areas': '全区域 Wi-Fi',
+  'free wifi': '免费 Wi-Fi',
+  'free wi-fi': '免费 Wi-Fi',
+  'air conditioning': '空调',
+  'baggage storage': '行李寄存',
+  '24-hour front desk': '24 小时前台',
+  'room service': '客房服务',
+  'family rooms': '家庭房',
+  bar: '酒吧',
+  elevator: '电梯',
+  heating: '暖气',
+  parking: '停车场',
+  'airport shuttle': '机场接送',
+}
+
+function localizeFacility(value: string): string {
+  return FACILITY_LABELS[value.trim().toLowerCase()] || value
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: '英语', fr: '法语', es: '西班牙语', pt: '葡萄牙语', de: '德语',
+  'en-gb': '英语', 'en-us': '英语', it: '意大利语', zh: '中文', ja: '日语', ar: '阿拉伯语', ru: '俄语',
+}
+
+function localizeLanguage(value: string): string {
+  return LANGUAGE_LABELS[value.trim().toLowerCase()] || value
+}
+
+function hotelScoreText(score?: number): string {
+  if (score == null) return ''
+  if (score >= 9) return '好极了'
+  if (score >= 8) return '非常好'
+  if (score >= 7) return '好'
+  return '令人愉悦'
+}
+
+function HotelFactIcon({ type }: { type: 'location' | 'clock' | 'facility' | 'info' }) {
+  const paths = {
+    location: <><path d="M12 21s6-5.3 6-11a6 6 0 1 0-12 0c0 5.7 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    facility: <><path d="M4 12h16M6 8h12M7 16h10" /><path d="M5 5h14v14H5z" /></>,
+    info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
+  }
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths[type]}</svg>
+}
+
+function BookingHotelFacts({
+  hotel,
+  identityLoading,
+  identityError,
+  loading,
+  error,
+  photosLoading,
+  photosError,
+  onIdentityRetry,
+  onRetry,
+  onLoadPhotos,
+}: {
+  hotel: HotelCandidate
+  identityLoading: boolean
+  identityError: string | null
+  loading: boolean
+  error: string | null
+  photosLoading: boolean
+  photosError: string | null
+  onIdentityRetry: () => void
+  onRetry: () => void
+  onLoadPhotos: () => void
+}) {
+  const facts = [
+    hotel.starRating != null
+      ? { label: '酒店星级', value: `${hotel.starRating} 星` }
+      : null,
+    hotel.checkIn ? { label: '最早入住', value: hotel.checkIn } : null,
+    hotel.checkOut ? { label: '最晚退房', value: hotel.checkOut } : null,
+    hotel.area ? { label: '所在区域', value: hotel.area } : null,
+    hotel.rating != null
+      ? { label: '住客评分', value: `${hotel.rating.toFixed(1)} / 10` }
+      : hotel.reviewCount
+        ? { label: '住客评价', value: `${hotel.reviewCount.toLocaleString('zh-CN')} 条` }
+        : null,
+  ].filter((item): item is { label: string; value: string } => Boolean(item))
+
+  const visibleFacilities = (hotel.facilities || []).map(localizeFacility)
+  const visibleLanguages = (hotel.languages || []).map(localizeLanguage)
+  const reviewScores = hotel.reviewScores || []
+  const policies = hotel.policies || []
+  const photoCount = Math.max(hotel.photos?.length || 0, hotel.image ? 1 : 0)
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[var(--mist)] bg-white/65 p-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {hotel.starRating != null && (
+              <span className="text-sm tracking-[0.12em] text-[#f5a623]" aria-label={`${hotel.starRating} 星酒店`}>
+                {'★'.repeat(Math.max(1, Math.min(5, Math.round(hotel.starRating))))}
+              </span>
+            )}
+            {hotel.propertyType && (
+              <span className="rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
+                {hotel.propertyType === 'HOTEL' ? '酒店' : hotel.propertyType}
+              </span>
+            )}
+            {hotel.sustainability && (
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
+                可持续住宿 · {hotel.sustainability}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 flex items-start gap-2 text-sm leading-relaxed">
+            <span className="mt-0.5 text-[#003b95]"><HotelFactIcon type="location" /></span>
+            <div>
+              <p>{hotel.address || `${hotel.name}, Paris`}</p>
+              {hotel.area && <p className="mt-0.5 text-xs text-[var(--stone)]">{hotel.area}</p>}
+            </div>
+          </div>
+        </div>
+        {hotel.rating != null && (
+          <div className="flex shrink-0 items-center gap-2 text-right">
+            <div>
+              <p className="text-sm font-semibold">{hotelScoreText(hotel.rating)}</p>
+              {hotel.reviewCount != null && <p className="text-[11px] text-[var(--stone)]">{hotel.reviewCount.toLocaleString('zh-CN')} 条住客点评</p>}
+            </div>
+            <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] px-2 text-sm font-semibold text-white">
+              {hotel.rating.toFixed(1)}
+            </span>
+          </div>
+        )}
+        {hasValidParisBookingIdentity(hotel) && hotel.bookingUrl && (
+          <a
+            href={hotel.bookingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 rounded-lg bg-[#006ce4] px-3 py-2 text-xs font-semibold transition duration-300 ease-out hover:-translate-y-0.5 hover:bg-[#0057b8] active:translate-y-0"
+            style={{ color: '#fff' }}
+          >
+            查看酒店
+            <span aria-hidden>↗</span>
+          </a>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {identityLoading && (
+          <LoadingIndicator label="正在识别 Booking.com 酒店" showDots size="sm" />
+        )}
+        {loading && (
+          <LoadingIndicator label="正在加载酒店完整资料" showDots size="sm" />
+        )}
+        {identityError && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <span>{identityError}</span>
+            <button
+              type="button"
+              onClick={onIdentityRetry}
+              className="font-medium underline underline-offset-2"
+            >
+              重试匹配
+            </button>
+          </div>
+        )}
+        {error && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="font-medium underline underline-offset-2"
+            >
+              重试
+            </button>
+          </div>
+        )}
+
+        {facts.length > 0 && (
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {facts.map((fact) => (
+              <div key={fact.label} className="rounded-xl border border-[var(--mist)] bg-white/60 px-3 py-2.5">
+                <dt className="text-[11px] text-[var(--stone)]">{fact.label}</dt>
+                <dd className="mt-0.5 text-sm font-medium">{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {visibleFacilities.length ? (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[#003b95]"><HotelFactIcon type="facility" /></span>
+              <p className="text-base font-semibold">热门设施</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+              {visibleFacilities.slice(0, 12).map((facility) => (
+                <span key={facility} className="flex items-center gap-2 text-sm">
+                  <span className="text-emerald-700">✓</span>{facility}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : !loading && !error && hotel.bookingDetailsLoaded ? (
+          <p className="text-xs text-[var(--stone)]">该酒店没有返回可展示的设施信息。</p>
+        ) : null}
+
+        {hasValidParisBookingIdentity(hotel) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--mist)] bg-white/60 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">
+                {hotel.bookingPhotosLoaded && photoCount > 1
+                  ? `酒店图集 · ${photoCount} 张`
+                  : '查看更多酒店照片'}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--stone)]">
+                {hotel.bookingPhotosLoaded && photoCount > 1
+                  ? '已缓存，刷新或换设备后无需重复加载'
+                  : '仅在点击时使用 1 次图片接口请求'}
+              </p>
+            </div>
+            {!(hotel.bookingPhotosLoaded && photoCount > 1) && (
+              <button
+                type="button"
+                onClick={onLoadPhotos}
+                disabled={photosLoading}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sage)]/35 bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition duration-300 hover:-translate-y-0.5 hover:border-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+              >
+                {photosLoading && <ButtonSpinner />}
+                {photosLoading ? '加载图集' : photosError ? '重试图集' : '查看全部照片'}
+              </button>
+            )}
+            {photosError && !photosLoading && (
+              <p className="basis-full text-xs text-amber-800">{photosError}</p>
+            )}
+          </div>
+        )}
+
+        {reviewScores.length > 0 && (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+            <h4 className="text-base font-semibold">住客评分细项</h4>
+            <div className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2">
+              {reviewScores.map((item) => (
+                <div key={item.label}>
+                  <div className="mb-1 flex justify-between text-xs"><span>{item.label}</span><span className="font-semibold">{item.score.toFixed(1)}</span></div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-[#dbe7f6]"><div className="h-full rounded-full bg-[#006ce4]" style={{ width: `${Math.min(100, item.score * 10)}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(hotel.checkIn || hotel.checkOut || visibleLanguages.length > 0 || policies.length > 0 || (hotel.paymentMethods?.length || 0) > 0) && (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+            <div className="mb-3 flex items-center gap-2"><span className="text-[#003b95]"><HotelFactIcon type="info" /></span><h4 className="text-base font-semibold">住宿规定与实用信息</h4></div>
+            <div className="divide-y divide-[var(--mist)] text-sm">
+              {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">入住与退房</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
+              {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">服务语言</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
+              {(hotel.paymentMethods?.length || 0) > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">付款方式</span><span className="text-[var(--ink)]/80">{hotel.paymentMethods?.join('、')}</span></div>}
+              {policies.slice(0, 6).map((policy, index) => <div key={`${policy}-${index}`} className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{index === 0 ? '重要须知' : ''}</span><span className="leading-relaxed text-[var(--ink)]/80">{policy}</span></div>)}
+            </div>
+          </div>
+        )}
+
+        <p className="text-[11px] leading-relaxed text-[var(--stone)]">
+          房型、实时价格、早餐与取消政策会随日期变化，请通过「查看酒店」确认当前可订状态。
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function BookingReviewsPanel({
+  hotel,
+  expanded,
+  loading,
+  error,
+  onToggle,
+  onRetry,
+}: {
+  hotel: HotelCandidate
+  expanded: boolean
+  loading: boolean
+  error: string | null
+  onToggle: () => void
+  onRetry: () => void
+}) {
+  const reviews = (hotel.reviews || []).map((review) => ({
+    text: review.negativeText
+      ? `${review.text}\n\n不足：${review.negativeText}`
+      : review.text,
+    rating: review.rating,
+    author: review.author,
+    relativeTime: review.relativeTime,
+  }))
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--mist)] bg-white/45">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="group flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left transition-colors duration-300 hover:bg-white/60"
+      >
+        <span>
+          <span className="block text-sm font-medium">Booking.com 住客精选评论</span>
+          <span className="mt-0.5 block text-xs text-[var(--stone)]">
+            {hotel.reviewCount
+              ? `共 ${hotel.reviewCount.toLocaleString('zh-CN')} 条评价 · 展开时加载精选内容`
+              : '展开时才加载，不额外浪费请求额度'}
+          </span>
+        </span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--mist)] text-[var(--stone)] transition duration-300 group-hover:bg-white group-hover:text-[var(--ink)]">
+          <ChevronIcon up={expanded} />
+        </span>
+      </button>
+
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-t border-[var(--mist)] px-4 py-3.5">
+            {loading && (
+              <LoadingIndicator label="正在加载精选住客评论" showDots size="sm" />
+            )}
+            {error && !loading && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="font-medium underline underline-offset-2"
+                >
+                  重试
+                </button>
+              </div>
+            )}
+            {!loading && !error && reviews.length > 0 && (
+              <GoogleReviewsList reviews={reviews} sourceLabel="Booking.com 精选评论" showHeader={false} />
+            )}
+            {!loading && !error && hotel.bookingReviewsLoaded && !reviews.length && (
+              <p className="text-sm text-[var(--stone)]">暂无可展示的精选住客评论。</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function HotelPicker({
   selected,
   candidates,
@@ -172,6 +545,17 @@ export function HotelPicker({
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [popupHotelId, setPopupHotelId] = useState<string | null>(null)
+  const [identityLoadingId, setIdentityLoadingId] = useState<string | null>(null)
+  const [identityError, setIdentityError] = useState<string | null>(null)
+  const [identityRetryToken, setIdentityRetryToken] = useState(0)
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [detailsRetryToken, setDetailsRetryToken] = useState(0)
+  const [photosLoadingId, setPhotosLoadingId] = useState<string | null>(null)
+  const [photosError, setPhotosError] = useState<string | null>(null)
+  const [reviewsExpanded, setReviewsExpanded] = useState(false)
+  const [reviewsLoadingId, setReviewsLoadingId] = useState<string | null>(null)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
   /** Custom hotel awaiting stay / consider / cancel decision. */
   const [pendingCustom, setPendingCustom] = useState<HotelCandidate | null>(null)
   const [storyLoadingId, setStoryLoadingId] = useState<string | null>(null)
@@ -215,6 +599,226 @@ export function HotelPicker({
     if (pendingCustom) return pendingCustom
     return candidates.find((h) => h.id === popupHotelId) || null
   }, [candidates, popupHotelId, pendingCustom])
+
+  const bookingDetailsOverride = useMemo(() => {
+    if (!popupCandidate) return null
+    return {
+      name: popupCandidate.name,
+      nameOriginal: popupCandidate.name,
+      address: popupCandidate.address,
+      rating: popupCandidate.rating,
+      userRatingCount: popupCandidate.reviewCount,
+      photos: popupCandidate.photos?.length
+        ? popupCandidate.photos.map(bookingPhotoUrl)
+        : popupCandidate.image
+          ? [bookingPhotoUrl(popupCandidate.image)]
+          : [],
+      reviews: (popupCandidate.reviews || []).map((review) => ({
+        text: review.negativeText
+          ? `${review.text}\n\n不足：${review.negativeText}`
+          : review.text,
+        rating: review.rating,
+        author: review.author,
+        relativeTime: review.relativeTime,
+      })),
+      summary: popupCandidate.description,
+      location: { lat: popupCandidate.lat, lng: popupCandidate.lng },
+      query: popupCandidate.name,
+    }
+  }, [popupCandidate])
+
+  useEffect(() => {
+    if (
+      !popupCandidate ||
+      hasValidParisBookingIdentity(popupCandidate) ||
+      !isBookingApiEnabled()
+    ) {
+      setIdentityLoadingId(null)
+      setIdentityError(null)
+      return
+    }
+    const card = popupCandidate
+    let cancelled = false
+    setIdentityLoadingId(card.id)
+    setIdentityError(null)
+    void resolveBookingHotelIdentity(card.name)
+      .then((identity) => {
+        if (cancelled) return
+        if (!identity) {
+          setIdentityError('没有找到对应的 Booking.com 酒店，请使用其原文名称重试。')
+          return
+        }
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                bookingHotelId: identity.id,
+                name: identity.name,
+                address: identity.address || hotel.address,
+                lat: identity.location.lat,
+                lng: identity.location.lng,
+                image: identity.image || hotel.image,
+                photos: identity.photos.length ? identity.photos : hotel.photos,
+                area: hotel.area || identity.area || '巴黎',
+                rating: undefined,
+                reviewCount: undefined,
+                starRating: undefined,
+                facilities: [],
+                reviews: [],
+                checkIn: undefined,
+                checkOut: undefined,
+                bookingUrl: undefined,
+                bookingDetailsLoaded: false,
+                bookingPhotosLoaded: false,
+                bookingReviewsLoaded: false,
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        const resolved = next.find((hotel) => hotel.id === card.id)
+        const nextSelected =
+          resolved && selectedRef.current.id === card.id
+            ? candidateToSelected(resolved)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch((cause) => {
+        if (cancelled) return
+        setIdentityError(
+          cause instanceof Error ? cause.message : 'Booking.com 酒店身份匹配失败。',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIdentityLoadingId((id) => (id === card.id ? null : id))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [popupCandidate, identityRetryToken, onCandidatesChange, onSelect])
+
+  useEffect(() => {
+    if (
+      !popupCandidate?.bookingHotelId ||
+      !hasValidParisBookingIdentity(popupCandidate) ||
+      !isBookingApiEnabled()
+    ) {
+      setDetailsLoadingId(null)
+      setDetailsError(null)
+      return
+    }
+    if (popupCandidate.bookingDetailsLoaded && (popupCandidate.bookingDetailsVersion || 0) >= 2) {
+      setDetailsLoadingId(null)
+      setDetailsError(null)
+      return
+    }
+    const dates = loadTripDates()
+    if (!dates) return
+    let cancelled = false
+    setDetailsLoadingId(popupCandidate.id)
+    setDetailsError(null)
+    void fetchBookingHotelDetails({
+      id: popupCandidate.bookingHotelId,
+      startDate: dates.startDate,
+      endDate: dates.endDate,
+    })
+      .then((details) => {
+        if (cancelled) return
+        if (!details) {
+          setDetailsError('酒店资料暂时无法解析，请稍后重试。')
+          return
+        }
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== popupCandidate.id
+            ? hotel
+            : {
+                ...hotel,
+                name: details.name,
+                address: details.address,
+                lat: details.location.lat,
+                lng: details.location.lng,
+                image: details.image || hotel.image,
+                photos:
+                  details.photos.length > (hotel.photos?.length || 0)
+                    ? details.photos
+                    : hotel.photos,
+                rating: details.rating ?? hotel.rating,
+                reviewCount: details.reviewCount ?? hotel.reviewCount,
+                starRating: details.stars ?? hotel.starRating,
+                facilities: details.facilities.length
+                  ? details.facilities
+                  : hotel.facilities,
+                propertyType: details.propertyType || hotel.propertyType,
+                reviewScores: details.reviewScores?.length
+                  ? details.reviewScores
+                  : hotel.reviewScores,
+                languages: details.languages?.length ? details.languages : hotel.languages,
+                policies: details.policies?.length ? details.policies : hotel.policies,
+                paymentMethods: details.paymentMethods?.length
+                  ? details.paymentMethods
+                  : hotel.paymentMethods,
+                sustainability: details.sustainability || hotel.sustainability,
+                description: details.description || hotel.description,
+                checkIn: details.checkIn || hotel.checkIn,
+                checkOut: details.checkOut || hotel.checkOut,
+                bookingUrl: details.sourceUrl || hotel.bookingUrl,
+                bookingDetailsLoaded: true,
+                bookingDetailsVersion: 2,
+                bookingPhotosLoaded:
+                  hotel.bookingPhotosLoaded || details.photos.length > 1,
+                reviews: details.reviews.length
+                  ? details.reviews.map((review) => ({
+                      text: review.text,
+                      negativeText: review.negativeText,
+                      rating: review.rating,
+                      author: review.author,
+                      relativeTime: review.completedAt
+                        ? new Date(review.completedAt * 1_000).toLocaleDateString('zh-CN')
+                        : undefined,
+                    }))
+                  : hotel.reviews,
+              }
+        if (pendingCustomRef.current?.id === popupCandidate.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        const resolved = next.find((hotel) => hotel.id === popupCandidate.id)
+        const nextSelected =
+          resolved && selectedRef.current.id === popupCandidate.id
+            ? candidateToSelected(resolved)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch((cause) => {
+        if (cancelled) return
+        setDetailsError(
+          cause instanceof Error ? cause.message : '酒店资料加载失败，请稍后重试。',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDetailsLoadingId((id) => (id === popupCandidate.id ? null : id))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [popupCandidate, onCandidatesChange, onSelect, detailsRetryToken])
+
+  useEffect(() => {
+    setReviewsExpanded(false)
+    setReviewsError(null)
+    setReviewsLoadingId(null)
+  }, [popupCandidate?.id])
 
   useEffect(() => {
     onDetailChange?.(popupCandidate)
@@ -458,11 +1062,127 @@ export function HotelPicker({
   }
 
   function closeHotelPopup() {
+    setPhotosError(null)
     if (pendingCustom) {
       dismissPendingCustom()
       return
     }
     setPopupHotelId(null)
+  }
+
+  function loadFeaturedReviews(card: HotelCandidate) {
+    if (
+      card.bookingReviewsLoaded ||
+      card.reviews?.length ||
+      reviewsLoadingId === card.id
+    ) {
+      return
+    }
+    if (
+      !card.bookingHotelId ||
+      !hasValidParisBookingIdentity(card) ||
+      !isBookingApiEnabled()
+    ) {
+      setReviewsError('该酒店暂时无法获取 Booking.com 精选评论。')
+      return
+    }
+    setReviewsLoadingId(card.id)
+    setReviewsError(null)
+    void fetchBookingHotelFeaturedReviews({ id: card.bookingHotelId })
+      .then((result) => {
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                bookingReviewsLoaded: true,
+                reviews: result.reviews.map((review) => ({
+                  text: review.text,
+                  negativeText: review.negativeText,
+                  rating: review.rating,
+                  author: review.author,
+                  relativeTime: review.completedAt
+                    ? new Date(review.completedAt * 1_000).toLocaleDateString('zh-CN')
+                    : undefined,
+                })),
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        persistHotelState(next, selectedRef.current)
+      })
+      .catch((cause) => {
+        setReviewsError(
+          cause instanceof Error ? cause.message : '精选评论加载失败，请稍后重试。',
+        )
+      })
+      .finally(() => {
+        setReviewsLoadingId((id) => (id === card.id ? null : id))
+      })
+  }
+
+  function loadHotelPhotos(card: HotelCandidate) {
+    if (
+      (card.bookingPhotosLoaded && (card.photos?.length || 0) > 1) ||
+      photosLoadingId === card.id
+    ) return
+    if (!card.bookingHotelId || !isBookingApiEnabled()) {
+      setPhotosError('该酒店暂时无法加载完整图集。')
+      return
+    }
+    setPhotosLoadingId(card.id)
+    setPhotosError(null)
+    void fetchBookingHotelPhotos({ id: card.bookingHotelId })
+      .then((photos) => {
+        if (!photos.length) {
+          setPhotosError('图片接口本次未返回可用照片，请稍后重试。')
+          return
+        }
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                bookingPhotosLoaded: photos.length > 1,
+                photos,
+                image: photos[0] || hotel.image,
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        const resolved = next.find((hotel) => hotel.id === card.id)
+        const nextSelected =
+          resolved && selectedRef.current.id === card.id
+            ? candidateToSelected(resolved)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch((cause) => {
+        setPhotosError(
+          cause instanceof Error ? cause.message : '酒店图集加载失败，请稍后重试。',
+        )
+      })
+      .finally(() => {
+        setPhotosLoadingId((id) => (id === card.id ? null : id))
+      })
+  }
+
+  function toggleFeaturedReviews() {
+    const card = popupCandidate
+    if (!card) return
+    if (reviewsExpanded) {
+      setReviewsExpanded(false)
+      return
+    }
+    setReviewsExpanded(true)
+    loadFeaturedReviews(card)
   }
 
   /** 就住这儿了：选中，并收起其他酒店卡片（可再展开） */
@@ -1117,6 +1837,41 @@ export function HotelPicker({
         }
         fallbackImage={popupCandidate?.image}
         showMap={false}
+        galleryVariant="booking"
+        providerOwnsSummary
+        detailsOverride={bookingDetailsOverride}
+        skipProviderLookup
+        providerDetails={
+          popupCandidate ? (
+            <BookingHotelFacts
+              hotel={popupCandidate}
+              identityLoading={identityLoadingId === popupCandidate.id}
+              identityError={identityError}
+              loading={detailsLoadingId === popupCandidate.id}
+              error={detailsError}
+              photosLoading={photosLoadingId === popupCandidate.id}
+              photosError={photosError}
+              onIdentityRetry={() => setIdentityRetryToken((token) => token + 1)}
+              onRetry={() => setDetailsRetryToken((token) => token + 1)}
+              onLoadPhotos={() => loadHotelPhotos(popupCandidate)}
+            />
+          ) : undefined
+        }
+        reviewsSection={
+          popupCandidate ? (
+            <BookingReviewsPanel
+              hotel={popupCandidate}
+              expanded={reviewsExpanded}
+              loading={reviewsLoadingId === popupCandidate.id}
+              error={reviewsError}
+              onToggle={toggleFeaturedReviews}
+              onRetry={() => {
+                setReviewsError(null)
+                loadFeaturedReviews(popupCandidate)
+              }}
+            />
+          ) : undefined
+        }
         llmNarrative={
           popupCandidate
             ? {

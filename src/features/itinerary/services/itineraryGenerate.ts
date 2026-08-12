@@ -9,6 +9,7 @@ import type {
   WalkLevel,
 } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
+import { fetchWikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
 import {
   fetchGooglePlaceDetails,
@@ -58,6 +59,12 @@ function normalizePace(raw: unknown): DayPlan['pace'] {
 function normalizeWalk(raw: unknown): WalkLevel | undefined {
   const v = String(raw || '').trim() as WalkLevel
   return WALK_SET.has(v) ? v : undefined
+}
+
+function normalizeTransportChoice(raw: unknown): '公共交通' | '步行' | undefined {
+  const text = String(raw || '').trim()
+  if (!text) return undefined
+  return /walk|walking|步行|走路|步走/i.test(text) ? '步行' : '公共交通'
 }
 
 function normalizeType(raw: unknown): PlaceType {
@@ -155,6 +162,10 @@ async function resolveDraftPlace(
     placeId: draft.googlePlaceId,
   }).catch(() => null)
   const loc = details?.location
+  const wikimediaPhoto =
+    draft.type === 'attraction' && loc
+      ? await fetchWikimediaPlacePhoto(details?.name || draft.name, loc)
+      : null
   const id = `gen-${slugKey(draft.key || draft.name) || 'place'}-${Math.random()
     .toString(36)
     .slice(2, 7)}`
@@ -162,7 +173,9 @@ async function resolveDraftPlace(
   const place: Place = {
     id,
     googlePlaceId: details?.id || draft.googlePlaceId,
-    name: details?.name || draft.name,
+    name: /[\u3400-\u9fff]/.test(draft.name)
+      ? draft.name
+      : details?.name || draft.name,
     // Persist Google's local/original title so itinerary cards are bilingual
     // immediately, even when the LLM only returned a Chinese place name.
     nameLocal: details?.nameOriginal || draft.nameLocal,
@@ -176,7 +189,7 @@ async function resolveDraftPlace(
         ? `Google ★ ${details.rating.toFixed(1)}`
         : draft.ratingHint || 'Google 地点',
     priceHint: details?.priceLevel,
-    image: details?.photos?.[0] || FALLBACK_IMAGE,
+    image: wikimediaPhoto?.url || details?.photos?.[0] || FALLBACK_IMAGE,
     location: loc || {
       // Soft fallback near hotel so the map still works if Places misses.
       lat: hotel.lat + (Math.random() - 0.5) * 0.01,
@@ -801,7 +814,7 @@ export async function buildGeneratedSingleDay(
       time: String(s.time || '10:00').trim() || '10:00',
       placeId,
       note: String(s.note || '').trim() || '按当天节奏灵活调整。',
-      transport: s.transport ? String(s.transport).trim() : undefined,
+      transport: normalizeTransportChoice(s.transport),
       walkLevel: normalizeWalk(s.walkLevel) || '短步行',
       duration: s.duration ? String(s.duration).trim() : undefined,
     }
@@ -933,7 +946,7 @@ export async function buildGeneratedItinerary(
         time: String(s.time || '10:00').trim() || '10:00',
         placeId,
         note: String(s.note || '').trim() || '按当天节奏灵活调整。',
-        transport: s.transport ? String(s.transport).trim() : undefined,
+        transport: normalizeTransportChoice(s.transport),
         walkLevel: normalizeWalk(s.walkLevel) || '短步行',
         duration: s.duration ? String(s.duration).trim() : undefined,
       }

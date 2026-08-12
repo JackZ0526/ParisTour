@@ -6,9 +6,15 @@ import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 interface Props {
   reviews: GoogleReview[]
+  sourceLabel?: string
+  showHeader?: boolean
 }
 
-export function GoogleReviewsList({ reviews }: Props) {
+export function GoogleReviewsList({
+  reviews,
+  sourceLabel = 'Google 评论',
+  showHeader = true,
+}: Props) {
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [showOriginal, setShowOriginal] = useState<Record<number, boolean>>({})
   const [translating, setTranslating] = useState(false)
@@ -62,8 +68,8 @@ export function GoogleReviewsList({ reviews }: Props) {
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium">Google 评论</p>
+      <div className={`${showHeader ? 'mb-2' : 'mb-3'} flex flex-wrap items-center justify-between gap-2`}>
+        {showHeader && <p className="text-sm font-medium">{sourceLabel}</p>}
         {translating && (
           <LoadingIndicator
             thinkingLabel="正在翻译非中文评论…"

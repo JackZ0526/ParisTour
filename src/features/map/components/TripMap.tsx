@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
+import { GoogleMap, Marker } from '@react-google-maps/api'
 import { getPlace } from '../../place/constants/places'
-import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import {
   getDayOriginFromHotelFields,
@@ -22,9 +21,6 @@ import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
 
 const mapContainerStyle = { width: '100%', height: '100%' }
 
-/** Google Maps blue — native look, not black */
-const GOOGLE_ROUTE_BLUE = '#1a73e8'
-
 const mapOptions: google.maps.MapOptions = {
   disableDefaultUI: false,
   zoomControl: true,
@@ -35,59 +31,21 @@ const mapOptions: google.maps.MapOptions = {
   gestureHandling: 'cooperative',
 }
 
-function collectNavLegs(navPlan: DayNavPlan): ResolvedDayLeg[] {
-  const legs: ResolvedDayLeg[] = []
-  if (navPlan.hotelToFirst) legs.push(navPlan.hotelToFirst)
-  for (const leg of navPlan.betweenStops) {
-    if (leg) legs.push(leg)
-  }
-  if (navPlan.lastToDestination) legs.push(navPlan.lastToDestination)
-  return legs
-}
-
-/** All coordinates that should stay inside the map viewport (markers + route geometry). */
+/** All origin and stop coordinates that should stay inside the map viewport. */
 function collectViewportPoints(
   origin: { lat: number; lng: number },
   stops: Place[],
-  navPlan: DayNavPlan,
 ): google.maps.LatLngLiteral[] {
-  const points: google.maps.LatLngLiteral[] = [
+  return [
     { lat: origin.lat, lng: origin.lng },
     ...stops.map((s) => s.location),
   ]
-
-  const pushPath = (path: google.maps.LatLngLiteral[] | undefined | null) => {
-    if (!path?.length) return
-    for (const p of path) {
-      if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) points.push(p)
-    }
-  }
-
-  pushPath(navPlan.hotelLinkPath)
-  pushPath(navPlan.routePath)
-  for (const leg of collectNavLegs(navPlan)) {
-    pushPath(leg.path)
-    const overview = leg.directionsResult?.routes?.[0]?.overview_path
-    if (overview?.length) {
-      for (const ll of overview) {
-        const lat = typeof ll.lat === 'function' ? ll.lat() : Number(ll.lat)
-        const lng = typeof ll.lng === 'function' ? ll.lng() : Number(ll.lng)
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-          points.push({ lat, lng })
-        }
-      }
-    }
-  }
-
-  return points
 }
 
 interface Props {
   hotel: SelectedHotel
   day: DayPlan
   customPlaces?: Record<string, Place>
-  navPlan: DayNavPlan
-  navLoading: boolean
   selectedPlaceId: string | null
   onSelectPlace: (id: string) => void
 }
@@ -96,8 +54,6 @@ export function TripMap({
   hotel,
   day,
   customPlaces = {},
-  navPlan,
-  navLoading,
   selectedPlaceId,
   onSelectPlace,
 }: Props) {
@@ -158,72 +114,23 @@ export function TripMap({
 
   const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
 
-  const directionsLegs = useMemo(
-    () => collectNavLegs(navPlan).filter((leg) => Boolean(leg.directionsResult)),
-    [navPlan],
-  )
-  const cachedPathLegs = useMemo(
-    () =>
-      collectNavLegs(navPlan).filter(
-        (leg) => !leg.directionsResult && leg.path.length >= 2,
-      ),
-    [navPlan],
-  )
-  const resolvedLegCount = directionsLegs.length + cachedPathLegs.length
-
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const onLoad = useCallback((m: google.maps.Map) => setMap(m), [])
   const onUnmount = useCallback(() => setMap(null), [])
 
-  // The wrapper's <Polyline> calls setPath on a stale Google instance when a
-  // realtime snapshot replaces the route array. Manage cached paths directly
-  // on the persistent map so sync updates cannot escape React as a commit error.
-  useEffect(() => {
-    if (!map || !isLoaded || !cachedPathLegs.length) return
-
-    const polylines: google.maps.Polyline[] = []
-    for (const leg of cachedPathLegs) {
-      try {
-        polylines.push(
-          new google.maps.Polyline({
-            map,
-            path: leg.path,
-            strokeColor: GOOGLE_ROUTE_BLUE,
-            strokeOpacity: 0.9,
-            strokeWeight: 6,
-          }),
-        )
-      } catch (error) {
-        console.warn('[TripMap] cached route overlay could not be drawn', error)
-      }
-    }
-
-    return () => {
-      for (const polyline of polylines) {
-        try {
-          polyline.setMap(null)
-        } catch {
-          /* Google may already have disposed the overlay with the map. */
-        }
-      }
-    }
-  }, [map, isLoaded, cachedPathLegs])
-
   /** Only refit when this day's route/places change — not when other days' data updates. */
   const viewportKey = useMemo(
-    () => `${day.day}|${dayOrigin.id}|${stopsFingerprint}|${navPlan.stopsKey || ''}`,
-    [day.day, dayOrigin.id, stopsFingerprint, navPlan.stopsKey],
+    () => `${day.day}|${dayOrigin.id}|${stopsFingerprint}`,
+    [day.day, dayOrigin.id, stopsFingerprint],
   )
   const lastFittedKeyRef = useRef('')
 
   useEffect(() => {
     if (!map || !isLoaded) return
-    // Wait until nav settles so route geometry is included (cached days are instant).
-    if (navLoading) return
     // Same day viewport — skip. Avoids one-shot pan when parent re-renders after other-day edits.
     if (lastFittedKeyRef.current === viewportKey) return
 
-    const points = collectViewportPoints(dayOrigin, stops, navPlan)
+    const points = collectViewportPoints(dayOrigin, stops)
     if (!points.length) return
 
     const padding = { top: 72, right: 72, bottom: 72, left: 72 }
@@ -261,7 +168,7 @@ export function TripMap({
       window.cancelAnimationFrame(raf)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, isLoaded, navLoading, viewportKey])
+  }, [map, isLoaded, viewportKey])
 
   // Switching days must allow a fresh fit even if a previous day shared a key shape.
   useEffect(() => {
@@ -294,24 +201,6 @@ export function TripMap({
           >
             Maps JavaScript API
           </a>
-          、
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/places.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Places API (New)
-          </a>
-          、
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/directions-backend.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Directions API
-          </a>
           。
         </p>
       </div>
@@ -329,23 +218,9 @@ export function TripMap({
   return (
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
-        <span>Google Maps · 当日路线</span>
-        {navLoading ? (
-          <LoadingIndicator label="正在获取实时导航…" size="sm" showDots />
-        ) : (
-          <span>
-            {resolvedLegCount
-              ? `${cachedPathLegs.length ? '已保存路线' : '实时路线'} · ${resolvedLegCount} 段`
-              : '等待路线数据'}
-          </span>
-        )}
+        <span>Google Maps · 当日地点</span>
+        <span>路线请点击时间线中的交通链接</span>
       </div>
-
-      {navPlan.error && (
-        <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          {navPlan.error} 请稍后刷新页面重试。
-        </div>
-      )}
 
       <div className="h-[min(52vh,360px)] w-full md:h-[560px]">
         <GoogleMap
@@ -356,21 +231,6 @@ export function TripMap({
           onLoad={onLoad}
           onUnmount={onUnmount}
         >
-          {directionsLegs.map((leg, i) => (
-            <DirectionsRenderer
-              key={`${navPlan.stopsKey || 'nav'}-gdir-${i}-${leg.displayMode}-${leg.durationSeconds}-${leg.distanceMeters}`}
-              directions={leg.directionsResult}
-              options={{
-                suppressMarkers: true,
-                preserveViewport: true,
-                polylineOptions: {
-                  strokeColor: GOOGLE_ROUTE_BLUE,
-                  strokeOpacity: 0.9,
-                  strokeWeight: 6,
-                },
-              }}
-            />
-          ))}
           <Marker
             position={{ lat: dayOrigin.lat, lng: dayOrigin.lng }}
             title={dayOrigin.label}

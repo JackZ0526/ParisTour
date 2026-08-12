@@ -10,6 +10,8 @@ export interface Coordinates {
 /** Hotel card shown in the picker (LLM recommend or custom address). */
 export interface HotelCandidate {
   id: string
+  bookingHotelId?: string
+  /** Legacy identity retained for older saved trips. */
   googlePlaceId?: string
   name: string
   area: string
@@ -19,6 +21,41 @@ export interface HotelCandidate {
   priceHint: string
   nearestMetro: string
   image: string
+  photos?: string[]
+  rating?: number
+  reviewCount?: number
+  starRating?: number
+  facilities?: string[]
+  /** Booking category, e.g. Hotel or Aparthotel. */
+  propertyType?: string
+  /** Booking review sub-scores such as location, staff and cleanliness. */
+  reviewScores?: Array<{ label: string; score: number }>
+  /** Languages spoken by the property staff. */
+  languages?: string[]
+  /** Important stay rules and fine print returned by Booking. */
+  policies?: string[]
+  /** Accepted payment methods returned by Booking. */
+  paymentMethods?: string[]
+  /** Sustainability tier or provider label. */
+  sustainability?: string
+  reviews?: Array<{
+    text: string
+    negativeText?: string
+    rating?: number
+    author?: string
+    relativeTime?: string
+  }>
+  checkIn?: string
+  checkOut?: string
+  bookingUrl?: string
+  /** True after the Booking detail endpoint has been resolved, including empty optional fields. */
+  bookingDetailsLoaded?: boolean
+  /** Local normalized detail schema; used to refresh older cached records once. */
+  bookingDetailsVersion?: number
+  /** True when the Booking detail response included a multi-photo gallery. */
+  bookingPhotosLoaded?: boolean
+  /** True after featured Booking reviews have been resolved, including an empty result. */
+  bookingReviewsLoaded?: boolean
   lat: number
   lng: number
   /** Short why-this-hotel line from recommend */
@@ -110,6 +147,7 @@ export interface FlightInfo {
 
 export interface SelectedHotel {
   id: string
+  bookingHotelId?: string
   googlePlaceId?: string
   name: string
   address: string

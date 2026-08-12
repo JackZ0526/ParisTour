@@ -17,7 +17,6 @@ import {
   placeOriginalLabel,
   placeTitleLines,
 } from '../../../shared/utils/placeTitle'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ActivityBars } from '../../../shared/components/LoadingIndicator'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
@@ -101,10 +100,9 @@ export function PlaceName({
   subtitleClassName = 'text-sm text-[var(--stone)]',
   inline = false,
   mode = 'bilingual',
-  enrichFromGoogle = true,
+  enrichFromGoogle = false,
   zhIsLlmTranslated = false,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const excludePropCjk = zhIsLlmTranslated
   const chineseOpts = excludePropCjk ? EXCLUDE_PROP_CJK_OPTIONS : undefined
   const locationLat = location?.lat
@@ -170,7 +168,7 @@ export function PlaceName({
         : !initial.subtitle)
 
   useEffect(() => {
-    if (!needsEnrich || !isLoaded) return
+    if (!needsEnrich) return
     let cancelled = false
     const queryLocation =
       locationLat != null && locationLng != null
@@ -181,8 +179,11 @@ export function PlaceName({
       setEnriched({ name: peek.name, original: peek.nameOriginal })
       return
     }
-    void fetchGooglePlaceDetails(placeDetailsQuery(name, nameLocal), queryLocation).then(
-      (details) => {
+    void fetchGooglePlaceDetails(
+      placeDetailsQuery(name, nameLocal),
+      queryLocation,
+      {},
+    ).then((details) => {
         if (cancelled) return
         // Mark attempted even when null so we can fall through to LLM translate.
         setEnriched(
@@ -190,12 +191,11 @@ export function PlaceName({
             ? { name: details.name, original: details.nameOriginal }
             : { name: undefined, original: undefined },
         )
-      },
-    )
+      })
     return () => {
       cancelled = true
     }
-  }, [needsEnrich, isLoaded, name, nameLocal, locationLat, locationLng])
+  }, [needsEnrich, name, nameLocal, locationLat, locationLng])
 
   const resolvedName = googleName || enriched?.name
   const resolvedOriginal = googleOriginal || enriched?.original

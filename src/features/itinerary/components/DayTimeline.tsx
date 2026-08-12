@@ -17,6 +17,12 @@ import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { HouseIcon, PlaneIcon } from '../../map/components/markerIcons'
 import { PlaceName } from '../../place/components/PlaceName'
+import {
+  googleMapsDirectionsUrl,
+  googleMapsTravelModeLabel,
+  inferGoogleMapsTravelMode,
+  type GoogleMapsTravelMode,
+} from '../../map/services/googleMapsDirectionsUrl'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -204,6 +210,8 @@ function LegConnector({
   leg,
   fallbackLabel,
   calculating,
+  routeUrl,
+  routeMode,
   /** Freeze displayed height — used while cards enter/exit/swap so leg morph can't push the list. */
   lockHeight = false,
   /** Optional cue for origin→first (e.g. 「从酒店」) — rendered as a prefix chip. */
@@ -212,16 +220,20 @@ function LegConnector({
   leg: ResolvedDayLeg | null | undefined
   fallbackLabel?: string
   calculating?: boolean
+  routeUrl?: string
+  routeMode?: GoogleMapsTravelMode
   lockHeight?: boolean
   originCue?: string
 }) {
   const mode = leg?.displayMode
   const tone =
-    mode === 'TRANSIT'
+    mode === 'TRANSIT' || routeMode === 'transit'
       ? 'border-sky-300/60 bg-sky-50 text-sky-900'
       : mode === 'DRIVING'
         ? 'border-[var(--copper)]/40 bg-[var(--copper)]/10 text-[var(--copper)]'
-        : 'border-[var(--stone)]/25 bg-[var(--mist)]/70 text-[var(--stone)]'
+        : routeMode === 'walking'
+          ? 'border-emerald-300/70 bg-emerald-50 text-emerald-900'
+          : 'border-[var(--stone)]/25 bg-[var(--mist)]/70 text-[var(--stone)]'
 
   const lines = leg?.transitLines || []
   const isCalculating = Boolean(calculating && !leg)
@@ -229,7 +241,7 @@ function LegConnector({
     ? 'calc'
     : lines.length > 0
       ? `transit:${originCue || ''}:${lines.length}`
-      : `simple:${originCue || ''}:${leg?.label || fallbackLabel || ''}`
+      : `simple:${originCue || ''}:${leg?.label || fallbackLabel || ''}:${routeMode || ''}`
 
   const measureRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -363,7 +375,7 @@ function LegConnector({
 
   return (
     <div
-      className="timeline-leg-connector flex items-start gap-3 px-2 py-1.5"
+      className="timeline-leg-connector flex items-center gap-3 px-2 py-1.5"
       aria-busy={isCalculating || undefined}
     >
       <div className="timeline-leg-rail" aria-hidden />
@@ -412,9 +424,38 @@ function LegConnector({
               )
             ) : (
               chipRow(
-                <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
-                  {leg?.label || fallbackLabel || '查看地图导航'}
-                </span>,
+                routeUrl ? (
+                  <a
+                    className={`timeline-route-link timeline-route-link--${routeMode || 'transit'} inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs`}
+                    href={routeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}，在 Google Maps 查看路线`}
+                  >
+                    <span className="timeline-route-link-label">
+                      {fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}
+                    </span>
+                    <svg
+                      className="timeline-route-link-arrow"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M7 17 17 7" />
+                      <path d="M7 7h10v10" />
+                    </svg>
+                  </a>
+                ) : (
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
+                    {leg?.label || fallbackLabel || '查看地图导航'}
+                  </span>
+                ),
               )
             )}
           </div>
@@ -430,7 +471,6 @@ interface Props {
   customPlaces: Record<string, Place>
   selectedPlaceId: string | null
   navPlan: DayNavPlan
-  navLoading: boolean
   copyRefreshing?: boolean
   /** True while this day's stops are being regenerated via LLM. */
   dayRegenerating?: boolean
@@ -493,7 +533,6 @@ export function DayTimeline({
   customPlaces,
   selectedPlaceId,
   navPlan,
-  navLoading,
   copyRefreshing,
   dayRegenerating = false,
   dayRegenError = null,
@@ -1038,20 +1077,47 @@ export function DayTimeline({
   }, [day.stops, day.day, exitGhosts])
 
   const dayOrigin = getDayOrigin(day.day, hotel)
-  // Origin cue chip shows 「从酒店」/「从机场」 — keep fallback free of that prefix.
-  const metroHint =
-    day.metroHintFromArea[hotel.areaKey] ||
-    day.metroHintFromArea.custom ||
-    '请根据地图出发。'
-
-  const stopPlaces = day.stops.map((stop) => {
+  const routePlaces = day.stops.map((stop): Place | null => {
     try {
       return getPlace(stop.placeId, customPlaces)
     } catch {
-      return { id: stop.placeId, type: 'attraction' as const, name: stop.placeId }
+      return null
     }
   })
+  const stopPlaces = routePlaces.map((place, index) =>
+    place || {
+      id: day.stops[index]?.placeId || `missing-${index}`,
+      type: 'attraction' as const,
+      name: day.stops[index]?.placeId || '未知地点',
+    },
+  )
   const stopNumbers = numberedStopIndexes(stopPlaces)
+  const routeCity = 'Paris, France'
+  const originRoutePoint = {
+    lat: dayOrigin.lat,
+    lng: dayOrigin.lng,
+    query:
+      dayOrigin.kind === 'airport' ? 'Charles de Gaulle Airport' : hotel.name,
+    city: routeCity,
+    placeId: dayOrigin.kind === 'hotel' ? hotel.googlePlaceId : undefined,
+  }
+  const firstRoutePlace = routePlaces[0]
+  const firstRouteMode = inferGoogleMapsTravelMode(
+    day.stops[0]?.transport,
+    day.stops[0]?.walkLevel,
+  )
+  const firstRouteUrl = firstRoutePlace
+    ? googleMapsDirectionsUrl({
+        origin: originRoutePoint,
+        destination: {
+          ...firstRoutePlace.location,
+          query: firstRoutePlace.name,
+          city: routeCity,
+          placeId: firstRoutePlace.googlePlaceId,
+        },
+        travelMode: firstRouteMode,
+      })
+    : undefined
 
   const isFixedAt = (index: number) => {
     const place = stopPlaces[index]
@@ -1492,18 +1558,9 @@ export function DayTimeline({
           </div>
         )}
         <div className="mt-3">
-          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm" aria-busy={navLoading || undefined}>
-            <span className="font-medium">今日步行：</span>
-            {navLoading ? (
-              <LoadingIndicator
-                className="ml-1 align-middle"
-                label="正在计算步行路线…"
-                size="sm"
-                showDots
-              />
-            ) : (
-              navPlan.walkSummaryText
-            )}
+          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm">
+            <span className="font-medium">路线导航：</span>
+            点击每段交通，在 Google Maps 查看实时路线
           </p>
         </div>
       </div>
@@ -1535,16 +1592,13 @@ export function DayTimeline({
           <div className="timeline-leg-slot-inner">
             <LegConnector
               leg={navPlan.hotelToFirst}
-              calculating={navLoading && !navPlan.hotelToFirst}
               lockHeight={lockLegHeight}
+              routeUrl={firstRouteUrl}
+              routeMode={firstRouteMode}
               originCue={
                 dayOrigin.kind === 'airport' ? '从机场' : '从酒店'
               }
-              fallbackLabel={
-                navLoading
-                  ? '计算出发方式…'
-                  : navPlan.hotelToFirstText || metroHint
-              }
+              fallbackLabel={`${googleMapsTravelModeLabel(firstRouteMode)} · Google Maps`}
             />
           </div>
         </div>
@@ -1611,6 +1665,12 @@ export function DayTimeline({
               : '回酒店过夜固定为末站'
           const legToNext =
             liveIndex != null ? navPlan.betweenStops[liveIndex] : undefined
+          const nextStop =
+            liveIndex != null ? day.stops[liveIndex + 1] : undefined
+          const nextRouteMode = inferGoogleMapsTravelMode(
+            nextStop?.transport,
+            nextStop?.walkLevel,
+          )
           const legInbound =
             liveIndex == null
               ? null
@@ -1762,6 +1822,7 @@ export function DayTimeline({
                   name={place.name}
                   nameLocal={place.nameLocal}
                   location={place.location}
+                  type={place.type}
                   fallback={place.image}
                   alt={place.name}
                   className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
@@ -1928,6 +1989,7 @@ export function DayTimeline({
                             name={oldSwapPlace.name}
                             nameLocal={oldSwapPlace.nameLocal}
                             location={oldSwapPlace.location}
+                            type={oldSwapPlace.type}
                             fallback={oldSwapPlace.image}
                             alt={oldSwapPlace.name}
                             className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
@@ -1969,12 +2031,30 @@ export function DayTimeline({
                   <div className="timeline-leg-slot-inner">
                     <LegConnector
                       leg={legToNext}
-                      calculating={navLoading && !legToNext}
                       lockHeight={lockLegHeight}
+                      routeMode={nextRouteMode}
+                      routeUrl={
+                        place.location && routePlaces[liveIndex + 1]
+                          ? googleMapsDirectionsUrl({
+                              origin: {
+                                ...place.location,
+                                query: place.name,
+                                city: routeCity,
+                                placeId: place.googlePlaceId,
+                              },
+                              destination: {
+                                ...routePlaces[liveIndex + 1]!.location,
+                                query: routePlaces[liveIndex + 1]!.name,
+                                city: routeCity,
+                                placeId:
+                                  routePlaces[liveIndex + 1]!.googlePlaceId,
+                              },
+                              travelMode: nextRouteMode,
+                            })
+                          : undefined
+                      }
                       fallbackLabel={
-                        navLoading
-                          ? '计算前往方式…'
-                          : stop.transport || '查看地图导航'
+                        `${googleMapsTravelModeLabel(nextRouteMode)} · Google Maps`
                       }
                     />
                   </div>
@@ -2066,6 +2146,7 @@ export function DayTimeline({
                     name={place.name}
                     nameLocal={place.nameLocal}
                     location={place.location}
+                    type={place.type}
                     fallback={place.image}
                     alt={place.name}
                     className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
