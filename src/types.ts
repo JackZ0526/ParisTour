@@ -38,6 +38,12 @@ export interface HotelCandidate {
   paymentMethods?: string[]
   /** Sustainability tier or provider label. */
   sustainability?: string
+  /** Booking district label, e.g. "3rd arr." */
+  districtLabel?: string
+  /** Distance to city center in kilometres from Booking detail. */
+  distanceToCityCenterKm?: number
+  /** Location / neighbourhood blurb from Booking description. */
+  locationDescription?: string
   reviews?: Array<{
     text: string
     negativeText?: string
@@ -62,6 +68,8 @@ export interface HotelCandidate {
   reason?: string
   /** How this stay fits the trip + user preferences */
   tripFit?: string
+  /** LLM advisor reason schema version; v2 = single combined reason. */
+  hotelAdvisorVersion?: number
   isBest?: boolean
   source: 'llm' | 'custom'
 }

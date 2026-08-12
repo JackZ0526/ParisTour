@@ -6,9 +6,11 @@ import {
   isBookingApiEnabled,
   normalizeBookingDestinationResponse,
   normalizeBookingDetailResponse,
+  normalizeBookingDescriptionResponse,
   normalizeBookingFeaturedReviews,
   normalizeBookingHotelIdentityResponse,
   normalizeBookingPhotosResponse,
+  normalizeBookingReviewScoresResponse,
   normalizeBookingSearchResponse,
   resetBookingHotelCacheForTests,
   searchBookingHotelCandidates,
@@ -178,6 +180,83 @@ describe('Booking hotel adapter', () => {
       checkOut: '11:00',
       location: { lat: 48.8632711, lng: 2.352693 },
     })
+  })
+
+  it('extracts structured policies from property_policy_display_details', () => {
+    const hotel = normalizeBookingDetailResponse({
+      data: {
+        hotel_id: 432332,
+        hotel_name: 'Georgette Hôtel & Restaurant',
+        latitude: 48.86324,
+        longitude: 2.3526356,
+        review_score: 8.6,
+        review_nr: 743,
+        property_policy_display_details: {
+          minimum_age_phrase: 'Guests must be 18 or older to check in.',
+          pets_allowed_phrase: 'Pets are not allowed.',
+          smoking_not_allowed_phrase: 'Smoking is not allowed.',
+        },
+        hotel_accepts_cash_status: 'PATP_PROPERTY_DOES_NOT_ACCEPT_CASH',
+      },
+    })
+
+    expect(hotel?.policies).toEqual(
+      expect.arrayContaining([
+        'Guests must be 18 or older to check in.',
+        'Pets are not allowed.',
+        'Smoking is not allowed.',
+        '住宿不接受现金付款',
+      ]),
+    )
+  })
+
+  it('extracts review scores from stays/review-scores total breakdown', () => {
+    const result = normalizeBookingReviewScoresResponse({
+      data: {
+        hotel_id: 432332,
+        score_breakdown: [
+          {
+            customer_type: 'total',
+            count: 743,
+            average_score: '8.4',
+            question: [
+              { question: 'hotel_clean', score: 8.8 },
+              { question: 'hotel_location', score: 9.4 },
+              { question: 'hotel_staff', score: 9.3 },
+              { question: 'total', score: 8.4 },
+            ],
+          },
+        ],
+      },
+    })
+
+    expect(result).toMatchObject({
+      rating: 8.4,
+      reviewCount: 743,
+      reviewScores: [
+        { label: '清洁程度', score: 8.8 },
+        { label: '位置', score: 9.4 },
+        { label: '员工服务', score: 9.3 },
+      ],
+    })
+  })
+
+  it('extracts location description from stays/get-description', () => {
+    const result = normalizeBookingDescriptionResponse({
+      data: [
+        {
+          descriptiontype_id: 6,
+          description: 'Located in the Marais district.\n\nRambuteau Metro is nearby.',
+        },
+        {
+          descriptiontype_id: 7,
+          description: 'Guests must show photo ID at check-in.',
+        },
+      ],
+    })
+
+    expect(result.locationDescription).toContain('Marais')
+    expect(result.policies).toEqual(['Guests must show photo ID at check-in.'])
   })
 
   it('extracts stable hotel details from the supplied GraphQL-style response', () => {

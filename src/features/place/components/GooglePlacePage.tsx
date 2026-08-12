@@ -29,6 +29,8 @@ export interface LlmPlaceNarrative {
   reason?: string
   tripFit?: string
   loading?: boolean
+  /** `single` renders one paragraph (hotel advisor reason); default is multi-section. */
+  variant?: 'single' | 'full'
   /** Customize section copy; defaults suit hotels, override for places. */
   labels?: {
     title?: string
@@ -52,8 +54,14 @@ interface Props {
   placeType?: PlaceType
   fallbackImage?: string
   showMap?: boolean
-  /** Booking-style asymmetric photo mosaic when enough provider photos exist. */
+  /** Booking-style gallery with lazy full album load on forward swipe. */
   galleryVariant?: 'carousel' | 'booking'
+  /** Fired when user swipes forward at the last loaded Booking photo. */
+  onBookingGalleryAdvance?: (nextIndex: number, loadedCount: number) => void
+  bookingGalleryPhotosLoading?: boolean
+  bookingGalleryPhotosError?: string | null
+  /** True after the full Booking photo API has been fetched. */
+  bookingPhotosFullyLoaded?: boolean
   /** Provider block renders rating/address; suppress generic summary above it. */
   providerOwnsSummary?: boolean
   /** Pre-resolved provider payload (used by Booking hotel details). */
@@ -94,6 +102,10 @@ export function GooglePlacePage({
   fallbackImage,
   showMap = true,
   galleryVariant = 'carousel',
+  onBookingGalleryAdvance,
+  bookingGalleryPhotosLoading = false,
+  bookingGalleryPhotosError = null,
+  bookingPhotosFullyLoaded = false,
   providerOwnsSummary = false,
   detailsOverride,
   skipProviderLookup = false,
@@ -112,8 +124,8 @@ export function GooglePlacePage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = useState(0)
-  const [galleryExpanded, setGalleryExpanded] = useState(false)
   const [failedPhotos, setFailedPhotos] = useState<string[]>([])
+  const pendingGalleryAdvanceRef = useRef(false)
   const [wikimediaPhoto, setWikimediaPhoto] =
     useState<WikimediaPlacePhoto | null>(null)
   const [llmZh, setLlmZh] = useState<string | null>(null)
@@ -151,9 +163,32 @@ export function GooglePlacePage({
     : null
 
   function stepPhoto(delta: number) {
+    if (delta < 0) {
+      if (photos.length < 2) return
+      setPhotoIndex((i) => (i - 1 + photos.length) % photos.length)
+      return
+    }
+
+    if (
+      galleryVariant === 'booking' &&
+      onBookingGalleryAdvance &&
+      !bookingPhotosFullyLoaded &&
+      (photos.length <= 1 || photoIndex >= photos.length - 1)
+    ) {
+      pendingGalleryAdvanceRef.current = true
+      onBookingGalleryAdvance(photoIndex + 1, photos.length)
+      return
+    }
+
     if (photos.length < 2) return
-    setPhotoIndex((i) => (i + delta + photos.length) % photos.length)
+    setPhotoIndex((i) => (i + 1) % photos.length)
   }
+
+  const showGalleryNav =
+    photos.length > 1 ||
+    (galleryVariant === 'booking' &&
+      !bookingPhotosFullyLoaded &&
+      Boolean(onBookingGalleryAdvance))
 
   useEffect(() => {
     if (!open || placeType !== 'attraction' || !location) {
@@ -178,8 +213,19 @@ export function GooglePlacePage({
 
   useEffect(() => {
     setFailedPhotos([])
-    setGalleryExpanded(false)
-  }, [open, name, detailsOverride])
+    pendingGalleryAdvanceRef.current = false
+  }, [open, name])
+
+  useEffect(() => {
+    if (!open) return
+    setPhotoIndex(0)
+  }, [open, name])
+
+  useEffect(() => {
+    if (!pendingGalleryAdvanceRef.current || photos.length < 1) return
+    pendingGalleryAdvanceRef.current = false
+    setPhotoIndex((i) => Math.min(i + 1, photos.length - 1))
+  }, [photos.length])
 
   useEffect(() => {
     thumbRefs.current[photoIndex]?.scrollIntoView({
@@ -215,7 +261,6 @@ export function GooglePlacePage({
       setDetails(detailsOverride)
       setLoading(false)
       setError(null)
-      setPhotoIndex(0)
       return
     }
     if (skipProviderLookup) {
@@ -453,47 +498,16 @@ export function GooglePlacePage({
           )}
           {error && <p className="text-sm text-amber-800">{error}</p>}
 
-          {activePhoto && galleryVariant === 'booking' && photos.length >= 3 && !galleryExpanded ? (
-            <div className="relative grid h-64 grid-cols-[1.55fr_1fr] grid-rows-2 gap-1 overflow-hidden rounded-2xl sm:h-80">
-              {photos.slice(0, 3).map((url, i) => (
-                <button
-                  type="button"
-                  key={url}
-                  onClick={() => {
-                    setPhotoIndex(i)
-                    setGalleryExpanded(true)
-                  }}
-                  className={`group relative overflow-hidden bg-[var(--mist)] ${i === 0 ? 'row-span-2' : ''}`}
-                  aria-label={`查看第 ${i + 1} 张酒店照片`}
-                >
-                  <img
-                    src={url}
-                    alt={i === 0 ? details?.name || name : ''}
-                    className="h-full w-full object-cover transition duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.025]"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    onError={() => setFailedPhotos((current) => current.includes(url) ? current : [...current, url])}
-                  />
-                </button>
-              ))}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 to-transparent" />
-              <button
-                type="button"
-                onClick={() => setGalleryExpanded(true)}
-                className="absolute bottom-3 right-3 rounded-xl border border-white/65 bg-white/90 px-3 py-2 text-xs font-medium text-[var(--ink)] shadow-sm backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:bg-white"
-              >
-                查看全部 {photos.length} 张照片
-              </button>
-            </div>
-          ) : activePhoto && (
+          {activePhoto && (
             <div className="space-y-2">
               <div
                 className="relative overflow-hidden rounded-2xl select-none"
                 onPointerDown={(e) => {
-                  if (photos.length < 2) return
+                  if (!showGalleryNav) return
                   swipeStartX.current = e.clientX
                 }}
                 onPointerUp={(e) => {
-                  if (swipeStartX.current == null || photos.length < 2) return
+                  if (swipeStartX.current == null || !showGalleryNav) return
                   const dx = e.clientX - swipeStartX.current
                   swipeStartX.current = null
                   if (Math.abs(dx) < 40) return
@@ -529,13 +543,19 @@ export function GooglePlacePage({
                     {wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}
                   </a>
                 )}
-                {photos.length > 1 && (
+                {bookingGalleryPhotosLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/35 backdrop-blur-[1px]">
+                    <LoadingIndicator label="正在加载更多照片" showDots size="sm" />
+                  </div>
+                )}
+                {showGalleryNav && (
                   <>
                     <button
                       type="button"
                       aria-label="上一张"
                       onClick={() => stepPhoto(-1)}
-                      className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
+                      disabled={photos.length < 2}
+                      className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-40"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M15 18l-6-6 6-6" />
@@ -545,7 +565,8 @@ export function GooglePlacePage({
                       type="button"
                       aria-label="下一张"
                       onClick={() => stepPhoto(1)}
-                      className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
+                      disabled={bookingGalleryPhotosLoading}
+                      className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:opacity-60"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M9 18l6-6-6-6" />
@@ -553,10 +574,18 @@ export function GooglePlacePage({
                     </button>
                     <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
                       {photoIndex + 1} / {photos.length}
+                      {galleryVariant === 'booking' &&
+                      !bookingPhotosFullyLoaded &&
+                      onBookingGalleryAdvance
+                        ? '+'
+                        : ''}
                     </div>
                   </>
                 )}
               </div>
+              {bookingGalleryPhotosError && !bookingGalleryPhotosLoading && (
+                <p className="text-xs text-amber-800">{bookingGalleryPhotosError}</p>
+              )}
               {photos.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {photos.map((url, i) => (
@@ -586,36 +615,8 @@ export function GooglePlacePage({
                   ))}
                 </div>
               )}
-              {galleryVariant === 'booking' && galleryExpanded && photos.length >= 3 && (
-                <button
-                  type="button"
-                  onClick={() => setGalleryExpanded(false)}
-                  className="text-xs font-medium text-[var(--sage)] hover:underline"
-                >
-                  返回酒店图集
-                </button>
-              )}
             </div>
           )}
-
-          {!providerOwnsSummary && <div className="flex flex-wrap gap-2 text-sm">
-            {details?.rating != null && (
-              <span className="rounded-full bg-[var(--gold)]/25 px-3 py-1">
-                ★ {details.rating.toFixed(1)}
-                {details.userRatingCount != null ? `（${details.userRatingCount}）` : ''}
-              </span>
-            )}
-            {priceLevelLabel && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{priceLevelLabel}</span>
-            )}
-            {details?.phone && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{details.phone}</span>
-            )}
-          </div>}
-
-          {!providerOwnsSummary && details?.address && <p className="text-sm text-[var(--stone)]">{details.address}</p>}
-
-          {providerDetails}
 
           {llmNarrative &&
             (llmNarrative.loading ||
@@ -662,6 +663,34 @@ export function GooglePlacePage({
                       </button>
                     )}
                 </div>
+                {llmNarrative.variant === 'single' ? (
+                  <>
+                    {llmNarrative.loading && !llmNarrative.reason && (
+                      <LoadingIndicator
+                        thinkingLabel="正在生成推荐理由…"
+                        generatingLabel={
+                          llmNarrative.labels?.loadingText || '正在生成推荐理由…'
+                        }
+                        showDots
+                        size="sm"
+                        mode="thinking"
+                        task="hotelDetail"
+                      />
+                    )}
+                    {llmNarrative.reason && (
+                      <p className="text-sm leading-relaxed text-[var(--ink)]/90">
+                        {llmNarrative.reason}
+                        {llmNarrative.loading ? (
+                          <span
+                            className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
                 {llmNarrative.loading && !llmNarrative.intro && !llmNarrative.reason && (
                   <LoadingIndicator
                     thinkingLabel="正在思考简介与推荐理由…"
@@ -732,8 +761,29 @@ export function GooglePlacePage({
                       task="placeDetail"
                     />
                   )}
+                  </>
+                )}
               </div>
             )}
+
+          {!providerOwnsSummary && <div className="flex flex-wrap gap-2 text-sm">
+            {details?.rating != null && (
+              <span className="rounded-full bg-[var(--gold)]/25 px-3 py-1">
+                ★ {details.rating.toFixed(1)}
+                {details.userRatingCount != null ? `（${details.userRatingCount}）` : ''}
+              </span>
+            )}
+            {priceLevelLabel && (
+              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{priceLevelLabel}</span>
+            )}
+            {details?.phone && (
+              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{details.phone}</span>
+            )}
+          </div>}
+
+          {!providerOwnsSummary && details?.address && <p className="text-sm text-[var(--stone)]">{details.address}</p>}
+
+          {providerDetails}
 
           {reviewsSection !== undefined ? reviewsSection : details?.reviews?.length ? (
             <GoogleReviewsList

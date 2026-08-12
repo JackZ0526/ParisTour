@@ -40,6 +40,9 @@ export interface BookingHotelRecord {
   policies?: string[]
   paymentMethods?: string[]
   sustainability?: string
+  districtLabel?: string
+  distanceToCityCenterKm?: number
+  locationDescription?: string
   reviews: BookingHotelReview[]
   checkIn?: string
   checkOut?: string
@@ -49,9 +52,11 @@ export interface BookingHotelRecord {
 type CachedValue<T> = { value: T; fetchedAt: number }
 
 const SEARCH_PREFIX = 'booking-hotels-search:v3:'
-const DETAIL_PREFIX = 'booking-hotel-detail:v4:'
+const DETAIL_PREFIX = 'booking-hotel-detail:v5:'
 const PHOTOS_PREFIX = 'booking-hotel-photos:v3:'
 const FEATURED_REVIEWS_PREFIX = 'booking-hotel-featured-reviews:v1:'
+const REVIEW_SCORES_PREFIX = 'booking-hotel-review-scores:v1:'
+const DESCRIPTION_PREFIX = 'booking-hotel-description:v1:'
 const IDENTITY_PREFIX = 'booking-hotel-identity:v1:'
 const CANDIDATE_PREFIX = 'booking-hotel-candidate:v3:'
 const SEARCH_TTL_MS = 24 * 60 * 60 * 1_000
@@ -132,7 +137,11 @@ function normalizeReviewScores(value: unknown): Array<{ label: string; score: nu
     if (!row) return []
     const question = asRecord(row.question)
     const scoreSegment = asRecord(row.scoreSegment)
-    const rawLabel = text(row.name) || text(question?.question) || text(row.label)
+    const rawLabel =
+      text(row.name) ||
+      (typeof row.question === 'string' ? text(row.question) : '') ||
+      text(question?.question) ||
+      text(row.label)
     const score = number(row.score) ?? number(scoreSegment?.score) ?? number(scoreSegment?.scoreOutOf10)
     const customerType = text(row.customerType)
     if (!rawLabel || score == null || score <= 0 || /(^|_)total$/i.test(rawLabel)) return []
@@ -185,6 +194,48 @@ export function normalizeBookingPhotosResponse(payload: unknown): string[] {
 
 function joinedAddress(...parts: unknown[]): string {
   return uniqueStrings(parts).join(', ')
+}
+
+function extractPolicyDisplayDetails(value: unknown): string[] {
+  const root = asRecord(value)
+  if (!root) return []
+
+  const direct = uniqueStrings([
+    text(root.minimum_age_phrase),
+    text(root.pets_allowed_phrase),
+    text(root.smoking_not_allowed_phrase),
+    text(root.quiet_hours_phrase),
+    text(root.cash_accepted_phrase),
+    text(root.parties_not_allowed_phrase),
+    text(root.group_limit_phrase),
+    text(asRecord(root.pets)?.phrase),
+    text(asRecord(root.smoking)?.phrase),
+    text(asRecord(root.checkin_age)?.phrase),
+    text(asRecord(root.payment)?.phrase),
+    number(root.minimum_age) != null ? `最低入住年龄：${number(root.minimum_age)} 岁` : '',
+    text(root.minimum_age) ? `最低入住年龄：${text(root.minimum_age)} 岁` : '',
+    text(root.pets_allowed) === 'NO' ? '不允许携带宠物' : text(root.pets_allowed),
+    text(root.hotel_accepts_cash_status) === 'PATP_PROPERTY_DOES_NOT_ACCEPT_CASH'
+      ? '住宿不接受现金付款'
+      : '',
+  ])
+
+  const nested: string[] = []
+  for (const entry of Object.values(root)) {
+    const row = asRecord(entry)
+    if (!row) continue
+    nested.push(
+      ...uniqueStrings([
+        text(row.phrase),
+        text(row.title),
+        text(row.text),
+        text(row.description),
+        text(row.label),
+      ]),
+    )
+  }
+
+  return uniqueStrings([...direct, ...nested])
 }
 
 const GENERIC_HOTEL_NAME_TOKENS = new Set([
@@ -513,18 +564,28 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
     const checkOut = asRecord(data.checkout)
     const wifiScore = asRecord(data.wifi_review_score)
     const breakfastScore = asRecord(data.breakfast_review_score)
+    const wifiRating = number(wifiScore?.rating)
+    const breakfastRating = number(breakfastScore?.rating)
     const regularReviewScores = [
       Array.isArray(data.review_scores) ? data.review_scores :
       Array.isArray(data.review_subscores) ? data.review_subscores : [],
-      wifiScore ? [{ name: 'hotel_wifi', score: wifiScore.rating }] : [],
-      breakfastScore ? [{ name: 'hotel_breakfast', score: breakfastScore.rating }] : [],
+      wifiRating != null && wifiRating > 0 ? [{ name: 'hotel_wifi', score: wifiRating }] : [],
+      breakfastRating != null && breakfastRating > 0
+        ? [{ name: 'hotel_breakfast', score: breakfastRating }]
+        : [],
     ].flat()
+    const cashNotAccepted =
+      text(data.hotel_accepts_cash_status) === 'PATP_PROPERTY_DOES_NOT_ACCEPT_CASH'
     const regularPolicies = uniqueStrings([
+      ...extractPolicyDisplayDetails(data.property_policy_display_details),
       ...stringArray(data.important_information),
       ...stringArray(data.fine_print),
       ...stringArray(data.house_rules),
       text(data.minimum_age) ? `最低入住年龄：${text(data.minimum_age)} 岁` : '',
       text(data.pets_allowed) ? `宠物政策：${text(data.pets_allowed)}` : '',
+      text(data.smoking_policy),
+      text(data.quiet_hours),
+      cashNotAccepted ? '住宿不接受现金付款' : '',
     ])
 
     return {
@@ -541,7 +602,9 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
         number(data.class) ??
         number(data.accurate_property_class) ??
         number(data.property_class),
-      area: text(data.city),
+      area: text(data.district) || text(data.city),
+      districtLabel: text(data.district) || undefined,
+      distanceToCityCenterKm: number(data.distance_to_cc),
       image: photos[0],
       photos,
       description:
@@ -703,6 +766,74 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
   }
 }
 
+export function normalizeBookingReviewScoresResponse(payload: unknown): {
+  rating?: number
+  reviewCount?: number
+  reviewScores: Array<{ label: string; score: number }>
+} {
+  const data = asRecord(asRecord(payload)?.data)
+  const breakdown = Array.isArray(data?.score_breakdown) ? data.score_breakdown : []
+  const totalRow = breakdown
+    .map(asRecord)
+    .find((row) => text(row?.customer_type) === 'total')
+  if (!totalRow) {
+    return { reviewScores: [] }
+  }
+
+  const questions = Array.isArray(totalRow.question) ? totalRow.question : []
+  const reviewScores = normalizeReviewScores(questions)
+  const totalQuestion = questions
+    .map(asRecord)
+    .find((row) => /^total$/i.test(text(row?.question)))
+  const rating =
+    number(totalQuestion?.score) ?? number(totalRow.average_score)
+  const reviewCount = number(totalRow.count)
+
+  return {
+    rating,
+    reviewCount,
+    reviewScores,
+  }
+}
+
+export function normalizeBookingDescriptionResponse(payload: unknown): {
+  description?: string
+  locationDescription?: string
+  policies: string[]
+} {
+  const rows = Array.isArray(asRecord(payload)?.data) ? asRecord(payload)!.data as unknown[] : []
+  let description = ''
+  let locationDescription = ''
+  const policies: string[] = []
+
+  for (const raw of rows) {
+    const row = asRecord(raw)
+    if (!row) continue
+    const body = text(row.description)
+    if (!body) continue
+    const typeId = number(row.descriptiontype_id)
+    if (typeId === 6) {
+      locationDescription = body
+      if (!description) description = body
+      continue
+    }
+    if (typeId === 7) {
+      policies.push(
+        ...body
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+      )
+    }
+  }
+
+  return {
+    description: description || undefined,
+    locationDescription: locationDescription || undefined,
+    policies: uniqueStrings(policies),
+  }
+}
+
 export function normalizeBookingFeaturedReviews(
   payload: unknown,
 ): BookingFeaturedReviews {
@@ -811,6 +942,112 @@ export async function resolveBookingHotelIdentity(
   return identity
 }
 
+async function fetchBookingReviewScores(
+  hotelId: string,
+): Promise<ReturnType<typeof normalizeBookingReviewScoresResponse> | null> {
+  const key = `${REVIEW_SCORES_PREFIX}${hotelId}`
+  const cached = cachedValue<ReturnType<typeof normalizeBookingReviewScoresResponse>>(key, DETAIL_TTL_MS)
+  if (cached) return cached
+  try {
+    const payload = await request<unknown>('stays/review-scores', {
+      hotelId,
+      languageCode: 'en-us',
+    })
+    const parsed = normalizeBookingReviewScoresResponse(payload)
+    if (!parsed.rating && !parsed.reviewScores.length) return null
+    setLlmArtifact(key, { value: parsed, fetchedAt: Date.now() })
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+async function fetchBookingDescription(
+  hotelId: string,
+): Promise<ReturnType<typeof normalizeBookingDescriptionResponse> | null> {
+  const key = `${DESCRIPTION_PREFIX}${hotelId}`
+  const cached = cachedValue<ReturnType<typeof normalizeBookingDescriptionResponse>>(key, DETAIL_TTL_MS)
+  if (cached) return cached
+  try {
+    const payload = await request<unknown>('stays/get-description', {
+      hotelId,
+      languageCode: 'en-us',
+    })
+    const parsed = normalizeBookingDescriptionResponse(payload)
+    if (!parsed.description && !parsed.locationDescription && !parsed.policies.length) {
+      return null
+    }
+    setLlmArtifact(key, { value: parsed, fetchedAt: Date.now() })
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function mergeBookingDetailRecord(
+  record: BookingHotelRecord,
+  candidate: BookingHotelRecord | null,
+  extras: {
+    reviewScores?: ReturnType<typeof normalizeBookingReviewScoresResponse> | null
+    description?: ReturnType<typeof normalizeBookingDescriptionResponse> | null
+  },
+): BookingHotelRecord {
+  const reviewScores = extras.reviewScores
+  const description = extras.description
+  const merged: BookingHotelRecord = candidate
+    ? {
+        ...candidate,
+        ...record,
+        rating: record.rating ?? candidate.rating,
+        reviewCount: record.reviewCount ?? candidate.reviewCount,
+        stars: record.stars ?? candidate.stars,
+        image: record.image || candidate.image,
+        photos: record.photos.length ? record.photos : candidate.photos,
+        facilities: record.facilities.length ? record.facilities : candidate.facilities,
+        reviews: record.reviews.length ? record.reviews : candidate.reviews,
+        propertyType: record.propertyType || candidate.propertyType,
+        reviewScores: record.reviewScores?.length
+          ? record.reviewScores
+          : candidate.reviewScores,
+        languages: record.languages?.length ? record.languages : candidate.languages,
+        policies: record.policies?.length ? record.policies : candidate.policies,
+        paymentMethods: record.paymentMethods?.length
+          ? record.paymentMethods
+          : candidate.paymentMethods,
+        sustainability: record.sustainability || candidate.sustainability,
+        checkIn: record.checkIn || candidate.checkIn,
+        checkOut: record.checkOut || candidate.checkOut,
+        sourceUrl: record.sourceUrl || candidate.sourceUrl,
+        districtLabel: record.districtLabel || candidate.districtLabel,
+        distanceToCityCenterKm:
+          record.distanceToCityCenterKm ?? candidate.distanceToCityCenterKm,
+        locationDescription:
+          record.locationDescription || candidate.locationDescription,
+        description: record.description || candidate.description,
+      }
+    : record
+
+  const needsReviewScores =
+    merged.rating == null || (merged.reviewScores?.length || 0) < 3
+  const reviewData = needsReviewScores ? reviewScores : null
+
+  return {
+    ...merged,
+    rating: merged.rating ?? reviewData?.rating,
+    reviewCount: merged.reviewCount ?? reviewData?.reviewCount,
+    reviewScores:
+      (reviewData?.reviewScores?.length ? reviewData.reviewScores : merged.reviewScores) ||
+      [],
+    description: merged.description || description?.description,
+    locationDescription:
+      merged.locationDescription || description?.locationDescription,
+    policies: uniqueStrings([
+      ...(merged.policies || []),
+      ...(description?.policies || []),
+    ]),
+  }
+}
+
 export async function fetchBookingHotelDetails(input: {
   id: string
   startDate: string
@@ -835,42 +1072,22 @@ export async function fetchBookingHotelDetails(input: {
     currencyCode: 'EUR',
   })
     .then(normalizeBookingDetailResponse)
-    .then((record) => {
-      if (record) {
-        const candidate = peekBookingHotel(input.id)
-        const merged: BookingHotelRecord = candidate
-          ? {
-              ...candidate,
-              ...record,
-              rating: record.rating ?? candidate.rating,
-              reviewCount: record.reviewCount ?? candidate.reviewCount,
-              stars: record.stars ?? candidate.stars,
-              image: record.image || candidate.image,
-              photos: record.photos.length ? record.photos : candidate.photos,
-              facilities: record.facilities.length
-                ? record.facilities
-                : candidate.facilities,
-              reviews: record.reviews.length ? record.reviews : candidate.reviews,
-              propertyType: record.propertyType || candidate.propertyType,
-              reviewScores: record.reviewScores?.length
-                ? record.reviewScores
-                : candidate.reviewScores,
-              languages: record.languages?.length ? record.languages : candidate.languages,
-              policies: record.policies?.length ? record.policies : candidate.policies,
-              paymentMethods: record.paymentMethods?.length
-                ? record.paymentMethods
-                : candidate.paymentMethods,
-              sustainability: record.sustainability || candidate.sustainability,
-              checkIn: record.checkIn || candidate.checkIn,
-              checkOut: record.checkOut || candidate.checkOut,
-              sourceUrl: record.sourceUrl || candidate.sourceUrl,
-            }
-          : record
-        remember(merged)
-        setLlmArtifact(key, { value: merged, fetchedAt: Date.now() })
-        return merged
-      }
-      return record
+    .then(async (record) => {
+      if (!record) return null
+      const candidate = peekBookingHotel(input.id)
+      const needsReviewScores =
+        record.rating == null || (record.reviewScores?.length || 0) < 3
+      const [reviewScores, description] = await Promise.all([
+        needsReviewScores ? fetchBookingReviewScores(input.id) : null,
+        fetchBookingDescription(input.id),
+      ])
+      const merged = mergeBookingDetailRecord(record, candidate, {
+        reviewScores,
+        description,
+      })
+      remember(merged)
+      setLlmArtifact(key, { value: merged, fetchedAt: Date.now() })
+      return merged
     })
     .finally(() => detailInflight.delete(key))
   detailInflight.set(key, task)

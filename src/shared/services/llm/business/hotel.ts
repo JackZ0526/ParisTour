@@ -18,14 +18,27 @@ function toExcludeSet(names: string[]): Set<string> {
   return new Set(names.map((n) => n.toLowerCase().trim()).filter(Boolean))
 }
 
-/** Rich hotel narrative for the detail popup: intro, why recommended, trip fit. */
+/** Rich hotel narrative for the detail popup: one concise recommendation reason. */
 export async function generateHotelDetailCopy(input: {
   name: string
   area: string
   address: string
   nearestMetro?: string
-  ratingHint?: string
-  existingDescription?: string
+  rating?: number
+  reviewCount?: number
+  starRating?: number
+  propertyType?: string
+  facilities?: string[]
+  reviewScores?: Array<{ label: string; score: number }>
+  locationDescription?: string
+  districtLabel?: string
+  distanceToCityCenterKm?: number
+  featuredReviews?: Array<{
+    text: string
+    negativeText?: string
+    rating?: number
+    author?: string
+  }>
   existingReason?: string
   isBest?: boolean
   userPreferences?: string
@@ -34,17 +47,18 @@ export async function generateHotelDetailCopy(input: {
   if (!isLlmConfigured()) return null
 
   const system = buildPrompt(
-    '旅行住宿顾问。为酒店详情页写简洁中文点评。',
+    '旅行住宿顾问。为酒店详情页写一段简洁的中文推荐理由。',
     null,
     `<hard_rules>
-- intro：2–3 句酒店简介（氛围、区位、适合谁），可吸收 existingDescription 但要更完整。
-- reason：1–2 句说明为何出现在推荐列表 / 为何值得考虑。
-- tripFit：2–3 句说明它与本次行程（地铁出行、迪士尼日、自驾日、抵达日倒时差等）以及 userPreferences 的匹配关系；若无偏好则按行程常识写。
-- 不要编造具体房价数字；不要把卢浮宫/凡尔赛周边当唯一卖点。
+- 只输出 reason 一个字段，3–5 句连贯中文，不要分标题或小标题。
+- 综合 hotel 资料与 featuredReviews：区位、评分细项、设施亮点、住客好评/差评要点。
+- 可轻点与 trip / userPreferences 的匹配，但不要写成单独的「行程关系」段落。
+- 不要复述 Booking 英文原文；不要编造房价；不要把卢浮宫/凡尔赛周边当唯一卖点。
+- 若无精选评论，仅依据酒店资料写推荐理由。
 </hard_rules>`,
     jsonContract(
-      '{ intro: "string", reason: "string", tripFit: "string" }',
-      '{ "intro": "16区特罗卡德罗一带的现代精品酒店，紧邻地铁 9 号线。", "reason": "评分 4.6 且步行可上特罗卡德罗平台看铁塔。", "tripFit": "与本次行程的迪士尼日、自驾日衔接顺畅，地铁直达右岸经典。" }',
+      '{ reason: "string" }',
+      '{ "reason": "玛黑区步行可达蓬皮杜与孚日广场，Booking 住客普遍称赞位置与员工服务；地铁 3、4 号线方便衔接本次右岸经典日与迪士尼安排，适合追求在地体验的旅客。" }',
     ),
   )
   const user = JSON.stringify({
@@ -53,11 +67,24 @@ export async function generateHotelDetailCopy(input: {
       area: input.area,
       address: input.address,
       nearestMetro: input.nearestMetro || '',
-      ratingHint: input.ratingHint || '',
-      existingDescription: input.existingDescription || '',
+      rating: input.rating ?? null,
+      reviewCount: input.reviewCount ?? null,
+      starRating: input.starRating ?? null,
+      propertyType: input.propertyType || '',
+      facilities: (input.facilities || []).slice(0, 12),
+      reviewScores: input.reviewScores || [],
+      locationDescription: input.locationDescription || '',
+      districtLabel: input.districtLabel || '',
+      distanceToCityCenterKm: input.distanceToCityCenterKm ?? null,
       existingReason: input.existingReason || '',
       isBest: Boolean(input.isBest),
     },
+    featuredReviews: (input.featuredReviews || []).slice(0, 6).map((review) => ({
+      text: review.text,
+      negativeText: review.negativeText || '',
+      rating: review.rating ?? null,
+      author: review.author || '',
+    })),
     userPreferences: input.userPreferences || null,
     trip: input.tripDays || [],
   })
@@ -71,17 +98,13 @@ export async function generateHotelDetailCopy(input: {
   const parsed = extractJsonObject(text)
   if (!parsed) return null
 
-  const intro = String(parsed.intro || parsed.description || '').trim()
-  const reason = String(parsed.reason || '').trim()
-  const tripFit = String(parsed.tripFit || parsed.fit || '').trim()
-  if (!intro && !reason && !tripFit) return null
+  const reason = String(parsed.reason || parsed.recommendation || '').trim()
+  if (!reason) return null
 
   return {
-    intro: intro || input.existingDescription || `${input.name}，位于${input.area}。`,
-    reason: reason || input.existingReason || '适合作为巴黎行程的住宿起点。',
-    tripFit:
-      tripFit ||
-      '地铁便利，便于连接本行程中的右岸经典、左岸轻松日与迪士尼/自驾安排。',
+    intro: '',
+    reason,
+    tripFit: '',
   }
 }
 

@@ -17,6 +17,8 @@ const ALLOWED_PATHS = new Set([
   'stays/detail',
   'stays/get-photos',
   'stays/review-featured',
+  'stays/review-scores',
+  'stays/get-description',
 ])
 
 export async function GET(req: Request): Promise<Response> {

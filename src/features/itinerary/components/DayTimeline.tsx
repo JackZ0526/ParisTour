@@ -576,6 +576,7 @@ export function DayTimeline({
   const dragRef = useRef<DragSession | null>(null)
   const pointerRef = useRef({ x: 0, y: 0 })
   const floatRef = useRef({ x: 0, y: 0 })
+  const floatElRef = useRef<HTMLDivElement | null>(null)
   const velocityRef = useRef({ y: 0, lastY: 0, lastT: 0 })
   const rafRef = useRef<number | null>(null)
   const itemRefs = useRef<(HTMLLIElement | null)[]>([])
@@ -1234,6 +1235,15 @@ export function DayTimeline({
     }
   }
 
+  const applyFloatPos = (x: number, y: number) => {
+    floatRef.current = { x, y }
+    const el = floatElRef.current
+    if (el) {
+      el.style.left = `${x}px`
+      el.style.top = `${y}px`
+    }
+  }
+
   const tickFloat = () => {
     const session = dragRef.current
     if (!session) {
@@ -1244,11 +1254,10 @@ export function DayTimeline({
     const targetY = pointerRef.current.y - session.grabY
     // Viscous follow — lags behind the finger for sticky inertia.
     const ease = 0.22
-    floatRef.current = {
-      x: floatRef.current.x + (targetX - floatRef.current.x) * ease,
-      y: floatRef.current.y + (targetY - floatRef.current.y) * ease,
-    }
-    setFloatPos({ ...floatRef.current })
+    applyFloatPos(
+      floatRef.current.x + (targetX - floatRef.current.x) * ease,
+      floatRef.current.y + (targetY - floatRef.current.y) * ease,
+    )
 
     const hover = pickHoverIndex(
       pointerRef.current.y,
@@ -1259,6 +1268,7 @@ export function DayTimeline({
     if (hover !== session.hover) {
       const next = { ...session, hover }
       dragRef.current = next
+      setFloatPos({ ...floatRef.current })
       setDrag(next)
     }
 
@@ -1346,6 +1356,11 @@ export function DayTimeline({
 
   useEffect(() => () => stopRaf(), [])
 
+  useLayoutEffect(() => {
+    if (!drag || dropping) return
+    applyFloatPos(floatRef.current.x, floatRef.current.y)
+  }, [drag?.from, dropping])
+
   const beginDrag = (
     index: number,
     e: ReactPointerEvent,
@@ -1381,9 +1396,9 @@ export function DayTimeline({
       startTop: rect.top,
     }
     pointerRef.current = { x: e.clientX, y: e.clientY }
-    floatRef.current = { x: rect.left, y: rect.top }
     velocityRef.current = { y: 0, lastY: e.clientY, lastT: performance.now() }
     dragRef.current = session
+    applyFloatPos(rect.left, rect.top)
     setFloatPos({ x: rect.left, y: rect.top })
     setDrag(session)
     setDropping(false)
@@ -2068,12 +2083,13 @@ export function DayTimeline({
 
       {drag && (
         <div
+          ref={floatElRef}
           className={`timeline-drag-float pointer-events-none fixed z-[80] ${
             dropping ? 'timeline-drag-float-settle' : 'timeline-drag-float-lifted'
           }`}
           style={{
-            left: floatPos.x,
-            top: floatPos.y,
+            left: dropping ? floatPos.x : undefined,
+            top: dropping ? floatPos.y : undefined,
             width: drag.width,
           }}
         >
