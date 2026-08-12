@@ -1,7 +1,7 @@
 import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../constants/hotels'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
 import { geocodeParisAddress } from '../../map/services/geocode'
-import { fetchGooglePlaceDetails } from '../../map/services/googlePlaceDetails'
+import { fetchPlaceDetails } from '../../map/services/placeDetails'
 
 const FALLBACK_HOTEL_IMAGE =
   'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'
@@ -30,10 +30,10 @@ function ratingHint(details: {
   if (details?.rating == null) return undefined
   const count =
     details.userRatingCount != null ? `（${details.userRatingCount}）` : ''
-  return `Google ★ ${details.rating.toFixed(1)}${count}`
+  return `★ ${details.rating.toFixed(1)}${count}`
 }
 
-/** Resolve a hotel name/address into a candidate card via Google Places (+ Nominatim fallback). */
+/** Resolve a hotel name/address into a candidate card via OpenStreetMap. */
 export async function resolveHotelCandidate(input: {
   googlePlaceId?: string
   name: string
@@ -47,7 +47,7 @@ export async function resolveHotelCandidate(input: {
   source?: 'llm' | 'custom'
 }): Promise<HotelCandidate> {
   const query = [input.name, input.address, 'Paris'].filter(Boolean).join(' ')
-  const details = await fetchGooglePlaceDetails(query, undefined, {
+  const details = await fetchPlaceDetails(query, undefined, {
     placeId: input.googlePlaceId,
   }).catch(() => null)
 

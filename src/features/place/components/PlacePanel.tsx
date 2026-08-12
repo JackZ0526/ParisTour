@@ -11,7 +11,7 @@ import {
   placeDetailKeysFromPlace,
 } from '../services/placeDetailMemo'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
-import { GooglePlacePage } from './GooglePlacePage'
+import { PlaceDetailsPage } from './PlaceDetailsPage'
 
 interface Props {
   placeId: string | null
@@ -23,6 +23,7 @@ interface Props {
     placeId: string,
     googlePlaceId: string,
     nameOriginal?: string,
+    location?: { lat: number; lng: number },
   ) => void
   onClose: () => void
 }
@@ -155,7 +156,7 @@ export function PlacePanel({
   }, [placeId])
 
   return (
-    <GooglePlacePage
+    <PlaceDetailsPage
       open={Boolean(place)}
       name={place?.name || ''}
       nameLocal={place?.nameLocal}
@@ -187,6 +188,7 @@ export function PlacePanel({
           placeId,
           resolved.id,
           resolved.nameOriginal,
+          resolved.location,
         )
       }}
       onClose={onClose}

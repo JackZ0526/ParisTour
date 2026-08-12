@@ -18,8 +18,16 @@
       "destination": "/api/aerodatabox?rest=$1"
     },
     {
-      "source": "/api/gemini/(.*)",
-      "destination": "/api/gemini?rest=$1"
+      "source": "/api/openrouteservice/(.*)",
+      "destination": "/api/openrouteservice?rest=$1"
+    },
+    {
+      "source": "/api/osm-route/(.*)",
+      "destination": "/api/osm-route?rest=$1"
+    },
+    {
+      "source": "/api/transitous/(.*)",
+      "destination": "/api/transitous?rest=$1"
     },
     {
       "source": "/api/openai/(.*)",

@@ -13,8 +13,8 @@
 - **可编辑时间线（DayTimeline）**：拖拽排序、删除、恢复 baseline；按日浏览
 - **AI 行程生成**：按航班、酒店与偏好生成多日行程；支持单日重排
 - **TripChat**：自然语言改行程（加/换地点、调酒店、切日等）
-- **地点添加**：LLM 推荐或 Google 搜索；地点详情、照片与评论
-- **地图与导航**：Google Maps 展示当日路线；Directions；航班优先 TimeTable Lookup
+- **地点添加**：LLM 推荐或 OpenStreetMap 搜索；缓存地点详情与开放数据图片
+- **地图与导航**：Leaflet/OpenStreetMap 地图、开放步行/驾车路线与 Transitous 公共交通
 - **酒店 / 航班**：酒店区位推荐与选择；航班模板与实时班次查询
 
 ## 技术栈
@@ -22,7 +22,7 @@
 | 层 | 技术 |
 |----|------|
 | 前端 | Vite · React 19 · TypeScript · Tailwind CSS v4 |
-| 地图 | Google Maps（`@react-google-maps/api`）；Leaflet 备用 |
+| 地图 | Leaflet + OpenStreetMap + OpenRouteService/OSM 路由 + Transitous |
 | 后端 / 数据 | Supabase（Auth · Postgres · Realtime · RLS） |
 | API 代理 | Vercel Serverless（`/api/*`）：OpenAI、Gemini、RapidAPI、分享邮件 |
 | 邮件 | Resend（可选；未配置时可复制邀请链接） |
@@ -70,19 +70,12 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- 浏览器（VITE_）---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_MAPS_API_KEY=
 # VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # 默认 DeepSeek 模型（或 deepseek-v4-pro）
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # 覆盖为 OpenAI 模型
 # VITE_LLM_ENABLED=true              # false 可隐藏 LLM 能力
 ```
 
-Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**。HTTP 引荐来源请同时加入：
-
-- `http://127.0.0.1:5173/*`
-- `http://localhost:5173/*`
-- `https://paristour.vercel.app/*`
-
-本地若出现 `RefererNotAllowedMapError`，就是缺了上面某一条。
+可选地在服务端配置免费的 `OPENROUTESERVICE_API_KEY`。未配置时，步行和驾车路线会使用无需密钥的 OpenStreetMap 路由回退。
 
 Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + 白名单。未配置 `RESEND_API_KEY` 时分享仍可用，界面会提示手动复制邀请链接。
 

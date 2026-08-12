@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  fetchGooglePlaceDetails,
+  fetchPlaceDetails,
   placeDetailsQuery,
-  searchNearbyGooglePlaceCandidates,
-  type GooglePlaceDetails,
-} from '../../map/services/googlePlaceDetails'
+  searchNearbyPlaceCandidates,
+  type PlaceDetails,
+} from '../../map/services/placeDetails'
+import { openStreetMapPlaceUrl } from '../../map/services/openStreetMap'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -19,7 +20,7 @@ import {
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,
-  placeDetailKeysFromGoogle,
+  placeDetailKeysFromDetails,
 } from '../services/placeDetailMemo'
 import {
   getDayRecommendCache,
@@ -29,8 +30,7 @@ import type { Place, PlaceType } from '../../../types'
 import type { RecommendationPreferences } from '../services/recommendationPreferences'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
-import { GooglePlacePage } from './GooglePlacePage'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
+import { PlaceDetailsPage } from './PlaceDetailsPage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
 
@@ -87,13 +87,12 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
   const [googleType, setGoogleType] = useState<PlaceType>('attraction')
   const [googleDetail, setGoogleDetail] = useState<{
-    details: GooglePlaceDetails
+    details: PlaceDetails
     type: PlaceType
   } | null>(null)
   const [googleStory, setGoogleStory] = useState<HotelDetailCopy | null>(null)
@@ -112,7 +111,7 @@ export function AddPlaceDialog({
     Partial<Record<RecommendPlaceType, string>>
   >({})
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
-  const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
+  const [detailsByKey, setDetailsByKey] = useState<Record<string, PlaceDetails | null>>({})
   const [loadingDetailsKey, setLoadingDetailsKey] = useState<string | null>(null)
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
   const chromeRef = useRef<HTMLDivElement>(null)
@@ -232,7 +231,7 @@ export function AddPlaceDialog({
     }
     const rows = await Promise.all(
       types.map(async (type) => {
-        const candidates = await searchNearbyGooglePlaceCandidates({
+        const candidates = await searchNearbyPlaceCandidates({
           textQuery: queryByType[type],
           location: hotelLocation,
           maxDistanceMeters: type === 'attraction' ? 20_000 : 12_000,
@@ -281,7 +280,7 @@ export function AddPlaceDialog({
     try {
       const verifiedCandidates = await loadVerifiedCandidates(types)
       if (!verifiedCandidates.length) {
-        throw new Error('Google 暂时没有返回附近候选，请稍后重试。')
+        throw new Error('OpenStreetMap 暂时没有返回附近候选，请稍后重试。')
       }
       let list = await recommendPlacesForDay({
         day: dayNumber,
@@ -360,8 +359,8 @@ export function AddPlaceDialog({
       const returnedTypes = new Set(list.map((item) => item.type))
       if (!list.length) {
         const message = isLlmConfigured()
-          ? '这次没有可用推荐，请再点「换一批」或改用 Google 搜索。'
-          : '推荐助手暂不可用，请改用 Google 搜索。'
+          ? '这次没有可用推荐，请再点「换一批」或改用地点搜索。'
+          : '推荐助手暂不可用，请改用地点搜索。'
         setRecErrors((prev) => ({
           ...prev,
           ...Object.fromEntries(types.map((type) => [type, message])),
@@ -547,21 +546,16 @@ export function AddPlaceDialog({
   async function ensureDetails(item: PlaceRecommendation) {
     const key = itemKey(item)
     if (detailsByKey[key] !== undefined) return detailsByKey[key]
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return null
-    }
-
     setLoadingDetailsKey(key)
     setError(null)
     try {
       const query = placeDetailsQuery(item.name, item.nameLocal)
       if (!query) {
         setDetailsByKey((prev) => ({ ...prev, [key]: null }))
-        setError('缺少地点原文名称，无法查询 Google 详情。')
+        setError('缺少地点原文名称，无法查询地点详情。')
         return null
       }
-      const details = await fetchGooglePlaceDetails(query, undefined, {
+      const details = await fetchPlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
       })
       setDetailsByKey((prev) => ({ ...prev, [key]: details }))
@@ -569,7 +563,7 @@ export function AddPlaceDialog({
       return details
     } catch {
       setDetailsByKey((prev) => ({ ...prev, [key]: null }))
-      setError('加载 Google 地点详情失败。')
+      setError('加载 OpenStreetMap 地点详情失败。')
       return null
     } finally {
       setLoadingDetailsKey(null)
@@ -593,23 +587,19 @@ export function AddPlaceDialog({
     type: PlaceType,
     mode: 'best' | 'end',
     intro?: string,
-    cached?: GooglePlaceDetails | null,
+    cached?: PlaceDetails | null,
   ) {
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return
-    }
     setAddingName(`${name}:${mode}`)
     setSearching(true)
     setError(null)
     try {
       const query = placeDetailsQuery(name)
       if (!cached?.location && !query) {
-        throw new Error('缺少地点原文名称，无法查询 Google 详情。')
+        throw new Error('缺少地点原文名称，无法查询地点详情。')
       }
       const details = cached?.location
         ? cached
-        : await fetchGooglePlaceDetails(query)
+        : await fetchPlaceDetails(query)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -637,18 +627,15 @@ export function AddPlaceDialog({
         description,
         ratingHint:
           details.rating != null
-            ? `Google ★ ${details.rating.toFixed(1)}`
-            : 'AI 推荐 / Google 地点',
+            ? `★ ${details.rating.toFixed(1)}`
+            : 'AI 推荐 / OpenStreetMap 地点',
         priceHint: details.priceLevel,
         image: details.photos[0] || FALLBACK_IMAGE,
         location: details.location,
-        googleMapsUrl: details.id
-          ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-              details.nameOriginal || details.name,
-            )}&query_place_id=${encodeURIComponent(details.id)}`
-          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-              details.nameOriginal || details.name,
-            )}`,
+        googleMapsUrl: openStreetMapPlaceUrl(
+          details.nameOriginal || details.name,
+          details.location,
+        ),
         durationHint: '自定',
       }
       onAddCustom(place, mode)
@@ -667,10 +654,6 @@ export function AddPlaceDialog({
   async function searchGooglePlace() {
     const q = googleQuery.trim()
     if (!q || searching) return
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return
-    }
     setSearching(true)
     setError(null)
     try {
@@ -678,7 +661,7 @@ export function AddPlaceDialog({
       if (!query) {
         throw new Error('请使用地点的原文名称搜索。')
       }
-      const details = await fetchGooglePlaceDetails(query)
+      const details = await fetchPlaceDetails(query)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -706,7 +689,7 @@ export function AddPlaceDialog({
     }
 
     const { details, type } = googleDetail
-    const detailKeys = placeDetailKeysFromGoogle(details)
+    const detailKeys = placeDetailKeysFromDetails(details)
     const bypass = googleStoryRegenToken > 0
     if (!bypass) {
       const memoHit = peekPlaceDetailCopy(...detailKeys)
@@ -834,7 +817,7 @@ export function AddPlaceDialog({
                 mainTab === 'google' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
               }`}
             >
-              Google 搜索
+              地点搜索
             </button>
           </div>
         </div>
@@ -940,7 +923,7 @@ export function AddPlaceDialog({
                             <div className="space-y-3 border-t border-[var(--mist)] px-3 pb-3 pt-3">
                               {loadingDetails ? (
                                 <LoadingIndicator
-                                  label="正在加载 Google 照片…"
+                                  label="正在加载地点图片…"
                                   showDots
                                   size="sm"
                                 />
@@ -1061,7 +1044,7 @@ export function AddPlaceDialog({
                                     </div>
                                   ) : (
                                     <p className="text-sm text-[var(--stone)]">
-                                      暂未获取到 Google 照片，仍可查看介绍后加入。
+                                      暂未获取到开放数据图片，仍可查看介绍后加入。
                                     </p>
                                   )}
 
@@ -1144,7 +1127,7 @@ export function AddPlaceDialog({
                   })}
                   {!visible.length && (
                     <p className="py-6 text-center text-sm text-[var(--stone)]">
-                      这一类暂时没有推荐，可切换其他分类、换一批，或用 Google 搜索。
+                      这一类暂时没有推荐，可切换其他分类、换一批，或用地点搜索。
                     </p>
                   )}
                 </ul>
@@ -1215,7 +1198,7 @@ export function AddPlaceDialog({
       </div>
       </div>
 
-      <GooglePlacePage
+      <PlaceDetailsPage
         open={Boolean(googleDetail)}
         name={googleDetail?.details.name || ''}
         nameLocal={googleDetail?.details.nameOriginal}

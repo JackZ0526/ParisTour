@@ -36,6 +36,116 @@ export type {
   VerifiedPlaceCandidate,
 }
 
+function discoveredCandidateId(
+  type: RecommendPlaceType,
+  name: string,
+  address?: string,
+) {
+  const source = `${type}|${name.trim().toLowerCase()}|${(address || '').trim().toLowerCase()}`
+  let hash = 2166136261
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `llm:${type}:${(hash >>> 0).toString(36)}`
+}
+
+/**
+ * Discover a durable trip-wide candidate pool with web-grounded LLM research.
+ * Coordinates are intentionally omitted: only places selected by the itinerary
+ * are geocoded later, which keeps the public place service out of the hot path.
+ */
+export async function discoverItineraryCandidates(input: {
+  destination: string
+  hotelName: string
+  hotelAddress?: string
+  hotelArea?: string
+  recommendationPreferences: RecommendationPreferences
+  countPerType?: number
+  signal?: AbortSignal
+}): Promise<VerifiedPlaceCandidate[]> {
+  if (!isLlmConfigured()) return []
+  const countPerType = Math.max(6, Math.min(14, input.countPerType || 10))
+  const system = buildPrompt(
+    '旅行地点研究员。联网查找真实存在、适合编排行程的地点候选；只做候选发现，不编排行程。',
+    null,
+    COMMON_RULES,
+    PLACE_RESEARCH_DISCIPLINE,
+    CAFE_VS_RESTAURANT_RULE,
+    `<hard_rules>
+- 分别提供 ${countPerType} 个 cafe、restaurant、attraction，共 ${countPerType * 3} 个候选。
+- name 必须是商家或景点当前使用的正式原文名称；address 尽量给出完整地址或明确街区。
+- 候选必须位于目的地城市内，并优先覆盖酒店周边及交通方便的主要游览片区。
+- 不得虚构名称、分店、地址、评分、营业时间或坐标；无法核实的地点不要输出。
+- cafe 是精品咖啡、烘焙或早午餐小店；restaurant 是正餐；attraction 是景点、博物馆、公园或街区。
+- 不输出经纬度。坐标将在地点最终入选后由独立地点服务校验。
+</hard_rules>`,
+    jsonContract(
+      '{ candidates: [{ name, type: "cafe|restaurant|attraction", address? }] }',
+      '{ "candidates": [{ "name": "Musée Rodin", "type": "attraction", "address": "77 Rue de Varenne, 75007 Paris" }] }',
+    ),
+  )
+  const user = JSON.stringify({
+    destination: input.destination,
+    hotel: {
+      name: input.hotelName,
+      address: input.hotelAddress || null,
+      area: input.hotelArea || null,
+    },
+    countPerType,
+    recommendationPreferences: recommendationPreferencesPrompt(
+      input.recommendationPreferences,
+    ),
+  })
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'placeRecommend',
+    json: true,
+    webSearch: true,
+    signal: input.signal,
+    userText: `${input.destination} 真实咖啡馆、餐厅和景点候选`,
+    preflightContext: {
+      destination: input.destination,
+      hotel: input.hotelName,
+      countPerType,
+    },
+  })
+  const parsed = text ? extractJsonObject(text) : null
+  const rows = Array.isArray(parsed?.candidates)
+    ? (parsed.candidates as unknown[])
+    : []
+  const output: VerifiedPlaceCandidate[] = []
+  const seen = new Set<string>()
+  const counts: Record<RecommendPlaceType, number> = {
+    cafe: 0,
+    restaurant: 0,
+    attraction: 0,
+  }
+  for (const item of rows) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const name = String(row.name || '').trim()
+    const address = String(row.address || row.area || '').trim() || undefined
+    const rawType = String(row.type || '').trim().toLowerCase()
+    const type: RecommendPlaceType | null =
+      rawType === 'cafe' || rawType === 'restaurant' || rawType === 'attraction'
+        ? rawType
+        : null
+    if (!name || !type || counts[type] >= countPerType) continue
+    const key = `${type}:${name.toLowerCase()}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    counts[type] += 1
+    output.push({
+      id: discoveredCandidateId(type, name, address),
+      name,
+      type,
+      address,
+    })
+  }
+  return output
+}
+
 /** Cheap, always-cached place blurb. */
 export async function generatePlaceDescription(input: {
   name: string
@@ -348,11 +458,11 @@ export async function recommendPlacesForDay(input: {
 - 只推荐 requestedTypes 中的类别；每个类别严格给出 ${countPerType} 个地点，共 ${
       requestedTypes.length * countPerType
     } 个。
-- cafe 类：优先 Google 高分 specialty coffee、烘焙店可坐位、brunch/早午餐小店；不要推荐以正餐为主的 brasserie / café-restaurant。
+- cafe 类：优先高分 specialty coffee、烘焙店可坐位、brunch/早午餐小店；不要推荐以正餐为主的 brasserie / café-restaurant。
 - restaurant 类：正餐（午餐/晚餐），可含 bistro、brasserie、各国菜；不要用咖啡店/纯甜品店凑数。
 - 严禁推荐 alreadyOnThisDay 与 alreadyOnTrip 中的地点。
 - 尽量避开 avoidAlso（上一批推荐）；batch>1 时必须给出明显不同的新名单，不要复用上一批。
-- name 用可被 Google Maps 搜到的正式名称，可附 nameLocal 中文名。
+- name 使用 OpenStreetMap/Nominatim 可检索的正式原文名称，可附 nameLocal 中文名。
 - 只能从 verifiedCandidates 选择地点；name 与 googlePlaceId 必须原样复制，禁止另造店名、地址、评分或距离。
 - 比较候选时同时考虑距离、评分和评论量；没有评分不等于低质量，但不得自行补评分。
 - ${

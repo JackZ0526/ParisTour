@@ -101,7 +101,7 @@ export async function translateTextsToChinese(
         {
           role: 'system',
           content: buildPrompt(
-            '翻译助手。把用户给出的 Google 评论译成简洁通顺的简体中文。',
+            '翻译助手。把用户给出的地点评论译成简洁通顺的简体中文。',
             null,
             jsonContract(
               '{ translations: ["..."] }',

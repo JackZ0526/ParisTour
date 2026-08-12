@@ -14,15 +14,15 @@
 | `flight/` | 航班查询 + 缓存 | `FlightPanel` |
 | `hotel/` | 酒店推荐 + 缓存 + 区域解析 | `HotelPicker` |
 | `itinerary/` | 多日行程生成 + 时间线 | `DayTimeline`, `TripDatesPanel`, `useDayNav` |
-| `place/` | 地点详情 + 点评 + 翻译 | `AddPlaceDialog`, `PlacePanel`, `GooglePlacePage` |
-| `map/` | Google Maps 集成 | `TripMap`, `GoogleMapsProvider` |
+| `place/` | 地点详情 + 点评 + 翻译 | `AddPlaceDialog`, `PlacePanel`, `PlaceDetailsPage` |
+| `map/` | OpenStreetMap、开放路线与公共交通集成 | `TripMap`, `navigation` |
 | `chat/` | 行程助手对话 + LLM model picker | `TripChatPanel`, `LlmModelPicker`, `InlineMarkdown` |
 
 ## 跨 feature 复用
 
 通过 `../shared/` 共享：
 - `shared/services/llm/` — LLM 调用、prompt、artifact
-- `shared/services/maps/` — Google Maps key + URL 工具
+- `map/services/` — OpenStreetMap、地点检索与开放路线工具
 - `shared/services/translate.ts` — 翻译（chat + place name 翻译共用）
 - `shared/services/supabase/` — Supabase client
 - `shared/components/` — 通用 UI 组件

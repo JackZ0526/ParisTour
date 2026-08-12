@@ -10,7 +10,7 @@
 
 ## 未来要加的
 
-- `maps.ts` — Google Maps API key、referrer 白名单提示、embed URL 模板（替代 `services/googleMapsKey.ts` 里的零散函数）。
+- `maps.ts` — 地图与开放路线服务配置。
 - `supabase.ts` — Supabase URL/anon key 解析（从 `lib/supabase.ts` 抽出来）。
 - `env.ts` — 一站式 `getEnv(name)` helper + zod-style 校验（避免 `import.meta.env.X` 散落）。
 

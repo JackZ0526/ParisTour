@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { getPlace } from '../../place/constants/places'
-import type { DayNavPlan, ResolvedDayLeg } from '../../map/services/googleNav'
-import { PATH_MODE_COLORS } from '../../map/services/googleNav'
+import type { DayNavPlan, ResolvedDayLeg } from '../../map/services/navigation'
+import { PATH_MODE_COLORS } from '../../map/services/navigation'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../../../types'
 import {
@@ -13,7 +13,7 @@ import {
 } from '../utils/dayOrigin'
 import { AddPlaceDialog } from '../../place/components/AddPlaceDialog'
 import { GommagePetals } from '../../../shared/components/GommagePetals'
-import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
+import { PlacePhoto } from '../../place/components/PlacePhoto'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { HouseIcon, PlaneIcon } from '../../map/components/markerIcons'
 import { PlaceName } from '../../place/components/PlaceName'
@@ -406,7 +406,7 @@ function LegConnector({
                   <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
                     {leg?.durationText}
                     {leg?.distanceText ? ` · ${leg.distanceText}` : ''}
-                    <span className="ml-1 opacity-60">· Google</span>
+                    <span className="ml-1 opacity-60">· Transitous</span>
                   </span>
                 </>,
               )
@@ -1736,6 +1736,11 @@ export function DayTimeline({
                     <span className="text-xs text-[var(--stone)]">
                       {typeLabel[place.type] || place.type}
                     </span>
+                    {place.locationPending && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                        位置待确认
+                      </span>
+                    )}
                   </div>
                   <PlaceName
                     className="mt-1"
@@ -1758,7 +1763,7 @@ export function DayTimeline({
                     )}
                   </div>
                 </div>
-                <GooglePlacePhoto
+                <PlacePhoto
                   name={place.name}
                   nameLocal={place.nameLocal}
                   location={place.location}
@@ -1924,7 +1929,7 @@ export function DayTimeline({
                               {swapAnim.oldStop.note}
                             </p>
                           </div>
-                          <GooglePlacePhoto
+                          <PlacePhoto
                             name={oldSwapPlace.name}
                             nameLocal={oldSwapPlace.nameLocal}
                             location={oldSwapPlace.location}
@@ -2062,7 +2067,7 @@ export function DayTimeline({
                       )}
                     </div>
                   </div>
-                  <GooglePlacePhoto
+                  <PlacePhoto
                     name={place.name}
                     nameLocal={place.nameLocal}
                     location={place.location}

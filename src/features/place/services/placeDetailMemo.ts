@@ -11,8 +11,8 @@ export function placeDetailIdKey(placeId: string) {
 }
 
 /** Shared stable key by Google place id when known. */
-export function placeDetailGoogleIdKey(googlePlaceId: string) {
-  return `place-detail:google:${googlePlaceId.trim()}`
+export function placeDetailProviderIdKey(providerId: string) {
+  return `place-detail:provider:${providerId.trim()}`
 }
 
 /**
@@ -23,14 +23,14 @@ export function placeDetailNameKey(name: string) {
   return `place-detail:google:${name.toLowerCase().trim()}`
 }
 
-/** Keys used when generating from a Google Places details payload. */
-export function placeDetailKeysFromGoogle(details: {
+/** Keys used when generating from a structured place-details payload. */
+export function placeDetailKeysFromDetails(details: {
   id?: string
   name: string
 }): string[] {
   const nameKey = placeDetailNameKey(details.name)
   const gid = details.id?.trim()
-  if (gid) return [placeDetailGoogleIdKey(gid), nameKey]
+  if (gid) return [placeDetailProviderIdKey(gid), nameKey]
   return [nameKey]
 }
 
@@ -42,7 +42,7 @@ export function placeDetailKeysFromPlace(place: {
 }): string[] {
   const keys = [placeDetailIdKey(place.id)]
   if (place.googlePlaceId?.trim()) {
-    keys.push(placeDetailGoogleIdKey(place.googlePlaceId))
+    keys.push(placeDetailProviderIdKey(place.googlePlaceId))
   }
   keys.push(placeDetailNameKey(place.name))
   return keys

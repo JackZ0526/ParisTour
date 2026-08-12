@@ -13,8 +13,8 @@ Invite-only Paris trip planner with per-account cloud save and realtime sync. Sh
 - **Editable timeline (DayTimeline)**: Drag to reorder, delete, restore baseline; browse by day
 - **AI itinerary generation**: Multi-day plans from flights, hotels, and preferences; single-day reshuffle supported
 - **TripChat**: Natural-language itinerary edits (add/swap places, change hotels, switch days, etc.)
-- **Place add**: LLM recommendations or Google search; place details, photos, and reviews
-- **Map & navigation**: Google Maps for the day’s route; Directions; flight lookup via TimeTable Lookup first
+- **Place add**: LLM recommendations or OpenStreetMap search; cached details and open-data photos
+- **Map & navigation**: Leaflet/OpenStreetMap map, open walking/driving routes, and Transitous public transport
 - **Hotels / flights**: Hotel area recommendations and selection; flight templates and live schedule lookup
 
 ## Stack
@@ -22,7 +22,7 @@ Invite-only Paris trip planner with per-account cloud save and realtime sync. Sh
 | Layer | Tech |
 |-------|------|
 | Frontend | Vite · React 19 · TypeScript · Tailwind CSS v4 |
-| Maps | Google Maps (`@react-google-maps/api`); Leaflet fallback |
+| Maps | Leaflet + OpenStreetMap + OpenRouteService/OSM routing + Transitous |
 | Backend / data | Supabase (Auth · Postgres · Realtime · RLS) |
 | API proxy | Vercel Serverless (`/api/*`): OpenAI, Gemini, RapidAPI, share email |
 | Email | Resend (optional; without it you can copy invite links) |
@@ -70,19 +70,13 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- Browser (VITE_) ---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_MAPS_API_KEY=
 # VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # Default DeepSeek model (or deepseek-v4-pro)
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # Override default to an OpenAI model
 # VITE_LLM_ENABLED=true              # false hides LLM features
 ```
 
-On Google Cloud, enable **Maps JavaScript API**, **Places API (New)**, and **Directions API**. Add these HTTP referrers:
-
-- `http://127.0.0.1:5173/*`
-- `http://localhost:5173/*`
-- `https://paristour.vercel.app/*`
-
-A local `RefererNotAllowedMapError` usually means one of the above is missing.
+Optionally add a free `OPENROUTESERVICE_API_KEY` on the server. Without it,
+walking/driving routes use the no-key OpenStreetMap routing fallback.
 
 On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + allowlist. Without `RESEND_API_KEY`, sharing still works—the UI prompts you to copy the invite link manually.
 

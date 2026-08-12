@@ -21,7 +21,7 @@ import {
   type ThinkingEffortUi,
 } from '../../../shared/services/llm/llm'
 import { dateForTripDay, formatTripDayLabel } from '../../itinerary/services/tripDates'
-import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlaceDetails'
+import { searchNearbyPlaceCandidates } from '../../map/services/placeDetails'
 import {
   COMMON_RULES,
   NO_HALLUCINATION,
@@ -189,7 +189,7 @@ export interface TripChatContext {
   outbound?: FlightInfo | null
   returnFlight?: FlightInfo | null
   /**
-   * Detail overlay the user currently has open (PlacePanel / hotel GooglePlacePage).
+   * Detail overlay the user currently has open (PlacePanel / hotel detail page).
    * When set, 「这个 / 多少钱」等指代优先指向该对象。
    */
   viewing?: TripChatViewingTarget | null
@@ -624,7 +624,7 @@ export function tripChatNeedsWebResearch(userMessage: string): boolean {
     return true
   }
   // Open-ended recommendations need live candidates and ratings before the
-  // model chooses a place. This is handled primarily by Google Places below.
+  // model chooses a place. This is handled primarily by OpenStreetMap below.
   if (isLivePlaceRecommendationRequest(text)) return true
   // Pure itinerary edits usually don't need web search.
   if (
@@ -696,14 +696,14 @@ function recommendationSearchQuery(ctx: TripChatContext, userMessage: string): {
   return { textQuery: `${category} ${destination}`, maxDistanceMeters }
 }
 
-async function fetchGooglePlaceRecommendationResearch(input: {
+async function fetchOpenStreetMapPlaceRecommendationResearch(input: {
   ctx: TripChatContext
   userMessage: string
 }): Promise<string | null> {
   const query = recommendationSearchQuery(input.ctx, input.userMessage)
   if (!query) return null
   try {
-    const candidates = await searchNearbyGooglePlaceCandidates({
+    const candidates = await searchNearbyPlaceCandidates({
       textQuery: query.textQuery,
       location: { lat: input.ctx.hotel.lat, lng: input.ctx.hotel.lng },
       maxDistanceMeters: query.maxDistanceMeters,
@@ -718,10 +718,10 @@ async function fetchGooglePlaceRecommendationResearch(input: {
       return `${index + 1}. ${candidate.name}｜评分 ${rating}（${reviews}）｜距酒店约 ${distance}${price}｜${candidate.address || '地址待确认'}`
     })
     return [
-      '【Google Places 实时附近候选】',
-      `已按评分、评论量与距离综合排序；硬范围 ${Math.round(query.maxDistanceMeters / 1000)} 公里。`,
+      '【OpenStreetMap 实时附近候选】',
+      `已按距离筛选；硬范围 ${Math.round(query.maxDistanceMeters / 1000)} 公里。`,
       ...rows,
-      '推荐动作必须从以上候选中选择；比较评分时同时考虑评论量与距离，不要另造店名、地址或评分。',
+      '推荐动作必须从以上候选中选择；不要另造店名、地址或评分。',
     ].join('\n')
   } catch {
     return null
@@ -778,12 +778,12 @@ export async function fetchTripChatWebResearch(input: {
   signal?: AbortSignal
   onSearch?: (detail: TripChatWebSearchDetail) => void
 }): Promise<string | null> {
-  const googleQuery = recommendationSearchQuery(input.ctx, input.userMessage)
-  if (googleQuery) {
-    input.onSearch?.({ source: 'google_places', query: googleQuery.textQuery })
+  const placeQuery = recommendationSearchQuery(input.ctx, input.userMessage)
+  if (placeQuery) {
+    input.onSearch?.({ source: 'openstreetmap', query: placeQuery.textQuery })
   }
-  const googleResearch = await fetchGooglePlaceRecommendationResearch(input)
-  if (googleResearch) return googleResearch
+  const placeResearch = await fetchOpenStreetMapPlaceRecommendationResearch(input)
+  if (placeResearch) return placeResearch
   try {
     // Provisional detail until the stream reveals the real query.
     input.onSearch?.({ source: 'web', query: input.userMessage })
@@ -847,15 +847,15 @@ function buildTripChatMessages(input: {
   })
   const research = String(input.webResearch || '').trim()
   if (research) {
-    const isGooglePlacesShortlist = research.includes('【Google Places 实时附近候选】')
+    const isOpenStreetMapShortlist = research.includes('【OpenStreetMap 实时附近候选】')
     messages.push({
       role: 'user',
       content: [
         '<untrusted_research_data>',
-        isGooglePlacesShortlist
-          ? '以下是本轮从 Google Places 实时获取并按评分、评论量和距离排序的附近候选。'
+        isOpenStreetMapShortlist
+          ? '以下是本轮从 OpenStreetMap 实时获取并按距离筛选的附近候选。'
           : '以下是针对本轮用户问题的网络检索摘要（可能过时或不完整）。',
-        isGooglePlacesShortlist
+        isOpenStreetMapShortlist
           ? '开放式地点推荐必须从候选中选择，并在回复中简要说明与其它候选相比的理由。'
           : '回答价目/营业/门票/天气等时优先参考；与「当前行程」冲突时以行程计划为准。',
         '对用户回复时不要提及本段或「检索摘要」字样。',
@@ -1214,7 +1214,7 @@ async function repairTripChatJson(
 
 export type TripChatWebSearchPhase = 'start' | 'done' | 'skip'
 export interface TripChatWebSearchDetail {
-  source: 'google_places' | 'web'
+  source: 'openstreetmap' | 'web'
   query: string
 }
 

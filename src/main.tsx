@@ -4,16 +4,13 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { AuthGate } from './features/auth/components/AuthGate'
-import { GoogleMapsProvider } from './features/map/components/GoogleMapsProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GoogleMapsProvider>
-      <AuthProvider>
-        <AuthGate>
-          <App />
-        </AuthGate>
-      </AuthProvider>
-    </GoogleMapsProvider>
+    <AuthProvider>
+      <AuthGate>
+        <App />
+      </AuthGate>
+    </AuthProvider>
   </StrictMode>,
 )

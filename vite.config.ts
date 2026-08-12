@@ -7,9 +7,11 @@ import path from 'node:path'
 const PAID_API_PREFIXES = [
   '/api/openai',
   '/api/deepseek',
-  '/api/gemini',
   '/api/aerodatabox',
   '/api/timetable-lookup',
+  '/api/openrouteservice',
+  '/api/osm-route',
+  '/api/transitous',
 ]
 
 function readBearer(req: IncomingMessage): string | null {
@@ -170,7 +172,7 @@ export default defineConfig(({ mode }) => {
   const rapidApiKey = env.RAPIDAPI_KEY || env.AERODATABOX_RAPIDAPI_KEY || ''
   const openaiKey = env.OPENAI_API_KEY || ''
   const deepseekKey = env.DEEPSEEK_API_KEY || ''
-  const geminiKey = env.GEMINI_API_KEY || ''
+  const openRouteServiceKey = env.OPENROUTESERVICE_API_KEY || ''
   const openaiBase = (env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
   const deepseekBase = (env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/$/, '')
   const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || ''
@@ -209,6 +211,43 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: {
+        '/api/openrouteservice': {
+          target: 'https://api.openrouteservice.org',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/openrouteservice/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('authorization')
+              if (openRouteServiceKey) {
+                proxyReq.setHeader('Authorization', openRouteServiceKey)
+              }
+              proxyReq.setHeader('Accept', 'application/json, application/geo+json')
+            })
+          },
+        },
+        '/api/osm-route': {
+          target: 'https://routing.openstreetmap.de',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/osm-route/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('authorization')
+              proxyReq.setHeader('Accept', 'application/json')
+            })
+          },
+        },
+        '/api/transitous': {
+          target: 'https://api.transitous.org',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/transitous/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('authorization')
+              proxyReq.setHeader('Accept', 'application/json')
+              proxyReq.setHeader('User-Agent', 'ParisTour/0.5 (https://paristour.vercel.app)')
+            })
+          },
+        },
         // AeroDataBox (RapidAPI) — key injected server-side, never exposed to the browser
         '/api/aerodatabox': {
           target: 'https://aerodatabox.p.rapidapi.com',
@@ -239,26 +278,6 @@ export default defineConfig(({ mode }) => {
               }
               proxyReq.setHeader('X-RapidAPI-Host', 'timetable-lookup.p.rapidapi.com')
               proxyReq.setHeader('Content-Type', 'application/json')
-            })
-          },
-        },
-        // Gemini — key injected server-side from GEMINI_API_KEY
-        '/api/gemini': {
-          target: 'https://generativelanguage.googleapis.com',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/gemini/, ''),
-          configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq, req) => {
-              proxyReq.removeHeader('authorization')
-              if (!geminiKey) return
-              try {
-                const incoming = new URL(req.url || '/', 'http://localhost')
-                incoming.searchParams.delete('key')
-                incoming.searchParams.set('key', geminiKey)
-                proxyReq.path = `${proxyReq.path.split('?')[0]}?${incoming.searchParams.toString()}`
-              } catch {
-                /* ignore */
-              }
             })
           },
         },

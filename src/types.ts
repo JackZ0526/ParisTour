@@ -10,6 +10,7 @@ export interface Coordinates {
 /** Hotel card shown in the picker (LLM recommend or custom address). */
 export interface HotelCandidate {
   id: string
+  /** @deprecated Compatibility field; stores a provider-neutral OSM identity. */
   googlePlaceId?: string
   name: string
   area: string
@@ -31,7 +32,7 @@ export interface HotelCandidate {
 
 export interface Place {
   id: string
-  /** Stable Google Places identity. Prefer this over text search when available. */
+  /** @deprecated Compatibility field; new values use `osm:<type>:<id>`. */
   googlePlaceId?: string
   name: string
   nameLocal?: string
@@ -42,7 +43,9 @@ export interface Place {
   priceHint?: string
   image: string
   location: Coordinates
-  /** Opens Google Maps place search / photos & reviews */
+  /** True when the model selected the place but precise coordinates still need validation. */
+  locationPending?: boolean
+  /** @deprecated Compatibility field; now stores an OpenStreetMap URL. */
   googleMapsUrl: string
   durationHint?: string
 }
@@ -110,6 +113,7 @@ export interface FlightInfo {
 
 export interface SelectedHotel {
   id: string
+  /** @deprecated Compatibility field; stores a provider-neutral OSM identity. */
   googlePlaceId?: string
   name: string
   address: string

@@ -619,10 +619,16 @@ export function useItineraryGeneration(
           setDayIndex(0)
         }
 
-        // Shared Google candidates once per run.
-        const sharedCandidates = await getSharedItineraryCandidates(hotel)
+        // Shared verified candidates once per run.
+        const sharedCandidates = await getSharedItineraryCandidates(
+          hotel,
+          [],
+          destination,
+          recommendationPreferences,
+          abortController.signal,
+        )
         if (!sharedCandidates.length) {
-          throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+          throw new Error('暂时没有找到可验证的地点候选，请稍后重试。')
         }
 
         const generateDayWithRetry = async (dayNumber: number) => {

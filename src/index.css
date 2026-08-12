@@ -119,7 +119,7 @@
   --timeline-leg-fade-ms: 220ms;
   --timeline-swap-wipe-ms: 720ms;
   --timeline-reorder-ms: 420ms;
-  font-family: 'Outfit', system-ui, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
   background: var(--paper);
   line-height: 1.5;
@@ -159,7 +159,7 @@ h1,
 h2,
 h3,
 .font-display {
-  font-family: 'Noto Serif SC', 'Noto Serif', Georgia, 'Songti SC', serif;
+  font-family: 'Songti SC', 'STSong', Georgia, serif;
   font-weight: 600;
   letter-spacing: 0.01em;
 }

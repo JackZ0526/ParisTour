@@ -16,9 +16,8 @@ import { candidateToSelected, resolveHotelCandidate } from '../services/hotelRes
 import { generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
 import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
-import { GooglePlacePage } from '../../place/components/GooglePlacePage'
-import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
+import { PlaceDetailsPage } from '../../place/components/PlaceDetailsPage'
+import { PlacePhoto } from '../../place/components/PlacePhoto'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 interface Props {
@@ -28,7 +27,7 @@ interface Props {
   onSelect: (hotel: SelectedHotel) => void
   onCandidatesChange: (candidates: HotelCandidate[]) => void
   readOnly?: boolean
-  /** Fired when hotel GooglePlacePage opens/closes (for trip chat viewing context). */
+  /** Fired when the hotel detail page opens/closes (for trip chat viewing context). */
   onDetailChange?: (hotel: HotelCandidate | null) => void
 }
 
@@ -62,10 +61,17 @@ function pointInRect(x: number, y: number, rect: DOMRect) {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 }
 
+function publicHotelText(value?: string | null) {
+  return (value || '')
+    .replace(/\bGoogle(?:\s+Maps)?\b\s*/gi, '')
+    .replace(/谷歌\s*/g, '')
+    .trim()
+}
+
 function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
   return (
     <>
-      <GooglePlacePhoto
+      <PlacePhoto
         name={hotel.name}
         location={{ lat: hotel.lat, lng: hotel.lng }}
         fallback={hotel.image}
@@ -89,9 +95,11 @@ function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
         </div>
         <p className="font-medium leading-snug">{hotel.name}</p>
         <p className="line-clamp-2 text-xs text-[var(--stone)]">
-          {hotel.reason || hotel.description}
+          {publicHotelText(hotel.reason || hotel.description)}
         </p>
-        <p className="text-xs text-[var(--stone)]">{hotel.priceHint}</p>
+        <p className="text-xs text-[var(--stone)]">
+          {publicHotelText(hotel.priceHint)}
+        </p>
       </div>
     </>
   )
@@ -166,7 +174,6 @@ export function HotelPicker({
   readOnly = false,
   onDetailChange,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [customQuery, setCustomQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -237,7 +244,6 @@ export function HotelPicker({
 
   useEffect(() => {
     if (bootstrappedRef.current) return
-    if (!isLoaded) return
     bootstrappedRef.current = true
 
     const cached = loadHotelCache()
@@ -255,7 +261,7 @@ export function HotelPicker({
     if (readOnly) return
     void bootstrapRecommendations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, readOnly])
+  }, [readOnly])
 
   function selectHotel(
     card: HotelCandidate,
@@ -311,9 +317,9 @@ export function HotelPicker({
           area: card.area,
           address: card.address,
           nearestMetro: card.nearestMetro,
-          ratingHint: card.priceHint,
-          existingDescription: card.description,
-          existingReason: card.reason,
+          ratingHint: publicHotelText(card.priceHint),
+          existingDescription: publicHotelText(card.description),
+          existingReason: publicHotelText(card.reason),
           isBest: card.isBest,
           userPreferences: prefs,
           tripDays,
@@ -982,7 +988,7 @@ export function HotelPicker({
                 />
                 <button
                   type="button"
-                  disabled={loading || !customQuery.trim() || !isLoaded || decidingCustom}
+                  disabled={loading || !customQuery.trim() || decidingCustom}
                   onClick={() => void applyCustom()}
                   aria-busy={loading || undefined}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2 text-sm text-[var(--paper)] disabled:opacity-50"
@@ -1107,7 +1113,7 @@ export function HotelPicker({
         </div>
       )}
 
-      <GooglePlacePage
+      <PlaceDetailsPage
         open={Boolean(popupCandidate)}
         name={popupCandidate?.name || ''}
         location={
@@ -1120,9 +1126,9 @@ export function HotelPicker({
         llmNarrative={
           popupCandidate
             ? {
-                intro: popupCandidate.description,
-                reason: popupCandidate.reason,
-                tripFit: popupCandidate.tripFit,
+                intro: publicHotelText(popupCandidate.description),
+                reason: publicHotelText(popupCandidate.reason),
+                tripFit: publicHotelText(popupCandidate.tripFit),
                 loading: storyLoadingId === popupCandidate.id,
                 labels: {
                   title: '行程顾问点评',

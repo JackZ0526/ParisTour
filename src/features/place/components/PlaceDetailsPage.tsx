@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  fetchGooglePlaceDetails,
+  fetchPlaceDetails,
   placeDetailsQuery,
-  type GooglePlaceDetails,
-} from '../../map/services/googlePlaceDetails'
-import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../../map/services/googleMapsKey'
+  type PlaceDetails,
+} from '../../map/services/placeDetails'
+import { openStreetMapPlaceUrl } from '../../map/services/openStreetMap'
+import { OpenStreetMapEmbed } from '../../map/components/OpenStreetMapEmbed'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
   looksChinese,
@@ -16,8 +17,7 @@ import type { Coordinates } from '../../../types'
 import { placeOriginalLabel, placeTitleLines } from '../../../shared/utils/placeTitle'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
-import { GoogleReviewsList } from './GoogleReviewsList'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
+import { PlaceReviewsList } from './PlaceReviewsList'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 export interface LlmPlaceNarrative {
@@ -62,11 +62,11 @@ interface Props {
    */
   overlayZIndex?: number
   /** Persist a recovered Google identity in the owning trip record. */
-  onDetailsResolved?: (details: GooglePlaceDetails) => void
+  onDetailsResolved?: (details: PlaceDetails) => void
   onClose: () => void
 }
 
-export function GooglePlacePage({
+export function PlaceDetailsPage({
   open,
   name,
   nameLocal,
@@ -82,8 +82,7 @@ export function GooglePlacePage({
   onDetailsResolved,
   onClose,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
-  const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
+  const [details, setDetails] = useState<PlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = useState(0)
@@ -96,8 +95,6 @@ export function GooglePlacePage({
   onDetailsResolvedRef.current = onDetailsResolved
 
   const query = placeDetailsQuery(name, nameLocal)
-  const apiKey = getGoogleMapsApiKey()
-  const embedSrc = googleMapsEmbedApiUrl(query, apiKey)
   const nameTranslateKey = `${open ? 1 : 0}|${name}|${nameLocal || ''}`
   const nameTranslateKeyRef = useRef(nameTranslateKey)
   if (nameTranslateKeyRef.current !== nameTranslateKey) {
@@ -109,10 +106,11 @@ export function GooglePlacePage({
   const photos =
     details?.photos?.length ? details.photos : fallbackImage ? [fallbackImage] : []
   const activePhoto = photos[photoIndex] || photos[0]
-  const googleMapsPlaceUrl = details?.id
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+  const googleMapsPlaceUrl = details
+    ? openStreetMapPlaceUrl(
         details.nameOriginal || details.name || query,
-      )}&query_place_id=${encodeURIComponent(details.id)}`
+        details.location,
+      )
     : null
 
   function stepPhoto(delta: number) {
@@ -149,20 +147,20 @@ export function GooglePlacePage({
   }, [open, onClose, closeOnBackdrop, photos.length])
 
   useEffect(() => {
-    if (!open || !isLoaded) return
+    if (!open) return
     let cancelled = false
     setLoading(true)
     setError(null)
     setPhotoIndex(0)
 
-    void fetchGooglePlaceDetails(query, location, {
+    void fetchPlaceDetails(query, location, {
       placeId: googlePlaceId,
       recoverFromLocation: !googlePlaceId && !query,
     })
       .then((result) => {
         if (cancelled) return
         if (!result) {
-          setError('未找到该地点的 Google 详情。')
+          setError('未找到该地点的 OpenStreetMap 详情。')
           setDetails(null)
         } else {
           setDetails(result)
@@ -179,7 +177,7 @@ export function GooglePlacePage({
     return () => {
       cancelled = true
     }
-  }, [open, isLoaded, query, googlePlaceId, location])
+  }, [open, query, googlePlaceId, location])
 
   // When Google / trip data has no Chinese display name, LLM-translate the original.
   useEffect(() => {
@@ -289,7 +287,7 @@ export function GooglePlacePage({
   )
   const dialogLabel = showNameLoader
     ? `正在翻译「${originalLabel}」`
-    : `${title || originalLabel} Google 地点页`
+    : `${title || originalLabel} 地点详情`
   const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel)
 
   return createPortal(
@@ -374,7 +372,7 @@ export function GooglePlacePage({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
           {loading && (
-            <LoadingIndicator label="正在加载 Google 地点信息…" showDots size="sm" />
+            <LoadingIndicator label="正在加载 OpenStreetMap 地点信息…" showDots size="sm" />
           )}
           {error && <p className="text-sm text-amber-800">{error}</p>}
 
@@ -589,17 +587,17 @@ export function GooglePlacePage({
               </div>
             )}
 
-          {details?.reviews?.length ? <GoogleReviewsList reviews={details.reviews} /> : null}
+          {details?.reviews?.length ? <PlaceReviewsList reviews={details.reviews} /> : null}
 
           {details &&
             !loading &&
             !details.reviews.length &&
             (details.userRatingCount || 0) > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium">Google 评论</p>
+                <p className="mb-2 text-sm font-medium">地点评论</p>
                 <div className="rounded-xl bg-white/70 px-3 py-2 text-sm">
                   <p className="leading-relaxed text-[var(--stone)]">
-                    Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。
+                    当前数据源提供了汇总评分，但没有可公开展示的评论正文。
                   </p>
                   {googleMapsPlaceUrl && (
                     <a
@@ -608,7 +606,7 @@ export function GooglePlacePage({
                       rel="noreferrer"
                       className="mt-1.5 inline-flex items-center gap-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
                     >
-                      在 Google 地图查看评价
+                      在 OpenStreetMap 查看位置
                       <span aria-hidden>↗</span>
                     </a>
                   )}
@@ -616,17 +614,13 @@ export function GooglePlacePage({
               </div>
             )}
 
-          {showMap && (
+          {showMap && (details?.location || location) && (
             <div>
               <p className="mb-2 text-sm font-medium">地图位置（本页嵌入）</p>
               <div className="overflow-hidden rounded-xl border border-[var(--mist)]">
-                <iframe
-                  title={`${name} map`}
-                  src={embedSrc}
-                  className="h-[260px] w-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allowFullScreen
+                <OpenStreetMapEmbed
+                  title={name}
+                  location={details?.location || location!}
                 />
               </div>
             </div>

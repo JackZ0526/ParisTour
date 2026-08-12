@@ -165,6 +165,7 @@ export {
   generatePlaceDescription,
   generatePlaceDetailCopy,
   generateDayCopy,
+  discoverItineraryCandidates,
   recommendPlacesForDay,
 } from './business/place'
 

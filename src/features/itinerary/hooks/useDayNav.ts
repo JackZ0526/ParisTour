@@ -4,11 +4,10 @@ import {
   planDayNavigation,
   type DayNavPlan,
   type ResolvedDayLeg,
-} from '../../map/services/googleNav'
+} from '../../map/services/navigation'
 import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getDayOriginFromHotelFields } from '../utils/dayOrigin'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 
 const emptyPlan = (
   stopsKey = '',
@@ -33,18 +32,15 @@ const emptyPlan = (
 /** Session cache: reuse Directions results when switching days (invalidate when places/origin change). */
 const navPlanCache = new Map<string, DayNavPlan>()
 
-const NAV_ARTIFACT_PREFIX = 'day-navigation:v1:'
+// v3 invalidates pre-Transitous route geometry so unchanged trips migrate once.
+const NAV_ARTIFACT_PREFIX = 'day-navigation:v3:'
 
 function artifactKey(day: number): string {
   return `${NAV_ARTIFACT_PREFIX}${day}`
 }
 
 function persistedLeg(leg: ResolvedDayLeg | null): ResolvedDayLeg | null {
-  if (!leg) return null
-  // Google DirectionsResult contains Maps runtime objects. All information the
-  // timeline and cached-map renderer need already lives in these normalized fields.
-  const { directionsResult: _directionsResult, ...serializable } = leg
-  return serializable
+  return leg ? { ...leg } : null
 }
 
 function persistedPlan(plan: DayNavPlan): DayNavPlan {
@@ -91,7 +87,6 @@ export function useDayNav(
   customPlaces: Record<string, Place>,
   enabled = true,
 ) {
-  const { isLoaded } = useGoogleMapsReady()
   const origin = useMemo(
     () =>
       getDayOriginFromHotelFields(
@@ -118,6 +113,9 @@ export function useDayNav(
           .map((s) => {
             try {
               const place = getPlace(s.placeId, customPlaces)
+              if (place.locationPending) {
+                return `${s.id || ''}:${s.placeId}@pending`
+              }
               const { lat, lng } = place.location
               if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 return `${s.id || ''}:${s.placeId}@${lat.toFixed(5)},${lng.toFixed(5)}`
@@ -130,6 +128,18 @@ export function useDayNav(
           .join(','),
       ].join('|'),
     [day.day, day.stops, day.pace, origin.kind, origin.id, origin.lat, origin.lng, customPlaces],
+  )
+
+  const hasPendingLocations = useMemo(
+    () =>
+      day.stops.some((stop) => {
+        try {
+          return Boolean(getPlace(stop.placeId, customPlaces).locationPending)
+        } catch {
+          return false
+        }
+      }),
+    [day.stops, customPlaces],
   )
 
   const stopPoints = useMemo(() => {
@@ -168,17 +178,27 @@ export function useDayNav(
       return
     }
 
+    if (hasPendingLocations) {
+      requestIdRef.current += 1
+      setLoading(false)
+      setPlan({
+        ...emptyPlan(
+          stopsKey,
+          '部分地点位置待确认，暂不计算路线',
+          origin.kind,
+        ),
+        hotelToFirstText: '地点位置确认后计算路线',
+        error: '地点位置待确认',
+      })
+      return
+    }
+
     const cached = navPlanCache.get(stopsKey) || durablePlan(day.day, stopsKey)
     if (cached) {
       navPlanCache.set(stopsKey, cached)
       requestIdRef.current += 1
       setLoading(false)
       setPlan((prev) => (prev === cached || prev.stopsKey === cached.stopsKey ? prev : cached))
-      return
-    }
-
-    if (!isLoaded) {
-      setLoading((prev) => (prev ? false : prev))
       return
     }
 
@@ -222,7 +242,6 @@ export function useDayNav(
       })
   }, [
     enabled,
-    isLoaded,
     origin.lat,
     origin.lng,
     origin.id,
@@ -231,7 +250,8 @@ export function useDayNav(
     day.pace,
     day.day,
     stopsKey,
+    hasPendingLocations,
   ])
 
-  return { plan, loading, isLoaded, stopsKey, origin }
+  return { plan, loading, stopsKey, origin }
 }

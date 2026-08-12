@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  fetchGooglePlaceDetails,
-} from '../../map/services/googlePlaceDetails'
+  fetchPlaceDetails,
+} from '../../map/services/placeDetails'
+import { openStreetMapPlaceUrl } from '../../map/services/openStreetMap'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -52,8 +53,7 @@ import type {
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
-import { GooglePlacePage } from '../../place/components/GooglePlacePage'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
+import { PlaceDetailsPage } from '../../place/components/PlaceDetailsPage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
 import {
@@ -159,7 +159,6 @@ export function TripChatPanel({
   viewing = null,
   handlers,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -170,7 +169,7 @@ export function TripChatPanel({
   const [panelMounted, setPanelMounted] = useState(false)
   const [panelEntered, setPanelEntered] = useState(false)
   const [pendingPlaces, setPendingPlaces] = useState<PendingPlaceConfirm[]>([])
-  /** Bumps GooglePlacePage remount when confirm overlay must be forced visible. */
+  /** Bumps the place-detail remount when confirm overlay must be forced visible. */
   const [confirmEpoch, setConfirmEpoch] = useState(0)
   const [pendingStory, setPendingStory] = useState<HotelDetailCopy | null>(null)
   const [pendingStoryLoading, setPendingStoryLoading] = useState(false)
@@ -455,8 +454,6 @@ export function TripChatPanel({
     note?: string
     dayNum: number
   }): Promise<Place> {
-    if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加地点。')
-
     const placeType: PlaceType = input.placeType || 'attraction'
     const hotelLocation =
       Number.isFinite(hotel.lat) &&
@@ -472,7 +469,7 @@ export function TripChatPanel({
           ? RECOMMENDED_FOOD_MAX_DISTANCE_METERS
           : RECOMMENDED_ATTRACTION_MAX_DISTANCE_METERS
         : undefined
-    const details = await fetchGooglePlaceDetails(
+    const details = await fetchPlaceDetails(
       `${input.placeName} Paris`,
       hotelLocation,
       { maxDistanceMeters },
@@ -510,10 +507,10 @@ export function TripChatPanel({
       name: details.name,
       type: placeType,
       description,
-      ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
+      ratingHint: details.rating ? `★ ${details.rating}` : 'OpenStreetMap 地点',
       image: details.photos[0] || FALLBACK_IMAGE,
       location: details.location,
-      googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
+      googleMapsUrl: openStreetMapPlaceUrl(details.name, details.location),
       durationHint: placeType === 'cafe' ? '45 分钟' : '90 分钟',
     }
   }
@@ -523,8 +520,6 @@ export function TripChatPanel({
     workingCandidates: HotelCandidate[],
     workingHotel: SelectedHotel,
   ): Promise<{ note: string; candidates: HotelCandidate[]; hotel: SelectedHotel }> {
-    if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加酒店。')
-
     const existing = matchHotelCandidate(workingCandidates, action.hotelName)
     if (existing) {
       const selectedHotel = candidateToSelected(existing)
@@ -1380,7 +1375,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'refresh_hotels') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试推荐酒店。')
           const result = await refreshHotelCandidates({
             current: workingCandidates,
             preferences: action.preferences,
@@ -1399,7 +1393,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_hotel') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试替换酒店。')
           const from = matchHotelCandidate(workingCandidates, action.fromHotelName)
           if (!from) {
             notes.push(`候选项里没有「${action.fromHotelName}」`)
@@ -1422,7 +1415,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_hotels') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试替换酒店。')
           const fromHotels: HotelCandidate[] = []
           for (const name of action.fromHotelNames) {
             const hit = matchHotelCandidate(workingCandidates, name)
@@ -1594,7 +1586,7 @@ export function TripChatPanel({
         notes = [NO_ACTION_APPLIED_NOTE]
       }
 
-      // Guard again after long applyActions (Google Places) in case a newer turn started.
+      // Guard again after long place resolution in case a newer turn started.
       if (abortRef.current !== ac) return
 
       const ensured = await ensurePendingFromTurn({
@@ -1898,7 +1890,7 @@ export function TripChatPanel({
   return (
     <>
       {createPortal(chatChrome, document.body)}
-      <GooglePlacePage
+      <PlaceDetailsPage
         key={`${activePending?.id || 'pending-place'}-${confirmEpoch}`}
         open={Boolean(activePending)}
         name={activePending?.place.name || ''}

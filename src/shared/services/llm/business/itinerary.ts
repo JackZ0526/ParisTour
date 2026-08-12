@@ -273,7 +273,7 @@ export async function resolveItineraryStart(
 
 /**
  * Generate a complete multi-day Paris itinerary as structured JSON.
- * Caller resolves place names via Google Places and persists the result.
+ * Caller resolves place names via the configured place provider and persists the result.
  */
 export async function generateFullItinerary(
   input: GenerateFullItineraryInput,
@@ -330,7 +330,7 @@ export async function generateFullItinerary(
         ? '软偏好：同日地点尽量同片区聚类，优先少步行、少换乘。'
         : '在路线合理的前提下可接受适量步行以丰富行程。'
     }
-- 文案一致（硬规则）：note 只写本站在做什么（氛围/吃什么/看点），不要写「乘X号线回酒店」「地铁去下一站」等离开本站的具体交通；回酒店/去下一站由时间线站点之间的 Google 导航展示。walkLevel 表示到达本站这一段的步行强度，须与 transport 一致：若 transport 含地铁/公交则 walkLevel 不要写短步行/很少走。
+- 文案一致（硬规则）：note 只写本站在做什么（氛围/吃什么/看点），不要写「乘X号线回酒店」「地铁去下一站」等离开本站的具体交通；回酒店/去下一站由时间线站点之间的路线信息展示。walkLevel 表示到达本站这一段的步行强度，须与 transport 一致：若 transport 含地铁/公交则 walkLevel 不要写短步行/很少走。
 - ${
       prefs.avoidLouvreAndVersailles
         ? '软偏好：默认不主动安排卢浮宫或凡尔赛；用户明确要求时优先服从。'
@@ -752,7 +752,7 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
         ? '软偏好：同日地点尽量同片区聚类，优先少步行、少换乘。'
         : '可接受适量步行以换取更丰富的行程。'
     }
-- 文案一致（硬规则）：note 只写本站在做什么（氛围/吃什么/看点），不要写「乘X号线回酒店」「地铁去下一站」等离开本站的具体交通；回酒店/去下一站由时间线站点之间的 Google 导航展示。walkLevel 表示到达本站这一段的步行强度，须与 transport 一致：若 transport 含地铁/公交则 walkLevel 不要写短步行/很少走。
+- 文案一致（硬规则）：note 只写本站在做什么（氛围/吃什么/看点），不要写「乘X号线回酒店」「地铁去下一站」等离开本站的具体交通；回酒店/去下一站由时间线站点之间的路线信息展示。walkLevel 表示到达本站这一段的步行强度，须与 transport 一致：若 transport 含地铁/公交则 walkLevel 不要写短步行/很少走。
 - ${
       prefs.avoidLouvreAndVersailles
         ? '软偏好：默认不主动安排卢浮宫或凡尔赛；用户明确要求时优先服从。'

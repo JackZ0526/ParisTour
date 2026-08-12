@@ -121,6 +121,20 @@ export async function generateText(
   for (const provider of order) {
     try {
       let text = await callProvider(provider, system, user, chatOpts)
+      // Some Responses-compatible backends occasionally return the raw web
+      // tool envelope instead of continuing to the requested JSON object.
+      // Retry the original task once without tools before asking the JSON
+      // repair pass to work on an unusable tool-call fragment.
+      if (
+        options?.json &&
+        !extractJsonObject(text) &&
+        options.webSearch !== false
+      ) {
+        text = await callProvider(provider, system, user, {
+          ...chatOpts,
+          webSearch: false,
+        })
+      }
       if (options?.json && !extractJsonObject(text)) {
         text = await callProvider(
           provider,

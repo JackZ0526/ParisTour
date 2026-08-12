@@ -21,7 +21,7 @@ import type { TripDateRange } from './features/itinerary/services/tripDates'
 
 export const ITINERARY_LOADING_LINES = [
   '正在按航班、酒店和推荐偏好拼接日程…',
-  '正在从 Google 已验证地点中筛选候选…',
+  '正在联网发现并整理地点候选…',
   '正在比较评分、评论量与路线距离…',
   '正在给同一天的地点做片区聚类…',
   '正在检查抵达日和返程日的时间边界…',

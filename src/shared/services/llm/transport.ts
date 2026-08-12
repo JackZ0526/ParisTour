@@ -11,7 +11,7 @@
  * stream.ts and prompts-runtime.ts respectively; this file only knows
  * how to put a body on the wire and read a response back.
  */
-import { isLlmConfigured, GEMINI_MODEL } from '../../../config/llmModels'
+import { isLlmConfigured } from '../../../config/llmModels'
 import { LlmRequestError } from './errors'
 import {
   getActiveLlmLabel,
@@ -461,35 +461,11 @@ export async function readResponseJson<T>(
 }
 
 export async function callGemini(
-  system: string,
-  user: string,
-  options?: { signal?: AbortSignal },
+  _system: string,
+  _user: string,
+  _options?: { signal?: AbortSignal },
 ): Promise<string> {
-  // Key injected by /api/gemini (Vite proxy or Vercel) — never send from the browser.
-  const url = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`
-  const { authFetch } = await import('../../../features/auth/services/authFetch')
-  const res = await authFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: system }] },
-      contents: [{ role: 'user', parts: [{ text: user }] }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-      },
-    }),
-    signal: options?.signal,
-  })
-  if (!res.ok) {
-    throw friendlyLlmError(res.status, await res.text(), 'gemini')
-  }
-  const data = await readResponseJson<{
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-  }>(res, 'gemini')
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
-  if (!text.trim()) throw new LlmRequestError('Gemini 没有返回内容。', 'empty')
-  return text.trim()
+  throw new LlmRequestError('该备用模型服务已停用。', 'provider_disabled')
 }
 
 /** gpt-5 / o-series often only allow default temperature (1) and max_completion_tokens. */

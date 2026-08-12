@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { GoogleReview } from '../../map/services/googlePlaceDetails'
+import type { PlaceReview } from '../../map/services/placeDetails'
 import { looksChinese, translateTextsToChinese } from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 
 interface Props {
-  reviews: GoogleReview[]
+  reviews: PlaceReview[]
 }
 
-export function GoogleReviewsList({ reviews }: Props) {
+export function PlaceReviewsList({ reviews }: Props) {
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [showOriginal, setShowOriginal] = useState<Record<number, boolean>>({})
   const [translating, setTranslating] = useState(false)
@@ -63,7 +63,7 @@ export function GoogleReviewsList({ reviews }: Props) {
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium">Google 评论</p>
+        <p className="text-sm font-medium">地点评论</p>
         {translating && (
           <LoadingIndicator
             thinkingLabel="正在翻译非中文评论…"

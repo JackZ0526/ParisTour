@@ -9,7 +9,8 @@ import {
   type SetStateAction,
 } from 'react'
 import type { FlightSelection } from '../features/flight/components/FlightPanel'
-import type { DayNavPlan } from '../features/map/services/googleNav'
+import type { DayNavPlan } from '../features/map/services/navigation'
+import { openStreetMapPlaceUrl } from '../features/map/services/openStreetMap'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../types'
 import {
   AREA_KEY_CN,
@@ -81,6 +82,7 @@ export interface UseItineraryDaysResult {
     placeId: string,
     googlePlaceId: string,
     nameOriginal?: string,
+    location?: { lat: number; lng: number },
   ) => void
   handleAddOnDay: (
     dayNum: number,
@@ -217,7 +219,7 @@ export function useItineraryDays(
 
   const handleAddCustom = useCallback(
     (place: Place, mode: 'best' | 'end') => {
-      // Don't auto-open PlacePanel / GooglePlacePage after add-from-dialog.
+      // Don't auto-open the detail page after add-from-dialog.
       handleAddOnDay(day.day, place, { mode, select: false })
     },
     [day.day],
@@ -228,6 +230,7 @@ export function useItineraryDays(
       placeId: string,
       googlePlaceId: string,
       nameOriginal?: string,
+      location?: { lat: number; lng: number },
     ) => {
       setCustomPlaces((prev) => {
         const current = prev[placeId]
@@ -235,19 +238,26 @@ export function useItineraryDays(
         const nextNameLocal = nameOriginal || current.nameLocal
         if (
           current.googlePlaceId === googlePlaceId &&
-          current.nameLocal === nextNameLocal
+          current.nameLocal === nextNameLocal &&
+          (!location ||
+            (!current.locationPending &&
+              current.location.lat === location.lat &&
+              current.location.lng === location.lng))
         ) {
           return prev
         }
-        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        const googleMapsUrl = openStreetMapPlaceUrl(
           nextNameLocal || current.name,
-        )}&query_place_id=${encodeURIComponent(googlePlaceId)}`
+          location || current.location,
+        )
         return {
           ...prev,
           [placeId]: {
             ...current,
             googlePlaceId,
             nameLocal: nextNameLocal,
+            location: location || current.location,
+            locationPending: location ? false : current.locationPending,
             googleMapsUrl,
           },
         }

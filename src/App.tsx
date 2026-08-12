@@ -829,7 +829,7 @@ export default function App() {
                         后续天数生成中断
                       </p>
                       <p className="mt-0.5 whitespace-pre-line break-words text-xs text-[var(--stone)]">
-                        {itineraryGenError}
+                        {itineraryGenError?.split('\npreview=')[0]}
                       </p>
                     </div>
                     {!readOnly && (
@@ -995,7 +995,7 @@ export default function App() {
 
         <footer className="rounded-2xl border border-white/60 bg-[var(--card)] px-4 py-5 text-sm text-[var(--stone)]">
           <p>
-            航班与营业信息会变动；餐厅评分以 Google Maps 实时为准。自驾日请确认低排放区（Crit’Air）与租车保险。
+            航班、营业信息与开放交通数据会变动；出发前请向商家及官方交通渠道复核。自驾日请确认低排放区（Crit’Air）与租车保险。
           </p>
         </footer>
       </main>

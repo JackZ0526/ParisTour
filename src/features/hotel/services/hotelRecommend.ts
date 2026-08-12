@@ -8,7 +8,7 @@ import {
   resolveHotelCandidates,
 } from './hotelResolve'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
-import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlaceDetails'
+import { searchNearbyPlaceCandidates } from '../../map/services/placeDetails'
 
 export function persistHotelState(
   candidates: HotelCandidate[],
@@ -38,7 +38,7 @@ function markBest(candidates: HotelCandidate[], bestId: string): HotelCandidate[
   return candidates.map((h) => ({ ...h, isBest: h.id === bestId }))
 }
 
-/** Fresh LLM batch → Google-resolved candidates. */
+/** Fresh LLM batch → OpenStreetMap-resolved candidates. */
 export async function fetchResolvedHotelRecommendations(input?: {
   count?: number
   batch?: number
@@ -51,14 +51,14 @@ export async function fetchResolvedHotelRecommendations(input?: {
   const excluded = new Set(
     (input?.excludeNames || []).map((name) => name.trim().toLowerCase()),
   )
-  const verifiedCandidates = (await searchNearbyGooglePlaceCandidates({
+  const verifiedCandidates = (await searchNearbyPlaceCandidates({
     textQuery: 'hotel Paris',
     location: { lat: 48.8566, lng: 2.3522 },
     maxDistanceMeters: 25_000,
     limit: 20,
   })).filter((candidate) => !excluded.has(candidate.name.trim().toLowerCase()))
   if (!verifiedCandidates.length) {
-    throw new Error('Google 暂时没有返回可验证的酒店候选。')
+    throw new Error('OpenStreetMap 暂时没有返回可验证的酒店候选。')
   }
   const raw = await recommendHotelsForTrip({
     count,

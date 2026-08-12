@@ -1,4 +1,4 @@
-/** Map Google Places `priceLevel` enum → display chip text (`€€ · 钱包暂安`). */
+/** Map provider price-level enums to display chip text (`€€ · 钱包暂安`). */
 export function formatPriceLevelLabel(priceLevel: string | undefined | null): string | null {
   if (!priceLevel) return null
 

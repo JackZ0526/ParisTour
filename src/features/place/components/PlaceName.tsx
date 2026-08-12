@@ -1,9 +1,4 @@
 import { useEffect, useState } from 'react'
-import {
-  fetchGooglePlaceDetails,
-  peekGooglePlaceDetails,
-  placeDetailsQuery,
-} from '../../map/services/googlePlaceDetails'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
   looksChinese,
@@ -17,7 +12,6 @@ import {
   placeOriginalLabel,
   placeTitleLines,
 } from '../../../shared/utils/placeTitle'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ActivityBars } from '../../../shared/components/LoadingIndicator'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
@@ -76,10 +70,7 @@ interface Props {
    * `originalWithZh` — original primary + Chinese on its own row (itinerary).
    */
   mode?: 'bilingual' | 'original' | 'originalWithZh'
-  /**
-   * When props lack an original-language name, hydrate from Google details
-   * (shared cache with GooglePlacePage) so list + detail stay consistent.
-   */
+  /** @deprecated Kept for caller compatibility; names no longer query Google. */
   enrichFromGoogle?: boolean
   /**
    * Hint that prop CJK (`name` / `nameLocal`) is recommend-authored, not an
@@ -93,7 +84,6 @@ interface Props {
 export function PlaceName({
   name,
   nameLocal,
-  location,
   googleName,
   googleOriginal,
   className,
@@ -101,111 +91,40 @@ export function PlaceName({
   subtitleClassName = 'text-sm text-[var(--stone)]',
   inline = false,
   mode = 'bilingual',
-  enrichFromGoogle = true,
   zhIsLlmTranslated = false,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const excludePropCjk = zhIsLlmTranslated
   const chineseOpts = excludePropCjk ? EXCLUDE_PROP_CJK_OPTIONS : undefined
-  const locationLat = location?.lat
-  const locationLng = location?.lng
-  const cached = peekGooglePlaceDetails(name, nameLocal, location)
-  const [enriched, setEnriched] = useState<{
-    name?: string
-    original?: string
-  } | null>(() =>
-    cached
-      ? { name: cached.name, original: cached.nameOriginal }
-      : null,
-  )
   const [llmZh, setLlmZh] = useState<string | null>(() => {
-    const seedName = googleName || cached?.name
-    const seedOriginal = googleOriginal || cached?.nameOriginal
     if (
       placeChineseLabel(
         name,
         nameLocal,
-        seedName,
-        seedOriginal,
+        googleName,
+        googleOriginal,
         undefined,
         chineseOpts,
       ).zh
     ) {
       return null
     }
-    // A durable translation was only written after an earlier Google lookup
-    // confirmed that no official Chinese label was available. Reuse it on the
-    // first render instead of repeating that wait whenever a category remounts.
     const original = placeOriginalLabel(
       name,
       nameLocal,
-      seedName,
-      seedOriginal,
+      googleName,
+      googleOriginal,
     )
     const peeked = peekPlaceNameZh(original)
     return peeked && looksChinese(peeked) ? peeked : null
   })
   const [llmZhTranslating, setLlmZhTranslating] = useState(false)
 
-  const gName = googleName || enriched?.name
-  const gOriginal = googleOriginal || enriched?.original
-  const hasGoogle = Boolean(googleName || enriched)
-  const initial = placeTitleLines(
-    name,
-    nameLocal,
-    gName,
-    gOriginal,
-    undefined,
-    chineseOpts,
-  )
-  const originalNow = placeOriginalLabel(name, nameLocal, gName, gOriginal)
-  const needsEnrich =
-    enrichFromGoogle &&
-    Boolean(name.trim()) &&
-    !hasGoogle &&
-    (mode === 'original'
-      ? hasCjk(originalNow)
-      : mode === 'originalWithZh'
-        ? true
-        : !initial.subtitle)
+  const resolvedName = googleName
+  const resolvedOriginal = googleOriginal
 
-  useEffect(() => {
-    if (!needsEnrich || !isLoaded) return
-    let cancelled = false
-    const queryLocation =
-      locationLat != null && locationLng != null
-        ? { lat: locationLat, lng: locationLng }
-        : undefined
-    const peek = peekGooglePlaceDetails(name, nameLocal, queryLocation)
-    if (peek?.nameOriginal || peek?.name) {
-      setEnriched({ name: peek.name, original: peek.nameOriginal })
-      return
-    }
-    void fetchGooglePlaceDetails(placeDetailsQuery(name, nameLocal), queryLocation).then(
-      (details) => {
-        if (cancelled) return
-        // Mark attempted even when null so we can fall through to LLM translate.
-        setEnriched(
-          details
-            ? { name: details.name, original: details.nameOriginal }
-            : { name: undefined, original: undefined },
-        )
-      },
-    )
-    return () => {
-      cancelled = true
-    }
-  }, [needsEnrich, isLoaded, name, nameLocal, locationLat, locationLng])
-
-  const resolvedName = googleName || enriched?.name
-  const resolvedOriginal = googleOriginal || enriched?.original
-  const googleReady = Boolean(googleName || enriched || !enrichFromGoogle)
-
-  // LLM Chinese for itinerary: after Google (when enriching), peek cache, then translate.
+  // Reuse a durable translation, otherwise stream one LLM translation and cache it.
   useEffect(() => {
     if (mode !== 'originalWithZh') return
-    if (!googleReady) return
-
     const official = placeChineseLabel(
       name,
       nameLocal,
@@ -271,7 +190,6 @@ export function PlaceName({
     nameLocal,
     resolvedName,
     resolvedOriginal,
-    googleReady,
     chineseOpts,
   ])
 
@@ -305,7 +223,7 @@ export function PlaceName({
     // reserved row and receives its source badge only after completion.
     const zhFromLlm = Boolean(chinese.isLlmTranslated)
     const displayedZh = chinese.zh
-    const reserveZhRow = excludePropCjk && enrichFromGoogle
+    const reserveZhRow = excludePropCjk
     const showBadgeOnTitle = zhFromLlm && !displayedZh
     const showBadgeOnZh = Boolean(
       zhFromLlm && displayedZh && !llmZhTranslating,

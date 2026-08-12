@@ -128,7 +128,7 @@ export const itinerary: DayPlan[] = [
       {
         time: '13:45',
         placeId: 'rest-clown',
-        note: '午餐。若排队长，可在 Google Maps 换附近评分更高的空位店。',
+        note: '午餐。若排队长，可在附近寻找仍有空位的餐厅。',
         transport: '地铁 1/2/6 或短程到七区',
         walkLevel: '短步行',
         duration: '75 分钟',
@@ -144,7 +144,7 @@ export const itinerary: DayPlan[] = [
       {
         time: '19:30',
         placeId: 'rest-asuka',
-        note: '换日料口味；请用 Google Maps 确认当日营业。',
+        note: '换日料口味；请向商家确认当日营业。',
         transport: '地铁回右岸中心',
         walkLevel: '短步行',
         duration: '70 分钟',
@@ -321,7 +321,7 @@ export const itinerary: DayPlan[] = [
       {
         time: '14:15',
         placeId: 'rest-fontaine-town',
-        note: '小镇午餐，出发前用 Google Maps 确认评分与空位。',
+        note: '小镇午餐，出发前向商家确认营业与空位。',
         walkLevel: '短步行',
         duration: '75 分钟',
       },

@@ -73,10 +73,10 @@ export const NO_HALLUCINATION = `<no_hallucination>
  * lived inline in `tripChat.systemPrompt`.
  */
 export const PLACE_RESEARCH_DISCIPLINE = `<place_research_discipline>
-- 所有推荐的地点必须有 Google Maps 可搜到的正式名称（address / place name 字段，不是用户口语化简称）。
+- 所有推荐地点必须使用 OpenStreetMap/Nominatim 可检索的正式原文名称（不是用户口语化简称）。
 - 餐厅/咖啡馆必须位于行程当前酒店或当天路线附近、且位于巴黎都会区（地理范围由系统硬距离复核）。
 - 景点必须与当前目的地相符；不要仅凭同名店猜测地址或距离。
-- 禁止在 reply 或 actions 里声称"步行 X 分钟可达"等无依据的距离判断；用"附近"或"步行约 X 分钟（来源：Google Directions）"这种带来源的形式。
+- 禁止在 reply 或 actions 里声称"步行 X 分钟可达"等无依据的距离判断；用"附近"或"步行约 X 分钟（来源：路线服务）"这种带来源的形式。
 </place_research_discipline>`
 
 /**

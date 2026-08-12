@@ -9,13 +9,15 @@ import type {
   WalkLevel,
 } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
+import { openStreetMapPlaceUrl } from '../../map/services/openStreetMap'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
 import {
-  fetchGooglePlaceDetails,
+  fetchPlaceDetails,
   placeDetailsQuery,
-  searchNearbyGooglePlaceCandidates,
-} from '../../map/services/googlePlaceDetails'
+  searchNearbyPlaceCandidates,
+} from '../../map/services/placeDetails'
 import {
+  discoverItineraryCandidates,
   generateFullItinerary,
   generateSingleDayItinerary,
   type FullItineraryPlaceDraft,
@@ -24,6 +26,14 @@ import {
   type OccupiedPlaceBrief,
   type VerifiedPlaceCandidate,
 } from '../../../shared/services/llm/llm'
+import {
+  getLlmArtifact,
+  setLlmArtifact,
+} from '../../../shared/services/llm/llmArtifactStore'
+import {
+  loadRecommendationPreferences,
+  type RecommendationPreferences,
+} from '../../place/services/recommendationPreferences'
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
@@ -71,7 +81,7 @@ function normalizeType(raw: unknown): PlaceType {
 }
 
 function mapsUrl(query: string) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+  return openStreetMapPlaceUrl(query)
 }
 
 function resolveSpecialPlaceId(key: string, name: string, type: PlaceType): string | null {
@@ -151,10 +161,16 @@ async function resolveDraftPlace(
     draft.area ? `${draft.name} ${draft.area}` : draft.name,
     draft.nameLocal,
   )
-  const details = await fetchGooglePlaceDetails(query, undefined, {
+  const details = await fetchPlaceDetails(query, undefined, {
     placeId: draft.googlePlaceId,
   }).catch(() => null)
-  const loc = details?.location
+  const catalogFallback = Object.values(catalogPlaces).find((candidate) => {
+    const names = [candidate.name, candidate.nameLocal]
+      .filter(Boolean)
+      .map((name) => normalizePlaceName(String(name)))
+    return names.includes(normalizePlaceName(draft.name))
+  })
+  const loc = details?.location || catalogFallback?.location
   const id = `gen-${slugKey(draft.key || draft.name) || 'place'}-${Math.random()
     .toString(36)
     .slice(2, 7)}`
@@ -163,25 +179,27 @@ async function resolveDraftPlace(
     id,
     googlePlaceId: details?.id || draft.googlePlaceId,
     name: details?.name || draft.name,
-    // Persist Google's local/original title so itinerary cards are bilingual
+    // Persist the local/original title so itinerary cards are bilingual
     // immediately, even when the LLM only returned a Chinese place name.
-    nameLocal: details?.nameOriginal || draft.nameLocal,
+    nameLocal: details?.nameOriginal || draft.nameLocal || catalogFallback?.nameLocal,
     type: draft.type,
     description:
       draft.description ||
       details?.summary ||
+      catalogFallback?.description ||
       `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
     ratingHint:
       details?.rating != null
-        ? `Google ★ ${details.rating.toFixed(1)}`
-        : draft.ratingHint || 'Google 地点',
-    priceHint: details?.priceLevel,
-    image: details?.photos?.[0] || FALLBACK_IMAGE,
+        ? `★ ${details.rating.toFixed(1)}`
+        : draft.ratingHint || catalogFallback?.ratingHint || '地点待核实',
+    priceHint: details?.priceLevel || catalogFallback?.priceHint,
+    image: details?.photos?.[0] || catalogFallback?.image || FALLBACK_IMAGE,
     location: loc || {
-      // Soft fallback near hotel so the map still works if Places misses.
-      lat: hotel.lat + (Math.random() - 0.5) * 0.01,
-      lng: hotel.lng + (Math.random() - 0.5) * 0.01,
+      // Keep the card renderable, but do not route or map this placeholder.
+      lat: hotel.lat,
+      lng: hotel.lng,
     },
+    locationPending: !loc,
     googleMapsUrl: mapsUrl(details?.name || `${draft.name} Paris`),
     durationHint: draft.durationHint || '60 分钟',
   }
@@ -193,20 +211,105 @@ async function resolveDraftPlace(
 }
 
 type CandidateCacheEntry = {
-  hotelKey: string
+  contextKey: string
   candidates: VerifiedPlaceCandidate[]
   at: number
+}
+
+type DurableCandidatePool = {
+  candidates: VerifiedPlaceCandidate[]
+  source: 'llm' | 'open-data' | 'catalog'
+  generatedAt: number
 }
 
 let sessionCandidateCache: CandidateCacheEntry | null = null
 const placeResolveCache = new Map<string, { id: string; place?: Place }>()
 const CANDIDATE_CACHE_TTL_MS = 30 * 60 * 1000
+const CANDIDATE_ARTIFACT_PREFIX = 'itinerary-candidates:v2:'
 
 function hotelCandidateKey(hotel: SelectedHotel): string {
   return `${hotel.id}:${hotel.lat.toFixed(3)}:${hotel.lng.toFixed(3)}`
 }
 
-async function loadItineraryCandidates(
+function shortHash(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+function candidateContextKey(
+  hotel: SelectedHotel,
+  destination: string,
+  preferences: RecommendationPreferences,
+) {
+  return `${hotelCandidateKey(hotel)}:${shortHash(
+    `${destination.trim().toLowerCase()}|${JSON.stringify(preferences)}`,
+  )}`
+}
+
+function cleanCandidatePool(value: unknown): VerifiedPlaceCandidate[] {
+  if (!Array.isArray(value)) return []
+  const output: VerifiedPlaceCandidate[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const name = String(row.name || '').trim()
+    const type = String(row.type || '').trim()
+    if (
+      !name ||
+      (type !== 'cafe' && type !== 'restaurant' && type !== 'attraction')
+    ) {
+      continue
+    }
+    const key = `${type}:${normalizePlaceName(name)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    output.push({
+      id: String(row.id || '').trim() || `cached:${shortHash(key)}`,
+      name,
+      type,
+      address: String(row.address || '').trim() || undefined,
+      rating: Number.isFinite(Number(row.rating)) ? Number(row.rating) : undefined,
+      userRatingCount: Number.isFinite(Number(row.userRatingCount))
+        ? Number(row.userRatingCount)
+        : undefined,
+      priceLevel: String(row.priceLevel || '').trim() || undefined,
+      distanceMeters: Number.isFinite(Number(row.distanceMeters))
+        ? Number(row.distanceMeters)
+        : undefined,
+    })
+  }
+  return output
+}
+
+function hasUsefulCandidateMix(candidates: VerifiedPlaceCandidate[]) {
+  const types = new Set(candidates.map((candidate) => candidate.type))
+  return candidates.length >= 9 && types.size === 3
+}
+
+function catalogCandidatePool(): VerifiedPlaceCandidate[] {
+  return Object.values(catalogPlaces)
+    .filter(
+      (place) =>
+        place.type === 'cafe' ||
+        place.type === 'restaurant' ||
+        place.type === 'attraction',
+    )
+    .map((place) => ({
+      id: `catalog:${place.id}`,
+      name:
+        place.nameLocal && /\p{Script=Latin}/u.test(place.nameLocal)
+          ? place.nameLocal
+          : place.name,
+      type: place.type as VerifiedPlaceCandidate['type'],
+    }))
+}
+
+async function loadOpenDataCandidates(
   hotel: SelectedHotel,
   occupiedNames: string[] = [],
 ): Promise<VerifiedPlaceCandidate[]> {
@@ -222,7 +325,7 @@ async function loadItineraryCandidates(
   ]
   const batches = await Promise.all(
     specs.map(async (spec) => {
-      const rows = await searchNearbyGooglePlaceCandidates({
+      const rows = await searchNearbyPlaceCandidates({
         textQuery: spec.query,
         location: { lat: hotel.lat, lng: hotel.lng },
         maxDistanceMeters: spec.radius,
@@ -242,20 +345,88 @@ async function loadItineraryCandidates(
   })
 }
 
-/** One Google candidate pull per hotel/session; filter occupied names per day. */
+async function loadItineraryCandidates(
+  hotel: SelectedHotel,
+  destination: string,
+  preferences: RecommendationPreferences,
+  signal?: AbortSignal,
+): Promise<VerifiedPlaceCandidate[]> {
+  const contextKey = candidateContextKey(hotel, destination, preferences)
+  const artifactKey = `${CANDIDATE_ARTIFACT_PREFIX}${contextKey}`
+  const stored = getLlmArtifact<DurableCandidatePool>(artifactKey)
+  const storedCandidates = cleanCandidatePool(stored?.candidates)
+  if (hasUsefulCandidateMix(storedCandidates)) return storedCandidates
+
+  try {
+    const discovered = cleanCandidatePool(
+      await discoverItineraryCandidates({
+        destination,
+        hotelName: hotel.name,
+        hotelAddress: hotel.address,
+        hotelArea: hotel.areaKey,
+        recommendationPreferences: preferences,
+        signal,
+      }),
+    )
+    if (hasUsefulCandidateMix(discovered)) {
+      setLlmArtifact(artifactKey, {
+        candidates: discovered,
+        source: 'llm',
+        generatedAt: Date.now(),
+      } satisfies DurableCandidatePool)
+      return discovered
+    }
+  } catch (error) {
+    if (signal?.aborted) throw error
+  }
+
+  try {
+    const openData = cleanCandidatePool(await loadOpenDataCandidates(hotel))
+    if (hasUsefulCandidateMix(openData)) {
+      setLlmArtifact(artifactKey, {
+        candidates: openData,
+        source: 'open-data',
+        generatedAt: Date.now(),
+      } satisfies DurableCandidatePool)
+      return openData
+    }
+  } catch {
+    // The public service is best-effort; use the bundled catalog below.
+  }
+
+  const catalog = cleanCandidatePool(catalogCandidatePool())
+  if (catalog.length) {
+    setLlmArtifact(artifactKey, {
+      candidates: catalog,
+      source: 'catalog',
+      generatedAt: Date.now(),
+    } satisfies DurableCandidatePool)
+  }
+  return catalog
+}
+
+/** One durable LLM-first candidate pool per hotel/context; filter occupied names per day. */
 export async function getSharedItineraryCandidates(
   hotel: SelectedHotel,
   occupiedNames: string[] = [],
+  destination = '巴黎',
+  preferences: RecommendationPreferences = loadRecommendationPreferences(),
+  signal?: AbortSignal,
 ): Promise<VerifiedPlaceCandidate[]> {
-  const key = hotelCandidateKey(hotel)
+  const contextKey = candidateContextKey(hotel, destination, preferences)
   const now = Date.now()
   if (
     !sessionCandidateCache ||
-    sessionCandidateCache.hotelKey !== key ||
+    sessionCandidateCache.contextKey !== contextKey ||
     now - sessionCandidateCache.at > CANDIDATE_CACHE_TTL_MS
   ) {
-    const candidates = await loadItineraryCandidates(hotel, [])
-    sessionCandidateCache = { hotelKey: key, candidates, at: now }
+    const candidates = await loadItineraryCandidates(
+      hotel,
+      destination,
+      preferences,
+      signal,
+    )
+    sessionCandidateCache = { contextKey, candidates, at: now }
   }
   const excluded = new Set(occupiedNames.map(normalizePlaceName))
   return sessionCandidateCache.candidates.filter(
@@ -662,7 +833,7 @@ export function buildDisneyDayResult(input: {
 }
 
 /**
- * Regenerate one day: LLM draft → Google resolve → merge into existing plan.
+ * Regenerate one day: LLM draft → OpenStreetMap resolve → merge into existing plan.
  * Keeps other days intact; preserves generated fingerprint at the App layer.
  */
 export async function buildGeneratedSingleDay(
@@ -672,7 +843,7 @@ export async function buildGeneratedSingleDay(
     hotelAreaLabel?: string
     existingDays: DayPlan[]
     existingCustomPlaces: Record<string, Place>
-    /** Shared candidate pool (skip per-day Google nearby). */
+    /** Shared candidate pool (skip per-day OpenStreetMap nearby). */
     verifiedCandidates?: VerifiedPlaceCandidate[]
     onDayPreview?: (preview: { day: number; title?: string; theme?: string }) => void
   },
@@ -705,9 +876,12 @@ export async function buildGeneratedSingleDay(
       : await getSharedItineraryCandidates(
           hotel,
           (input.occupiedPlaces || []).map((place) => place.name),
+          input.destination,
+          input.recommendationPreferences,
+          input.signal,
         )
   if (!verifiedCandidates.length) {
-    throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+    throw new Error('暂时没有找到可用的地点候选，请稍后重试。')
   }
   const areaLabel =
     input.hotelAreaLabel || hotel.areaKey || undefined
@@ -739,7 +913,16 @@ export async function buildGeneratedSingleDay(
     onDayPreview: input.onDayPreview,
   })
 
-  const draftByKey = new Map(draft.places.map((p) => [p.key, p]))
+  const usedPlaceKeys = new Set(
+    draft.day.stops
+      .map((stop) => String(stop.placeKey || '').trim())
+      .filter(Boolean),
+  )
+  const draftByKey = new Map(
+    draft.places
+      .filter((place) => usedPlaceKeys.has(place.key))
+      .map((place) => [place.key, place]),
+  )
   for (const stop of draft.day.stops) {
     const key = String(stop.placeKey || '').trim()
     if (!key || draftByKey.has(key)) continue
@@ -855,7 +1038,7 @@ export async function buildGeneratedSingleDay(
 }
 
 /**
- * Ask the LLM for a full multi-day plan, resolve places via Google, then light-fix.
+ * Ask the LLM for a full multi-day plan, resolve places via OpenStreetMap, then light-fix.
  */
 export async function buildGeneratedItinerary(
   input: Omit<GenerateFullItineraryInput, 'hotel' | 'verifiedCandidates'> & {
@@ -863,16 +1046,32 @@ export async function buildGeneratedItinerary(
   },
 ): Promise<GeneratedItineraryResult> {
   const hotel = input.hotel
-  const verifiedCandidates = await loadItineraryCandidates(hotel)
+  const verifiedCandidates = await loadItineraryCandidates(
+    hotel,
+    input.destination,
+    input.recommendationPreferences,
+    input.signal,
+  )
   if (!verifiedCandidates.length) {
-    throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+    throw new Error('暂时没有找到可用的地点候选，请稍后重试。')
   }
   const draft = await generateFullItinerary({
     ...input,
     verifiedCandidates,
   })
 
-  const draftByKey = new Map(draft.places.map((p) => [p.key, p]))
+  const usedPlaceKeys = new Set(
+    draft.days.flatMap((day) =>
+      day.stops
+        .map((stop) => String(stop.placeKey || '').trim())
+        .filter(Boolean),
+    ),
+  )
+  const draftByKey = new Map(
+    draft.places
+      .filter((place) => usedPlaceKeys.has(place.key))
+      .map((place) => [place.key, place]),
+  )
   // Also collect placeKeys referenced in stops but missing from places[]
   for (const day of draft.days) {
     for (const stop of day.stops) {

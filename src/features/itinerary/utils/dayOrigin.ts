@@ -1,4 +1,5 @@
 import type { Coordinates, Place, SelectedHotel } from '../../../types'
+import { openStreetMapPlaceUrl } from '../../map/services/openStreetMap'
 
 /** Charles de Gaulle — day-1 route origin (not an itinerary stop). */
 export const CDG_PLACE_ID = 'attr-cdg'
@@ -22,9 +23,10 @@ export function placeFromHotel(hotel: SelectedHotel): Place {
       hotel.image ||
       'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80',
     location: { lat: hotel.lat, lng: hotel.lng },
-    googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      `${hotel.name} ${hotel.address}`,
-    )}`,
+    googleMapsUrl: openStreetMapPlaceUrl(`${hotel.name} ${hotel.address}`, {
+      lat: hotel.lat,
+      lng: hotel.lng,
+    }),
     durationHint: '入住 30–45 分钟',
   }
 }

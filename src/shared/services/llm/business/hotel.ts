@@ -87,7 +87,7 @@ export async function generateHotelDetailCopy(input: {
 
 /**
  * Recommend Paris stay options via LLM (no local hotel catalog).
- * Caller should resolve names with Google Places afterwards.
+ * Caller should resolve names with the configured place provider afterwards.
  */
 export async function recommendHotelsForTrip(input?: {
   batch?: number
@@ -127,7 +127,7 @@ export async function recommendHotelsForTrip(input?: {
 - area 统一写成「N区 (Français / 中文)」格式，例如「4区 (Marais / 玛黑)」「9区 (Opéra / 歌剧院)」「16区 (Trocadéro / 特罗卡德罗)」。
 - 优先 3–4区玛黑 / 2区大林荫道 / 9区歌剧院 / 6区圣日耳曼 / 5区拉丁区 等地铁便利区。
 - 若提供 userPreferences，必须优先满足（区位、预算、风格、安静/便利等）。
-- name 用 Google Maps 可搜到的正式店名；尽量附带含邮编的 address（如 75004 Paris）。
+- name 使用 OpenStreetMap/Nominatim 可检索的正式原文店名；尽量附带含邮编的 address（如 75004 Paris）。
 - 只能从 verifiedCandidates 中选择；name、googlePlaceId 与 address 必须原样复制，不得编造酒店或评分。
 - ${
     count === 1

@@ -5,7 +5,7 @@
  *   - tripDates (start/end)
  *   - flights (outbound + return)
  *   - hotel + hotelCandidates
- *   - viewingHotelDetail (HotelPicker GooglePlacePage popup)
+ *   - viewingHotelDetail (HotelPicker detail popup)
  *   - readiness flags (datesReady / flightsReady / hotelReady / …)
  *   - handleFlightsChange (no-op when outbound+return are unchanged)
  *
