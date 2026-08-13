@@ -57,6 +57,8 @@ export interface ItineraryStartResult {
 export interface FullItineraryPlaceDraft {
   key: string
   googlePlaceId?: string
+  /** Google formatted address copied from the verified candidate, never authored by the model. */
+  googleAddress?: string
   name: string
   nameLocal?: string
   type: PlaceTypeForItinerary
@@ -447,6 +449,9 @@ export async function generateFullItinerary(
     places.push({
       key,
       googlePlaceId: verified.id,
+      googleAddress: /^ChI/i.test(verified.id)
+        ? verified.address
+        : undefined,
       name: verified.name,
       nameLocal: String(row.nameLocal || '').trim() || undefined,
       type,
@@ -555,6 +560,9 @@ function parseItineraryPlaces(
     places.push({
       key,
       googlePlaceId: verified.id,
+      googleAddress: /^ChI/i.test(verified.id)
+        ? verified.address
+        : undefined,
       name: verified.name,
       nameLocal: String(row.nameLocal || '').trim() || undefined,
       type,

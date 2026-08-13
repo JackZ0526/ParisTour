@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   classifyApiRequest,
   getApiRequestMeterSnapshot,
@@ -7,10 +7,12 @@ import {
   recordApiRequest,
   resetApiRequestMeterForTests,
 } from '../shared/services/apiRequestMeter'
+import { authFetch } from '../features/auth/services/authFetch'
 
 describe('API request meter', () => {
   afterEach(() => {
     resetApiRequestMeterForTests()
+    vi.unstubAllGlobals()
   })
 
   it('classifies Google Places search and details separately', () => {
@@ -22,6 +24,18 @@ describe('API request meter', () => {
         '/api/google-places?rest=v1%2Fplaces%2FChIJ-id&languageCode=fr',
       ),
     ).toBe('google-place-details')
+    expect(
+      classifyApiRequest(
+        '/api/google-places?rest=v1%2Fplaces%3AsearchText',
+        'official',
+      ),
+    ).toBe('google-official-search')
+    expect(
+      classifyApiRequest(
+        '/api/google-places?rest=v1%2Fplaces%2FChIJ-id&provider=rapidapi-new',
+        'rapidapi',
+      ),
+    ).toBe('google-rapidapi-details')
   })
 
   it('classifies Tripadvisor, Booking, LLM, and other paid routes', () => {
@@ -57,15 +71,40 @@ describe('API request meter', () => {
 
   it('counts each kind independently for the local day', () => {
     const now = new Date(2026, 7, 12, 18)
-    recordApiRequest('google-place-search', 2, now)
-    recordApiRequest('google-place-details', 1, now)
+    recordApiRequest('google-official-search', 2, now)
+    recordApiRequest('google-rapidapi-details', 1, now)
     recordApiRequest('tripadvisor-gallery', 3, now)
     const snapshot = getApiRequestMeterSnapshot(now)
     expect(snapshot.used).toBe(6)
-    expect(snapshot.byKind['google-place-search']).toBe(2)
-    expect(snapshot.byKind['google-place-details']).toBe(1)
+    expect(snapshot.byKind['google-official-search']).toBe(2)
+    expect(snapshot.byKind['google-rapidapi-details']).toBe(1)
     expect(snapshot.byKind['tripadvisor-gallery']).toBe(3)
     const google = API_REQUEST_GROUPS.find((group) => group.id === 'google-places')
     expect(google && groupCount(snapshot, google)).toBe(3)
+  })
+
+  it('records the Google Places provider returned by the server', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{}', {
+          headers: { 'x-paristour-places-provider': 'official' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response('{}', {
+          headers: { 'x-paristour-places-provider': 'rapidapi' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await authFetch('/api/google-places?rest=v1%2Fplaces%3AsearchText')
+    await authFetch('/api/google-places?rest=v1%2Fplaces%2FChIJ-id')
+
+    const snapshot = getApiRequestMeterSnapshot()
+    expect(snapshot.byKind['google-official-search']).toBe(1)
+    expect(snapshot.byKind['google-rapidapi-details']).toBe(1)
+    expect(snapshot.byKind['google-place-search']).toBeUndefined()
+    expect(snapshot.byKind['google-place-details']).toBeUndefined()
   })
 })

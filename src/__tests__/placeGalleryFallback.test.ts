@@ -1,52 +1,41 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MIN_OFFICIAL_PHOTOS_BEFORE_TRIPADVISOR,
   pickRestaurantGalleryPhotos,
-  shouldFetchTripadvisorGalleryFallback,
-  websitePhotosNeedTripadvisorFallback,
+  shouldFetchWebsiteGalleryFallback,
 } from '../features/place/services/placeGalleryFallback'
 
-describe('place gallery Tripadvisor fallback', () => {
-  it('uses a threshold of 5 official photos before skipping Tripadvisor', () => {
-    expect(MIN_OFFICIAL_PHOTOS_BEFORE_TRIPADVISOR).toBe(5)
-    expect(websitePhotosNeedTripadvisorFallback(0)).toBe(true)
-    expect(websitePhotosNeedTripadvisorFallback(2)).toBe(true)
-    expect(websitePhotosNeedTripadvisorFallback(4)).toBe(true)
-    expect(websitePhotosNeedTripadvisorFallback(5)).toBe(false)
-    expect(websitePhotosNeedTripadvisorFallback(6)).toBe(false)
-  })
-
-  it('still fetches Tripadvisor when two official-site photos are already on screen', () => {
+describe('place gallery website fallback', () => {
+  it('fetches the official website only after Tripadvisor settles without photos', () => {
     expect(
-      shouldFetchTripadvisorGalleryFallback({
-        needsTripadvisorFallback: true,
-        websitePhotosResolved: true,
-        usableWebsitePhotoCount: 2,
-        hasCachedTripadvisorAlbum: false,
+      shouldFetchWebsiteGalleryFallback({
+        usesTripadvisor: true,
+        tripadvisorResolved: true,
+        usableTripadvisorPhotoCount: 0,
+        hasCachedWebsiteResult: false,
       }),
     ).toBe(true)
   })
 
-  it('does not fetch Tripadvisor after a rich official gallery or a cached listing album', () => {
+  it('does not fetch the website while Tripadvisor is pending or has photos', () => {
     expect(
-      shouldFetchTripadvisorGalleryFallback({
-        needsTripadvisorFallback: true,
-        websitePhotosResolved: true,
-        usableWebsitePhotoCount: 5,
-        hasCachedTripadvisorAlbum: false,
+      shouldFetchWebsiteGalleryFallback({
+        usesTripadvisor: true,
+        tripadvisorResolved: false,
+        usableTripadvisorPhotoCount: 0,
+        hasCachedWebsiteResult: false,
       }),
     ).toBe(false)
     expect(
-      shouldFetchTripadvisorGalleryFallback({
-        needsTripadvisorFallback: true,
-        websitePhotosResolved: true,
-        usableWebsitePhotoCount: 2,
-        hasCachedTripadvisorAlbum: true,
+      shouldFetchWebsiteGalleryFallback({
+        usesTripadvisor: true,
+        tripadvisorResolved: true,
+        usableTripadvisorPhotoCount: 1,
+        hasCachedWebsiteResult: false,
       }),
     ).toBe(false)
   })
 
-  it('replaces the official album entirely once Tripadvisor returns photos', () => {
+  it('prefers Tripadvisor and uses the website only after a confirmed miss', () => {
     const website = [
       'https://alsace.example/hero.jpg',
       'https://alsace.example/room.jpg',
@@ -73,10 +62,10 @@ describe('place gallery Tripadvisor fallback', () => {
     expect(
       pickRestaurantGalleryPhotos({
         websitePhotos: website,
-        tripadvisorPhotos: tripadvisor,
+        tripadvisorPhotos: [],
         tripadvisorResolved: false,
       }),
-    ).toEqual(website)
+    ).toEqual([])
     expect(
       pickRestaurantGalleryPhotos({
         websitePhotos: website,

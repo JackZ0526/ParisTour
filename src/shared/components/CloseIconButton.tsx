@@ -1,3 +1,5 @@
+import { X } from 'lucide-react'
+
 type Props = {
   onClick: () => void
   /** Defaults to "关闭". */
@@ -24,19 +26,7 @@ export function CloseIconButton({
       title={title ?? ariaLabel}
       className={className ? `${BASE} ${className}` : BASE}
     >
-      <svg
-        width="17"
-        height="17"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
-      >
-        <path d="M18 6L6 18M6 6l12 12" />
-      </svg>
+      <X size={17} strokeWidth={1.8} aria-hidden />
     </button>
   )
 }

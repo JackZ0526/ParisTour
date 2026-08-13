@@ -30,6 +30,7 @@ interface Props {
     placeId: string,
     googlePlaceId: string,
     nameOriginal?: string,
+    googleAddress?: string,
   ) => void
   onClose: () => void
 }
@@ -199,6 +200,10 @@ export function PlacePanel({
       name={place?.name || ''}
       nameLocal={place?.nameLocal}
       googlePlaceId={place?.googlePlaceId}
+      googleRating={place?.googleRating}
+      googleRatingCount={place?.googleUserRatingCount}
+      googleAddress={place?.googleAddress}
+      googleRatingHint={place?.ratingHint}
       tripadvisorContentId={place?.tripadvisorContentId}
       location={place?.location}
       placeType={place?.type}
@@ -232,6 +237,7 @@ export function PlacePanel({
           placeId,
           resolved.id,
           resolved.nameOriginal,
+          resolved.address,
         )
       }}
       onClose={onClose}

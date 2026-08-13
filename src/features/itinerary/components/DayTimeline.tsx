@@ -23,6 +23,7 @@ import {
   inferGoogleMapsTravelMode,
   type GoogleMapsTravelMode,
 } from '../../map/services/googleMapsDirectionsUrl'
+import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from 'lucide-react'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -88,89 +89,32 @@ const typeLabel: Record<string, string> = {
 }
 
 function TrashIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  )
+  return <Trash2 size={16} strokeWidth={1.8} aria-hidden />
 }
 
 function PinIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {/* Classic thumbtack / pushpin */}
-      <path d="M12 17v5" />
-      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-    </svg>
-  )
+  return <Pin size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function RestoreDayIcon({ busy = false }: { busy?: boolean }) {
   return (
-    <svg
+    <History
       className={busy ? 'animate-spin' : undefined}
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      size={17}
+      strokeWidth={1.8}
       aria-hidden
-    >
-      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l3 2" />
-    </svg>
+    />
   )
 }
 
 function RegenerateDayIcon({ busy = false }: { busy?: boolean }) {
   return (
-    <svg
+    <Sparkles
       className={busy ? 'animate-pulse' : undefined}
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      size={17}
+      strokeWidth={1.8}
       aria-hidden
-    >
-      <path d="m14.5 4.5 5 5L8 21H3v-5L14.5 4.5Z" />
-      <path d="m11.5 7.5 5 5" />
-      <path d="M5 3v4" />
-      <path d="M3 5h4" />
-      <path d="M19 16v4" />
-      <path d="M17 18h4" />
-    </svg>
+    />
   )
 }
 
@@ -435,21 +379,12 @@ function LegConnector({
                     <span className="timeline-route-link-label">
                       {fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}
                     </span>
-                    <svg
+                    <ExternalLink
                       className="timeline-route-link-arrow"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      size={12}
+                      strokeWidth={2}
                       aria-hidden
-                    >
-                      <path d="M7 17 17 7" />
-                      <path d="M7 7h10v10" />
-                    </svg>
+                    />
                   </a>
                 ) : (
                   <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
@@ -1164,7 +1099,11 @@ export function DayTimeline({
       !isLastDay &&
       index === day.stops.length - 1 &&
       place.id === SELECTED_HOTEL_PLACE_ID
-    return isCheckIn || isOvernight
+    const isReturnAirport =
+      isLastDay &&
+      index === day.stops.length - 1 &&
+      isAirportPlace(place)
+    return isCheckIn || isOvernight || isReturnAirport
   }
 
   const requestDelete = (stopKey: string, index: number) => {
@@ -1693,6 +1632,11 @@ export function DayTimeline({
           const isHotelStop = isHotelPlace(place)
           const isAirportStop = isAirportPlace(place)
           const isGhost = liveIndex == null
+          const isReturnAirport =
+            !isGhost &&
+            isLastDay &&
+            liveIndex === day.stops.length - 1 &&
+            isAirportStop
           const isFixedHotel =
             !isGhost && liveIndex != null ? isFixedAt(liveIndex) : false
           const pinTitle =
@@ -1761,7 +1705,21 @@ export function DayTimeline({
             }
           }
 
-          const cardInner = (
+          const cardInner = isReturnAirport ? (
+            <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+              <span
+                className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                title="机场"
+                aria-label="机场"
+              >
+                <PlaneIcon />
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="text-xs text-[var(--stone)]">今日终点</span>
+                <p className="mt-1 font-medium">{place.name}</p>
+              </div>
+            </div>
+          ) : (
             <div
               className={`flex items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 ${
                 active
@@ -1792,7 +1750,7 @@ export function DayTimeline({
                     if (card) beginDrag(liveIndex, e, card)
                   }}
                 >
-                  ⋮⋮
+                  <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                 </span>
               )}
               {isHotelStop ? (
@@ -2136,7 +2094,7 @@ export function DayTimeline({
               return (
                 <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
                   <span className="mt-1 inline-flex h-7 cursor-grabbing items-center justify-center rounded-md bg-[var(--mist)] px-2 text-xs text-[var(--stone)]">
-                    ⋮⋮
+                    <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                   </span>
                   {isHotelStop ? (
                     <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white">
@@ -2215,9 +2173,10 @@ export function DayTimeline({
             type="button"
             onClick={() => setAddOpen(true)}
             disabled={dayRestoring}
-            className="w-full rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
           >
-            + 添加地点
+            <Plus size={15} strokeWidth={2} aria-hidden />
+            添加地点
           </button>
 
           <AddPlaceDialog

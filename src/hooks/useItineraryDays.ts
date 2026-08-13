@@ -81,6 +81,7 @@ export interface UseItineraryDaysResult {
     placeId: string,
     googlePlaceId: string,
     nameOriginal?: string,
+    googleAddress?: string,
   ) => void
   handleAddOnDay: (
     dayNum: number,
@@ -228,14 +229,17 @@ export function useItineraryDays(
       placeId: string,
       googlePlaceId: string,
       nameOriginal?: string,
+      googleAddress?: string,
     ) => {
       setCustomPlaces((prev) => {
         const current = prev[placeId]
         if (!current) return prev
         const nextNameLocal = nameOriginal || current.nameLocal
+        const nextGoogleAddress = googleAddress || current.googleAddress
         if (
           current.googlePlaceId === googlePlaceId &&
-          current.nameLocal === nextNameLocal
+          current.nameLocal === nextNameLocal &&
+          current.googleAddress === nextGoogleAddress
         ) {
           return prev
         }
@@ -248,6 +252,7 @@ export function useItineraryDays(
             ...current,
             googlePlaceId,
             nameLocal: nextNameLocal,
+            googleAddress: nextGoogleAddress,
             googleMapsUrl,
           },
         }

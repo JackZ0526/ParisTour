@@ -1,17 +1,8 @@
-/** Official-site scrapes below this count still try Tripadvisor listing photos. */
-export const MIN_OFFICIAL_PHOTOS_BEFORE_TRIPADVISOR = 5
 const MAX_GALLERY_PHOTOS = 15
 
-export function websitePhotosNeedTripadvisorFallback(
-  usableOfficialCount: number,
-): boolean {
-  return usableOfficialCount < MIN_OFFICIAL_PHOTOS_BEFORE_TRIPADVISOR
-}
-
 /**
- * Restaurants/cafes: official site first, Tripadvisor when the scrape is sparse.
- * Once Tripadvisor returns any listing photos, drop the official-site album.
- * If Tripadvisor fails, keep the official photos.
+ * Tripadvisor owns the primary gallery. Do not reveal official-site photos
+ * until the Tripadvisor photo lookup has settled without a usable image.
  */
 export function pickRestaurantGalleryPhotos(input: {
   websitePhotos: string[]
@@ -20,25 +11,21 @@ export function pickRestaurantGalleryPhotos(input: {
 }): string[] {
   const website = input.websitePhotos.filter(Boolean)
   const tripadvisor = input.tripadvisorPhotos.filter(Boolean)
-  if (!websitePhotosNeedTripadvisorFallback(website.length)) {
-    return website.slice(0, MAX_GALLERY_PHOTOS)
-  }
-  if (!input.tripadvisorResolved || tripadvisor.length === 0) {
-    return website.slice(0, MAX_GALLERY_PHOTOS)
-  }
-  return tripadvisor.slice(0, MAX_GALLERY_PHOTOS)
+  if (tripadvisor.length) return tripadvisor.slice(0, MAX_GALLERY_PHOTOS)
+  if (!input.tripadvisorResolved) return []
+  return website.slice(0, MAX_GALLERY_PHOTOS)
 }
 
-export function shouldFetchTripadvisorGalleryFallback(input: {
-  needsTripadvisorFallback: boolean
-  websitePhotosResolved: boolean
-  usableWebsitePhotoCount: number
-  hasCachedTripadvisorAlbum: boolean
+export function shouldFetchWebsiteGalleryFallback(input: {
+  usesTripadvisor: boolean
+  tripadvisorResolved: boolean
+  usableTripadvisorPhotoCount: number
+  hasCachedWebsiteResult: boolean
 }): boolean {
   return (
-    input.needsTripadvisorFallback &&
-    input.websitePhotosResolved &&
-    websitePhotosNeedTripadvisorFallback(input.usableWebsitePhotoCount) &&
-    !input.hasCachedTripadvisorAlbum
+    input.usesTripadvisor &&
+    input.tripadvisorResolved &&
+    input.usableTripadvisorPhotoCount === 0 &&
+    !input.hasCachedWebsiteResult
   )
 }

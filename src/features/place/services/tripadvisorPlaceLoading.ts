@@ -39,19 +39,3 @@ export function tripadvisorPlaceLoadingSlices(input: {
     reviews: input.reviewCount <= 0,
   }
 }
-
-export function tripadvisorChipLoadingText(input: {
-  rating: boolean
-  price: boolean
-  cuisine: boolean
-}): string {
-  const labels = [
-    input.rating ? '评分' : '',
-    input.price ? '价格' : '',
-    input.cuisine ? '菜系' : '',
-  ].filter(Boolean)
-  if (!labels.length) return ''
-  if (labels.length === 1) return `正在加载${labels[0]}…`
-  if (labels.length === 2) return `正在加载${labels[0]}与${labels[1]}…`
-  return `正在加载${labels[0]}、${labels[1]}与${labels[2]}…`
-}

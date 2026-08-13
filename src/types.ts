@@ -85,6 +85,12 @@ export interface Place {
   type: PlaceType
   description: string
   cuisine?: string
+  /** Google rating captured during itinerary generation; detail pages never refetch it. */
+  googleRating?: number
+  /** Google rating count captured alongside `googleRating`. */
+  googleUserRatingCount?: number
+  /** Google address captured during itinerary generation. */
+  googleAddress?: string
   ratingHint: string
   priceHint?: string
   image: string

@@ -10,6 +10,7 @@
  *     requestPlanStepLabel, actionsNeedPlaceLookup)
  */
 import { useState } from 'react'
+import { Braces, Check, ChevronRight, ClipboardList, Globe2, MapPin, MessageSquareText, Sparkles, TriangleAlert } from 'lucide-react'
 import type {
   TripChatAction,
   TripChatRequestPlan,
@@ -227,74 +228,27 @@ function ChatWorkStepIcon({
     status === 'skipped' ? 'opacity-55' : ''
   }`
   if (id === 'preprocessPlan' || id === 'preprocessFallback') {
-    return (
-      id === 'preprocessPlan' ? (
-        <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M5 18.5 6.5 15H18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2" />
-          <path d="M8 9h8M8 12h5" />
-        </svg>
-      ) : (
-        <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M12 9v4m0 4h.01" />
-          <path d="m12 2 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 2Z" />
-        </svg>
-      )
-    )
+    return id === 'preprocessPlan'
+      ? <MessageSquareText aria-hidden className={common} strokeWidth={1.8} />
+      : <TriangleAlert aria-hidden className={common} strokeWidth={1.8} />
   }
   if (id === 'webSearch') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-      </svg>
-    )
+    return <Globe2 aria-hidden className={common} strokeWidth={1.8} />
   }
   if (id === 'resolvePlaces') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
-        <circle cx="12" cy="10" r="2.5" />
-      </svg>
-    )
+    return <MapPin aria-hidden className={common} strokeWidth={1.8} />
   }
   if (id === 'apply') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <rect x="5" y="3.5" width="14" height="17" rx="2" />
-        <path d="M8.5 9h7M8.5 13h7M8.5 17h4" />
-      </svg>
-    )
+    return <ClipboardList aria-hidden className={common} strokeWidth={1.8} />
   }
   if (id === 'parse') {
-    return (
-      <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M8 4H5v16h3M16 4h3v16h-3M10 9h4M10 13h4" />
-      </svg>
-    )
+    return <Braces aria-hidden className={common} strokeWidth={1.8} />
   }
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className={common} fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3Z" />
-      <path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" />
-    </svg>
-  )
+  return <Sparkles aria-hidden className={common} strokeWidth={1.8} />
 }
 
 function CompletedCheckIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m5 12.5 4.2 4.2L19 7" />
-    </svg>
-  )
+  return <Check aria-hidden className="h-4 w-4" strokeWidth={2} />
 }
 
 export function ChatWorkStepsPanel({
@@ -406,20 +360,7 @@ export function ChatWorkStepsPanel({
           <CompletedCheckIcon />
         </span>
         <span className="min-w-0 truncate">{collapsedLabel}</span>
-        <svg
-          aria-hidden
-          viewBox="0 0 20 20"
-          className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${
-            open ? 'rotate-90' : ''
-          }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="m7 4.5 5.5 5.5L7 15.5" />
-        </svg>
+        <ChevronRight aria-hidden strokeWidth={1.6} className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${open ? 'rotate-90' : ''}`} />
       </button>
 
       <div

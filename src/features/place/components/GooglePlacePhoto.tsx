@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Image } from 'lucide-react'
 import { peekGooglePlaceDetails, peekGooglePlacePhotoMedia } from '../../map/services/googlePlaceDetails'
 import {
   fetchTripadvisorPlaceGallery,
@@ -67,19 +68,7 @@ function PhotoPlaceholder() {
       className="absolute inset-0 flex items-center justify-center bg-[var(--mist)]"
       aria-hidden
     >
-      <svg
-        viewBox="0 0 24 24"
-        className="h-6 w-6 text-[var(--stone)]/40"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="5" width="18" height="14" rx="2.2" />
-        <circle cx="8.5" cy="9.5" r="1.2" />
-        <path d="m21 16-4.2-4.2a1.5 1.5 0 0 0-2.1 0L6 20" />
-      </svg>
+      <Image className="h-6 w-6 text-[var(--stone)]/40" strokeWidth={1.6} />
     </span>
   )
 }

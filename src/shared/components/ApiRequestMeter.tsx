@@ -114,14 +114,19 @@ export function ApiRequestMeter() {
                       <span className="tabular-nums text-[var(--sage)]">{total}</span>
                     </div>
                     <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)]">
-                      {group.kinds.map((item) => (
-                        <li key={item.kind} className="flex justify-between gap-2">
-                          <span>{item.label}</span>
-                          <span className="tabular-nums">
-                            {snapshot.byKind[item.kind] || 0}
-                          </span>
-                        </li>
-                      ))}
+                      {group.kinds
+                        .filter(
+                          (item) =>
+                            !item.legacy || Boolean(snapshot.byKind[item.kind]),
+                        )
+                        .map((item) => (
+                          <li key={item.kind} className="flex justify-between gap-2">
+                            <span>{item.label}</span>
+                            <span className="tabular-nums">
+                              {snapshot.byKind[item.kind] || 0}
+                            </span>
+                          </li>
+                        ))}
                     </ul>
                   </li>
                 )

@@ -194,6 +194,7 @@ async function handleOfficialPlaces(
   search: string,
   body: ArrayBuffer | null,
   fullDetails: boolean,
+  reviewDetails: boolean,
 ): Promise<Response> {
   const key = getOfficialGooglePlacesApiKey()
   if (!key) return missingKey('GOOGLE_PLACES_API_KEY')
@@ -208,7 +209,7 @@ async function handleOfficialPlaces(
   try {
     const upstream = await proxyRequest(target, primaryReq, {
       'X-Goog-Api-Key': key,
-      ...googlePlacesUpstreamHeaders(req.method, { fullDetails }),
+      ...googlePlacesUpstreamHeaders(req.method, { fullDetails, reviewDetails }),
     })
     logUpstream('official', req.method, rest, upstream.status)
     if (!upstream.ok) {
@@ -232,6 +233,8 @@ async function handleRapidApiPlaces(
   search: string,
   body: ArrayBuffer | null,
   fullDetails: boolean,
+  reviewDetails: boolean,
+  allowLegacyFallback = true,
 ): Promise<Response> {
   const key = getRapidApiKey()
   if (!key) return missingKey('RAPIDAPI_KEY')
@@ -251,7 +254,7 @@ async function handleRapidApiPlaces(
     primary = await proxyRequest(target, primaryReq, {
       'X-RapidAPI-Key': key,
       'X-RapidAPI-Host': host,
-      ...googlePlacesUpstreamHeaders(req.method, { fullDetails }),
+      ...googlePlacesUpstreamHeaders(req.method, { fullDetails, reviewDetails }),
     })
   } catch (error) {
     console.error('[google-places] primary', error)
@@ -275,6 +278,7 @@ async function handleRapidApiPlaces(
     )
   }
   if (
+    !allowLegacyFallback ||
     !shouldFallbackFromPrimary(primaryStatus) ||
     backupHost === host
   ) {
@@ -324,9 +328,13 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
   const url = new URL(req.url)
   let rest = (url.searchParams.get('rest') || '').replace(/^\/+/, '')
   url.searchParams.delete('rest')
-  const fullDetails =
-    req.method === 'GET' && url.searchParams.get('detailsMode') === 'full'
+  const detailsMode = req.method === 'GET' ? url.searchParams.get('detailsMode') : null
+  const fullDetails = detailsMode === 'full'
+  const reviewDetails = detailsMode === 'reviews'
   url.searchParams.delete('detailsMode')
+  const rapidApiNewOnly =
+    req.method === 'GET' && url.searchParams.get('provider') === 'rapidapi-new'
+  url.searchParams.delete('provider')
   if (req.method === 'GET') rest = normalizeDetailsRest(rest)
   if (!allowedPath(req.method, rest)) {
     return json(400, { error: 'Unsupported Places path' })
@@ -336,9 +344,24 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
     req.method !== 'GET' && req.method !== 'HEAD'
       ? await req.arrayBuffer()
       : null
-  const provider = getGooglePlacesProvider()
+  const provider = rapidApiNewOnly ? 'rapidapi' : getGooglePlacesProvider()
   if (provider === 'official') {
-    return handleOfficialPlaces(req, rest, url.search, body, fullDetails)
+    return handleOfficialPlaces(
+      req,
+      rest,
+      url.search,
+      body,
+      fullDetails,
+      reviewDetails,
+    )
   }
-  return handleRapidApiPlaces(req, rest, url.search, body, fullDetails)
+  return handleRapidApiPlaces(
+    req,
+    rest,
+    url.search,
+    body,
+    fullDetails,
+    reviewDetails,
+    !rapidApiNewOnly,
+  )
 }

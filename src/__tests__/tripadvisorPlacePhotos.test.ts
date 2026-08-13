@@ -33,6 +33,7 @@ import {
   hasCachedTripadvisorGallery,
   hasCachedTripadvisorRestaurantDetails,
   hasSettledTripadvisorRestaurantDetails,
+  invalidateTripadvisorPlaceCache,
   pickTripadvisorPhotoUrl,
   resetTripadvisorPlacePhotosForTests,
   selectBestTripadvisorGalleryPhotos,
@@ -49,6 +50,7 @@ import {
 } from '../features/place/services/tripadvisorRequestBudget'
 import {
   resetLlmArtifactStoreForTests,
+  saveLlmArtifacts,
   setLlmArtifact,
 } from '../shared/services/llm/llmArtifactStore'
 import { placeIdentitySimilarity, PLACE_NAME_MATCH_MIN, placeSearchQuery } from '../shared/utils/placeTitle'
@@ -218,6 +220,13 @@ function tripadvisorMissingResponse() {
 
 describe('Tripadvisor place photos', () => {
   beforeEach(() => {
+    const storage = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) || null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+      clear: () => storage.clear(),
+    })
     resolveAttractionCanonicalName.mockReset()
     resolveAttractionCanonicalName.mockResolvedValue(null)
     resolveTripadvisorRestaurantListing.mockReset()
@@ -1129,6 +1138,9 @@ describe('Tripadvisor place photos', () => {
     )
     expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('restaurants%2Fdetail')
 
+    // Simulate cloud hydration replacing trip artifacts, followed by a page refresh.
+    saveLlmArtifacts({}, { silent: true })
+    resetTripadvisorPlacePhotosForTests()
     authFetch.mockClear()
     const again = await fetchTripadvisorPlaceGallery({
       name: 'Some Unknown Cafe',
@@ -1748,6 +1760,49 @@ describe('Tripadvisor place photos', () => {
     })
     expect(swapped?.photos).toEqual(['https://media-cdn.tripadvisor.com/parallel.jpg'])
     expect(authFetch).not.toHaveBeenCalled()
+  })
+
+  it('invalidates one cafe match and gallery before an explicit refresh', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch
+      .mockResolvedValueOnce(
+        tripadvisor34AutocompleteResponse([
+          { locationId: 778899, name: 'Parallel Coffee', type: 'restaurant' },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        restaurantMediaGalleryResponse('https://media-cdn.tripadvisor.com/wrong-hotel.jpg'),
+      )
+      .mockResolvedValueOnce(
+        tripadvisor34AutocompleteResponse([
+          { locationId: 990011, name: 'Parallel Coffee', type: 'restaurant' },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        restaurantMediaGalleryResponse('https://media-cdn.tripadvisor.com/parallel-new.jpg'),
+      )
+
+    const input = {
+      name: 'Parallel Coffee',
+      nameLocal: '平行咖啡',
+      type: 'cafe' as const,
+    }
+    const first = await fetchTripadvisorPlaceGallery(input)
+    expect(first?.photos).toEqual([
+      'https://media-cdn.tripadvisor.com/wrong-hotel.jpg',
+    ])
+
+    invalidateTripadvisorPlaceCache(input)
+    const refreshed = await fetchTripadvisorPlaceGallery(input)
+
+    expect(refreshed?.contentId).toBe('990011')
+    expect(refreshed?.photos).toEqual([
+      'https://media-cdn.tripadvisor.com/parallel-new.jpg',
+    ])
+    expect(authFetch).toHaveBeenCalledTimes(4)
   })
 
   it('does not attach an unrelated restaurant autocomplete hit', async () => {

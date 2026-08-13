@@ -162,13 +162,27 @@ async function resolveAttractionPlace(
   specialId?: string,
 ): Promise<{ id: string; place?: Place }> {
   const catalog = specialId ? catalogPlaces[specialId] : undefined
-  const ta = await fetchTripadvisorAttractionInfo({
-    name: draft.name || catalog?.name || '',
-    nameLocal: draft.nameLocal || catalog?.nameLocal,
-    contentId: tripadvisorContentIdFromCandidate(draft.googlePlaceId),
-  }).catch(() => null)
+  const lookupName = draft.name || catalog?.name || ''
+  const lookupLocal = draft.nameLocal || catalog?.nameLocal
+  const googleQuery = placeDetailsQuery(lookupName, lookupLocal)
+  const [ta, google] = await Promise.all([
+    fetchTripadvisorAttractionInfo({
+      name: lookupName,
+      nameLocal: lookupLocal,
+      contentId: tripadvisorContentIdFromCandidate(draft.googlePlaceId),
+    }).catch(() => null),
+    googleQuery
+      ? fetchGooglePlaceDetails(googleQuery, catalog?.location, {
+          placeId: /^ChI/i.test(draft.googlePlaceId || '')
+            ? draft.googlePlaceId
+            : undefined,
+          recoverPhotos: false,
+        }).catch(() => null)
+      : Promise.resolve(null),
+  ])
   const loc =
     ta?.location ||
+    google?.location ||
     catalog?.location || {
       lat: hotel.lat + (Math.random() - 0.5) * 0.01,
       lng: hotel.lng + (Math.random() - 0.5) * 0.01,
@@ -189,7 +203,7 @@ async function resolveAttractionPlace(
     ...(catalog ? { ...catalog } : {}),
     id,
     tripadvisorContentId: ta?.contentId || catalog?.tripadvisorContentId,
-    googlePlaceId: undefined,
+    googlePlaceId: google?.id,
     name: displayName,
     nameLocal: catalog?.nameLocal || draft.nameLocal || ta?.name,
     type: 'attraction',
@@ -198,6 +212,9 @@ async function resolveAttractionPlace(
       draft.description ||
       catalog?.description ||
       `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
+    googleRating: google?.rating,
+    googleUserRatingCount: google?.userRatingCount,
+    googleAddress: google?.address || draft.googleAddress,
     ratingHint:
       ta?.rating != null
         ? `Tripadvisor ★ ${ta.rating.toFixed(1)}`
@@ -293,6 +310,9 @@ async function resolveDraftPlace(
       draft.description ||
       details?.summary ||
       `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
+    googleRating: details?.rating,
+    googleUserRatingCount: details?.userRatingCount,
+    googleAddress: details?.address || draft.googleAddress,
     ratingHint:
       details?.rating != null
         ? `Google ★ ${details.rating.toFixed(1)}`

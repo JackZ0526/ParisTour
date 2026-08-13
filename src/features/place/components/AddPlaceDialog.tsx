@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
@@ -575,7 +576,6 @@ export function AddPlaceDialog({
       }
       const details = await fetchGooglePlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
-        requireFullDetails: true,
       })
       const websitePhotos = (
         await fetchPlaceWebsitePhotosWithFallback({
@@ -705,6 +705,9 @@ export function AddPlaceDialog({
         nameLocal: details.nameOriginal,
         type,
         description,
+        googleRating: details.rating,
+        googleUserRatingCount: details.userRatingCount,
+        googleAddress: details.address,
         ratingHint:
           details.rating != null
             ? `Google ★ ${details.rating.toFixed(1)}`
@@ -744,9 +747,7 @@ export function AddPlaceDialog({
       if (!query) {
         throw new Error('请使用地点的原文名称搜索。')
       }
-      const details = await fetchGooglePlaceDetails(query, undefined, {
-        requireFullDetails: true,
-      })
+      const details = await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -1102,19 +1103,7 @@ export function AddPlaceDialog({
                                               onClick={() => stepPhoto(key, photos.length, -1)}
                                               className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
                                             >
-                                              <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2.2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden
-                                              >
-                                                <path d="M15 18l-6-6 6-6" />
-                                              </svg>
+                                              <ChevronLeft size={14} strokeWidth={2.2} aria-hidden />
                                             </button>
                                             <button
                                               type="button"
@@ -1122,19 +1111,7 @@ export function AddPlaceDialog({
                                               onClick={() => stepPhoto(key, photos.length, 1)}
                                               className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
                                             >
-                                              <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2.2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden
-                                              >
-                                                <path d="M9 18l6-6-6-6" />
-                                              </svg>
+                                              <ChevronRight size={14} strokeWidth={2.2} aria-hidden />
                                             </button>
                                             <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
                                               {photoIndex + 1} / {photos.length}
@@ -1340,8 +1317,12 @@ export function AddPlaceDialog({
         googlePlaceId={googleDetail?.details.id}
         location={googleDetail?.details.location}
         placeType={googleDetail?.type}
+        googleRating={googleDetail?.details.rating}
+        googleRatingCount={googleDetail?.details.userRatingCount}
+        googleAddress={googleDetail?.details.address}
         fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
         showMap={false}
+        detailsOverride={googleDetail?.details}
         overlayClassName="z-[2200]"
         onAdvisorFacts={(next) => {
           setAdvisorFactsKey(googleDetailKey)

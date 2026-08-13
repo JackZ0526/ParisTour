@@ -184,6 +184,7 @@ export type PlaceTypeForItinerary =
 export interface FullItineraryPlaceDraft {
   key: string
   googlePlaceId?: string
+  googleAddress?: string
   name: string
   nameLocal?: string
   type: PlaceTypeForItinerary

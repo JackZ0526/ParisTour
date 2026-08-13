@@ -1,6 +1,10 @@
 export type ApiRequestKind =
   | 'google-place-search'
   | 'google-place-details'
+  | 'google-official-search'
+  | 'google-official-details'
+  | 'google-rapidapi-search'
+  | 'google-rapidapi-details'
   | 'tripadvisor-search'
   | 'tripadvisor-gallery'
   | 'tripadvisor-details'
@@ -25,7 +29,7 @@ export interface ApiRequestGroup {
   id: string
   label: string
   shortLabel: string
-  kinds: Array<{ kind: ApiRequestKind; label: string }>
+  kinds: Array<{ kind: ApiRequestKind; label: string; legacy?: boolean }>
 }
 
 export const API_REQUEST_GROUPS: ApiRequestGroup[] = [
@@ -34,8 +38,12 @@ export const API_REQUEST_GROUPS: ApiRequestGroup[] = [
     label: 'Google Places',
     shortLabel: 'Google',
     kinds: [
-      { kind: 'google-place-search', label: '搜索' },
-      { kind: 'google-place-details', label: '详情' },
+      { kind: 'google-official-search', label: '官方 · 搜索' },
+      { kind: 'google-official-details', label: '官方 · 详情' },
+      { kind: 'google-rapidapi-search', label: 'RapidAPI · 搜索' },
+      { kind: 'google-rapidapi-details', label: 'RapidAPI · 详情' },
+      { kind: 'google-place-search', label: '旧记录 · 搜索', legacy: true },
+      { kind: 'google-place-details', label: '旧记录 · 详情', legacy: true },
     ],
   },
   {
@@ -165,7 +173,12 @@ function writeMeter(meter: StoredMeter) {
   for (const listener of listeners) listener()
 }
 
-export function classifyApiRequest(input: string): ApiRequestKind | null {
+export type GooglePlacesMeterProvider = 'official' | 'rapidapi'
+
+export function classifyApiRequest(
+  input: string,
+  googlePlacesProvider?: GooglePlacesMeterProvider | null,
+): ApiRequestKind | null {
   let url: URL
   try {
     url = new URL(input, 'http://local.invalid')
@@ -176,11 +189,20 @@ export function classifyApiRequest(input: string): ApiRequestKind | null {
   const rest = url.searchParams.get('rest') || ''
 
   if (path === '/api/google-places' || path.startsWith('/api/google-places/')) {
-    if (rest.includes('searchText') || rest.endsWith('searchText')) {
-      return 'google-place-search'
+    const operation = /^v1\/places\//.test(rest) ? 'details' : 'search'
+    if (googlePlacesProvider === 'official') {
+      return operation === 'details'
+        ? 'google-official-details'
+        : 'google-official-search'
     }
-    if (/^v1\/places\//.test(rest)) return 'google-place-details'
-    return 'google-place-search'
+    if (googlePlacesProvider === 'rapidapi') {
+      return operation === 'details'
+        ? 'google-rapidapi-details'
+        : 'google-rapidapi-search'
+    }
+    return operation === 'details'
+      ? 'google-place-details'
+      : 'google-place-search'
   }
   if (path === '/api/tripadvisor' || path.startsWith('/api/tripadvisor/')) {
     if (rest.includes('media-gallery')) return 'tripadvisor-gallery'

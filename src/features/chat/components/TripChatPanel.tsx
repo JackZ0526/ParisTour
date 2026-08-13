@@ -599,6 +599,9 @@ export function TripChatPanel({
       name: details.name,
       type: placeType,
       description,
+      googleRating: details.rating,
+      googleUserRatingCount: details.userRatingCount,
+      googleAddress: details.address,
       ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
       image:
         websitePhoto ||
@@ -1996,6 +1999,10 @@ export function TripChatPanel({
         name={activePending?.place.name || ''}
         nameLocal={activePending?.place.nameLocal}
         googlePlaceId={activePending?.place.googlePlaceId}
+        googleRating={activePending?.place.googleRating}
+        googleRatingCount={activePending?.place.googleUserRatingCount}
+        googleAddress={activePending?.place.googleAddress}
+        googleRatingHint={activePending?.place.ratingHint}
         location={activePending?.place.location}
         placeType={activePending?.place.type}
         fallbackImage={activePending?.place.image}
@@ -2081,4 +2088,3 @@ export function TripChatPanel({
     </>
   )
 }
-

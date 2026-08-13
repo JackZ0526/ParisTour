@@ -39,7 +39,7 @@ export interface GooglePlaceDetails {
   priceLevel?: string
   location?: Coordinates
   query: string
-  /** True only after the lazy detail-page request (reviews included) completes. */
+  /** True after the one-shot photos/reviews detail response is cached. */
   fullDetails?: true
 }
 
@@ -56,7 +56,7 @@ export interface GooglePlaceSearchOptions {
    * stable Google field, and retries burn the daily Places quota.
    */
   recoverPhotos?: boolean
-  /** Fetch reviews and atmosphere fields; use only for an opened detail page. */
+  /** Expanded photos/reviews mode; reserved for an explicit provider fallback. */
   requireFullDetails?: boolean
 }
 
@@ -103,6 +103,13 @@ interface RapidPlace {
     name?: string
     photoUri?: string
     uri?: string
+    url?: string
+    photoUrl?: string
+    photo_url?: string
+    imageUrl?: string
+    image_url?: string
+    thumbnailUrl?: string
+    thumbnail_url?: string
     photo_reference?: string
     photoReference?: string
   }>
@@ -123,6 +130,7 @@ const DETAILS_PREFIX = 'rapid-google-place:v4:'
 const CANDIDATES_PREFIX = 'rapid-google-candidates:v3:'
 const PHOTO_URI_PREFIX = 'rapid-google-photo-uri:v1:'
 const WEBSITE_RECOVERY_PREFIX = 'rapid-google-website-recovery:v1:'
+const RAPID_DETAILS_FALLBACK_PREFIX = 'rapid-google-details-fallback:v1:'
 const MAX_PLACE_PHOTOS = 8
 const PLACE_PHOTO_MAX_PX = 900
 const detailMemory = new Map<string, GooglePlaceDetails>()
@@ -131,6 +139,7 @@ const inflight = new Map<string, Promise<GooglePlaceDetails | null>>()
 const photoUriMemory = new Map<string, string>()
 const photoInflight = new Map<string, Promise<string | null>>()
 const websiteRecoveryMemory = new Set<string>()
+const rapidDetailsFallbackMemory = new Set<string>()
 
 function textOf(value: LocalizedText): string {
   if (typeof value === 'string') return value.trim()
@@ -254,7 +263,17 @@ function extractPlacePhotoUrls(
         url = parsed ? storedPhotoRef(parsed) : null
       }
     } else if (photo && typeof photo === 'object') {
-      const direct = [photo.photoUri, photo.uri].find(
+      const direct = [
+        photo.photoUri,
+        photo.uri,
+        photo.url,
+        photo.photoUrl,
+        photo.photo_url,
+        photo.imageUrl,
+        photo.image_url,
+        photo.thumbnailUrl,
+        photo.thumbnail_url,
+      ].find(
         (value) => typeof value === 'string' && isResolvedPhotoUri(value),
       )
       if (direct) {
@@ -560,17 +579,91 @@ async function detailsById(
   placeId: string,
   query: string,
   fullDetails = false,
+  rapidApiNewOnly = false,
 ): Promise<GooglePlaceDetails | null> {
   const id = placeId.replace(/^places\//, '').trim()
   if (!id) return null
   const raw = await rapidRequest<RapidPlace>(
     'place-details',
-    `v1/places/${encodeURIComponent(id)}?languageCode=fr&regionCode=FR${fullDetails ? '&detailsMode=full' : ''}`,
+    `v1/places/${encodeURIComponent(id)}?languageCode=${rapidApiNewOnly ? 'en' : 'fr'}&regionCode=FR${fullDetails ? `&detailsMode=${rapidApiNewOnly ? 'reviews' : 'full'}` : ''}${rapidApiNewOnly ? '&provider=rapidapi-new' : ''}`,
   )
   const details = raw ? normalizeRapidPlace(raw, query) : null
+  // The Tripadvisor fallback owns reviews only. Never leak an unexpected photo
+  // field from the gateway into the website-photo fallback path.
+  if (details && rapidApiNewOnly) details.photos = []
   if (details && fullDetails) details.fullDetails = true
   if (details) storeDetails(details, query)
   return details ? withDisplayPhotos(details) : null
+}
+
+function hasAttemptedRapidDetailsFallback(placeId: string): boolean {
+  if (rapidDetailsFallbackMemory.has(placeId)) return true
+  const stored = getLlmArtifact<{ done: true }>(
+    `${RAPID_DETAILS_FALLBACK_PREFIX}${placeId}`,
+  )
+  if (!stored?.done) return false
+  rapidDetailsFallbackMemory.add(placeId)
+  return true
+}
+
+function markRapidDetailsFallbackAttempted(placeId: string) {
+  rapidDetailsFallbackMemory.add(placeId)
+  setLlmArtifact(
+    `${RAPID_DETAILS_FALLBACK_PREFIX}${placeId}`,
+    { done: true },
+    { silent: true },
+  )
+}
+
+/**
+ * Tripadvisor-miss fallback. Uses the cached Place ID and exactly one request
+ * to RapidAPI Google Place API (New V2); it never performs Text Search or the
+ * legacy-host retry.
+ */
+export async function fetchRapidApiGooglePlaceDetailsById(
+  placeId: string,
+  query: string,
+): Promise<GooglePlaceDetails | null> {
+  const id = placeId.replace(/^places\//, '').trim()
+  if (!id) return null
+  const cached = readDetails([detailKey('id', id)])
+  if (cached?.fullDetails) return cached
+  if (hasAttemptedRapidDetailsFallback(id)) return cached
+
+  const inflightKey = `rapidapi-new-fallback:${id}`
+  const pending = inflight.get(inflightKey)
+  if (pending) return pending
+
+  markRapidDetailsFallbackAttempted(id)
+  const task = detailsById(id, originalSearchLabel(query), true, true)
+  inflight.set(inflightKey, task)
+  try {
+    return (await task) || cached
+  } finally {
+    inflight.delete(inflightKey)
+  }
+}
+
+/**
+ * Explicit legacy-data repair. Called only when the user asks to refresh a
+ * missing cached Google address; core details exclude reviews and photos.
+ */
+export async function refreshGooglePlaceCoreDetailsById(
+  placeId: string,
+  query: string,
+): Promise<GooglePlaceDetails | null> {
+  const id = placeId.replace(/^places\//, '').trim()
+  if (!id) return null
+  const inflightKey = `manual-core-refresh:${id}`
+  const pending = inflight.get(inflightKey)
+  if (pending) return pending
+  const task = detailsById(id, originalSearchLabel(query), false)
+  inflight.set(inflightKey, task)
+  try {
+    return await task
+  } finally {
+    inflight.delete(inflightKey)
+  }
 }
 
 export async function searchNearbyGooglePlaceCandidates(input: {
@@ -783,4 +876,5 @@ export function resetGooglePlaceDetailsCacheForTests() {
   photoUriMemory.clear()
   photoInflight.clear()
   websiteRecoveryMemory.clear()
+  rapidDetailsFallbackMemory.clear()
 }

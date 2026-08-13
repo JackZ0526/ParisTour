@@ -3,6 +3,7 @@ import type { GoogleReview } from '../../map/services/googlePlaceDetails'
 import { authFetch } from '../../auth/services/authFetch'
 import {
   getLlmArtifact,
+  removeLlmArtifact,
   setLlmArtifact,
 } from '../../../shared/services/llm/llmArtifactStore'
 import {
@@ -65,6 +66,7 @@ const CATALOG_PREFIX = 'tripadvisor-catalog:v1:'
 const GALLERY_PREFIX = 'tripadvisor-gallery:v16:'
 const DETAILS_PREFIX = 'tripadvisor-place-details:v13:'
 const QUERY_MATCH_PREFIX = 'tripadvisor-query-match:v3:'
+const QUERY_MISS_STORAGE_PREFIX = 'paris-tour-tripadvisor-query-miss-v1:'
 export const MAX_GALLERY_PHOTOS = 15
 const MAX_REVIEWS = 8
 const MIN_GALLERY_WIDTH = 400
@@ -1745,6 +1747,24 @@ function queryMatchKey(
   return `${kind}|q:${tripadvisorAutocompleteQuery(name, nameLocal, kind).trim().toLowerCase()}`
 }
 
+function readPersistentMatchMiss(key: string): boolean {
+  try {
+    return localStorage.getItem(`${QUERY_MISS_STORAGE_PREFIX}${key}`) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writePersistentMatchMiss(key: string, miss: boolean) {
+  try {
+    const storageKey = `${QUERY_MISS_STORAGE_PREFIX}${key}`
+    if (miss) localStorage.setItem(storageKey, '1')
+    else localStorage.removeItem(storageKey)
+  } catch {
+    /* The artifact store remains the fallback when localStorage is unavailable. */
+  }
+}
+
 function readMatchLookup(
   kind: TripadvisorGalleryKind,
   input: { name: string; nameLocal?: string; contentId?: string },
@@ -1759,7 +1779,12 @@ function readMatchLookup(
     const stored = getLlmArtifact<string>(`${QUERY_MATCH_PREFIX}${key}`)
     if (stored === 'miss' || (typeof stored === 'string' && stored)) {
       matchLookup.set(key, stored as string | 'miss')
+      if (stored === 'miss') writePersistentMatchMiss(key, true)
       return stored as string | 'miss'
+    }
+    if (readPersistentMatchMiss(key)) {
+      matchLookup.set(key, 'miss')
+      return 'miss'
     }
   }
   return undefined
@@ -1776,8 +1801,70 @@ function rememberMatchLookup(
   ]
   for (const key of keys) {
     matchLookup.set(key, contentId)
-    if (contentId === 'miss') continue
-    setLlmArtifact(`${QUERY_MATCH_PREFIX}${key}`, contentId, { silent: true })
+    writePersistentMatchMiss(key, contentId === 'miss')
+  }
+  const artifactKeys = keys.map((key) => `${QUERY_MATCH_PREFIX}${key}`)
+  setLlmArtifact(artifactKeys[0], contentId, {
+    aliases: artifactKeys.slice(1),
+    // A miss prevents paid retries after the trip is restored from the cloud.
+    // Positive provider payloads remain silent because their own caches persist them.
+    silent: contentId !== 'miss',
+  })
+}
+
+/**
+ * Forget one place's Tripadvisor match and provider payloads so an explicit
+ * user refresh performs a real autocomplete/details lookup instead of merely
+ * repainting the same persisted gallery.
+ */
+export function invalidateTripadvisorPlaceCache(input: {
+  name: string
+  nameLocal?: string
+  type?: PlaceType
+  contentId?: string
+}): void {
+  const kind = galleryKindForPlaceType(input.type)
+  if (!kind) return
+
+  const catalog = readCatalog(kind)
+  const lookupKeys = [
+    matchLookupKey(kind, input),
+    queryMatchKey(kind, input.name, input.nameLocal),
+  ]
+  const rememberedIds = lookupKeys
+    .map((key) => {
+      const memory = matchLookup.get(key)
+      if (memory && memory !== 'miss') return memory
+      const stored = getLlmArtifact<string>(`${QUERY_MATCH_PREFIX}${key}`)
+      return stored && stored !== 'miss' ? stored : undefined
+    })
+    .filter((value): value is string => Boolean(value))
+  const matched = findCatalogItem(catalog, input)
+  const contentIds = new Set([
+    ...rememberedIds,
+    ...(matched?.contentId ? [matched.contentId] : []),
+    ...(input.contentId?.trim() ? [input.contentId.trim()] : []),
+  ])
+
+  for (const key of lookupKeys) {
+    matchLookup.delete(key)
+    writePersistentMatchMiss(key, false)
+    removeLlmArtifact(`${QUERY_MATCH_PREFIX}${key}`, { silent: true })
+  }
+
+  for (const contentId of contentIds) {
+    const galleryCacheKey = galleryKey(kind, contentId)
+    galleryMemory.delete(galleryCacheKey)
+    galleryInflight.delete(galleryCacheKey)
+    detailsMemory.delete(contentId)
+    removeLlmArtifact(galleryCacheKey, { silent: true })
+    removeLlmArtifact(detailsKey(contentId), { silent: true })
+  }
+
+  if (contentIds.size > 0) {
+    const nextCatalog = catalog.filter((item) => !contentIds.has(item.contentId))
+    catalogMemory.set(catalogKey(kind), nextCatalog)
+    setLlmArtifact(catalogKey(kind), nextCatalog, { silent: true })
   }
 }
 
@@ -1859,6 +1946,18 @@ export function peekTripadvisorPlacePhotos(
     return match.coverUrl ? [match.coverUrl] : []
   }
   return []
+}
+
+/** Synchronous negative-cache check used to avoid flashing a gallery on reopen. */
+export function hasRememberedTripadvisorPlaceMiss(input: {
+  name: string
+  nameLocal?: string
+  type?: PlaceType
+  contentId?: string
+}): boolean {
+  const kind = galleryKindForPlaceType(input.type)
+  if (!kind) return false
+  return readMatchLookup(kind, input) === 'miss'
 }
 
 function placeInfoFromParts(

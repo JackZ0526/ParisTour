@@ -6,12 +6,21 @@ import {
   type HTMLAttributeReferrerPolicy,
   type ReactNode,
 } from 'react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Languages,
+  MapPin,
+  RefreshCw,
+  RotateCw,
+} from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
-  fetchGooglePlaceDetails,
-  hasFullGooglePlaceDetails,
+  fetchRapidApiGooglePlaceDetailsById,
   peekGooglePlaceDetails,
   placeDetailsQuery,
+  refreshGooglePlaceCoreDetailsById,
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
 import {
@@ -20,24 +29,24 @@ import {
   fetchTripadvisorRestaurantInfo,
   hasCachedTripadvisorGallery,
   hasCachedTripadvisorRestaurantDetails,
+  hasRememberedTripadvisorPlaceMiss,
+  invalidateTripadvisorPlaceCache,
   peekTripadvisorAttractionInfo,
   peekTripadvisorPlacePhotos,
   peekTripadvisorRestaurantInfo,
   MAX_GALLERY_PHOTOS,
   type TripadvisorAttractionInfo,
 } from '../services/tripadvisorPlacePhotos'
-import { tripadvisorChipLoadingText, tripadvisorPlaceLoadingSlices } from '../services/tripadvisorPlaceLoading'
+import { tripadvisorPlaceLoadingSlices } from '../services/tripadvisorPlaceLoading'
 import {
   pickRestaurantGalleryPhotos,
-  shouldFetchTripadvisorGalleryFallback,
-  websitePhotosNeedTripadvisorFallback,
+  shouldFetchWebsiteGalleryFallback,
 } from '../services/placeGalleryFallback'
 import {
   fetchPlaceWebsitePhotosWithFallback,
   peekCachedPlaceWebsitePhotos,
 } from '../services/placeWebsitePhotos'
 import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../../map/services/googleMapsKey'
-import { getGoogleRequestBudgetSnapshot } from '../../map/services/googleRequestBudget'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
   looksChinese,
@@ -89,6 +98,12 @@ interface Props {
   name: string
   nameLocal?: string
   googlePlaceId?: string
+  /** Google facts captured before the detail page opens. */
+  googleRating?: number
+  googleRatingCount?: number
+  googleAddress?: string
+  /** Legacy fallback for saved places created before numeric Google facts. */
+  googleRatingHint?: string
   tripadvisorContentId?: string
   location?: Coordinates
   placeType?: PlaceType
@@ -142,6 +157,13 @@ function isUsablePhotoHttp(url: string): boolean {
   )
 }
 
+function googleRatingFromHint(value?: string): number | undefined {
+  if (!value || !/google/i.test(value)) return undefined
+  const match = value.match(/(?:^|\s|[≈★])([1-5](?:\.\d)?)(?:\s|$)/)
+  const rating = match ? Number(match[1]) : Number.NaN
+  return Number.isFinite(rating) ? rating : undefined
+}
+
 function mergePhotoUrls(current: string[], next: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []
@@ -190,6 +212,12 @@ function tripadvisorHasFacts(info: TripadvisorAttractionInfo | null): boolean {
         info.phone ||
         info.website),
   )
+}
+
+function tripadvisorHasDetailContent(
+  info: TripadvisorAttractionInfo | null,
+): boolean {
+  return Boolean(info && (info.photos.length || tripadvisorHasFacts(info)))
 }
 
 function PlaceChipShimmer({ label }: { label: string }) {
@@ -308,25 +336,15 @@ function photoFetchStatusLabel(input: {
     if (input.displayPhoto && !input.heroReady) return '正在加载 Tripadvisor 图片…'
     return '正在加载照片…'
   }
-  if (!input.skipGoogleLookup && !input.websitePhotosResolved) {
-    if (!input.hasWebsiteMiss && !input.hasTripadvisorCache) {
-      return input.hasWebsiteCache ? '正在读取官网图片缓存…' : '正在抓取官网图片…'
-    }
-  }
   if (
     input.needsTripadvisorFallback &&
-    input.websitePhotosResolved &&
-    websitePhotosNeedTripadvisorFallback(input.usableWebsitePhotos) &&
-    !input.tripadvisorFallbackResolved
+    input.tripadvisorResolved &&
+    input.tripadvisorFallbackResolved &&
+    !input.websitePhotosResolved
   ) {
-    if (input.usableWebsitePhotos === 0) {
-      return input.hasTripadvisorCache
-        ? '官网无可用图，正在读取 Tripadvisor 缓存…'
-        : '官网无可用图，正在请求 Tripadvisor…'
-    }
-    return input.hasTripadvisorCache
-      ? '官网图片较少，正在读取 Tripadvisor 缓存…'
-      : '官网图片较少，正在请求 Tripadvisor…'
+    return input.hasWebsiteCache
+      ? '正在读取官网图片缓存…'
+      : 'Tripadvisor 无可用图，正在抓取官网图片…'
   }
   if (
     input.needsTripadvisorFallback &&
@@ -334,7 +352,9 @@ function photoFetchStatusLabel(input: {
     input.usableWebsitePhotos === 0 &&
     !input.displayPhoto
   ) {
-    return 'Tripadvisor 无匹配照片，使用占位图…'
+    return input.hasWebsiteMiss
+      ? 'Tripadvisor 和官网都无可用图，使用占位图…'
+      : '正在加载官网图片…'
   }
   if (input.displayPhoto && !input.heroReady) {
     if (input.photoSource === 'website') return '正在加载官网图片…'
@@ -465,6 +485,10 @@ export function GooglePlacePage({
   name,
   nameLocal,
   googlePlaceId,
+  googleRating,
+  googleRatingCount,
+  googleAddress,
+  googleRatingHint,
   tripadvisorContentId,
   location,
   placeType,
@@ -508,12 +532,18 @@ export function GooglePlacePage({
     useState<TripadvisorAttractionInfo | null>(null)
   const [tripadvisorResolved, setTripadvisorResolved] = useState(false)
   const [tripadvisorDetailsResolved, setTripadvisorDetailsResolved] = useState(false)
+  const [rapidApiFallbackLoading, setRapidApiFallbackLoading] = useState(false)
+  const [rapidApiFallbackResolved, setRapidApiFallbackResolved] = useState(false)
+  const [googleAddressRefreshing, setGoogleAddressRefreshing] = useState(false)
+  const [tripadvisorPhotosRefreshing, setTripadvisorPhotosRefreshing] = useState(false)
+  const [tripadvisorRefreshVersion, setTripadvisorRefreshVersion] = useState(0)
   const tripadvisorPlaceKeyRef = useRef('')
   const [llmZh, setLlmZh] = useState<string | null>(null)
   /** idle = not finished; loading = in flight; done = success or gave up */
   const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
   const swipeStartX = useRef<number | null>(null)
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const thumbScrollReadyRef = useRef(false)
   const onDetailsResolvedRef = useRef(onDetailsResolved)
   onDetailsResolvedRef.current = onDetailsResolved
   const onAdvisorFactsRef = useRef(onAdvisorFacts)
@@ -523,7 +553,7 @@ export function GooglePlacePage({
   const apiKey = getGoogleMapsApiKey()
   const embedSrc = googleMapsEmbedApiUrl(query, apiKey)
   const nameTranslateKey = `${open ? 1 : 0}|${name}|${nameLocal || ''}`
-  const placeResetKey = `${nameTranslateKey}|${tripadvisorContentId || ''}`
+  const placeResetKey = `${nameTranslateKey}|${tripadvisorContentId || ''}|${googlePlaceId || ''}`
   const nameTranslateKeyRef = useRef(nameTranslateKey)
   const placeResetKeyRef = useRef(placeResetKey)
   if (nameTranslateKeyRef.current !== nameTranslateKey) {
@@ -540,6 +570,11 @@ export function GooglePlacePage({
     setTripadvisorInfo(null)
     setTripadvisorResolved(false)
     setTripadvisorDetailsResolved(false)
+    setRapidApiFallbackLoading(false)
+    setRapidApiFallbackResolved(false)
+    setGoogleAddressRefreshing(false)
+    setTripadvisorPhotosRefreshing(false)
+    setTripadvisorRefreshVersion(0)
     setTripadvisorFallbackPhotos([])
     setTripadvisorFallbackResolved(false)
     setWebsitePhotos([])
@@ -555,20 +590,28 @@ export function GooglePlacePage({
     placeType !== 'attraction' &&
     placeType !== 'hotel' &&
     placeType !== 'transport'
-  const skipGoogleLookup =
-    skipProviderLookup || isAttraction || placeType === 'hotel'
-  const googleQuotaExhausted =
-    needsTripadvisorFallback && getGoogleRequestBudgetSnapshot().remaining <= 0
-  const googleDetailsMissing =
-    needsTripadvisorFallback &&
-    googleLookupReady &&
-    !loading &&
-    !details &&
-    !detailsOverride
   const tripadvisorRoute =
-    isAttraction ||
-    googleDetailsMissing ||
-    (googleQuotaExhausted && !detailsOverride && !details)
+    !skipProviderLookup && (isAttraction || needsTripadvisorFallback)
+  // Detail pages are cache-only for Google. Tripadvisor owns live facts and photos.
+  const skipGoogleLookup = true
+  const knownTripadvisorMiss =
+    tripadvisorRoute &&
+    hasRememberedTripadvisorPlaceMiss({
+      name,
+      nameLocal,
+      type: placeType,
+      contentId: tripadvisorContentId,
+    })
+  const tripadvisorMissing =
+    tripadvisorRoute &&
+    (knownTripadvisorMiss || tripadvisorDetailsResolved) &&
+    !tripadvisorHasDetailContent(tripadvisorInfo)
+  const rapidApiReviewFallbackNeeded =
+    tripadvisorRoute &&
+    (knownTripadvisorMiss || tripadvisorDetailsResolved) &&
+    !(tripadvisorInfo?.reviews.length)
+  const rapidApiFallbackActive = tripadvisorMissing
+  const rapidApiReviewsActive = rapidApiReviewFallbackNeeded
   const displayNarrative = llmNarrative
   const tripadvisorCached = peekTripadvisorPlacePhotos(
     name,
@@ -583,18 +626,20 @@ export function GooglePlacePage({
     tripadvisorInfo?.photos || [],
     mergePhotoUrls(tripadvisorFallbackPhotos, tripadvisorCached),
   )
+  const hasTripadvisorPhotos = restaurantTripadvisorAlbum.length > 0
+  const tripadvisorPhotoLookupResolved =
+    knownTripadvisorMiss ||
+    (tripadvisorResolved && (isAttraction || tripadvisorFallbackResolved))
   const restaurantGalleryPhotos = pickRestaurantGalleryPhotos({
     websitePhotos: usableWebsitePhotos,
     tripadvisorPhotos: restaurantTripadvisorAlbum,
-    tripadvisorResolved: tripadvisorFallbackResolved,
+    tripadvisorResolved: tripadvisorPhotoLookupResolved,
   })
   const photoRefs = (
-    tripadvisorRoute
-      ? tripadvisorInfo?.photos.length
-        ? tripadvisorInfo.photos
-        : tripadvisorFallbackPhotos.length
-          ? tripadvisorFallbackPhotos
-          : tripadvisorCached
+    rapidApiFallbackActive
+      ? restaurantGalleryPhotos
+      : tripadvisorRoute
+      ? restaurantGalleryPhotos
       : restaurantGalleryPhotos
   ).slice(0, MAX_GALLERY_PHOTOS)
   const googlePhotos = photoRefs.filter(
@@ -639,10 +684,6 @@ export function GooglePlacePage({
     ? hasCachedTripadvisorGallery(tripadvisorPeekedId)
     : hasCachedTripadvisorGallery(tripadvisorPeekedId, 'restaurant') ||
       hasCachedTripadvisorRestaurantDetails(tripadvisorPeekedId)
-  const hasTripadvisorPhotos =
-    tripadvisorCached.length > 0 ||
-    tripadvisorFallbackPhotos.length > 0 ||
-    Boolean(tripadvisorInfo?.photos.length)
   const hasTripadvisorAlbum =
     hasCachedTripadvisorAlbum ||
     (tripadvisorFallbackResolved && tripadvisorFallbackPhotos.length > 0)
@@ -658,20 +699,15 @@ export function GooglePlacePage({
   const galleryPending =
     galleryVariant !== 'booking' &&
     (tripadvisorRoute
-      ? !tripadvisorResolved && !hasTripadvisorPhotos
-      : !skipGoogleLookup &&
-        !hasTripadvisorAlbum &&
-        (!websitePhotosResolved ||
-          (needsTripadvisorFallback &&
-            websitePhotosNeedTripadvisorFallback(usableWebsitePhotos.length) &&
-            !tripadvisorFallbackResolved)))
+      ? (!tripadvisorPhotoLookupResolved && !hasTripadvisorPhotos) ||
+        (tripadvisorPhotoLookupResolved &&
+          !hasTripadvisorPhotos &&
+          !websitePhotosResolved)
+        : !skipGoogleLookup &&
+          !hasTripadvisorAlbum &&
+          !websitePhotosResolved)
   const awaitingTripadvisorPhotos =
-    galleryPending &&
-    (tripadvisorRoute ||
-      (needsTripadvisorFallback &&
-        websitePhotosResolved &&
-        websitePhotosNeedTripadvisorFallback(usableWebsitePhotos.length) &&
-        !tripadvisorFallbackResolved))
+    galleryPending && tripadvisorRoute
   const displayPhoto =
     awaitingOfficialPhotos || awaitingTripadvisorPhotos ? '' : activePhoto
   const photoSource = resolvePhotoSource({
@@ -687,42 +723,49 @@ export function GooglePlacePage({
     wikimediaUrl: wikimediaPhoto?.url,
   })
   const factsSource: PlaceInfoSource | null =
-    tripadvisorRoute
-      ? tripadvisorHasFacts(tripadvisorInfo)
-        ? 'tripadvisor'
-        : null
-      : details && !skipGoogleLookup
+    rapidApiFallbackActive
+      ? details?.fullDetails
         ? 'google'
         : null
+      : tripadvisorRoute
+        ? tripadvisorHasFacts(tripadvisorInfo)
+          ? 'tripadvisor'
+          : null
+        : details && !skipGoogleLookup
+          ? 'google'
+          : null
   const photoSourcesExhausted =
     galleryVariant !== 'booking' &&
-    needsTripadvisorFallback &&
-    !galleryPending &&
-    survivingGoogle.length === 0
+    tripadvisorRoute &&
+    tripadvisorPhotoLookupResolved &&
+    websitePhotosResolved &&
+    photos.length === 0
   const photoSectionReady =
     !galleryPending && Boolean(displayPhoto) && heroReady
   const showPhotoShimmer = !photoSourcesExhausted && !photoSectionReady
-  const photoFetchStatus = photoFetchStatusLabel({
-    galleryVariant,
-    bookingGalleryPhotosLoading,
-    isAttraction,
-    needsTripadvisorFallback,
-    skipGoogleLookup,
-    googleLookupReady,
-    googleLoading: loading,
-    websitePhotosResolved,
-    usableWebsitePhotos: usableWebsitePhotos.length,
-    tripadvisorResolved,
-    tripadvisorFallbackResolved,
-    hasWebsiteCache: websitePhotoCache.photos.length > 0,
-    hasWebsiteMiss: Boolean(websitePhotoCache.miss),
-    hasTripadvisorCache:
-      hasCachedTripadvisorAlbum || Boolean(tripadvisorInfo?.photos.length),
-    googleDetailsMissing,
-    displayPhoto,
-    heroReady,
-    photoSource,
-  })
+  const photoFetchStatus = rapidApiFallbackLoading
+    ? 'Tripadvisor 无匹配详情，正在读取 Google Place Details…'
+    : photoFetchStatusLabel({
+        galleryVariant,
+        bookingGalleryPhotosLoading,
+        isAttraction,
+        needsTripadvisorFallback,
+        skipGoogleLookup,
+        googleLookupReady,
+        googleLoading: loading,
+        websitePhotosResolved,
+        usableWebsitePhotos: usableWebsitePhotos.length,
+        tripadvisorResolved,
+        tripadvisorFallbackResolved,
+        hasWebsiteCache: websitePhotoCache.photos.length > 0,
+        hasWebsiteMiss: Boolean(websitePhotoCache.miss),
+        hasTripadvisorCache:
+          hasCachedTripadvisorAlbum || Boolean(tripadvisorInfo?.photos.length),
+        googleDetailsMissing: false,
+        displayPhoto,
+        heroReady,
+        photoSource,
+      })
   const displayPhotoRef = useRef(displayPhoto)
   const heroImgRef = useRef<HTMLImageElement>(null)
   if (displayPhotoRef.current !== displayPhoto) {
@@ -731,10 +774,11 @@ export function GooglePlacePage({
   }
   const galleryLength = Math.max(photoRefs.length, photos.length)
   const showThumbStrip = galleryLength > 1
-  const googleMapsPlaceUrl = details?.id
+  const mapsPlaceId = details?.id || googlePlaceId?.replace(/^places\//, '').trim()
+  const googleMapsPlaceUrl = mapsPlaceId
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        details.nameOriginal || details.name || query,
-      )}&query_place_id=${encodeURIComponent(details.id)}`
+        details?.nameOriginal || details?.name || query,
+      )}&query_place_id=${encodeURIComponent(mapsPlaceId)}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 
   function stepPhoto(delta: number) {
@@ -764,6 +808,48 @@ export function GooglePlacePage({
     (galleryVariant === 'booking' &&
       !bookingPhotosFullyLoaded &&
       Boolean(onBookingGalleryAdvance))
+
+  async function refreshCachedGoogleAddress() {
+    const placeId = googlePlaceId?.trim()
+    if (!placeId || googleAddressRefreshing) return
+    setGoogleAddressRefreshing(true)
+    setError(null)
+    try {
+      const refreshed = await refreshGooglePlaceCoreDetailsById(placeId, query)
+      if (!refreshed?.address) {
+        setError('Google 暂未返回可用地址。')
+        return
+      }
+      setDetails(refreshed)
+      onDetailsResolvedRef.current?.(refreshed)
+    } catch {
+      setError('Google 地址刷新失败，请稍后再试。')
+    } finally {
+      setGoogleAddressRefreshing(false)
+    }
+  }
+
+  function refreshTripadvisorPhotos() {
+    if (!tripadvisorRoute || tripadvisorPhotosRefreshing) return
+    invalidateTripadvisorPlaceCache({
+      name,
+      nameLocal,
+      type: placeType,
+      contentId: tripadvisorContentId,
+    })
+    setTripadvisorPhotosRefreshing(true)
+    setTripadvisorInfo(null)
+    setTripadvisorResolved(false)
+    setTripadvisorDetailsResolved(false)
+    setTripadvisorFallbackPhotos([])
+    setTripadvisorFallbackResolved(false)
+    setWebsitePhotos([])
+    setWebsitePhotosResolved(false)
+    setFailedPhotos([])
+    setHeroReady(false)
+    setPhotoIndex(0)
+    setTripadvisorRefreshVersion((version) => version + 1)
+  }
 
   useEffect(() => {
     if (!open || !isAttraction || !location) {
@@ -807,6 +893,9 @@ export function GooglePlacePage({
     setTripadvisorInfo(null)
     setTripadvisorResolved(false)
     setTripadvisorDetailsResolved(false)
+    setRapidApiFallbackLoading(false)
+    setRapidApiFallbackResolved(false)
+    setGoogleAddressRefreshing(false)
     setDetails(null)
     setLoading(false)
     setError(null)
@@ -822,19 +911,25 @@ export function GooglePlacePage({
   }, [displayPhoto])
 
   useEffect(() => {
-    if (!open || skipGoogleLookup || galleryVariant === 'booking' || isAttraction) {
+    if (!open || galleryVariant === 'booking' || !tripadvisorRoute) {
       setWebsitePhotosResolved(true)
       return
     }
-    if (googleLookupReady && !loading && !details) {
+    if (hasTripadvisorPhotos) {
+      setWebsitePhotos([])
       setWebsitePhotosResolved(true)
       return
     }
+    if (!tripadvisorPhotoLookupResolved) {
+      setWebsitePhotosResolved(false)
+      return
+    }
+    const officialWebsite = tripadvisorInfo?.website || details?.website
     const cached = peekCachedPlaceWebsitePhotos({
-      website: details?.website,
+      website: officialWebsite,
       name: details?.name || name,
       nameLocal: details?.nameOriginal || nameLocal,
-      address: details?.address,
+      address: tripadvisorInfo?.address || googleAddress || details?.address,
     })
     if (cached.photos.length) {
       setWebsitePhotos(cached.photos)
@@ -846,14 +941,24 @@ export function GooglePlacePage({
       setWebsitePhotosResolved(true)
       return
     }
-    if (!googleLookupReady || loading) return
+    if (
+      !shouldFetchWebsiteGalleryFallback({
+        usesTripadvisor: tripadvisorRoute,
+        tripadvisorResolved: tripadvisorPhotoLookupResolved,
+        usableTripadvisorPhotoCount: restaurantTripadvisorAlbum.length,
+        hasCachedWebsiteResult: Boolean(cached.photos.length || cached.miss),
+      })
+    ) {
+      setWebsitePhotosResolved(true)
+      return
+    }
     let cancelled = false
     setWebsitePhotosResolved(false)
     void fetchPlaceWebsitePhotosWithFallback({
-      website: details?.website,
+      website: officialWebsite,
       name: details?.name || name,
       nameLocal: details?.nameOriginal || nameLocal,
-      address: details?.address,
+      address: tripadvisorInfo?.address || googleAddress || details?.address,
     })
       .then((result) => {
         if (cancelled || !result.photos.length) return
@@ -868,22 +973,24 @@ export function GooglePlacePage({
     }
   }, [
     open,
-    loading,
+    galleryVariant,
+    tripadvisorRoute,
+    tripadvisorPhotoLookupResolved,
+    hasTripadvisorPhotos,
+    restaurantTripadvisorAlbum.length,
+    tripadvisorInfo?.website,
+    tripadvisorInfo?.address,
     details?.website,
     details?.name,
     details?.nameOriginal,
     details?.address,
     name,
     nameLocal,
-    placeType,
-    skipGoogleLookup,
-    galleryVariant,
-    isAttraction,
-    googleLookupReady,
+    googleAddress,
   ])
 
   useEffect(() => {
-    if (!open || skipGoogleLookup || galleryVariant === 'booking' || isAttraction) {
+    if (!open || !needsTripadvisorFallback || galleryVariant === 'booking') {
       setTripadvisorFallbackResolved(true)
       return
     }
@@ -906,19 +1013,10 @@ export function GooglePlacePage({
       hasCachedTripadvisorGallery(peeked?.contentId, 'restaurant')
     if (cachedPhotos.length) {
       setTripadvisorFallbackPhotos(cachedPhotos)
-    }
-    if (googleLookupReady && !loading && !details) {
+      setTripadvisorFallbackResolved(true)
       return
     }
-    if (loading || !googleLookupReady || !websitePhotosResolved) return
-    if (
-      !shouldFetchTripadvisorGalleryFallback({
-        needsTripadvisorFallback,
-        websitePhotosResolved,
-        usableWebsitePhotoCount: usableWebsitePhotos.length,
-        hasCachedTripadvisorAlbum: hasCachedAlbum,
-      })
-    ) {
+    if (hasCachedAlbum) {
       setTripadvisorFallbackResolved(true)
       return
     }
@@ -944,10 +1042,6 @@ export function GooglePlacePage({
     }
   }, [
     open,
-    loading,
-    googleLookupReady,
-    websitePhotosResolved,
-    usableWebsitePhotos.length,
     needsTripadvisorFallback,
     details?.name,
     details?.nameOriginal,
@@ -956,9 +1050,7 @@ export function GooglePlacePage({
     nameLocal,
     placeType,
     tripadvisorContentId,
-    skipGoogleLookup,
     galleryVariant,
-    isAttraction,
   ])
 
   useEffect(() => {
@@ -968,12 +1060,20 @@ export function GooglePlacePage({
   }, [photos.length])
 
   useEffect(() => {
+    if (!open) {
+      thumbScrollReadyRef.current = false
+      return
+    }
+    if (!thumbScrollReadyRef.current) {
+      thumbScrollReadyRef.current = true
+      return
+    }
     thumbRefs.current[photoIndex]?.scrollIntoView({
       inline: 'nearest',
       block: 'nearest',
       behavior: 'smooth',
     })
-  }, [photoIndex])
+  }, [open, photoIndex])
 
   useEffect(() => {
     if (!open) return
@@ -997,82 +1097,27 @@ export function GooglePlacePage({
 
   useEffect(() => {
     if (!open) return
-    if (detailsOverride) {
-      setDetails(detailsOverride)
-      setLoading(false)
-      setError(null)
-      setGoogleLookupReady(true)
-      return
-    }
-    if (skipGoogleLookup) {
-      setDetails(null)
-      setLoading(false)
-      setError(null)
-      setPhotoIndex(0)
-      setGoogleLookupReady(true)
-      return
-    }
-    let cancelled = false
     const queryLocation =
       location?.lat != null && location?.lng != null
         ? { lat: location.lat, lng: location.lng }
         : undefined
-    const peeked = peekGooglePlaceDetails(name, nameLocal, queryLocation, googlePlaceId)
-    if (peeked) {
-      setDetails(peeked)
-      setLoading(false)
-      setError(null)
-      setPhotoIndex(0)
-      setGoogleLookupReady(true)
-      onDetailsResolvedRef.current?.(peeked)
-      if (hasFullGooglePlaceDetails(peeked)) return
-    }
-
-    setLoading(!peeked)
+    const cached =
+      detailsOverride ||
+      peekGooglePlaceDetails(name, nameLocal, queryLocation, googlePlaceId)
+    setDetails(cached || null)
+    setLoading(false)
     setError(null)
     setPhotoIndex(0)
-    setGoogleLookupReady(false)
-
-    void fetchGooglePlaceDetails(query, queryLocation, {
-      placeId: googlePlaceId,
-      recoverFromLocation: !googlePlaceId && !query,
-      requireFullDetails: true,
-    })
-      .then((result) => {
-        if (cancelled) return
-        if (!result) {
-          const budget = getGoogleRequestBudgetSnapshot()
-          setError(
-            budget.remaining <= 0
-              ? '今日 Google 地点查询次数已用完。已打开过的地点仍可从缓存查看；其余地点改从 Tripadvisor 读取地址、评论与图片。'
-              : '未找到该地点的 Google 详情。',
-          )
-          setDetails(null)
-        } else {
-          setDetails(result)
-          onDetailsResolvedRef.current?.(result)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError('加载地点详情失败，请稍后再试。')
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false)
-          setGoogleLookupReady(true)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, query, googlePlaceId, location?.lat, location?.lng, detailsOverride, skipGoogleLookup])
+    setGoogleLookupReady(true)
+    if (cached) onDetailsResolvedRef.current?.(cached)
+  }, [open, name, nameLocal, googlePlaceId, location?.lat, location?.lng, detailsOverride])
 
   useEffect(() => {
     if (!open) {
       setTripadvisorInfo(null)
       setTripadvisorResolved(true)
       setTripadvisorDetailsResolved(true)
+      setTripadvisorPhotosRefreshing(false)
       return
     }
     if (isAttraction) {
@@ -1088,6 +1133,7 @@ export function GooglePlacePage({
       if (galleryReady && peeked?.reviews.length) {
         setTripadvisorResolved(true)
         setTripadvisorDetailsResolved(true)
+        setTripadvisorPhotosRefreshing(false)
         return
       }
       setTripadvisorResolved(galleryReady)
@@ -1106,26 +1152,17 @@ export function GooglePlacePage({
           if (!cancelled) {
             setTripadvisorResolved(true)
             setTripadvisorDetailsResolved(true)
+            setTripadvisorPhotosRefreshing(false)
           }
         })
       return () => {
         cancelled = true
       }
     }
-    const googleQuotaExhaustedNow = getGoogleRequestBudgetSnapshot().remaining <= 0
-    if (!needsTripadvisorFallback || detailsOverride) {
+    if (!needsTripadvisorFallback) {
       setTripadvisorResolved(true)
       setTripadvisorDetailsResolved(true)
-      return
-    }
-    // Stale Google details from the previous place must not skip Tripadvisor.
-    if (googleLookupReady && !loading && details && !googleQuotaExhaustedNow) {
-      setTripadvisorResolved(true)
-      setTripadvisorDetailsResolved(true)
-      return
-    }
-    const googleMissed = googleLookupReady && !loading && !details
-    if (!googleMissed && !googleQuotaExhaustedNow) {
+      setTripadvisorPhotosRefreshing(false)
       return
     }
     const peeked = peekTripadvisorRestaurantInfo(
@@ -1144,6 +1181,7 @@ export function GooglePlacePage({
       setTripadvisorResolved(true)
       setTripadvisorFallbackResolved(true)
       setTripadvisorDetailsResolved(true)
+      setTripadvisorPhotosRefreshing(false)
       return
     }
     setTripadvisorResolved(false)
@@ -1163,7 +1201,7 @@ export function GooglePlacePage({
       name,
       nameLocal,
       contentId: tripadvisorContentId,
-      address: details?.address,
+      address: googleAddress || details?.address,
       onPreview: (preview) => {
         if (cancelled) return
         if (!preview.photos.length && !tripadvisorHasFacts(preview)) return
@@ -1183,6 +1221,7 @@ export function GooglePlacePage({
         if (cancelled || tripadvisorPlaceKeyRef.current !== expectedKey) return
         setTripadvisorResolved(true)
         setTripadvisorFallbackResolved(true)
+        setTripadvisorPhotosRefreshing(false)
       })
     return () => {
       cancelled = true
@@ -1191,13 +1230,57 @@ export function GooglePlacePage({
     open,
     isAttraction,
     needsTripadvisorFallback,
-    googleLookupReady,
-    loading,
-    details,
-    detailsOverride,
+    googleAddress,
+    details?.address,
     name,
     nameLocal,
     tripadvisorContentId,
+    tripadvisorRefreshVersion,
+  ])
+
+  useEffect(() => {
+    if (!open) {
+      setRapidApiFallbackLoading(false)
+      setRapidApiFallbackResolved(false)
+      return
+    }
+    if (!rapidApiReviewFallbackNeeded) {
+      setRapidApiFallbackLoading(false)
+      setRapidApiFallbackResolved(tripadvisorDetailsResolved)
+      return
+    }
+    const placeId = googlePlaceId?.trim()
+    if (!placeId) {
+      setRapidApiFallbackLoading(false)
+      setRapidApiFallbackResolved(true)
+      return
+    }
+
+    let cancelled = false
+    setRapidApiFallbackLoading(true)
+    setRapidApiFallbackResolved(false)
+    void fetchRapidApiGooglePlaceDetailsById(placeId, query)
+      .then((result) => {
+        if (cancelled || !result) return
+        setDetails(result)
+        onDetailsResolvedRef.current?.(result)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return
+        setRapidApiFallbackLoading(false)
+        setRapidApiFallbackResolved(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    open,
+    rapidApiReviewFallbackNeeded,
+    tripadvisorDetailsResolved,
+    googlePlaceId,
+    query,
   ])
 
   // When Google / trip data has no Chinese display name, LLM-translate the original.
@@ -1264,12 +1347,16 @@ export function GooglePlacePage({
     }
   }, [open, name, nameLocal, details?.name, details?.nameOriginal])
 
-  const advisorReviews = tripadvisorRoute
-    ? tripadvisorInfo?.reviews || []
-    : details?.reviews || []
-  const advisorFactsSettled = tripadvisorRoute
-    ? tripadvisorDetailsResolved
-    : googleLookupReady && !loading
+  const advisorReviews = rapidApiReviewsActive
+    ? details?.reviews || []
+    : tripadvisorRoute
+      ? tripadvisorInfo?.reviews || []
+      : details?.reviews || []
+  const advisorFactsSettled = rapidApiReviewFallbackNeeded
+    ? rapidApiFallbackResolved
+    : tripadvisorRoute
+      ? tripadvisorDetailsResolved
+      : googleLookupReady && !loading
   const advisorReviewsKey = advisorReviews
     .slice(0, 6)
     .map((review) => `${review.rating ?? ''}:${review.text.slice(0, 80)}`)
@@ -1280,18 +1367,31 @@ export function GooglePlacePage({
     const cb = onAdvisorFactsRef.current
     if (!cb) return
     cb({
-      address: tripadvisorRoute
-        ? tripadvisorInfo?.address
-        : details?.address || tripadvisorInfo?.address,
-      description: tripadvisorRoute
-        ? tripadvisorInfo?.description || details?.summary
-        : details?.summary || tripadvisorInfo?.description,
-      rating: tripadvisorRoute ? tripadvisorInfo?.rating : details?.rating,
-      reviewCount: tripadvisorRoute
-        ? tripadvisorInfo?.userRatingCount
-        : details?.userRatingCount,
+      // Prefer the concise Google address captured during itinerary generation.
+      // Tripadvisor sometimes appends entrance/access instructions to its
+      // address field, which should only be a last-resort fallback.
+      address: googleAddress || details?.address || tripadvisorInfo?.address,
+      description: rapidApiFallbackActive
+        ? details?.summary
+        : tripadvisorRoute
+          ? tripadvisorInfo?.description || details?.summary
+          : details?.summary || tripadvisorInfo?.description,
+      rating: rapidApiFallbackActive
+        ? details?.rating
+        : tripadvisorRoute
+          ? tripadvisorInfo?.rating
+          : details?.rating,
+      reviewCount: rapidApiFallbackActive
+        ? details?.userRatingCount
+        : tripadvisorRoute
+          ? tripadvisorInfo?.userRatingCount
+          : details?.userRatingCount,
       priceLevel:
-        (tripadvisorRoute ? tripadvisorInfo?.priceLevel : details?.priceLevel) ||
+        (rapidApiFallbackActive
+          ? details?.priceLevel
+          : tripadvisorRoute
+            ? tripadvisorInfo?.priceLevel
+            : details?.priceLevel) ||
         tripadvisorInfo?.priceLevel ||
         details?.priceLevel,
       cuisine: tripadvisorInfo?.cuisine,
@@ -1306,6 +1406,10 @@ export function GooglePlacePage({
     open,
     advisorFactsSettled,
     advisorReviewsKey,
+    rapidApiFallbackActive,
+    rapidApiReviewFallbackNeeded,
+    rapidApiReviewsActive,
+    rapidApiFallbackResolved,
     tripadvisorRoute,
     tripadvisorInfo?.address,
     tripadvisorInfo?.description,
@@ -1318,6 +1422,7 @@ export function GooglePlacePage({
     details?.rating,
     details?.userRatingCount,
     details?.priceLevel,
+    googleAddress,
   ])
 
   if (!open) return null
@@ -1364,29 +1469,37 @@ export function GooglePlacePage({
   )
   const dialogLabel = showNameLoader
     ? `正在翻译「${originalLabel}」`
-    : `${title || originalLabel} Google 地点页`
+    : `${title || originalLabel} 地点详情`
   const priceLevelLabel = formatPriceLevelLabel(
     isAttraction
       ? undefined
-      : tripadvisorRoute
-        ? tripadvisorInfo?.priceLevel
-        : details?.priceLevel,
+      : rapidApiFallbackActive
+        ? details?.priceLevel
+        : tripadvisorInfo?.priceLevel || details?.priceLevel,
   )
   const displayCuisine =
-    isAttraction || !tripadvisorRoute ? undefined : tripadvisorInfo?.cuisine
-  const displayRating = tripadvisorRoute ? tripadvisorInfo?.rating : details?.rating
-  const displayRatingCount =
-    tripadvisorRoute ? tripadvisorInfo?.userRatingCount : details?.userRatingCount
-  const displayAddress = tripadvisorRoute ? tripadvisorInfo?.address : details?.address
-  const displayPhone = tripadvisorRoute
-    ? tripadvisorInfo?.phone || details?.phone
-    : details?.phone || tripadvisorInfo?.phone
-  const displayWebsite = tripadvisorRoute
-    ? tripadvisorInfo?.website || details?.website
-    : details?.website || tripadvisorInfo?.website
-  const displayReviews = tripadvisorRoute
-    ? tripadvisorInfo?.reviews || []
-    : details?.reviews || []
+    isAttraction || rapidApiFallbackActive ? undefined : tripadvisorInfo?.cuisine
+  const cachedGoogleRating =
+    googleRating ?? details?.rating ?? googleRatingFromHint(googleRatingHint)
+  const cachedGoogleRatingCount =
+    googleRatingCount ?? details?.userRatingCount
+  const displayRating = rapidApiFallbackActive ? undefined : tripadvisorInfo?.rating
+  const displayRatingCount = rapidApiFallbackActive
+    ? undefined
+    : tripadvisorInfo?.userRatingCount
+  const displayAddress =
+    googleAddress ||
+    details?.address ||
+    tripadvisorInfo?.address
+  const displayPhone = rapidApiFallbackActive
+    ? details?.phone
+    : tripadvisorInfo?.phone || details?.phone
+  const displayWebsite = rapidApiFallbackActive
+    ? details?.website
+    : tripadvisorInfo?.website || details?.website
+  const displayReviews = rapidApiReviewsActive
+    ? details?.reviews || []
+    : tripadvisorInfo?.reviews || []
   const tripadvisorLoading = tripadvisorPlaceLoadingSlices({
     detailsResolved: tripadvisorDetailsResolved,
     photoCount: galleryLength,
@@ -1413,8 +1526,8 @@ export function GooglePlacePage({
     !providerOwnsSummary && tripadvisorRoute && tripadvisorLoading.address
   const showTripadvisorReviewsShimmer =
     reviewsSection === undefined &&
-    tripadvisorRoute &&
-    tripadvisorLoading.reviews
+    ((rapidApiReviewsActive && rapidApiFallbackLoading) ||
+      (tripadvisorRoute && !rapidApiReviewsActive && tripadvisorLoading.reviews))
   const reviewsBlock =
     reviewsSection !== undefined
       ? reviewsSection
@@ -1423,9 +1536,19 @@ export function GooglePlacePage({
             <GoogleReviewsList
               reviews={displayReviews}
               sourceLabel={
-                tripadvisorRoute ? 'Tripadvisor 评论' : reviewSourceLabel
+                rapidApiReviewsActive
+                  ? 'Google 评论'
+                  : tripadvisorRoute
+                    ? 'Tripadvisor 评论'
+                    : reviewSourceLabel
               }
-              source={tripadvisorRoute ? 'tripadvisor' : 'google'}
+              source={
+                rapidApiReviewsActive
+                  ? 'google'
+                  : tripadvisorRoute
+                    ? 'tripadvisor'
+                    : 'google'
+              }
             />
           )
         : showTripadvisorReviewsShimmer
@@ -1484,24 +1607,7 @@ export function GooglePlacePage({
                   title="非公认中文名，由 AI 翻译"
                   aria-label="非公认中文名，由 AI 翻译"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="m5 8 6 6" />
-                    <path d="m4 14 6-6 2-3" />
-                    <path d="M2 5h12" />
-                    <path d="M7 2h1" />
-                    <path d="m22 22-5-10-5 10" />
-                    <path d="M14 18h6" />
-                  </svg>
+                  <Languages size={14} strokeWidth={1.75} aria-hidden />
                 </span>
               )}
             </div>
@@ -1516,6 +1622,7 @@ export function GooglePlacePage({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
           aria-busy={
             loading ||
+            rapidApiFallbackLoading ||
             (isAttraction && !tripadvisorResolved && !tripadvisorInfo) ||
             (tripadvisorRoute && !tripadvisorDetailsResolved) ||
             undefined
@@ -1526,17 +1633,9 @@ export function GooglePlacePage({
           {(displayPhoto ||
             awaitingOfficialPhotos ||
             awaitingTripadvisorPhotos ||
-            photoSourcesExhausted ||
             (!needsTripadvisorFallback && Boolean(fallbackImage))) && (
             <div className="space-y-2">
-              <div
-                className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  photoSourcesExhausted
-                    ? 'pointer-events-none grid-rows-[0fr] opacity-0'
-                    : 'grid-rows-[1fr] opacity-100'
-                }`}
-                aria-hidden={photoSourcesExhausted || undefined}
-              >
+              <div className="grid grid-rows-[1fr] opacity-100">
               <div className="min-h-0 overflow-hidden">
               <div
                 className="relative h-56 overflow-hidden rounded-2xl bg-[var(--mist)] select-none sm:h-72"
@@ -1631,6 +1730,24 @@ export function GooglePlacePage({
                       <PlaceSourceMark source={photoSource} onPhoto />
                     </span>
                   )}
+                {tripadvisorRoute && galleryVariant !== 'booking' && (
+                  <button
+                    type="button"
+                    aria-label="重新获取 Tripadvisor 图片"
+                    title="重新获取 Tripadvisor 图片"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={refreshTripadvisorPhotos}
+                    disabled={tripadvisorPhotosRefreshing}
+                    className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/65 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <RefreshCw
+                      size={16}
+                      strokeWidth={2.2}
+                      className={tripadvisorPhotosRefreshing ? 'animate-spin' : undefined}
+                      aria-hidden
+                    />
+                  </button>
+                )}
                 {showGalleryNav && (
                   <>
                     <button
@@ -1640,9 +1757,7 @@ export function GooglePlacePage({
                       disabled={galleryLength < 2}
                       className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-40"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M15 18l-6-6 6-6" />
-                      </svg>
+                      <ChevronLeft size={16} strokeWidth={2.2} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -1651,9 +1766,7 @@ export function GooglePlacePage({
                       disabled={bookingGalleryPhotosLoading}
                       className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:opacity-60"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M9 18l6-6-6-6" />
-                      </svg>
+                      <ChevronRight size={16} strokeWidth={2.2} aria-hidden />
                     </button>
                     <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
                       {photoIndex + 1} / {galleryLength}
@@ -1667,7 +1780,7 @@ export function GooglePlacePage({
                 )}
               </div>
               {showPhotoShimmer ? (
-                <div className="space-y-1">
+                <div className="mt-2 space-y-1">
                   <div className="flex gap-2 overflow-hidden" aria-hidden>
                     {Array.from({ length: 9 }, (_, i) => (
                       <span
@@ -1679,7 +1792,7 @@ export function GooglePlacePage({
                   <p className="text-xs text-[var(--stone)]">正在加载照片…</p>
                 </div>
               ) : showThumbStrip ? (
-                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {photoRefs.map((ref, i) => {
                     const url = isUsablePhotoHttp(ref) ? ref : undefined
                     return (
@@ -1703,7 +1816,7 @@ export function GooglePlacePage({
                   })}
                 </div>
               ) : showMorePhotoShimmer ? (
-                <div className="space-y-1">
+                <div className="mt-2 space-y-1">
                   <div
                     className="flex gap-2 overflow-hidden"
                     aria-busy
@@ -1741,44 +1854,31 @@ export function GooglePlacePage({
               )}
               </div>
               </div>
-              <div
-                className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  photoSourcesExhausted
-                    ? 'grid-rows-[1fr] opacity-100'
-                    : 'pointer-events-none grid-rows-[0fr] opacity-0'
-                }`}
-                aria-hidden={!photoSourcesExhausted || undefined}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  <a
-                    href={googleMapsPlaceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    tabIndex={photoSourcesExhausted ? undefined : -1}
-                    className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-[var(--sage)]/40 bg-[var(--sage)]/10 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/15"
-                  >
-                    在 Google 地图查看图片
-                    <span aria-hidden>↗</span>
-                  </a>
-                </div>
-              </div>
             </div>
           )}
 
-          {!providerOwnsSummary && (displayRating != null || priceLevelLabel || displayPhone || displayWebsite || displayCuisine || showTripadvisorChipShimmer) && (
+          {!providerOwnsSummary && (cachedGoogleRating != null || displayRating != null || priceLevelLabel || displayPhone || displayWebsite || displayCuisine || showTripadvisorChipShimmer) && (
             <div className="space-y-1">
             <div className="flex flex-wrap gap-2 text-sm">
+            {cachedGoogleRating != null && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
+                title="生成行程时缓存的 Google 评分"
+              >
+                <PlaceSourceMark source="google" />
+                <span>★ {cachedGoogleRating.toFixed(1)}</span>
+                {cachedGoogleRatingCount != null ? `（${cachedGoogleRatingCount}）` : ''}
+              </span>
+            )}
             {tripadvisorLoading.rating && showTripadvisorChipShimmer && (
               <PlaceChipShimmer label="评分" />
             )}
             {displayRating != null && (
               <span
                 className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
-                title={factsSource ? `评分来自 ${placeSourceLabel(factsSource)}` : undefined}
+                title="Tripadvisor 评分"
               >
-                {factsSource && (factsSource === 'google' || factsSource === 'tripadvisor') ? (
-                  <PlaceSourceMark source={factsSource} showLabel={false} />
-                ) : null}
+                <PlaceSourceMark source="tripadvisor" />
                 <span className="sr-only">
                   {factsSource ? `${placeSourceLabel(factsSource)} 评分 ` : '评分 '}
                 </span>
@@ -1812,18 +1912,45 @@ export function GooglePlacePage({
               </a>
             )}
           </div>
-            {showTripadvisorChipShimmer ? (
-              <p className="text-xs text-[var(--stone)]">
-                {tripadvisorChipLoadingText(tripadvisorLoading)}
-              </p>
-            ) : null}
           </div>
           )}
 
           {!providerOwnsSummary && displayAddress && (
-              <p className="text-sm text-[var(--stone)]">
-                {displayAddress}
-              </p>
+            <div className="flex max-w-full items-center gap-1.5">
+              <a
+                href={googleMapsPlaceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1 text-sm text-[var(--stone)] transition-colors hover:text-[var(--sage)]"
+                title="在 Google 地图中查看"
+              >
+                <MapPin size={14} strokeWidth={1.9} className="shrink-0" aria-hidden />
+                <span className="min-w-0 leading-snug">{displayAddress}</span>
+                <ExternalLink
+                  size={14}
+                  strokeWidth={1.9}
+                  className="ml-0.5 shrink-0 text-[var(--stone)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </a>
+              {!googleAddress && googlePlaceId && (
+                <button
+                  type="button"
+                  onClick={() => void refreshCachedGoogleAddress()}
+                  disabled={googleAddressRefreshing}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center text-[var(--stone)] transition-colors hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+                  title="刷新并缓存 Google 地址"
+                  aria-label="刷新并缓存 Google 地址"
+                >
+                  <RefreshCw
+                    size={17}
+                    strokeWidth={1.9}
+                    className={googleAddressRefreshing ? 'animate-spin' : undefined}
+                    aria-hidden
+                  />
+                </button>
+              )}
+            </div>
             )}
           {!providerOwnsSummary && showTripadvisorAddressShimmer && (
             <div className="space-y-1" aria-busy>
@@ -1855,25 +1982,16 @@ export function GooglePlacePage({
                         title={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
                         onClick={displayNarrative.onRegenerate}
                       >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                        <RotateCw
+                          size={13}
+                          strokeWidth={2.2}
                           className={
                             displayNarrative.regenerating || displayNarrative.loading
                               ? 'animate-spin'
                               : undefined
                           }
                           aria-hidden
-                        >
-                          <path d="M21 12a9 9 0 1 1-2.6-6.3" />
-                          <path d="M21 3v6h-6" />
-                        </svg>
+                        />
                       </button>
                     )}
                 </div>
@@ -1964,7 +2082,8 @@ export function GooglePlacePage({
 
           {reviewsBlock}
 
-          {!tripadvisorRoute && reviewsSection === undefined && details &&
+          {(!tripadvisorRoute || rapidApiReviewsActive) &&
+            reviewsSection === undefined && details &&
             !loading &&
             !details.reviews.length &&
             (details.userRatingCount || 0) > 0 && (
@@ -1985,7 +2104,7 @@ export function GooglePlacePage({
                       className="mt-1.5 inline-flex items-center gap-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
                     >
                       在 Google 地图查看评价
-                      <span aria-hidden>↗</span>
+                      <ExternalLink size={13} strokeWidth={1.9} aria-hidden />
                     </a>
                   )}
                 </div>

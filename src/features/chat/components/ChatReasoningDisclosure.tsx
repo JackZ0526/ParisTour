@@ -6,57 +6,18 @@
  * the stored one owns its own disclosure state.
  */
 import { useState } from 'react'
+import { Check, ChevronRight, Sparkles } from 'lucide-react'
 
 function DisclosureChevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 20 20"
-      className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${
-        open ? 'rotate-90' : ''
-      }`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m7 4.5 5.5 5.5L7 15.5" />
-    </svg>
-  )
+  return <ChevronRight aria-hidden strokeWidth={1.6} className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${open ? 'rotate-90' : ''}`} />
 }
 
 function CompletedCheckIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m5 12.5 4.2 4.2L19 7" />
-    </svg>
-  )
+  return <Check aria-hidden className="h-4 w-4" strokeWidth={2} />
 }
 
 function ThinkingSparkleIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-4 w-4 animate-pulse"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3Z" />
-      <path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" />
-    </svg>
-  )
+  return <Sparkles aria-hidden className="h-4 w-4 animate-pulse" strokeWidth={1.8} />
 }
 
 export function ChatReasoningDisclosure({

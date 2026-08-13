@@ -55,6 +55,8 @@ import {
   Bell,
   Building2,
   Check,
+  ChevronDown,
+  CircleMinus,
   CircleParking,
   CigaretteOff,
   Coffee,
@@ -72,6 +74,7 @@ import {
   Snowflake,
   Sparkles,
   Trees,
+  Trash2,
   Tv,
   Utensils,
   WashingMachine,
@@ -204,62 +207,21 @@ function HotelCardFace({
 }
 
 function TrashIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  )
+  return <Trash2 size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function UnselectIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M8 12h8" />
-    </svg>
-  )
+  return <CircleMinus size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function ChevronIcon({ up }: { up?: boolean }) {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <ChevronDown
+      size={14}
+      strokeWidth={1.8}
       aria-hidden
       className={`transition-transform duration-300 ${up ? 'rotate-180' : ''}`}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
+    />
   )
 }
 

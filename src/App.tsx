@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
 import { useAuth } from './features/auth/AuthProvider'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
@@ -479,21 +480,7 @@ export default function App() {
               title="存档"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <rect x="3" y="4" width="18" height="4" rx="1" />
-                <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
-                <path d="M10 12h4" />
-              </svg>
+              <Archive size={17} strokeWidth={1.8} aria-hidden />
             </button>
           )}
           {role === 'owner' && activeTrip && (
@@ -507,22 +494,7 @@ export default function App() {
               title="分享"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <circle cx="18" cy="5" r="2.5" />
-                <circle cx="6" cy="12" r="2.5" />
-                <circle cx="18" cy="19" r="2.5" />
-                <path d="M8.3 10.8 15.7 6.2M8.3 13.2l7.4 4.6" />
-              </svg>
+              <Share2 size={17} strokeWidth={1.8} aria-hidden />
             </button>
           )}
           {!readOnly && (
@@ -533,22 +505,7 @@ export default function App() {
               title="清空全部"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M3 6h18" />
-                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
-                <path d="M19 6v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
-                <path d="M10 11v6M14 11v6" />
-              </svg>
+              <Trash2 size={17} strokeWidth={1.8} aria-hidden />
             </button>
           )}
           <button
@@ -560,21 +517,7 @@ export default function App() {
             title="退出"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
           >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
-              <path d="M16 8l4 4-4 4" />
-              <path d="M9 12h11" />
-            </svg>
+            <LogOut size={17} strokeWidth={1.8} aria-hidden />
           </button>
         </div>
       </div>
@@ -732,21 +675,7 @@ export default function App() {
                     title="恢复默认推荐"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
                   >
-                    <svg
-                      width="17"
-                      height="17"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                      <path d="M3 3v5h5" />
-                      <path d="M12 7v5l3 2" />
-                    </svg>
+                    <History size={17} strokeWidth={1.8} aria-hidden />
                   </button>
                 )}
                 <button
@@ -756,24 +685,7 @@ export default function App() {
                   title="重新生成全部"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
                 >
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="m14.5 4.5 5 5L8 21H3v-5L14.5 4.5Z" />
-                    <path d="m11.5 7.5 5 5" />
-                    <path d="M5 3v4" />
-                    <path d="M3 5h4" />
-                    <path d="M19 16v4" />
-                    <path d="M17 18h4" />
-                  </svg>
+                  <Sparkles size={17} strokeWidth={1.8} aria-hidden />
                 </button>
                   </>
                 )}
@@ -1008,7 +920,7 @@ export default function App() {
 
         <footer className="rounded-2xl border border-white/60 bg-[var(--card)] px-4 py-5 text-sm text-[var(--stone)]">
           <p>
-            航班与营业信息会变动；餐厅评分以 Google Maps 实时为准。自驾日请确认低排放区（Crit’Air）与租车保险。
+            航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
           </p>
         </footer>
       </main>

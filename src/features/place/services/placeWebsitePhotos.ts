@@ -118,16 +118,19 @@ function remember(
   const stored: PlaceWebsitePhotos = result.photos.length
     ? { photos: result.photos, instagram: result.instagram || null }
     : { photos: [], miss: true, instagram: result.instagram || null }
-  if (website?.trim()) {
-    for (const key of websiteCacheKeys(website)) {
-      memory.set(key, stored)
-      setLlmArtifact(key, stored, { silent: true })
-    }
-  }
-  for (const key of placeIndexKeys(aliases?.name, aliases?.nameLocal)) {
+  const keys = [
+    ...(website?.trim() ? websiteCacheKeys(website) : []),
+    ...placeIndexKeys(aliases?.name, aliases?.nameLocal),
+  ]
+  for (const key of keys) {
     memory.set(key, stored)
-    setLlmArtifact(key, stored, { silent: true })
   }
+  if (!keys.length) return
+  setLlmArtifact(keys[0], stored, {
+    aliases: keys.slice(1),
+    // Persist confirmed misses to the trip snapshot so refreshes do not retry.
+    silent: !stored.miss,
+  })
 }
 
 export function peekPlaceWebsitePhotos(website?: string): string[] {

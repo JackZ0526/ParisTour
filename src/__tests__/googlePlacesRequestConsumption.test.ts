@@ -7,6 +7,8 @@ vi.mock('../features/auth/services/authFetch', () => ({ authFetch }))
 import {
   fetchGooglePlaceDetails,
   fetchGooglePlacePhotoMedia,
+  fetchRapidApiGooglePlaceDetailsById,
+  refreshGooglePlaceCoreDetailsById,
   resetGooglePlaceDetailsCacheForTests,
   searchNearbyGooglePlaceCandidates,
 } from '../features/map/services/googlePlaceDetails'
@@ -133,6 +135,58 @@ describe('current Places request consumption', () => {
       'place-search': 1,
       'place-details': 1,
     })
+  })
+
+  it('uses exactly one RapidAPI New V2 details request for a Tripadvisor miss', async () => {
+    authFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'ChIJ-fallback',
+          displayName: { text: 'Fallback Café', languageCode: 'fr' },
+          formattedAddress: 'Paris, France',
+          rating: 4.6,
+          photos: [{ photoUri: 'https://images.test/fallback.jpg' }],
+          reviews: [{ text: { text: 'Excellent.' }, rating: 5 }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    const first = await fetchRapidApiGooglePlaceDetailsById(
+      'ChIJ-fallback',
+      'Fallback Café Paris',
+    )
+    const again = await fetchRapidApiGooglePlaceDetailsById(
+      'ChIJ-fallback',
+      'Fallback Café Paris',
+    )
+
+    expect(first?.photos).toEqual([])
+    expect(first?.reviews[0]?.text).toBe('Excellent.')
+    expect(again?.reviews[0]?.text).toBe('Excellent.')
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expect(authFetch.mock.calls[0][0]).toContain('languageCode=en')
+    expect(authFetch.mock.calls[0][0]).toContain('detailsMode=reviews')
+    expect(authFetch.mock.calls[0][0]).toContain('provider=rapidapi-new')
+    expect(authFetch.mock.calls[0][0]).not.toContain('searchText')
+    expect(getGoogleRequestBudgetSnapshot().byKind).toEqual({
+      'place-details': 1,
+    })
+  })
+
+  it('manually refreshes a legacy cached address with one core details request', async () => {
+    authFetch.mockResolvedValue(detailsResponse('ChIJ-legacy-address', 'Grand Palais'))
+
+    const refreshed = await refreshGooglePlaceCoreDetailsById(
+      'ChIJ-legacy-address',
+      'Grand Palais Paris',
+    )
+
+    expect(refreshed?.address).toBe('Paris, France')
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expect(authFetch.mock.calls[0][0]).toContain('v1%2Fplaces%2FChIJ-legacy-address')
+    expect(authFetch.mock.calls[0][0]).not.toContain('detailsMode=')
+    expect(authFetch.mock.calls[0][0]).not.toContain('searchText')
   })
 
   it('uses 1 Text Search per nearby candidate query (cafe + restaurant = 2)', async () => {

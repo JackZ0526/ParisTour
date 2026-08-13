@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  tripadvisorChipLoadingText,
-  tripadvisorPlaceLoadingSlices,
-} from '../features/place/services/tripadvisorPlaceLoading'
+import { tripadvisorPlaceLoadingSlices } from '../features/place/services/tripadvisorPlaceLoading'
 
 describe('tripadvisorPlaceLoadingSlices', () => {
   const pending = {
@@ -75,14 +72,5 @@ describe('tripadvisorPlaceLoadingSlices', () => {
       address: false,
       reviews: false,
     })
-  })
-
-  it('names only the chips that will actually render', () => {
-    expect(
-      tripadvisorChipLoadingText({ rating: true, price: false, cuisine: false }),
-    ).toBe('正在加载评分…')
-    expect(
-      tripadvisorChipLoadingText({ rating: true, price: true, cuisine: true }),
-    ).toBe('正在加载评分、价格与菜系…')
   })
 })
