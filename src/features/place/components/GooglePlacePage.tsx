@@ -22,9 +22,10 @@ import {
   peekTripadvisorAttractionInfo,
   peekTripadvisorPlacePhotos,
   peekTripadvisorRestaurantInfo,
+  MAX_GALLERY_PHOTOS,
   type TripadvisorAttractionInfo,
 } from '../services/tripadvisorPlacePhotos'
-import { tripadvisorPlaceLoadingSlices } from '../services/tripadvisorPlaceLoading'
+import { tripadvisorChipLoadingText, tripadvisorPlaceLoadingSlices } from '../services/tripadvisorPlaceLoading'
 import {
   pickRestaurantGalleryPhotos,
   shouldFetchTripadvisorGalleryFallback,
@@ -43,6 +44,7 @@ import {
   translatePlaceNameToChinese,
 } from '../../chat/services/translate'
 import type { Coordinates, PlaceType } from '../../../types'
+import type { PlaceAdvisorFacts } from '../services/placeAdvisorFacts'
 import { placeOriginalLabel, placeTitleLines } from '../../../shared/utils/placeTitle'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
@@ -126,6 +128,8 @@ interface Props {
   overlayZIndex?: number
   /** Persist a recovered Google identity in the owning trip record. */
   onDetailsResolved?: (details: GooglePlaceDetails) => void
+  /** Listing facts for 行程顾问点评 once Google / Tripadvisor details settle. */
+  onAdvisorFacts?: (facts: PlaceAdvisorFacts) => void
   onClose: () => void
 }
 
@@ -482,6 +486,7 @@ export function GooglePlacePage({
   overlayClassName = 'z-[2000]',
   overlayZIndex,
   onDetailsResolved,
+  onAdvisorFacts,
   onClose,
 }: Props) {
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
@@ -510,6 +515,8 @@ export function GooglePlacePage({
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
   const onDetailsResolvedRef = useRef(onDetailsResolved)
   onDetailsResolvedRef.current = onDetailsResolved
+  const onAdvisorFactsRef = useRef(onAdvisorFacts)
+  onAdvisorFactsRef.current = onAdvisorFacts
 
   const query = placeDetailsQuery(name, nameLocal)
   const apiKey = getGoogleMapsApiKey()
@@ -562,14 +569,6 @@ export function GooglePlacePage({
     googleDetailsMissing ||
     (googleQuotaExhausted && !detailsOverride && !details)
   const displayNarrative = llmNarrative
-    ? {
-        ...llmNarrative,
-        intro:
-          isAttraction && tripadvisorInfo?.description
-            ? tripadvisorInfo.description
-            : llmNarrative.intro,
-      }
-    : null
   const tripadvisorCached = peekTripadvisorPlacePhotos(
     name,
     nameLocal,
@@ -588,27 +587,28 @@ export function GooglePlacePage({
     tripadvisorPhotos: restaurantTripadvisorAlbum,
     tripadvisorResolved: tripadvisorFallbackResolved,
   })
-  const photoRefs =
+  const photoRefs = (
     tripadvisorRoute
       ? tripadvisorInfo?.photos.length
         ? tripadvisorInfo.photos
         : tripadvisorFallbackPhotos.length
           ? tripadvisorFallbackPhotos
           : tripadvisorCached
-      : restaurantGalleryPhotos.length
-        ? restaurantGalleryPhotos
-        : (details?.photos || []).filter(isUsablePhotoHttp)
+      : restaurantGalleryPhotos
+  ).slice(0, MAX_GALLERY_PHOTOS)
   const googlePhotos = photoRefs.filter(
     (url) => isUsablePhotoHttp(url) && !failedPhotos.includes(url),
   )
   const survivingGoogle = googlePhotos.filter((url) => !failedPhotos.includes(url))
   const rawPhotos = survivingGoogle.length
     ? survivingGoogle
-    : wikimediaPhoto?.url
-      ? [wikimediaPhoto.url]
-      : fallbackImage
-        ? [fallbackImage]
-        : []
+    : needsTripadvisorFallback
+      ? []
+      : wikimediaPhoto?.url
+        ? [wikimediaPhoto.url]
+        : fallbackImage
+          ? [fallbackImage]
+          : []
   const photos = rawPhotos.filter((url) => !failedPhotos.includes(url))
   const currentRef = photoRefs[photoIndex]
   const currentResolved =
@@ -620,9 +620,9 @@ export function GooglePlacePage({
       ? currentResolved
       : null) ||
     photos[0] ||
-    wikimediaPhoto?.url ||
-    fallbackImage ||
-    ''
+    (needsTripadvisorFallback
+      ? ''
+      : wikimediaPhoto?.url || fallbackImage || '')
   const websitePhotoCache = peekCachedPlaceWebsitePhotos({
     website: details?.website,
     name: details?.name || name,
@@ -693,8 +693,14 @@ export function GooglePlacePage({
       : details && !skipGoogleLookup
         ? 'google'
         : null
-  const photoSectionReady = !galleryPending && Boolean(displayPhoto) && heroReady
-  const showPhotoShimmer = !photoSectionReady
+  const photoSourcesExhausted =
+    galleryVariant !== 'booking' &&
+    needsTripadvisorFallback &&
+    !galleryPending &&
+    survivingGoogle.length === 0
+  const photoSectionReady =
+    !galleryPending && Boolean(displayPhoto) && heroReady
+  const showPhotoShimmer = !photoSourcesExhausted && !photoSectionReady
   const photoFetchStatus = photoFetchStatusLabel({
     galleryVariant,
     bookingGalleryPhotosLoading,
@@ -728,7 +734,7 @@ export function GooglePlacePage({
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         details.nameOriginal || details.name || query,
       )}&query_place_id=${encodeURIComponent(details.id)}`
-    : null
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 
   function stepPhoto(delta: number) {
     if (delta < 0) {
@@ -1074,12 +1080,15 @@ export function GooglePlacePage({
         tripadvisorContentId,
       )
       if (peeked) setTripadvisorInfo(peeked)
-      if (peeked && hasCachedTripadvisorGallery(peeked.contentId)) {
+      const galleryReady = Boolean(
+        peeked && hasCachedTripadvisorGallery(peeked.contentId),
+      )
+      if (galleryReady && peeked?.reviews.length) {
         setTripadvisorResolved(true)
         setTripadvisorDetailsResolved(true)
         return
       }
-      setTripadvisorResolved(false)
+      setTripadvisorResolved(galleryReady)
       setTripadvisorDetailsResolved(false)
       let cancelled = false
       void fetchTripadvisorAttractionInfo({
@@ -1253,6 +1262,62 @@ export function GooglePlacePage({
     }
   }, [open, name, nameLocal, details?.name, details?.nameOriginal])
 
+  const advisorReviews = tripadvisorRoute
+    ? tripadvisorInfo?.reviews || []
+    : details?.reviews || []
+  const advisorFactsSettled = tripadvisorRoute
+    ? tripadvisorDetailsResolved
+    : googleLookupReady && !loading
+  const advisorReviewsKey = advisorReviews
+    .slice(0, 6)
+    .map((review) => `${review.rating ?? ''}:${review.text.slice(0, 80)}`)
+    .join('|')
+
+  useEffect(() => {
+    if (!open) return
+    const cb = onAdvisorFactsRef.current
+    if (!cb) return
+    cb({
+      address: tripadvisorRoute
+        ? tripadvisorInfo?.address
+        : details?.address || tripadvisorInfo?.address,
+      description: tripadvisorRoute
+        ? tripadvisorInfo?.description || details?.summary
+        : details?.summary || tripadvisorInfo?.description,
+      rating: tripadvisorRoute ? tripadvisorInfo?.rating : details?.rating,
+      reviewCount: tripadvisorRoute
+        ? tripadvisorInfo?.userRatingCount
+        : details?.userRatingCount,
+      priceLevel:
+        (tripadvisorRoute ? tripadvisorInfo?.priceLevel : details?.priceLevel) ||
+        tripadvisorInfo?.priceLevel ||
+        details?.priceLevel,
+      cuisine: tripadvisorInfo?.cuisine,
+      reviews: advisorReviews.slice(0, 6).map((review) => ({
+        text: review.text,
+        rating: review.rating,
+        author: review.author,
+      })),
+      settled: advisorFactsSettled,
+    })
+  }, [
+    open,
+    advisorFactsSettled,
+    advisorReviewsKey,
+    tripadvisorRoute,
+    tripadvisorInfo?.address,
+    tripadvisorInfo?.description,
+    tripadvisorInfo?.rating,
+    tripadvisorInfo?.userRatingCount,
+    tripadvisorInfo?.priceLevel,
+    tripadvisorInfo?.cuisine,
+    details?.address,
+    details?.summary,
+    details?.rating,
+    details?.userRatingCount,
+    details?.priceLevel,
+  ])
+
   if (!open) return null
 
   const originalLabel = placeOriginalLabel(
@@ -1299,9 +1364,14 @@ export function GooglePlacePage({
     ? `正在翻译「${originalLabel}」`
     : `${title || originalLabel} Google 地点页`
   const priceLevelLabel = formatPriceLevelLabel(
-    tripadvisorRoute ? tripadvisorInfo?.priceLevel : details?.priceLevel,
+    isAttraction
+      ? undefined
+      : tripadvisorRoute
+        ? tripadvisorInfo?.priceLevel
+        : details?.priceLevel,
   )
-  const displayCuisine = tripadvisorRoute ? tripadvisorInfo?.cuisine : undefined
+  const displayCuisine =
+    isAttraction || !tripadvisorRoute ? undefined : tripadvisorInfo?.cuisine
   const displayRating = tripadvisorRoute ? tripadvisorInfo?.rating : details?.rating
   const displayRatingCount =
     tripadvisorRoute ? tripadvisorInfo?.userRatingCount : details?.userRatingCount
@@ -1323,6 +1393,8 @@ export function GooglePlacePage({
     hasCuisine: Boolean(displayCuisine),
     hasAddress: Boolean(displayAddress),
     reviewCount: displayReviews.length,
+    expectPrice: !isAttraction,
+    expectCuisine: !isAttraction,
   })
   const showMorePhotoShimmer =
     tripadvisorRoute &&
@@ -1341,6 +1413,22 @@ export function GooglePlacePage({
     reviewsSection === undefined &&
     tripadvisorRoute &&
     tripadvisorLoading.reviews
+  const reviewsBlock =
+    reviewsSection !== undefined
+      ? reviewsSection
+      : displayReviews.length
+        ? (
+            <GoogleReviewsList
+              reviews={displayReviews}
+              sourceLabel={
+                tripadvisorRoute ? 'Tripadvisor 评论' : reviewSourceLabel
+              }
+              source={tripadvisorRoute ? 'tripadvisor' : 'google'}
+            />
+          )
+        : showTripadvisorReviewsShimmer
+          ? <PlaceReviewsShimmer />
+          : null
 
   return createPortal(
     <div
@@ -1436,8 +1524,18 @@ export function GooglePlacePage({
           {(displayPhoto ||
             awaitingOfficialPhotos ||
             awaitingTripadvisorPhotos ||
-            fallbackImage) && (
+            photoSourcesExhausted ||
+            (!needsTripadvisorFallback && Boolean(fallbackImage))) && (
             <div className="space-y-2">
+              <div
+                className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  photoSourcesExhausted
+                    ? 'pointer-events-none grid-rows-[0fr] opacity-0'
+                    : 'grid-rows-[1fr] opacity-100'
+                }`}
+                aria-hidden={photoSourcesExhausted || undefined}
+              >
+              <div className="min-h-0 overflow-hidden">
               <div
                 className="relative h-56 overflow-hidden rounded-2xl bg-[var(--mist)] select-none sm:h-72"
                 aria-busy={showPhotoShimmer || undefined}
@@ -1639,6 +1737,96 @@ export function GooglePlacePage({
               {bookingGalleryPhotosError && !bookingGalleryPhotosLoading && (
                 <p className="text-xs text-amber-800">{bookingGalleryPhotosError}</p>
               )}
+              </div>
+              </div>
+              <div
+                className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  photoSourcesExhausted
+                    ? 'grid-rows-[1fr] opacity-100'
+                    : 'pointer-events-none grid-rows-[0fr] opacity-0'
+                }`}
+                aria-hidden={!photoSourcesExhausted || undefined}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <a
+                    href={googleMapsPlaceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    tabIndex={photoSourcesExhausted ? undefined : -1}
+                    className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-[var(--sage)]/40 bg-[var(--sage)]/10 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/15"
+                  >
+                    在 Google 地图查看图片
+                    <span aria-hidden>↗</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!providerOwnsSummary && (displayRating != null || priceLevelLabel || displayPhone || displayWebsite || displayCuisine || showTripadvisorChipShimmer) && (
+            <div className="space-y-1">
+            <div className="flex flex-wrap gap-2 text-sm">
+            {tripadvisorLoading.rating && showTripadvisorChipShimmer && (
+              <PlaceChipShimmer label="评分" />
+            )}
+            {displayRating != null && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
+                title={factsSource ? `评分来自 ${placeSourceLabel(factsSource)}` : undefined}
+              >
+                {factsSource && (factsSource === 'google' || factsSource === 'tripadvisor') ? (
+                  <PlaceSourceMark source={factsSource} showLabel={false} />
+                ) : null}
+                <span className="sr-only">
+                  {factsSource ? `${placeSourceLabel(factsSource)} 评分 ` : '评分 '}
+                </span>
+                ★ {displayRating.toFixed(1)}
+                {displayRatingCount != null ? `（${displayRatingCount}）` : ''}
+              </span>
+            )}
+            {tripadvisorLoading.price && showTripadvisorChipShimmer && (
+              <PlaceChipShimmer label="价格" />
+            )}
+            {priceLevelLabel && (
+              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{priceLevelLabel}</span>
+            )}
+            {tripadvisorLoading.cuisine && showTripadvisorChipShimmer && (
+              <PlaceChipShimmer label="菜系" />
+            )}
+            {displayCuisine && (
+              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{displayCuisine}</span>
+            )}
+            {displayPhone && (
+              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{displayPhone}</span>
+            )}
+            {displayWebsite && (
+              <a
+                href={displayWebsite}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-[var(--mist)] px-3 py-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
+              >
+                官网
+              </a>
+            )}
+          </div>
+            {showTripadvisorChipShimmer ? (
+              <p className="text-xs text-[var(--stone)]">
+                {tripadvisorChipLoadingText(tripadvisorLoading)}
+              </p>
+            ) : null}
+          </div>
+          )}
+
+          {!providerOwnsSummary && displayAddress && (
+              <p className="text-sm text-[var(--stone)]">
+                {displayAddress}
+              </p>
+            )}
+          {!providerOwnsSummary && showTripadvisorAddressShimmer && (
+            <div className="space-y-1" aria-busy>
+              <p className="text-xs text-[var(--stone)]">正在加载地址…</p>
+              <span className="block h-3.5 w-[72%] rounded-full day-tab-shimmer" aria-hidden />
             </div>
           )}
 
@@ -1712,7 +1900,7 @@ export function GooglePlacePage({
                     <p className="text-sm font-medium">
                       {displayNarrative.labels?.intro || '简介'}
                     </p>
-                    <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
+                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-[var(--ink)]/90">
                       {displayNarrative.intro}
                       {displayNarrative.loading &&
                       !displayNarrative.reason &&
@@ -1730,7 +1918,7 @@ export function GooglePlacePage({
                     <p className="text-sm font-medium">
                       {displayNarrative.labels?.reason || '为什么推荐'}
                     </p>
-                    <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
+                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-[var(--ink)]/90">
                       {displayNarrative.reason}
                       {displayNarrative.loading && !displayNarrative.labels?.tripFit ? (
                         <span
@@ -1770,88 +1958,9 @@ export function GooglePlacePage({
               </div>
             )}
 
-          {!providerOwnsSummary && (displayRating != null || priceLevelLabel || displayPhone || displayWebsite || displayCuisine || showTripadvisorChipShimmer) && (
-            <div className="space-y-1">
-            <div className="flex flex-wrap gap-2 text-sm">
-            {tripadvisorLoading.rating && showTripadvisorChipShimmer && (
-              <PlaceChipShimmer label="评分" />
-            )}
-            {displayRating != null && (
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
-                title={factsSource ? `评分来自 ${placeSourceLabel(factsSource)}` : undefined}
-              >
-                {factsSource && (factsSource === 'google' || factsSource === 'tripadvisor') ? (
-                  <PlaceSourceMark source={factsSource} showLabel={false} />
-                ) : null}
-                <span className="sr-only">
-                  {factsSource ? `${placeSourceLabel(factsSource)} 评分 ` : '评分 '}
-                </span>
-                ★ {displayRating.toFixed(1)}
-                {displayRatingCount != null ? `（${displayRatingCount}）` : ''}
-              </span>
-            )}
-            {tripadvisorLoading.price && showTripadvisorChipShimmer && (
-              <PlaceChipShimmer label="价格" />
-            )}
-            {priceLevelLabel && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{priceLevelLabel}</span>
-            )}
-            {tripadvisorLoading.cuisine && showTripadvisorChipShimmer && (
-              <PlaceChipShimmer label="菜系" />
-            )}
-            {displayCuisine && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{displayCuisine}</span>
-            )}
-            {displayPhone && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{displayPhone}</span>
-            )}
-            {displayWebsite && (
-              <a
-                href={displayWebsite}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-full bg-[var(--mist)] px-3 py-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
-              >
-                官网
-              </a>
-            )}
-          </div>
-            {showTripadvisorChipShimmer ? (
-              <p className="text-xs text-[var(--stone)]">正在加载评分、价格与菜系…</p>
-            ) : null}
-          </div>
-          )}
-
-          {!providerOwnsSummary && displayAddress && (
-              <p className="text-sm text-[var(--stone)]">
-                {displayAddress}
-              </p>
-            )}
-          {!providerOwnsSummary && showTripadvisorAddressShimmer && (
-            <div className="space-y-1" aria-busy>
-              <p className="text-xs text-[var(--stone)]">正在加载地址…</p>
-              <span className="block h-3.5 w-[72%] rounded-full day-tab-shimmer" aria-hidden />
-            </div>
-          )}
-
           {providerDetails}
 
-          {reviewsSection !== undefined
-            ? reviewsSection
-            : displayReviews.length
-              ? (
-                  <GoogleReviewsList
-                    reviews={displayReviews}
-                    sourceLabel={
-                      tripadvisorRoute ? 'Tripadvisor 评论' : reviewSourceLabel
-                    }
-                    source={tripadvisorRoute ? 'tripadvisor' : 'google'}
-                  />
-                )
-              : showTripadvisorReviewsShimmer
-                ? <PlaceReviewsShimmer />
-                : null}
+          {reviewsBlock}
 
           {!tripadvisorRoute && reviewsSection === undefined && details &&
             !loading &&

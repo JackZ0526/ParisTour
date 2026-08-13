@@ -271,6 +271,72 @@ export async function generatePlaceDescription(input: {
   )
 }
 
+function placeDetailKind(type: string): 'attraction' | 'food' | 'other' {
+  const t = type.trim().toLowerCase()
+  if (
+    t === 'attraction' ||
+    t.includes('attraction') ||
+    t.includes('景点') ||
+    t.includes('博物馆') ||
+    t.includes('museum')
+  ) {
+    return 'attraction'
+  }
+  if (
+    t === 'restaurant' ||
+    t === 'cafe' ||
+    t.includes('restaurant') ||
+    t.includes('cafe') ||
+    t.includes('餐') ||
+    t.includes('咖啡')
+  ) {
+    return 'food'
+  }
+  return 'other'
+}
+
+function placeDetailHardRules(kind: 'attraction' | 'food' | 'other'): string {
+  if (kind === 'attraction') {
+    return `<hard_rules>
+- intro：详细、结构清晰的中文简介，2–3 小段，段与段用换行分隔，不要小标题或项目符号。
+  第一段写清楚这是什么地方，以及历史、建造缘由或相关故事；
+  第二段写主要看点、空间气质与参观体验。可吸收 existingDescription 与 listingDescription，不要整段照抄英文。
+- reason：2–3 句。综合参观价值、featuredReviews 里的游客评价要点、以及当天行程主题/节奏/前后停点。不要罗列评论原文。
+- tripFit：固定输出空字符串（地点详情页不展示此项）。
+- 不要推荐卢浮宫或凡尔赛；不要编造精确年代、营业时间、票价或欧元数字。
+- 推荐理由不要出现 Tripadvisor、Google 等产品名。
+- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
+</hard_rules>`
+  }
+  if (kind === 'food') {
+    return `<hard_rules>
+- intro：介绍这家餐厅/咖啡馆的位置或片区、菜系或品类、资料或评论里提到的特色菜/招牌、以及价格档（只用 priceLevel；没有则不要编造具体欧元数字）。1–2 小段，换行分段，不要小标题。
+- reason：2–3 句。综合评论口碑、与当天行程的衔接（餐点时段与路线）、以及性价比。不要罗列评论原文。
+- tripFit：固定输出空字符串（地点详情页不展示此项）。
+- 不要推荐卢浮宫或凡尔赛；不要编造营业时间、菜单或未提供的价格。
+- 推荐理由不要出现 Tripadvisor、Google 等产品名。
+- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
+</hard_rules>`
+  }
+  return `<hard_rules>
+- intro：2–3 句中文简介，写清这是什么、氛围与适合谁。
+- reason：2–3 句，结合当天行程说明为何值得安排。
+- tripFit：固定输出空字符串。
+- 不要编造营业时间与价格；不要出现 Tripadvisor、Google 等产品名。
+- 字段顺序：先写 intro，再写 reason。
+</hard_rules>`
+}
+
+function placeDetailExample(kind: 'attraction' | 'food' | 'other'): string {
+  if (kind === 'attraction') {
+    return '{ "intro": "凯旋门是拿破仑为纪念法国军队胜利下令建造的纪念碑，矗立在星形广场中央，十二条大道从这里向外辐射。门身上的浮雕与阵亡将士名字，把帝国战争的荣耀与代价刻在同一座石头上。\\n\\n登顶可以把香榭丽舍与拉德芳斯尽收眼底；地面的无名战士墓与长明火，让参观不只是看景，也是一次对历史的停留。", "reason": "作为右岸经典日的视觉锚点，它把轴线、城市尺度和仪式感一次讲清楚。游客普遍觉得登顶视野值得排队，安排在当天博物馆之间也能把节奏拉开。", "tripFit": "" }'
+  }
+  if (kind === 'food') {
+    return '{ "intro": "斯菲尔在玛黑区，主打现代法餐小馆，评论里常点季节蔬菜与海鲜前菜。价格大约在 €€，适合当作白天行程之间的正餐，而不是米其林式的仪式感。", "reason": "食客普遍称赞出品稳定、座位相对安静；放在今天右岸经典日的午餐档，能把博物馆人流和晚餐分开。同区里性价比更扎实，排队通常可控。", "tripFit": "" }'
+  }
+  return '{ "intro": "塞纳河畔的经典停留点，适合放慢脚步看城市尺度。", "reason": "和今天的路线顺路，当作转换节奏的短停即可。", "tripFit": "" }'
+}
+
 /** Rich place narrative for the detail popup (same structure as hotel). */
 export async function generatePlaceDetailCopy(input: {
   name: string
@@ -278,7 +344,14 @@ export async function generatePlaceDetailCopy(input: {
   type: string
   address?: string
   existingDescription?: string
+  listingDescription?: string
   stopNote?: string
+  rating?: number
+  reviewCount?: number
+  priceLevel?: string
+  cuisine?: string
+  featuredReviews?: Array<{ text: string; rating?: number; author?: string }>
+  nearbyStops?: Array<{ name: string; type: string }>
   day?: number
   dayTitle?: string
   dayTheme?: string
@@ -291,19 +364,14 @@ export async function generatePlaceDetailCopy(input: {
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
+  const kind = placeDetailKind(input.type)
   const system = buildPrompt(
-    '旅行顾问。为地点详情页写简洁中文点评。',
+    '旅行顾问。为地点详情页写中文点评。',
     null,
-    `<hard_rules>
-- intro：2–3 句地点简介（氛围、看点、适合谁），可吸收 existingDescription。
-- reason：1–2 句说明为何值得放进行程 / 为何出现在当天；可参考 stopNote。
-- tripFit：固定输出空字符串（地点详情页不展示此项）。
-- 不要推荐卢浮宫或凡尔赛；不要编造营业时间与价格。
-- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
-</hard_rules>`,
+    placeDetailHardRules(kind),
     jsonContract(
       '{ intro: "string", reason: "string", tripFit: "" }',
-      '{ "intro": "塞纳河畔的玻璃金字塔入口，馆藏横跨古典与近东。", "reason": "适合安排在右岸经典日的上午，避开下午人流高峰。", "tripFit": "" }',
+      placeDetailExample(kind),
     ),
   )
   const user = JSON.stringify({
@@ -313,8 +381,19 @@ export async function generatePlaceDetailCopy(input: {
       type: input.type,
       address: input.address || '',
       existingDescription: input.existingDescription || '',
+      listingDescription: input.listingDescription || '',
       stopNote: input.stopNote || '',
+      rating: input.rating ?? null,
+      reviewCount: input.reviewCount ?? null,
+      priceLevel: input.priceLevel || '',
+      cuisine: input.cuisine || '',
     },
+    featuredReviews: (input.featuredReviews || []).slice(0, 6).map((review) => ({
+      author: review.author || '',
+      rating: review.rating ?? null,
+      text: String(review.text || '').slice(0, 400),
+    })),
+    nearbyStops: input.nearbyStops || [],
     currentDay: {
       day: input.day || null,
       title: input.dayTitle || '',

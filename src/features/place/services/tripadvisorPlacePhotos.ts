@@ -62,10 +62,10 @@ export interface TripadvisorAttractionInfo {
 }
 
 const CATALOG_PREFIX = 'tripadvisor-catalog:v1:'
-const GALLERY_PREFIX = 'tripadvisor-gallery:v10:'
-const DETAILS_PREFIX = 'tripadvisor-place-details:v8:'
+const GALLERY_PREFIX = 'tripadvisor-gallery:v16:'
+const DETAILS_PREFIX = 'tripadvisor-place-details:v13:'
 const QUERY_MATCH_PREFIX = 'tripadvisor-query-match:v3:'
-const MAX_GALLERY_PHOTOS = 48
+export const MAX_GALLERY_PHOTOS = 15
 const MAX_REVIEWS = 8
 const MIN_GALLERY_WIDTH = 400
 const DISPLAY_WIDTH = 1200
@@ -73,8 +73,7 @@ const DISPLAY_HEIGHT = 900
 const TA_AUTOCOMPLETE = 'api/v1/autocomplete'
 const TA_RESTAURANT_DETAIL = 'api/v1/restaurants/detail'
 const TA_RESTAURANT_REVIEWS = 'api/v1/restaurants/reviews'
-const TA_ATTRACTION_DETAIL = 'api/v1/things-to-do/detail'
-const TA_ATTRACTION_REVIEWS = 'api/v1/things-to-do/reviews'
+const TA_THINGS_TO_DO_DETAIL = 'api/v1/things-to-do/detail'
 const TA_LOCALE = 'en_US'
 const TA_AUTOCOMPLETE_LOCALE = 'en-US'
 const TA_CURRENCY = 'USD'
@@ -95,6 +94,17 @@ const SEEDED_ATTRACTIONS: TripadvisorCatalogItem[] = [
   { contentId: '189687', name: 'Luxembourg Gardens', kind: 'attraction', location: { lat: 48.8462, lng: 2.3372 } },
   { contentId: '190685', name: 'Basilique Du Sacre-Coeur De Montmartre', kind: 'attraction', location: { lat: 48.8867, lng: 2.3431 } },
   { contentId: '190204', name: 'Palais Garnier', kind: 'attraction', location: { lat: 48.8719, lng: 2.3316 } },
+  {
+    contentId: '590230',
+    name: 'Grand Palais',
+    kind: 'attraction',
+    location: { lat: 48.86611, lng: 2.312454 },
+    aliases: ['大皇宫'],
+    listingUrl:
+      'https://www.tripadvisor.com/Attraction_Review-g187147-d590230-Reviews-Grand_Palais-Paris_Ile_de_France.html',
+    coverUrl:
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/08/03/3f/99/grand-palais.jpg?w=1200&h=900&s=1',
+  },
   { contentId: '189284', name: 'Montmartre', kind: 'attraction', location: { lat: 48.8867, lng: 2.3431 } },
   { contentId: '189683', name: 'The Seine', kind: 'attraction', location: { lat: 48.858, lng: 2.342 } },
   { contentId: '189193', name: 'Galeries Lafayette Paris Haussmann', kind: 'attraction', location: { lat: 48.8738, lng: 2.332 } },
@@ -107,8 +117,20 @@ const SEEDED_ATTRACTIONS: TripadvisorCatalogItem[] = [
     name: "Musee d'Art Moderne de Paris",
     kind: 'attraction',
     location: { lat: 48.8644, lng: 2.2978 },
+    aliases: ['巴黎现代艺术博物馆', "Musée d'Art Moderne de Paris"],
+    listingUrl:
+      'https://www.tripadvisor.com/Attraction_Review-g187147-d188486-Reviews-Musee_d_Art_Moderne_de_Paris-Paris_Ile_de_France.html',
     coverUrl:
       'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/10/4b/8b/6d/les-collections-permanentes.jpg?w=1200&h=900&s=1',
+  },
+  {
+    contentId: '246664',
+    name: 'Palais de Tokyo',
+    kind: 'attraction',
+    location: { lat: 48.8642, lng: 2.2973 },
+    aliases: ['东京宫'],
+    listingUrl:
+      'https://www.tripadvisor.com/Attraction_Review-g187147-d246664-Reviews-Palais_de_Tokyo-Paris_Ile_de_France.html',
   },
 ]
 /**
@@ -401,16 +423,17 @@ export function tripadvisorListingUrl(
 }
 
 function tripadvisorDetailPath(kind: TripadvisorGalleryKind): string {
-  return kind === 'attraction' ? TA_ATTRACTION_DETAIL : TA_RESTAURANT_DETAIL
+  return kind === 'attraction' ? TA_THINGS_TO_DO_DETAIL : TA_RESTAURANT_DETAIL
 }
 
-function tripadvisorReviewsPath(kind: TripadvisorGalleryKind): string {
-  return kind === 'attraction' ? TA_ATTRACTION_REVIEWS : TA_RESTAURANT_REVIEWS
+function isTripadvisorRateLimited(error: unknown): boolean {
+  return error instanceof Error && /\(429\)|too many requests/i.test(error.message)
 }
 
 /**
- * tripadvisor34 details: `url` is required. `locationId` is only a fallback
- * when autocomplete did not return a listing page.
+ * tripadvisor34 details: restaurants send a listing `url`. Attractions always
+ * send `locationId` so things-to-do lookup cannot attach the wrong page, and
+ * also send `url` when autocomplete/seed already has an Attraction_Review link.
  */
 function seededCatalogItem(contentId: string): TripadvisorCatalogItem | undefined {
   return (
@@ -440,10 +463,7 @@ function tripadvisorDetailParams(
     currency: TA_CURRENCY,
   }
   const url = resolvedListingUrl(kind, contentId, listingUrl)
-  if (url) {
-    params.url = url
-    return params
-  }
+  if (url) params.url = url
   if (kind === 'attraction' && contentId) params.locationId = contentId
   return params
 }
@@ -458,10 +478,7 @@ function tripadvisorReviewParams(
     limit: String(MAX_REVIEWS),
   }
   const url = resolvedListingUrl(kind, contentId, listingUrl)
-  if (url) {
-    params.url = url
-    return params
-  }
+  if (url) params.url = url
   if (kind === 'attraction' && contentId) params.locationId = contentId
   return params
 }
@@ -565,10 +582,90 @@ function mediaEntryCandidate(entry: unknown): TripadvisorGalleryPhotoCandidate |
  * tripadvisor34 often flattens the same photos into top-level `images[]` too.
  */
 const RELATED_SECTION_KEY =
-  /^(related|similar|recommended|nearby|associated|also[_-]?viewed|recently[_-]?viewed|location[_-]?list|carousels?$|stories$|articles$|editorial$)/i
+  /^(related|similar|recommended|nearby|associated|also[_-]?viewed|recently[_-]?viewed|location[_-]?list|carousels?$|stories$|articles$|editorial$|must[_-]?see|historical[_-]?tours?|skip[_-]?the[_-]?line|audio[_-]?guides?|segway|more[_-]?tickets)/i
 
-function isRelatedSectionKey(key: string): boolean {
+const COMMERCE_SECTION_KEY =
+  /^(highlights|tours|tourproducts|tickets|experiences|activities|offers|bookableexperiences|products|audioguides|segwaytours|moretickets|ticketstoursandexexperiences|ticketstoursexperiences)$/i
+
+const LISTING_CONTENT_KEY =
+  /^(images?|photos?|reviews?|media|medialist|gallery|album|about|description|address|name|id|locationid)$/i
+
+const EXCLUDED_SHELF_HEADING =
+  /must[-\s]?see\s*highlights?|historical\s*tours?|skip\s*the\s*line|more\s+tickets|tours,?\s+and\s+experiences|audio\s*guides?|segway\s*tours?|sightseeing\s*(cruises?|tours?)|hop[-\s]?on|boat\s*tours?|bus\s*tours?|bike\s*tours?|private\s+and\s+luxury|best seller/i
+
+const EXCLUDED_ENTRY_BLOB =
+  /related\s*stor|min read|\barticle\b|\beditorial\b|\bnearby\b|best moderately|associated restaurant|must[-\s]?see\s*highlights?|historical\s*tours?|skip\s*the\s*line|more\s+tickets|tours,?\s+and\s+experiences|audio\s*guides?|segway|free cancellation|likely to sell out|walking tour|private sightseeing|sightseeing cruises?|from\s*c?\$|best seller/i
+
+function nestedLooksLikeCards(value: unknown): boolean {
+  const sample = carouselSample(value)
+  if (!sample.length) return false
+  let cardish = 0
+  for (const item of sample) {
+    const title = textOf(item.title) || textOf(item.name) || textOf(item.heading)
+    const description = textOf(item.description) || textOf(item.subtitle) || textOf(item.caption)
+    if ((title && description) || itemLooksLikeProduct(item)) cardish += 1
+  }
+  return cardish >= Math.min(2, sample.length) || (sample.length === 1 && cardish === 1)
+}
+
+function nestedLooksLikeProductCards(value: unknown): boolean {
+  const sample = carouselSample(value)
+  if (!sample.length) return false
+  let products = 0
+  for (const item of sample) {
+    if (itemLooksLikeProduct(item)) products += 1
+  }
+  return products >= Math.min(2, sample.length) || (sample.length === 1 && products === 1)
+}
+
+function carouselSample(value: unknown): Array<Record<string, unknown>> {
+  const row = asRecord(value)
+  const items = Array.isArray(value)
+    ? value
+    : Array.isArray(row?.items)
+      ? row.items
+      : Array.isArray(row?.cards)
+        ? row.cards
+        : Array.isArray(row?.tours)
+          ? row.tours
+          : Array.isArray(row?.products)
+            ? row.products
+            : []
+  if (!items.length) return []
+  return items.slice(0, 4).map(asRecord).filter(Boolean) as Array<Record<string, unknown>>
+}
+
+function itemLooksLikeProduct(item: Record<string, unknown>): boolean {
+  if (
+    item.price != null ||
+    item.fromPrice != null ||
+    item.productId != null ||
+    item.offerId != null ||
+    item.duration != null ||
+    item.durationString != null
+  ) {
+    return true
+  }
+  const blob = [
+    item.title,
+    item.name,
+    item.heading,
+    item.description,
+    item.subtitle,
+    item.caption,
+    item.category,
+    item.priceLabel,
+  ]
+    .map((value) => textOf(value))
+    .join(' ')
+  return /from\s|[€$£]|free cancellation|likely to sell out|best seller|\b\d+h(?:\s*\d+m)?\b|audio\s*guide|segway|\btour\b/i.test(
+    blob,
+  )
+}
+
+function isRelatedSectionKey(key: string, nested?: unknown): boolean {
   const normalized = key.replace(/[_-]/g, '').toLowerCase()
+  if (LISTING_CONTENT_KEY.test(normalized)) return false
   if (
     normalized === 'stories' ||
     normalized === 'articles' ||
@@ -576,11 +673,47 @@ function isRelatedSectionKey(key: string): boolean {
     normalized === 'nearby' ||
     normalized === 'locationlist' ||
     normalized === 'carousel' ||
-    normalized === 'carousels'
+    normalized === 'carousels' ||
+    normalized === 'mustsee' ||
+    normalized === 'mustseehighlights' ||
+    normalized === 'historicaltours' ||
+    normalized === 'skiptheline' ||
+    normalized === 'skipthelinetickets' ||
+    normalized === 'audioguides' ||
+    normalized === 'segwaytours' ||
+    normalized === 'moretickets' ||
+    normalized === 'moreticketstoursandexexperiences' ||
+    normalized === 'ticketstoursexperiences'
   ) {
     return true
   }
+  if (
+    normalized === 'duration' &&
+    typeof nested === 'string' &&
+    nested.length > 120
+  ) {
+    return true
+  }
+  if (COMMERCE_SECTION_KEY.test(normalized) || /tour|ticket|experience|guide|segway|cruise|product|offer/.test(normalized)) {
+    return nested === undefined || nestedLooksLikeCards(nested) || nestedLooksLikeProductCards(nested)
+  }
+  if (nested !== undefined && nestedLooksLikeProductCards(nested)) return true
   return RELATED_SECTION_KEY.test(key)
+}
+
+function sectionHeadingLooksExcluded(row: Record<string, unknown>): boolean {
+  const heading = [
+    row.title,
+    row.heading,
+    row.sectionTitle,
+    row.section,
+    row.label,
+    row.header,
+    row.name,
+  ]
+    .map((value) => textOf(value))
+    .join(' ')
+  return EXCLUDED_SHELF_HEADING.test(heading)
 }
 
 /**
@@ -604,7 +737,7 @@ function walkRecords(
   if (row) {
     visit(row)
     for (const [key, nested] of Object.entries(row)) {
-      if (isRelatedSectionKey(key)) continue
+      if (isRelatedSectionKey(key, nested)) continue
       walkRecords(nested, visit, depth + 1)
     }
     return
@@ -754,12 +887,13 @@ function collectPhotoIdentities(value: unknown, into: Set<string>, depth = 0) {
   }
 }
 
-/** Photo identities from Related Stories / nearby shelves in this payload. */
+/** Photo identities from Related Stories / nearby / highlight / tour shelves. */
 function relatedPhotoIdentities(payload: unknown): Set<string> {
   const into = new Set<string>(RELATED_STORY_PHOTO_IDENTITIES)
   const harvest = (row: Record<string, unknown>) => {
+    if (sectionHeadingLooksExcluded(row)) collectPhotoIdentities(row, into)
     for (const [key, nested] of Object.entries(row)) {
-      if (!isRelatedSectionKey(key)) continue
+      if (!isRelatedSectionKey(key, nested)) continue
       collectPhotoIdentities(nested, into)
     }
   }
@@ -786,9 +920,17 @@ function imageEntryLooksRelated(entry: unknown): boolean {
   ]
     .map((value) => textOf(value))
     .join(' ')
-  return /related\s*stor|min read|\barticle\b|\beditorial\b|\bnearby\b|best moderately|associated restaurant/i.test(
-    blob,
-  )
+  return EXCLUDED_ENTRY_BLOB.test(blob)
+}
+
+function imageEntryLooksCommerce(entry: unknown): boolean {
+  const row = asRecord(entry)
+  if (!row) return false
+  if (row.productId != null || row.offerId != null || row.fromPrice != null) return true
+  if ((row.price != null || row.priceAmount != null) && (row.duration != null || row.durationString)) {
+    return true
+  }
+  return false
 }
 
 function isExcludedGalleryPhoto(url: string, excluded: Set<string>): boolean {
@@ -800,27 +942,44 @@ function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] 
   const listing = listingRecordWithTopLevelPhotos(payload)
   if (!listing) return []
   const excluded = relatedPhotoIdentities(payload)
+  const images = Array.isArray(listing.images) ? listing.images : []
+  const groups: string[][] = []
+  let current: string[] = []
+  const flushGroup = () => {
+    if (!current.length) return
+    groups.push(current)
+    current = []
+  }
+  for (const entry of images) {
+    if (!photoBelongsToListing(entry, contentId)) continue
+    if (imageEntryLooksRelated(entry) || imageEntryLooksCommerce(entry)) continue
+    const url = photoUrlFromUnknown(entry)
+    if (!url) continue
+    const width = photoWidthFromUrl(url)
+    if (width > 0 && width < MIN_GALLERY_WIDTH) {
+      // Nearby / footer thumbs often sit before and after the listing album.
+      flushGroup()
+      continue
+    }
+    if (isExcludedGalleryPhoto(url, excluded)) continue
+    current.push(url)
+  }
+  flushGroup()
+  const album = groups.reduce(
+    (best, group) => (group.length > best.length ? group : best),
+    [] as string[],
+  )
   const urls: string[] = []
   const cover = photoUrlFromUnknown(listing.image)
   if (cover && !isExcludedGalleryPhoto(cover, excluded)) urls.push(cover)
-  const images = Array.isArray(listing.images) ? listing.images : []
-  let seenListingSizedFromAlbum = false
-  for (const entry of images) {
-    if (!photoBelongsToListing(entry, contentId)) continue
-    if (imageEntryLooksRelated(entry)) continue
-    const url = photoUrlFromUnknown(entry)
-    if (!url) continue
-    if (isExcludedGalleryPhoto(url, excluded)) continue
-    const width = photoWidthFromUrl(url)
-    if (width > 0 && width < MIN_GALLERY_WIDTH) {
-      // tripadvisor34 concatenates relatedStories / nearby thumbs after the album.
-      if (seenListingSizedFromAlbum) break
-      continue
-    }
-    seenListingSizedFromAlbum = true
-    urls.push(url)
-  }
-  return urls
+  urls.push(...album)
+  const seen = new Set<string>()
+  return urls.filter((url) => {
+    const identity = tripadvisorPhotoIdentity(url)
+    if (!url || seen.has(identity)) return false
+    seen.add(identity)
+    return true
+  })
 }
 
 /** Listing hero only: top-level image/images, listing photo fields, or PoiHero. */
@@ -1016,7 +1175,7 @@ export function normalizeTripadvisorGallery(
   for (const section of sections) {
     const row = asRecord(section)
     const type = `${row?.__typename || ''} ${row?.stableDiffingType || ''} ${row?.type || ''}`
-    if (/Nearby|Related|Similar|Carousel|AlsoViewed|RecentlyViewed|Stories|Article|Editorial|Recommended/i.test(type)) {
+    if (/Nearby|Related|Similar|Carousel|AlsoViewed|RecentlyViewed|Stories|Article|Editorial|Recommended|Highlight|MustSee|HistoricalTour|SkipTheLine|Ticket|Experience|AudioGuide|Segway|TourProduct/i.test(type)) {
       continue
     }
     const mediaList = row?.mediaList
@@ -1130,9 +1289,11 @@ function parseTripadvisor34Details(
   const listing = tripadvisor34ListingRecord(payload)
   if (!listing) return null
   const photos = uniquePhotos(
-    tripadvisor34PhotoUrls(listing, contentId)
-      .map((url) => tripadvisorPhotoUrl(url))
-      .filter(Boolean),
+    selectBestTripadvisorGalleryPhotos(
+      tripadvisor34PhotoUrls(listing, contentId)
+        .map((url) => candidateFromPhotoUrl(url))
+        .filter((candidate): candidate is TripadvisorGalleryPhotoCandidate => Boolean(candidate)),
+    ),
   )
   return {
     contentId,
@@ -1292,8 +1453,10 @@ export function normalizeTripadvisorReviews(payload: unknown): GoogleReview[] {
         textOf(user?.displayName) ||
         textOf(user?.username) ||
         textOf(user?.name) ||
-        textOf(row.username) ||
+        textOf(row.userDisplayName) ||
         textOf(row.displayName) ||
+        textOf(row.userUsername) ||
+        textOf(row.username) ||
         undefined,
       relativeTime:
         textOf(row.publishedDate) ||
@@ -1433,9 +1596,11 @@ function mergeSeededAttractions(items: TripadvisorCatalogItem[]): TripadvisorCat
       byId.set(seed.contentId, { ...seed })
       continue
     }
-    if (seed.coverUrl && !current.coverUrl) {
-      byId.set(seed.contentId, { ...current, coverUrl: seed.coverUrl })
-    }
+    byId.set(seed.contentId, {
+      ...current,
+      coverUrl: current.coverUrl || seed.coverUrl,
+      listingUrl: current.listingUrl || seed.listingUrl,
+    })
   }
   return [...byId.values()]
 }
@@ -1824,7 +1989,7 @@ async function loadGalleryFor(
         'details',
         tripadvisorDetailPath(match.kind),
         tripadvisorDetailParams(match.kind, match.contentId, listingUrl),
-        match.kind === 'restaurant' ? 45_000 : 20_000,
+        45_000,
       )
       if (!payload || tripadvisorPayloadFailed(payload) || tripadvisorPlaceMissing(payload)) {
         return coverOnlyGallery(match)
@@ -2136,7 +2301,13 @@ export async function fetchTripadvisorAttractionInfo(input: {
 }): Promise<TripadvisorAttractionInfo | null> {
   if (!input.name.trim() && !input.contentId) return null
   const peeked = peekTripadvisorAttractionInfo(input.name, input.nameLocal, input.contentId)
-  if (peeked?.photos.length && hasCachedTripadvisorGallery(peeked.contentId)) return peeked
+  if (
+    peeked?.photos.length &&
+    peeked.reviews.length &&
+    hasCachedTripadvisorGallery(peeked.contentId)
+  ) {
+    return peeked
+  }
 
   const inflightKey = `${input.contentId || ''}:${input.name}:${input.nameLocal || ''}`
   const pending = infoInflight.get(inflightKey)
@@ -2147,7 +2318,7 @@ export async function fetchTripadvisorAttractionInfo(input: {
     if (!match) return null
 
     const gallery = await loadGalleryFor(match)
-    const details = readDetails(match.contentId)
+    const details = await loadReviewsIfMissing(match, readDetails(match.contentId))
     const info = placeInfoFromParts(match, details, gallery)
     if (info.photos.length || info.location) {
       storeDetails(info)
@@ -2164,25 +2335,69 @@ export async function fetchTripadvisorAttractionInfo(input: {
   }
 }
 
+function reviewsFromTripadvisorPayload(payload: unknown): GoogleReview[] {
+  if (!payload || tripadvisorPayloadFailed(payload)) return []
+  return normalizeTripadvisorReviews(payload)
+}
+
+async function requestTripadvisorReviewsPayload(
+  path: string,
+  params: Record<string, string>,
+  kind: TripadvisorRequestKind = 'reviews',
+): Promise<GoogleReview[]> {
+  try {
+    return reviewsFromTripadvisorPayload(await requestTripadvisor(kind, path, params))
+  } catch (error) {
+    if (!isTripadvisorRateLimited(error)) return []
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    try {
+      return reviewsFromTripadvisorPayload(await requestTripadvisor(kind, path, params))
+    } catch {
+      return []
+    }
+  }
+}
+
+async function fetchTripadvisorReviewList(
+  match: TripadvisorCatalogItem,
+): Promise<GoogleReview[]> {
+  const reviewParams = tripadvisorReviewParams(match.kind, match.contentId, match.listingUrl)
+  if (!reviewParams.url && !reviewParams.locationId) return []
+  // things-to-do/reviews returns `{ count: 0 }` for attractions. The same
+  // listing's traveler reviews come from restaurants/reviews. Hitting both
+  // in a burst also 429s the working endpoint.
+  const fromReviews = await requestTripadvisorReviewsPayload(
+    TA_RESTAURANT_REVIEWS,
+    reviewParams,
+  )
+  if (fromReviews.length || match.kind !== 'attraction') return fromReviews
+  const detailParams = tripadvisorDetailParams(
+    'restaurant',
+    match.contentId,
+    match.listingUrl,
+  )
+  if (!detailParams.url) return []
+  return requestTripadvisorReviewsPayload(TA_RESTAURANT_DETAIL, detailParams, 'details')
+}
+
 async function loadReviewsIfMissing(
   match: TripadvisorCatalogItem,
   details: TripadvisorAttractionInfo | null,
 ): Promise<TripadvisorAttractionInfo | null> {
-  if (!details || details.reviews.length) return details
-  const params = tripadvisorReviewParams(match.kind, match.contentId, match.listingUrl)
-  if (!params.url && !params.locationId) return details
+  if (details?.reviews.length) return details
+  if (!details && match.kind !== 'attraction') return details
   try {
-    const reviewsPayload = await requestTripadvisor(
-      'reviews',
-      tripadvisorReviewsPath(match.kind),
-      params,
-    )
-    const reviews =
-      reviewsPayload && !tripadvisorPayloadFailed(reviewsPayload)
-        ? normalizeTripadvisorReviews(reviewsPayload)
-        : []
+    const reviews = await fetchTripadvisorReviewList(match)
     if (!reviews.length) return details
-    const next = { ...details, reviews }
+    const next = details
+      ? { ...details, reviews }
+      : {
+          contentId: match.contentId,
+          name: match.name,
+          location: match.location,
+          photos: match.coverUrl ? [match.coverUrl] : [],
+          reviews,
+        }
     storeDetails(next)
     return next
   } catch {

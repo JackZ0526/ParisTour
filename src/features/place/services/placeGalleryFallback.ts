@@ -1,5 +1,6 @@
 /** Official-site scrapes below this count still try Tripadvisor listing photos. */
 export const MIN_OFFICIAL_PHOTOS_BEFORE_TRIPADVISOR = 5
+const MAX_GALLERY_PHOTOS = 15
 
 export function websitePhotosNeedTripadvisorFallback(
   usableOfficialCount: number,
@@ -19,9 +20,13 @@ export function pickRestaurantGalleryPhotos(input: {
 }): string[] {
   const website = input.websitePhotos.filter(Boolean)
   const tripadvisor = input.tripadvisorPhotos.filter(Boolean)
-  if (!websitePhotosNeedTripadvisorFallback(website.length)) return website
-  if (!input.tripadvisorResolved || tripadvisor.length === 0) return website
-  return tripadvisor
+  if (!websitePhotosNeedTripadvisorFallback(website.length)) {
+    return website.slice(0, MAX_GALLERY_PHOTOS)
+  }
+  if (!input.tripadvisorResolved || tripadvisor.length === 0) {
+    return website.slice(0, MAX_GALLERY_PHOTOS)
+  }
+  return tripadvisor.slice(0, MAX_GALLERY_PHOTOS)
 }
 
 export function shouldFetchTripadvisorGalleryFallback(input: {

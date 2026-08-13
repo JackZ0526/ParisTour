@@ -51,7 +51,7 @@ import {
   resetLlmArtifactStoreForTests,
   setLlmArtifact,
 } from '../shared/services/llm/llmArtifactStore'
-import { placeSearchQuery } from '../shared/utils/placeTitle'
+import { placeIdentitySimilarity, PLACE_NAME_MATCH_MIN, placeSearchQuery } from '../shared/utils/placeTitle'
 import { formatPriceLevelLabel } from '../shared/utils/priceLevel'
 
 const SPHERE_LISTING_URL =
@@ -81,12 +81,13 @@ function expectRestaurantDetailsQuery(href: string, listingUrl: string) {
 }
 
 function expectAttractionDetailsQuery(href: string, listingUrl: string) {
+  const locationId = listingUrl.match(/-d(\d{5,})-/)?.[1]
+  expect(locationId).toBeTruthy()
   expect(href).toContain('rest=api%2Fv1%2Fthings-to-do%2Fdetail')
   expect(href).toContain(`url=${encodeURIComponent(listingUrl)}`)
+  expect(href).toContain(`locationId=${locationId}`)
   expect(href).toContain('locale=en_US')
   expect(href).toContain('currency=USD')
-  expect(href).not.toContain('locationId=')
-  expect(href).not.toMatch(/Attraction_Review-d\d+-Reviews\.html/)
 }
 
 function expectAttractionLocationIdQuery(href: string, locationId: string) {
@@ -95,7 +96,17 @@ function expectAttractionLocationIdQuery(href: string, locationId: string) {
   expect(href).toContain('locale=en_US')
   expect(href).toContain('currency=USD')
   expect(href).not.toContain('url=')
-  expect(href).not.toMatch(/Attraction_Review-d\d+-Reviews\.html/)
+}
+
+function expectRestaurantReviewsQuery(href: string, locationId: string, listingUrl?: string) {
+  expect(href).toContain('rest=api%2Fv1%2Frestaurants%2Freviews')
+  expect(href).toContain(`locationId=${locationId}`)
+  expect(href).toContain('language=en')
+  if (listingUrl) {
+    expect(href).toContain(`url=${encodeURIComponent(listingUrl)}`)
+  } else {
+    expect(href).not.toContain('url=')
+  }
 }
 
 function tripadvisor34DetailResponse(input: {
@@ -140,6 +151,27 @@ function tripadvisor34DetailResponse(input: {
 
 function restaurantMediaGalleryResponse(...urls: string[]) {
   return tripadvisor34DetailResponse({ photos: urls })
+}
+
+function tripadvisor34ReviewsResponse(reviews: unknown[]) {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      reviews,
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+}
+
+function tripadvisor34RestaurantReviewsResponse(reviews: unknown[]) {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data: { reviews },
+      returnedCount: reviews.length,
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
 }
 
 function tripadvisor34AutocompleteResponse(
@@ -374,9 +406,10 @@ describe('Tripadvisor place photos', () => {
       '188709',
       'Arc de Triomphe',
     )
-    expect(gallery.photos).toHaveLength(18)
+    expect(gallery.photos).toHaveLength(15)
     expect(gallery.photos[0]).toBe('https://media-cdn.tripadvisor.com/p17.jpg')
-    expect(gallery.photos[17]).toBe('https://media-cdn.tripadvisor.com/p0.jpg')
+    expect(gallery.photos[14]).toBe('https://media-cdn.tripadvisor.com/p3.jpg')
+    expect(gallery.photos).not.toContain('https://media-cdn.tripadvisor.com/p0.jpg')
     expect(gallery.photos).not.toContain('https://media-cdn.tripadvisor.com/clip.mp4')
   })
 
@@ -423,6 +456,20 @@ describe('Tripadvisor place photos', () => {
       },
     ])
     expect(onlyPortrait).toEqual(['https://media-cdn.tripadvisor.com/tall.jpg'])
+  })
+
+  it('keeps at most 15 photos, landscape first then portrait fill', () => {
+    const ranked = selectBestTripadvisorGalleryPhotos(
+      Array.from({ length: 20 }, (_, index) => ({
+        url: `https://media-cdn.tripadvisor.com/${index < 12 ? 'wide' : 'tall'}-${index}.jpg`,
+        maxWidth: index < 12 ? 1600 : 900,
+        maxHeight: index < 12 ? 900 : 1600,
+        identity: `/media/photo/${index < 12 ? 'wide' : 'tall'}-${index}.jpg`,
+      })),
+    )
+    expect(ranked).toHaveLength(15)
+    expect(ranked.slice(0, 12).every((url) => url.includes('/wide-'))).toBe(true)
+    expect(ranked.slice(12).every((url) => url.includes('/tall-'))).toBe(true)
   })
 
   it('matches a ranked catalog title to the itinerary name', () => {
@@ -473,6 +520,26 @@ describe('Tripadvisor place photos', () => {
       '209760',
     )
     expect(matchTripadvisorCatalogItem(items, 'Champs-Elysees')?.contentId).toBe('209760')
+  })
+
+  it('does not treat Grand Palais as Palais Garnier just because both are palaces', () => {
+    const items = listSeededTripadvisorAttractions()
+    expect(matchTripadvisorCatalogItem(items, 'Grand Palais')?.contentId).toBe('590230')
+    expect(matchTripadvisorCatalogItem(items, '大皇宫')?.contentId).toBe('590230')
+    expect(matchTripadvisorCatalogItem(items, 'Palais Garnier')?.contentId).toBe('190204')
+    expect(matchTripadvisorCatalogItem(items, '巴黎歌剧院')?.contentId).toBe('190204')
+    expect(placeIdentitySimilarity('Grand Palais', 'Palais Garnier')).toBeLessThan(
+      PLACE_NAME_MATCH_MIN,
+    )
+    expect(placeIdentitySimilarity('Palais de Tokyo', 'Grand Palais')).toBeLessThan(
+      PLACE_NAME_MATCH_MIN,
+    )
+    expect(placeIdentitySimilarity('Palais de Tokyo', 'Palais Garnier')).toBeLessThan(
+      PLACE_NAME_MATCH_MIN,
+    )
+    expect(placeIdentitySimilarity('Musée Rodin', "Musée d'Orsay")).toBeLessThan(
+      PLACE_NAME_MATCH_MIN,
+    )
   })
 
   it('pins the Tripadvisor listing hero ahead of gallery traveler photos', () => {
@@ -538,6 +605,15 @@ describe('Tripadvisor place photos', () => {
       matchTripadvisorCatalogItem(items, 'Museum of Modern Art of the City of Paris')
         ?.contentId,
     ).toBe('188486')
+  })
+
+  it('matches Palais de Tokyo from the seeded listing', () => {
+    const items = listSeededTripadvisorAttractions()
+    expect(matchTripadvisorCatalogItem(items, '东京宫', 'Palais de Tokyo')?.contentId).toBe(
+      '246664',
+    )
+    expect(matchTripadvisorCatalogItem(items, '东京宫')?.contentId).toBe('246664')
+    expect(matchTripadvisorCatalogItem(items, 'Palais de Tokyo')?.contentId).toBe('246664')
   })
 
   it('prefers a size at least 800px wide', () => {
@@ -1977,6 +2053,266 @@ describe('Tripadvisor place photos', () => {
     expect(gallery.photos.join(' ')).not.toContain('2e/ca/54/84')
   })
 
+  it('keeps the listing album when nearby thumbs come before the photos', () => {
+    const cover =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/10/4b/8b/6d/les-collections-permanentes.jpg?w=1200&h=-1&s=1'
+    const nearbyTiny =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/15/f2/f9/mayfair-garden.jpg?w=200&h=-1&'
+    const nearbyLarge =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/27/3c/f9/a3/galerie-dior.jpg?w=1200&h=1200&'
+    const albumOne =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/34/2e/06/97/caption.jpg?w=1100&h=1100&'
+    const albumTwo =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/34/2e/06/96/caption.jpg?w=1100&h=1100&'
+    const albumThree =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/34/2e/06/92/caption.jpg?w=1100&h=1100&'
+    const courtyard =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0f/ec/32/31/vue-de-la-cour-d-honneur.jpg?w=1200&h=1200&'
+    const editorial =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/30/0f/25/01/caption.jpg?w=2400&h=-1&'
+
+    const info = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '188486',
+        name: "Musee d'Art Moderne de Paris",
+        category: 'ATTRACTION',
+        image: cover,
+        images: [
+          { url: nearbyTiny },
+          { url: nearbyLarge },
+          { url: nearbyTiny },
+          { url: albumOne },
+          { url: albumTwo },
+          { url: albumThree },
+          { url: nearbyTiny },
+          { url: courtyard },
+          { url: editorial },
+          { url: cover },
+        ],
+      },
+      '188486',
+    )
+    const photos = info.photos.join(' ')
+    expect(photos).toContain('les-collections-permanentes')
+    expect(photos).toContain('34/2e/06/97')
+    expect(photos).toContain('34/2e/06/96')
+    expect(photos).toContain('34/2e/06/92')
+    expect(photos).not.toContain('mayfair-garden')
+    expect(photos).not.toContain('galerie-dior')
+    expect(photos).not.toContain('30/0f/25/01')
+  })
+
+  it('drops Must-see highlights and Historical Tours photos from attraction details', () => {
+    const arcHero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0e/53/47/52/arc-de-triomphe.jpg?w=1200&h=900&s=1'
+    const arcSunset =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/arc-sunset.jpg?w=1600&h=1200&s=1'
+    const rooftop =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/highlight-rooftop.jpg?w=1600&h=1200&s=1'
+    const flame =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/highlight-flame.jpg?w=1600&h=1200&s=1'
+    const tomb =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/highlight-tomb.jpg?w=1600&h=1200&s=1'
+    const pontTour =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/tour-pont-alexandre.jpg?w=1600&h=1200&s=1'
+    const bikeTour =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/tour-invalides-bikes.jpg?w=1600&h=1200&s=1'
+    const skipTicket =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/ticket-pantheon.jpg?w=1600&h=1200&s=1'
+
+    const details = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '188709',
+        name: 'Arc de Triomphe',
+        category: 'ATTRACTION',
+        image: arcHero,
+        images: [
+          { url: arcHero },
+          { url: arcSunset },
+          { url: rooftop },
+          { url: flame },
+          { url: tomb },
+          { url: pontTour },
+          { url: bikeTour },
+          { url: skipTicket },
+        ],
+        mustSeeHighlights: [
+          {
+            title: 'Rooftop terrace',
+            description: 'For 360-degree views of Paris, climb the spiral staircases.',
+            image: rooftop,
+          },
+          {
+            title: 'Flame of Remembrance',
+            description: 'First lit in 1923, this eternal flame is rekindled every night.',
+            image: flame,
+          },
+          {
+            title: 'Tomb of the Unknown Soldier',
+            description: 'This memorial at the base of the Arc honors French WWI soldiers.',
+            image: tomb,
+          },
+        ],
+        historicalTours: [
+          {
+            title: '1. Arc de Triomphe and Champs-Élysées Walking Tour',
+            duration: '1h 15m',
+            price: 'from C$82',
+            image: pontTour,
+          },
+          {
+            title: '2. Must-See Sites Tour',
+            duration: '2h 30m',
+            image: bikeTour,
+          },
+        ],
+        skipTheLineTickets: [{ title: 'Paris Museum Pass', image: skipTicket }],
+      },
+      '188709',
+    )
+    const photos = details.photos.join(' ')
+    expect(photos).toContain('arc-de-triomphe.jpg')
+    expect(photos).toContain('arc-sunset')
+    expect(photos).not.toContain('highlight-rooftop')
+    expect(photos).not.toContain('highlight-flame')
+    expect(photos).not.toContain('highlight-tomb')
+    expect(photos).not.toContain('tour-pont-alexandre')
+    expect(photos).not.toContain('tour-invalides-bikes')
+    expect(photos).not.toContain('ticket-pantheon')
+
+    const captioned = normalizeTripadvisorGallery(
+      {
+        success: true,
+        data: {
+          id: '188709',
+          name: 'Arc de Triomphe',
+          category: 'ATTRACTION',
+          image: arcHero,
+          images: [
+            { url: arcHero },
+            { url: arcSunset },
+            { url: pontTour, section: 'Historical Tours', title: 'Walking Tour' },
+            { url: rooftop, section: 'Must-see highlights', title: 'Rooftop terrace' },
+          ],
+        },
+      },
+      'attraction',
+      '188709',
+      'Arc de Triomphe',
+    )
+    expect(captioned.photos.join(' ')).toContain('arc-de-triomphe.jpg')
+    expect(captioned.photos.join(' ')).toContain('arc-sunset')
+    expect(captioned.photos.join(' ')).not.toContain('tour-pont-alexandre')
+    expect(captioned.photos.join(' ')).not.toContain('highlight-rooftop')
+  })
+
+  it('drops More tickets / Audio Guides / Segway Tours photos from attraction details', () => {
+    const palaisHero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/grand-palais-hero.jpg?w=1600&h=1200&s=1'
+    const palaisHall =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/grand-palais-hall.jpg?w=1600&h=1200&s=1'
+    const audioBoat =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/audio-guide-notre-dame-boat.jpg?w=1600&h=1200&s=1'
+    const audioSunset =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/audio-guide-seine-sunset.jpg?w=1600&h=1200&s=1'
+    const segwayArc =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/segway-arc.jpg?w=1600&h=1200&s=1'
+    const tourBus =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/hop-on-bus.jpg?w=1600&h=1200&s=1'
+
+    const details = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '590230',
+        name: 'Grand Palais',
+        category: 'ATTRACTION',
+        image: palaisHero,
+        images: [
+          { url: palaisHero },
+          { url: palaisHall },
+          { url: audioBoat },
+          { url: audioSunset },
+          { url: segwayArc },
+          { url: tourBus },
+        ],
+        audioGuides: [
+          {
+            title: '1. Seine River Evening Cruise with Music and Comments',
+            category: 'Sightseeing Cruises',
+            duration: '1h',
+            price: 'from C$41',
+            image: audioBoat,
+          },
+          {
+            title: '2. Seine River Guided Cruise with Audio Guide',
+            duration: '60-80 minutes',
+            price: 'from C$41',
+            image: audioSunset,
+          },
+        ],
+        segwayTours: [
+          {
+            title: '1. Paris: Experience Segway Top Highlights Small Group 2 Hours',
+            duration: '2h',
+            price: 'from C$113',
+            image: segwayArc,
+          },
+        ],
+        moreTicketsToursAndExperiences: {
+          title: 'More tickets, tours, and experiences',
+          cards: [
+            {
+              title: 'Hop-on Hop-off Bus',
+              duration: '1 day',
+              price: 'from C$55',
+              image: tourBus,
+            },
+          ],
+        },
+      },
+      '590230',
+    )
+    const photos = details.photos.join(' ')
+    expect(photos).toContain('grand-palais-hero')
+    expect(photos).toContain('grand-palais-hall')
+    expect(photos).not.toContain('audio-guide-notre-dame-boat')
+    expect(photos).not.toContain('audio-guide-seine-sunset')
+    expect(photos).not.toContain('segway-arc')
+    expect(photos).not.toContain('hop-on-bus')
+
+    const titled = normalizeTripadvisorGallery(
+      {
+        success: true,
+        data: {
+          id: '590230',
+          name: 'Grand Palais',
+          category: 'ATTRACTION',
+          image: palaisHero,
+          images: [
+            { url: palaisHero },
+            { url: audioBoat, section: 'Audio Guides', title: 'Seine River Evening Cruise' },
+            { url: segwayArc, section: 'Segway Tours', title: 'Paris Segway Express Tour' },
+          ],
+          sections: [
+            {
+              title: 'More tickets, tours, and experiences',
+              items: [{ image: tourBus, price: 'from C$55', duration: '1 day' }],
+            },
+          ],
+        },
+      },
+      'attraction',
+      '590230',
+      'Grand Palais',
+    )
+    expect(titled.photos.join(' ')).toContain('grand-palais-hero')
+    expect(titled.photos.join(' ')).not.toContain('audio-guide-notre-dame-boat')
+    expect(titled.photos.join(' ')).not.toContain('segway-arc')
+    expect(titled.photos.join(' ')).not.toContain('hop-on-bus')
+  })
+
   it('keeps Sphere and Sogno details galleries on separate contentIds', async () => {
     authFetch.mockReset()
     resetTripadvisorRequestBudgetForTests()
@@ -2265,6 +2601,14 @@ describe('Tripadvisor place photos', () => {
         name: 'Arc de Triomphe',
         category: 'ATTRACTION',
         photos: ['https://media-cdn.tripadvisor.com/arc.jpg'],
+        reviews: [
+          {
+            text: 'Climb at sunset if you can; the view over the avenues is worth every step.',
+            rating: 5,
+            author: { name: 'Mia' },
+            publishedDate: '2026-05-02',
+          },
+        ],
       }),
     )
 
@@ -2272,12 +2616,192 @@ describe('Tripadvisor place photos', () => {
     expect(info?.contentId).toBe('188709')
     expect(info?.photos[0]).toContain('arc-de-triomphe.jpg')
     expect(info?.photos).toContain('https://media-cdn.tripadvisor.com/arc.jpg')
+    expect(info?.reviews[0]).toMatchObject({
+      text: 'Climb at sunset if you can; the view over the avenues is worth every step.',
+      rating: 5,
+      author: 'Mia',
+    })
     expect(authFetch).toHaveBeenCalledTimes(1)
     const url = String(authFetch.mock.calls[0]?.[0] || '')
     expectAttractionLocationIdQuery(url, '188709')
     expect(url).not.toContain('startDate')
     expect(url).not.toContain('attractions%2Fdetails')
+    expect(url).not.toContain('restaurants')
     expect(url).not.toContain('autocomplete')
+  })
+
+  it('loads attraction reviews when things-to-do details omit them', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch
+      .mockResolvedValueOnce(
+        tripadvisor34DetailResponse({
+          id: '188709',
+          name: 'Arc de Triomphe',
+          category: 'ATTRACTION',
+          photos: ['https://media-cdn.tripadvisor.com/arc.jpg'],
+          rating: 4.5,
+          reviewCount: 46505,
+        }),
+      )
+      .mockResolvedValueOnce(
+        tripadvisor34ReviewsResponse([
+          {
+            text: 'The rooftop terrace is the reason to climb, even with the stairs.',
+            rating: 5,
+            author: { name: 'Mia' },
+            publishedDate: '2026-05-02',
+          },
+        ]),
+      )
+
+    const info = await fetchTripadvisorAttractionInfo({ name: '凯旋门', nameLocal: 'Arc de Triomphe' })
+    expect(info?.contentId).toBe('188709')
+    expect(info?.reviews[0]).toMatchObject({
+      text: 'The rooftop terrace is the reason to climb, even with the stairs.',
+      rating: 5,
+      author: 'Mia',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expectAttractionLocationIdQuery(String(authFetch.mock.calls[0]?.[0] || ''), '188709')
+    expectRestaurantReviewsQuery(String(authFetch.mock.calls[1]?.[0] || ''), '188709')
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('restaurants')
+  })
+
+  it('still fetches attraction reviews when the gallery cache has no review text', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockResolvedValueOnce(
+      tripadvisor34DetailResponse({
+        id: '188709',
+        name: 'Arc de Triomphe',
+        category: 'ATTRACTION',
+        photos: ['https://media-cdn.tripadvisor.com/arc.jpg'],
+        rating: 4.5,
+        reviewCount: 46505,
+      }),
+    )
+
+    await fetchTripadvisorPlaceGallery({
+      name: '凯旋门',
+      nameLocal: 'Arc de Triomphe',
+      type: 'attraction',
+    })
+    authFetch.mockReset()
+    authFetch.mockResolvedValueOnce(
+      tripadvisor34ReviewsResponse([
+        {
+          text: 'Climb at sunset if you can; the view over the avenues is worth every step.',
+          rating: 5,
+          author: { name: 'Mia' },
+          publishedDate: '2026-05-02',
+        },
+      ]),
+    )
+
+    const info = await fetchTripadvisorAttractionInfo({ name: '凯旋门', nameLocal: 'Arc de Triomphe' })
+    expect(info?.reviews[0]).toMatchObject({
+      text: 'Climb at sunset if you can; the view over the avenues is worth every step.',
+      rating: 5,
+      author: 'Mia',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expectRestaurantReviewsQuery(String(authFetch.mock.calls[0]?.[0] || ''), '188709')
+  })
+
+  it('loads Palais de Tokyo reviews from the restaurant reviews endpoint', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    const listingUrl = attractionListingUrl(246664, 'Palais de Tokyo')
+    authFetch
+      .mockResolvedValueOnce(
+        tripadvisor34DetailResponse({
+          id: '246664',
+          name: 'Palais de Tokyo',
+          category: 'ATTRACTION',
+          photos: ['https://media-cdn.tripadvisor.com/tokyo.jpg'],
+          rating: 3.9,
+          reviewCount: 649,
+        }),
+      )
+      .mockResolvedValueOnce(
+        tripadvisor34RestaurantReviewsResponse([
+          {
+            text: 'We went to a very good special art exhibit here. The expo space is big and well-organized.',
+            rating: 4,
+            userDisplayName: 'Thomas V',
+            publishedDate: '2026-02-23',
+          },
+        ]),
+      )
+
+    const info = await fetchTripadvisorAttractionInfo({
+      name: '东京宫',
+      nameLocal: 'Palais de Tokyo',
+    })
+    expect(info?.contentId).toBe('246664')
+    expect(info?.reviews[0]).toMatchObject({
+      text: 'We went to a very good special art exhibit here. The expo space is big and well-organized.',
+      rating: 4,
+      author: 'Thomas V',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expectAttractionDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), listingUrl)
+    expectRestaurantReviewsQuery(String(authFetch.mock.calls[1]?.[0] || ''), '246664', listingUrl)
+  })
+
+  it('falls back to restaurant details when attraction review lists are empty', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    const listingUrl = attractionListingUrl(246664, 'Palais de Tokyo')
+    authFetch
+      .mockResolvedValueOnce(
+        tripadvisor34DetailResponse({
+          id: '246664',
+          name: 'Palais de Tokyo',
+          category: 'ATTRACTION',
+          photos: ['https://media-cdn.tripadvisor.com/tokyo.jpg'],
+          rating: 3.9,
+          reviewCount: 649,
+        }),
+      )
+      .mockResolvedValueOnce(tripadvisor34RestaurantReviewsResponse([]))
+      .mockResolvedValueOnce(
+        tripadvisor34DetailResponse({
+          id: '246664',
+          name: 'Palais de Tokyo',
+          reviews: [
+            {
+              text: 'We went to a very good special art exhibit here. The expo space is big and well-organized.',
+              rating: 4,
+              author: { name: 'Thomas V' },
+              publishedDate: '2026-02-23',
+            },
+          ],
+        }),
+      )
+
+    const info = await fetchTripadvisorAttractionInfo({
+      name: '东京宫',
+      nameLocal: 'Palais de Tokyo',
+    })
+    expect(info?.reviews[0]).toMatchObject({
+      text: 'We went to a very good special art exhibit here. The expo space is big and well-organized.',
+      rating: 4,
+      author: 'Thomas V',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(3)
+    expectAttractionDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), listingUrl)
+    expectRestaurantReviewsQuery(String(authFetch.mock.calls[1]?.[0] || ''), '246664', listingUrl)
+    expectRestaurantDetailsQuery(String(authFetch.mock.calls[2]?.[0] || ''), listingUrl)
   })
 
   it('loads Champs-Élysées from the seeded Tripadvisor id without autocomplete', async () => {
@@ -2291,6 +2815,14 @@ describe('Tripadvisor place photos', () => {
         name: 'Champs-Elysees',
         category: 'ATTRACTION',
         photos: ['https://media-cdn.tripadvisor.com/champs.jpg'],
+        reviews: [
+          {
+            text: 'Busy and touristy, but still the classic Paris walk from Concorde to the Arc.',
+            rating: 4,
+            author: { name: 'Jon' },
+            publishedDate: '2026-04-11',
+          },
+        ],
       }),
     )
 

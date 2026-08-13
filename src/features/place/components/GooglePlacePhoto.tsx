@@ -311,7 +311,7 @@ export function GooglePlacePhoto({
         }
       >
         {showShimmer ? (
-          <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
+          <span className="absolute inset-0 place-hero-shimmer" aria-hidden />
         ) : null}
         {showPlaceholder ? <PhotoPlaceholder /> : null}
       </div>
@@ -324,7 +324,7 @@ export function GooglePlacePhoto({
       aria-busy={showShimmer || undefined}
     >
       {showShimmer ? (
-        <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
+        <span className="absolute inset-0 place-hero-shimmer" aria-hidden />
       ) : null}
       {showPlaceholder ? <PhotoPlaceholder /> : null}
       {src ? (

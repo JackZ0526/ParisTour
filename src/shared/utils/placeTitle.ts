@@ -112,6 +112,35 @@ const TOKEN_EQUIVALENCE: Record<string, string> = {
   tower: 'tower',
   ville: 'city',
   city: 'city',
+  pont: 'bridge',
+  bridge: 'bridge',
+}
+
+/**
+ * Shared venue-class words are not enough to prove two landmarks are the same
+ * place (Grand Palais ≠ Palais Garnier, Musée Rodin ≠ Musée d'Orsay).
+ */
+const LANDMARK_TYPE_WORDS = new Set([
+  'palace',
+  'museum',
+  'garden',
+  'church',
+  'cathedral',
+  'chapel',
+  'tower',
+  'basilica',
+  'bridge',
+  'park',
+  'parc',
+])
+
+function tokensAreTypeOnly(tokens: Iterable<string>): boolean {
+  let count = 0
+  for (const token of tokens) {
+    count += 1
+    if (!LANDMARK_TYPE_WORDS.has(token)) return false
+  }
+  return count > 0
 }
 
 function foldToken(token: string): string {
@@ -157,16 +186,20 @@ export function nameSimilarity(query: string, displayName: string): number {
   if (q === n) return 1
   const qCore = significantLabel(q, true)
   const nCore = significantLabel(n, true)
-  if (qCore && nCore && qCore === nCore) return 1
-  if (n.includes(q) || q.includes(n) || (qCore && nCore && (nCore.includes(qCore) || qCore.includes(nCore)))) {
-    return 0.85
-  }
   const qTokens = new Set(significantTokens(q, true))
   const nTokens = new Set(significantTokens(n, true))
+  if (qCore && nCore && qCore === nCore) return 1
+  if (n.includes(q) || q.includes(n) || (qCore && nCore && (nCore.includes(qCore) || qCore.includes(nCore)))) {
+    const shorter = qCore.length <= nCore.length ? qTokens : nTokens
+    if (!tokensAreTypeOnly(shorter)) return 0.85
+  }
   if (!qTokens.size || !nTokens.size) return 0
-  let overlap = 0
-  for (const t of qTokens) if (nTokens.has(t)) overlap += 1
-  const tokenScore = overlap / Math.max(qTokens.size, nTokens.size)
+  const overlapping: string[] = []
+  for (const t of qTokens) if (nTokens.has(t)) overlapping.push(t)
+  if (overlapping.length && overlapping.every((token) => LANDMARK_TYPE_WORDS.has(token))) {
+    return 0
+  }
+  const tokenScore = overlapping.length / Math.max(qTokens.size, nTokens.size)
 
   const qVenue = significantLabel(q, true, VENUE_TYPE_WORDS)
   const nVenue = significantLabel(n, true, VENUE_TYPE_WORDS)
@@ -193,6 +226,7 @@ const PLACE_ALIAS_GROUPS: string[][] = [
   ['橘园美术馆', "Musée de l'Orangerie", "Musee de l'Orangerie"],
   ['罗丹美术馆', 'Musée Rodin', 'Musee Rodin'],
   ['巴黎歌剧院', 'Palais Garnier'],
+  ['大皇宫', 'Grand Palais'],
   [
     '香榭丽舍大街',
     '香榭丽舍',

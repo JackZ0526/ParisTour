@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { tripadvisorPlaceLoadingSlices } from '../features/place/services/tripadvisorPlaceLoading'
+import {
+  tripadvisorChipLoadingText,
+  tripadvisorPlaceLoadingSlices,
+} from '../features/place/services/tripadvisorPlaceLoading'
 
 describe('tripadvisorPlaceLoadingSlices', () => {
   const pending = {
@@ -12,12 +15,29 @@ describe('tripadvisorPlaceLoadingSlices', () => {
     reviewCount: 0,
   }
 
-  it('shows every skeleton while Tripadvisor details are in flight after a cover', () => {
+  it('shows restaurant skeletons while Tripadvisor details are in flight after a cover', () => {
     expect(tripadvisorPlaceLoadingSlices(pending)).toEqual({
       morePhotos: true,
       rating: true,
       price: true,
       cuisine: true,
+      address: true,
+      reviews: true,
+    })
+  })
+
+  it('omits price and cuisine skeletons for attractions', () => {
+    expect(
+      tripadvisorPlaceLoadingSlices({
+        ...pending,
+        expectPrice: false,
+        expectCuisine: false,
+      }),
+    ).toEqual({
+      morePhotos: true,
+      rating: true,
+      price: false,
+      cuisine: false,
       address: true,
       reviews: true,
     })
@@ -55,5 +75,14 @@ describe('tripadvisorPlaceLoadingSlices', () => {
       address: false,
       reviews: false,
     })
+  })
+
+  it('names only the chips that will actually render', () => {
+    expect(
+      tripadvisorChipLoadingText({ rating: true, price: false, cuisine: false }),
+    ).toBe('正在加载评分…')
+    expect(
+      tripadvisorChipLoadingText({ rating: true, price: true, cuisine: true }),
+    ).toBe('正在加载评分、价格与菜系…')
   })
 })

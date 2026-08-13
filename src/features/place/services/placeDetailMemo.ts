@@ -5,14 +5,16 @@ import {
 } from '../../../shared/services/llm/llmArtifactStore'
 import { memoizeLlmCall, peekLlmMemo, seedLlmMemo } from '../../../shared/services/llm/llmMemo'
 
+const PLACE_DETAIL_PREFIX = 'place-detail:v2:'
+
 /** PlacePanel / itinerary placeId key (catalog id or `custom-*`). */
 export function placeDetailIdKey(placeId: string) {
-  return `place-detail:${placeId}`
+  return `${PLACE_DETAIL_PREFIX}${placeId}`
 }
 
 /** Shared stable key by Google place id when known. */
 export function placeDetailGoogleIdKey(googlePlaceId: string) {
-  return `place-detail:google:${googlePlaceId.trim()}`
+  return `${PLACE_DETAIL_PREFIX}google:${googlePlaceId.trim()}`
 }
 
 /**
@@ -20,7 +22,7 @@ export function placeDetailGoogleIdKey(googlePlaceId: string) {
  * PlacePanel (after add with a new `custom-*` id) can reuse the same narrative.
  */
 export function placeDetailNameKey(name: string) {
-  return `place-detail:google:${name.toLowerCase().trim()}`
+  return `${PLACE_DETAIL_PREFIX}google:${name.toLowerCase().trim()}`
 }
 
 /** Keys used when generating from a Google Places details payload. */

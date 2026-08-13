@@ -20,6 +20,12 @@ import {
   placeDetailKeysFromPlace,
 } from '../../place/services/placeDetailMemo'
 import {
+  nearbyStopsForAdvisor,
+  placeAdvisorCopyFields,
+  placeAdvisorFactsSignature,
+  type PlaceAdvisorFacts,
+} from '../../place/services/placeAdvisorFacts'
+import {
   persistHotelState,
   refreshHotelCandidates,
   replaceHotelCandidates,
@@ -178,6 +184,8 @@ export function TripChatPanel({
   const [pendingStory, setPendingStory] = useState<HotelDetailCopy | null>(null)
   const [pendingStoryLoading, setPendingStoryLoading] = useState(false)
   const [pendingStoryRegenToken, setPendingStoryRegenToken] = useState(0)
+  const [advisorFacts, setAdvisorFacts] = useState<PlaceAdvisorFacts | null>(null)
+  const [advisorFactsPendingId, setAdvisorFactsPendingId] = useState<string | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [busyUserText, setBusyUserText] = useState('')
   const [workSteps, setWorkSteps] = useState<ChatWorkStep[]>([])
@@ -199,8 +207,8 @@ export function TripChatPanel({
     thinkingEnabled: requestThinkingEnabled,
   })
   // Snapshot day/hotel context so itinerary edits don't re-fire LLM mid-confirm.
-  const pendingCtxRef = useRef({ hotel, days })
-  pendingCtxRef.current = { hotel, days }
+  const pendingCtxRef = useRef({ hotel, days, customPlaces })
+  pendingCtxRef.current = { hotel, days, customPlaces }
   workStepsRef.current = workSteps
   reasoningTextRef.current = reasoningText
 
@@ -272,6 +280,10 @@ export function TripChatPanel({
     }
   }, [pendingPlaces, confirmEpoch])
 
+  const factsForPending =
+    advisorFactsPendingId === activePending?.id ? advisorFacts : null
+  const factsSig = placeAdvisorFactsSignature(factsForPending)
+
   // Generate intro + 推荐理由 when pending confirm opens (same memo as PlacePanel).
   useEffect(() => {
     if (!activePending) {
@@ -309,12 +321,22 @@ export function TripChatPanel({
       return
     }
 
+    if (!factsSig) {
+      setPendingStory({ intro: '', reason: '', tripFit: '' })
+      setPendingStoryLoading(true)
+      return
+    }
+
     let cancelled = false
     setPendingStory({ intro: '', reason: '', tripFit: '' })
     setPendingStoryLoading(true)
 
     const ctx = pendingCtxRef.current
     const day = ctx.days.find((d) => d.day === pending.dayNum)
+    const facts = placeAdvisorCopyFields(factsForPending)
+    const nearbyStops = day
+      ? nearbyStopsForAdvisor(day.stops, undefined, ctx.customPlaces)
+      : []
 
     void memoizePlaceDetailCopy(
       detailKeys,
@@ -323,8 +345,16 @@ export function TripChatPanel({
           name: place.name,
           nameLocal: place.nameLocal,
           type: place.type,
+          address: facts.address,
           existingDescription: place.description,
+          listingDescription: facts.listingDescription,
           stopNote,
+          rating: facts.rating,
+          reviewCount: facts.reviewCount,
+          priceLevel: facts.priceLevel,
+          cuisine: facts.cuisine,
+          featuredReviews: facts.featuredReviews,
+          nearbyStops,
           day: pending.dayNum,
           dayTitle: day?.title,
           dayTheme: day?.theme,
@@ -369,11 +399,24 @@ export function TripChatPanel({
     }
     // Only re-run when the pending confirm target changes or user regenerates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePending?.id, pendingStoryRegenToken])
+  }, [activePending?.id, pendingStoryRegenToken, factsSig])
 
   useEffect(() => {
     setPendingStoryRegenToken(0)
   }, [activePending?.id])
+
+  useEffect(() => {
+    if (!activePending || !isLlmConfigured()) return
+    if (factsSig) return
+    const pendingId = activePending.id
+    const timer = window.setTimeout(() => {
+      setAdvisorFactsPendingId(pendingId)
+      setAdvisorFacts((prev) =>
+        prev?.settled ? prev : { reviews: prev?.reviews || [], settled: true },
+      )
+    }, 12_000)
+    return () => window.clearTimeout(timer)
+  }, [activePending?.id, factsSig])
 
   // Keep the panel mounted through the close animation so exit can play.
   useEffect(() => {
@@ -1960,6 +2003,10 @@ export function TripChatPanel({
         overlayClassName="z-[2300]"
         overlayZIndex={2500}
         closeOnBackdrop={activePending?.status !== 'rerecommending'}
+        onAdvisorFacts={(next) => {
+          setAdvisorFactsPendingId(activePending?.id || null)
+          setAdvisorFacts(next)
+        }}
         llmNarrative={
           activePending
             ? {

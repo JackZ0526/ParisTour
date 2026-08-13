@@ -527,6 +527,41 @@ type DragSession = {
   startTop: number
 }
 
+const STOP_SKELETON_TITLE_WIDTHS = ['w-[62%]', 'w-[70%]', 'w-[56%]'] as const
+
+/** Matches the live stop card chrome while a day's places are still generating. */
+function TimelineStopCardSkeleton({ index }: { index: number }) {
+  const titleWidth =
+    STOP_SKELETON_TITLE_WIDTHS[index % STOP_SKELETON_TITLE_WIDTHS.length]
+  return (
+    <div
+      className="flex items-start gap-2 rounded-2xl border border-white/70 bg-[var(--card)] p-2.5 sm:gap-3 sm:p-3"
+      aria-hidden
+    >
+      <span className="mt-1 inline-flex h-7 w-7 shrink-0 rounded-md day-tab-shimmer" />
+      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 rounded-full day-tab-shimmer" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="h-5 w-[4.5rem] rounded-full day-tab-shimmer" />
+          <span className="h-3 w-8 rounded-full day-tab-shimmer" />
+        </div>
+        <span className={`mt-2 block h-4 rounded-full day-tab-shimmer ${titleWidth}`} />
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span className="h-3.5 w-[38%] rounded-full day-tab-shimmer" />
+          <span className="h-4 w-4 shrink-0 rounded-full day-tab-shimmer" />
+        </div>
+        <span className="mt-2 block h-3.5 w-[78%] rounded-full day-tab-shimmer" />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span className="h-6 w-14 rounded-full day-tab-shimmer" />
+          <span className="h-6 w-16 rounded-full day-tab-shimmer" />
+        </div>
+      </div>
+      <span className="hidden h-16 w-16 shrink-0 rounded-xl day-tab-shimmer sm:block" />
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 rounded-full day-tab-shimmer" />
+    </div>
+  )
+}
+
 export function DayTimeline({
   day,
   hotel,
@@ -1442,27 +1477,6 @@ export function DayTimeline({
       .filter(Boolean)
       .join(' ')
 
-  if (dayPending) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
-          <LoadingIndicator
-            variant="block"
-            mode="thinking"
-            task="itineraryDayGenerate"
-            thinkingLabel={`正在生成第 ${day.day} 天行程…`}
-            generatingLabel={`正在生成第 ${day.day} 天行程…`}
-            showDots
-            size="md"
-          />
-          <p className="mt-2 text-center text-xs text-[var(--stone)]">
-            其他天可先查看，这一天生成好后会自动更新。
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       <div className="animate-fade-up rounded-2xl border border-white/70 bg-[var(--card)] p-4">
@@ -1473,7 +1487,7 @@ export function DayTimeline({
             </span>
             <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-xs text-[var(--sage)]">
               {dayPending ? (
-                <span className="inline-block h-3 w-16 animate-pulse rounded-full bg-white/20" />
+                <span className="inline-block h-3 w-16 rounded-full day-tab-shimmer" />
               ) : (
                 day.pace
               )}
@@ -1535,21 +1549,21 @@ export function DayTimeline({
         </div>
         <h3 className="font-display mt-2 text-2xl sm:text-3xl">
           {dayPending ? (
-            <span className="inline-block h-8 w-2/3 animate-pulse rounded bg-white/20" />
+            <span className="mt-1 inline-block h-8 w-2/3 rounded-full day-tab-shimmer" />
           ) : (
             day.title
           )}
         </h3>
         <p className="text-sm text-[var(--copper)]">
           {dayPending ? (
-            <span className="inline-block h-4 w-1/2 animate-pulse rounded bg-white/20" />
+            <span className="inline-block h-4 w-1/2 rounded-full day-tab-shimmer" />
           ) : (
             day.theme
           )}
         </p>
         <p className="mt-2 text-sm text-[var(--stone)]">
           {dayPending ? (
-            <span className="inline-block h-4 w-full animate-pulse rounded bg-white/20" />
+            <span className="mt-1 inline-block h-4 w-full rounded-full day-tab-shimmer" />
           ) : (
             day.summary
           )}
@@ -1559,17 +1573,30 @@ export function DayTimeline({
             {dayRegenError}
           </p>
         )}
-        {dayRegenerating && (
+        {(dayPending || dayRegenerating) && (
           <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-[var(--mist)]/40 px-3 py-3">
             <LoadingIndicator
               variant="inline"
-              thinkingLabel="正在仔细规划今天的行程…"
-              generatingLabel="正在重新生成今天的行程…"
+              thinkingLabel={
+                dayPending
+                  ? `正在生成第 ${day.day} 天行程…`
+                  : '正在仔细规划今天的行程…'
+              }
+              generatingLabel={
+                dayPending
+                  ? `正在生成第 ${day.day} 天行程…`
+                  : '正在重新生成今天的行程…'
+              }
               size="sm"
               showDots
               mode="thinking"
               task="itineraryDayGenerate"
             />
+            {dayPending ? (
+              <p className="mt-1.5 text-xs text-[var(--stone)]">
+                其他天可先查看，这一天生成好后会自动更新。
+              </p>
+            ) : null}
           </div>
         )}
         <div className="mt-3">
@@ -1620,20 +1647,14 @@ export function DayTimeline({
       )}
 
       {dayPending ? (
-        <div className="space-y-1">
+        <div
+          className="space-y-1"
+          role="status"
+          aria-busy="true"
+          aria-label={`正在加载第 ${day.day} 天行程地点`}
+        >
           {Array.from({ length: 3 }, (_, i) => (
-            <div
-              // eslint-disable-next-line react/no-array-index-key
-              key={i}
-              className="rounded-2xl border border-white/10 bg-[var(--mist)]/25 p-3 animate-pulse"
-            >
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-10 rounded-full bg-white/20" />
-                <div className="h-4 w-24 rounded bg-white/20" />
-              </div>
-              <div className="mt-3 h-4 w-3/4 rounded bg-white/20" />
-              <div className="mt-2 h-3 w-full rounded bg-white/20" />
-            </div>
+            <TimelineStopCardSkeleton key={i} index={i} />
           ))}
         </div>
       ) : (

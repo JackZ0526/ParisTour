@@ -24,6 +24,11 @@ import {
   placeDetailKeysFromGoogle,
 } from '../services/placeDetailMemo'
 import {
+  placeAdvisorCopyFields,
+  placeAdvisorFactsSignature,
+  type PlaceAdvisorFacts,
+} from '../services/placeAdvisorFacts'
+import {
   getDayRecommendCache,
   setDayRecommendCache,
 } from '../services/recommendCache'
@@ -103,6 +108,8 @@ export function AddPlaceDialog({
   const [googleStory, setGoogleStory] = useState<HotelDetailCopy | null>(null)
   const [googleStoryLoading, setGoogleStoryLoading] = useState(false)
   const [googleStoryRegenToken, setGoogleStoryRegenToken] = useState(0)
+  const [advisorFacts, setAdvisorFacts] = useState<PlaceAdvisorFacts | null>(null)
+  const [advisorFactsKey, setAdvisorFactsKey] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [addingName, setAddingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -752,8 +759,16 @@ export function AddPlaceDialog({
     setGoogleDetail(null)
     setGoogleStory(null)
     setGoogleStoryLoading(false)
+    setAdvisorFacts(null)
+    setAdvisorFactsKey(null)
     setError(null)
   }
+
+  const googleDetailKey = googleDetail
+    ? `${googleDetail.details.id || googleDetail.details.name}:${googleDetail.type}`
+    : null
+  const factsForDetail = advisorFactsKey === googleDetailKey ? advisorFacts : null
+  const factsSig = placeAdvisorFactsSignature(factsForDetail)
 
   // Generate intro + 推荐理由 when Google detail opens (same memo as PlacePanel).
   useEffect(() => {
@@ -785,17 +800,34 @@ export function AddPlaceDialog({
       return
     }
 
+    if (!factsSig) {
+      setGoogleStory({ intro: '', reason: '', tripFit: '' })
+      setGoogleStoryLoading(true)
+      return
+    }
+
     let cancelled = false
     setGoogleStory({ intro: '', reason: '', tripFit: '' })
     setGoogleStoryLoading(true)
+    const facts = placeAdvisorCopyFields(factsForDetail)
     void memoizePlaceDetailCopy(
       detailKeys,
       () =>
         generatePlaceDetailCopy({
           name: details.name,
-          type: typeLabel[type] || type,
-          address: details.address,
+          nameLocal: details.nameOriginal,
+          type,
+          address: facts.address || details.address,
           existingDescription: details.summary,
+          listingDescription: facts.listingDescription,
+          rating: facts.rating ?? details.rating,
+          reviewCount: facts.reviewCount ?? details.userRatingCount,
+          priceLevel: facts.priceLevel || details.priceLevel,
+          cuisine: facts.cuisine,
+          featuredReviews: facts.featuredReviews?.length
+            ? facts.featuredReviews
+            : details.reviews.slice(0, 6),
+          nearbyStops: currentPlaceNames.slice(0, 8).map((name) => ({ name, type: '' })),
           day: dayNumber,
           dayTitle,
           dayTheme,
@@ -834,11 +866,23 @@ export function AddPlaceDialog({
     }
     // Snapshot day context on open; remount / same place should hit memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleDetail, googleStoryRegenToken])
+  }, [googleDetail, googleStoryRegenToken, factsSig])
 
   useEffect(() => {
     setGoogleStoryRegenToken(0)
   }, [googleDetail])
+
+  useEffect(() => {
+    if (!googleDetail || !isLlmConfigured()) return
+    if (factsSig) return
+    const timer = window.setTimeout(() => {
+      setAdvisorFactsKey(googleDetailKey)
+      setAdvisorFacts((prev) =>
+        prev?.settled ? prev : { reviews: prev?.reviews || [], settled: true },
+      )
+    }, 12_000)
+    return () => window.clearTimeout(timer)
+  }, [googleDetail, googleDetailKey, factsSig])
 
   if (!open || typeof document === 'undefined') return null
 
@@ -1296,6 +1340,10 @@ export function AddPlaceDialog({
         fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
         showMap={false}
         overlayClassName="z-[2200]"
+        onAdvisorFacts={(next) => {
+          setAdvisorFactsKey(googleDetailKey)
+          setAdvisorFacts(next)
+        }}
         llmNarrative={
           googleDetail
             ? {
