@@ -575,6 +575,7 @@ export function AddPlaceDialog({
       }
       const details = await fetchGooglePlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
+        requireFullDetails: true,
       })
       const websitePhotos = (
         await fetchPlaceWebsitePhotosWithFallback({
@@ -743,7 +744,9 @@ export function AddPlaceDialog({
       if (!query) {
         throw new Error('请使用地点的原文名称搜索。')
       }
-      const details = await fetchGooglePlaceDetails(query, undefined)
+      const details = await fetchGooglePlaceDetails(query, undefined, {
+        requireFullDetails: true,
+      })
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }

@@ -193,6 +193,7 @@ async function handleOfficialPlaces(
   rest: string,
   search: string,
   body: ArrayBuffer | null,
+  fullDetails: boolean,
 ): Promise<Response> {
   const key = getOfficialGooglePlacesApiKey()
   if (!key) return missingKey('GOOGLE_PLACES_API_KEY')
@@ -207,7 +208,7 @@ async function handleOfficialPlaces(
   try {
     const upstream = await proxyRequest(target, primaryReq, {
       'X-Goog-Api-Key': key,
-      ...googlePlacesUpstreamHeaders(req.method),
+      ...googlePlacesUpstreamHeaders(req.method, { fullDetails }),
     })
     logUpstream('official', req.method, rest, upstream.status)
     if (!upstream.ok) {
@@ -230,6 +231,7 @@ async function handleRapidApiPlaces(
   rest: string,
   search: string,
   body: ArrayBuffer | null,
+  fullDetails: boolean,
 ): Promise<Response> {
   const key = getRapidApiKey()
   if (!key) return missingKey('RAPIDAPI_KEY')
@@ -249,7 +251,7 @@ async function handleRapidApiPlaces(
     primary = await proxyRequest(target, primaryReq, {
       'X-RapidAPI-Key': key,
       'X-RapidAPI-Host': host,
-      ...googlePlacesUpstreamHeaders(req.method),
+      ...googlePlacesUpstreamHeaders(req.method, { fullDetails }),
     })
   } catch (error) {
     console.error('[google-places] primary', error)
@@ -322,6 +324,9 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
   const url = new URL(req.url)
   let rest = (url.searchParams.get('rest') || '').replace(/^\/+/, '')
   url.searchParams.delete('rest')
+  const fullDetails =
+    req.method === 'GET' && url.searchParams.get('detailsMode') === 'full'
+  url.searchParams.delete('detailsMode')
   if (req.method === 'GET') rest = normalizeDetailsRest(rest)
   if (!allowedPath(req.method, rest)) {
     return json(400, { error: 'Unsupported Places path' })
@@ -333,7 +338,7 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
       : null
   const provider = getGooglePlacesProvider()
   if (provider === 'official') {
-    return handleOfficialPlaces(req, rest, url.search, body)
+    return handleOfficialPlaces(req, rest, url.search, body, fullDetails)
   }
-  return handleRapidApiPlaces(req, rest, url.search, body)
+  return handleRapidApiPlaces(req, rest, url.search, body, fullDetails)
 }

@@ -9,6 +9,7 @@ import {
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
+  hasFullGooglePlaceDetails,
   peekGooglePlaceDetails,
   placeDetailsQuery,
   type GooglePlaceDetails,
@@ -1024,10 +1025,10 @@ export function GooglePlacePage({
       setPhotoIndex(0)
       setGoogleLookupReady(true)
       onDetailsResolvedRef.current?.(peeked)
-      return
+      if (hasFullGooglePlaceDetails(peeked)) return
     }
 
-    setLoading(true)
+    setLoading(!peeked)
     setError(null)
     setPhotoIndex(0)
     setGoogleLookupReady(false)
@@ -1035,6 +1036,7 @@ export function GooglePlacePage({
     void fetchGooglePlaceDetails(query, queryLocation, {
       placeId: googlePlaceId,
       recoverFromLocation: !googlePlaceId && !query,
+      requireFullDetails: true,
     })
       .then((result) => {
         if (cancelled) return

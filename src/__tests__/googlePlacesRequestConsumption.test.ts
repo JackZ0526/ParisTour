@@ -106,6 +106,35 @@ describe('current Places request consumption', () => {
     })
   })
 
+  it('upgrades a cached search result once when the detail page requests reviews', async () => {
+    authFetch
+      .mockResolvedValueOnce(
+        searchResponse('ChIJ-full', 'Le Full', 'https://full.test'),
+      )
+      .mockResolvedValueOnce(
+        detailsResponse('ChIJ-full', 'Le Full', 'https://full.test'),
+      )
+
+    await fetchGooglePlaceDetails('Le Full Paris', undefined)
+    const full = await fetchGooglePlaceDetails('Le Full Paris', undefined, {
+      placeId: 'ChIJ-full',
+      requireFullDetails: true,
+    })
+    await fetchGooglePlaceDetails('Le Full Paris', undefined, {
+      placeId: 'ChIJ-full',
+      requireFullDetails: true,
+    })
+
+    expect(full?.reviews[0]?.text).toBe('Bon.')
+    expect(full?.fullDetails).toBe(true)
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(authFetch.mock.calls[1][0]).toContain('detailsMode=full')
+    expect(getGoogleRequestBudgetSnapshot().byKind).toEqual({
+      'place-search': 1,
+      'place-details': 1,
+    })
+  })
+
   it('uses 1 Text Search per nearby candidate query (cafe + restaurant = 2)', async () => {
     authFetch.mockImplementation(() =>
       searchResponse('ChIJ-near', 'Nearby Cafe', 'https://near.test'),

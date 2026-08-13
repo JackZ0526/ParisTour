@@ -1,34 +1,39 @@
 /** Text Search (New) field masks must be prefixed with `places.`. */
 export const GOOGLE_PLACES_SEARCH_FIELD_MASK = [
   'places.id',
-  'places.name',
   'places.displayName',
   'places.formattedAddress',
-  'places.shortFormattedAddress',
   'places.location',
   'places.rating',
   'places.userRatingCount',
-  'places.photos',
-  'places.editorialSummary',
-  'places.nationalPhoneNumber',
-  'places.internationalPhoneNumber',
   'places.websiteUri',
-  'places.regularOpeningHours',
-  'places.currentOpeningHours',
   'places.priceLevel',
 ].join(',')
 
-/** Place Details (New) field masks are unprefixed. Reviews stay here, not on Text Search. */
-export const GOOGLE_PLACES_DETAILS_FIELD_MASK = [
+/** Core Place Details used by non-detail workflows; capped at the Enterprise SKU. */
+export const GOOGLE_PLACES_DETAILS_CORE_FIELD_MASK = [
   'id',
-  'name',
   'displayName',
   'formattedAddress',
-  'shortFormattedAddress',
   'location',
   'rating',
   'userRatingCount',
-  'photos',
+  'nationalPhoneNumber',
+  'internationalPhoneNumber',
+  'websiteUri',
+  'regularOpeningHours',
+  'currentOpeningHours',
+  'priceLevel',
+].join(',')
+
+/** Full detail-page mask. Reviews/summary intentionally stay off search and core details. */
+export const GOOGLE_PLACES_DETAILS_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'rating',
+  'userRatingCount',
   'reviews',
   'editorialSummary',
   'nationalPhoneNumber',
@@ -50,13 +55,18 @@ export function normalizeGooglePlaceId(placeId: string): string {
 }
 
 /** RapidAPI Place Details is GET with no body. Sending JSON Content-Type makes the gateway return 400. */
-export function googlePlacesUpstreamHeaders(method: string): Record<string, string> {
+export function googlePlacesUpstreamHeaders(
+  method: string,
+  options?: { fullDetails?: boolean },
+): Record<string, string> {
   const isPost = method.toUpperCase() === 'POST'
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Goog-FieldMask': isPost
       ? GOOGLE_PLACES_SEARCH_FIELD_MASK
-      : GOOGLE_PLACES_DETAILS_FIELD_MASK,
+      : options?.fullDetails
+        ? GOOGLE_PLACES_DETAILS_FIELD_MASK
+        : GOOGLE_PLACES_DETAILS_CORE_FIELD_MASK,
   }
   if (isPost) headers['Content-Type'] = 'application/json'
   return headers

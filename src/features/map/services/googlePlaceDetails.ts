@@ -39,6 +39,8 @@ export interface GooglePlaceDetails {
   priceLevel?: string
   location?: Coordinates
   query: string
+  /** True only after the lazy detail-page request (reviews included) completes. */
+  fullDetails?: true
 }
 
 export interface GooglePlaceSearchOptions {
@@ -54,6 +56,8 @@ export interface GooglePlaceSearchOptions {
    * stable Google field, and retries burn the daily Places quota.
    */
   recoverPhotos?: boolean
+  /** Fetch reviews and atmosphere fields; use only for an opened detail page. */
+  requireFullDetails?: boolean
 }
 
 export interface NearbyGooglePlaceCandidate {
@@ -387,6 +391,16 @@ function storeDetails(
   const stored = forStorage(details)
   const keys = aliasesFor(stored, query, location)
   if (!keys.length) return
+  const existing = readDetails(keys)
+  if (existing?.fullDetails && !stored.fullDetails) {
+    const preserved = forStorage(existing)
+    for (const key of keys) detailMemory.set(key, preserved)
+    setLlmArtifact(keys[0], preserved, {
+      aliases: keys.slice(1),
+      silent: options?.silent,
+    })
+    return
+  }
   for (const key of keys) detailMemory.set(key, stored)
   setLlmArtifact(keys[0], stored, {
     aliases: keys.slice(1),
@@ -542,14 +556,19 @@ async function searchFullPlaces(
   return details
 }
 
-async function detailsById(placeId: string, query: string): Promise<GooglePlaceDetails | null> {
+async function detailsById(
+  placeId: string,
+  query: string,
+  fullDetails = false,
+): Promise<GooglePlaceDetails | null> {
   const id = placeId.replace(/^places\//, '').trim()
   if (!id) return null
   const raw = await rapidRequest<RapidPlace>(
     'place-details',
-    `v1/places/${encodeURIComponent(id)}?languageCode=fr&regionCode=FR`,
+    `v1/places/${encodeURIComponent(id)}?languageCode=fr&regionCode=FR${fullDetails ? '&detailsMode=full' : ''}`,
   )
   const details = raw ? normalizeRapidPlace(raw, query) : null
+  if (details && fullDetails) details.fullDetails = true
   if (details) storeDetails(details, query)
   return details ? withDisplayPhotos(details) : null
 }
@@ -641,26 +660,43 @@ export async function fetchGooglePlaceDetails(
     ...(lookupQuery ? [detailKey('query', lookupQuery)] : []),
   ]
   const cached = readDetails(keys)
+  const detailPlaceId = placeId || cached?.id?.trim()
+  const requireFullDetails = options.requireFullDetails === true
+  const upgradeToFull =
+    Boolean(cached) &&
+    requireFullDetails &&
+    !cached?.fullDetails &&
+    Boolean(detailPlaceId)
   const recoverWebsite =
     Boolean(cached) &&
+    !upgradeToFull &&
     !cached?.website &&
-    Boolean(placeId) &&
+    Boolean(detailPlaceId) &&
     options.recoverPhotos !== false &&
-    !hasAttemptedWebsiteRecovery(placeId)
-  if (cached && !recoverWebsite) return cached
+    !hasAttemptedWebsiteRecovery(detailPlaceId!)
+  if (cached && !recoverWebsite && !upgradeToFull) return cached
   if (!placeId && !lookupQuery) return null
 
-  const inflightKey = placeId ? `id:${placeId}` : `query:${lookupQuery}|${location?.lat},${location?.lng}`
+  const detailMode = requireFullDetails ? 'full' : 'core'
+  const inflightKey = detailPlaceId
+    ? `id:${detailPlaceId}:${detailMode}`
+    : `query:${lookupQuery}|${location?.lat},${location?.lng}:${detailMode}`
   const pending = inflight.get(inflightKey)
   if (pending) return pending
 
   const task = (async () => {
-    if (cached && recoverWebsite && placeId) {
-      markWebsiteRecoveryAttempted(placeId)
-      const recovered = await detailsById(placeId, lookupQuery)
+    if (cached && upgradeToFull && detailPlaceId) {
+      const complete = await detailsById(detailPlaceId, lookupQuery, true)
+      return complete || cached
+    }
+    if (cached && recoverWebsite && detailPlaceId) {
+      markWebsiteRecoveryAttempted(detailPlaceId)
+      const recovered = await detailsById(detailPlaceId, lookupQuery, false)
       return recovered || cached
     }
-    if (placeId) return detailsById(placeId, lookupQuery)
+    if (detailPlaceId) {
+      return detailsById(detailPlaceId, lookupQuery, requireFullDetails)
+    }
     const places = await searchFullPlaces(
       lookupQuery,
       location,
@@ -683,6 +719,10 @@ export async function fetchGooglePlaceDetails(
     }
     if (!best || !Number.isFinite(bestScore)) return null
     storeDetails(best, lookupQuery, location)
+    if (requireFullDetails && best.id) {
+      const complete = await detailsById(best.id, lookupQuery, true)
+      if (complete) return complete
+    }
     return withDisplayPhotos(best)
   })()
 
@@ -692,6 +732,12 @@ export async function fetchGooglePlaceDetails(
   } finally {
     inflight.delete(inflightKey)
   }
+}
+
+export function hasFullGooglePlaceDetails(
+  details: GooglePlaceDetails | null | undefined,
+): boolean {
+  return details?.fullDetails === true
 }
 
 export function placeDetailsQuery(name: string, nameLocal?: string): string {
