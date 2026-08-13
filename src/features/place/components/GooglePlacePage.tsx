@@ -2,10 +2,24 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
+  peekGooglePlaceDetails,
   placeDetailsQuery,
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
+import {
+  fetchTripadvisorAttractionInfo,
+  fetchTripadvisorPlaceGallery,
+  hasCachedTripadvisorGallery,
+  peekTripadvisorAttractionInfo,
+  peekTripadvisorPlacePhotos,
+  type TripadvisorAttractionInfo,
+} from '../services/tripadvisorPlacePhotos'
+import {
+  fetchPlaceWebsitePhotosWithFallback,
+  peekCachedPlaceWebsitePhotos,
+} from '../services/placeWebsitePhotos'
 import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../../map/services/googleMapsKey'
+import { getGoogleRequestBudgetSnapshot } from '../../map/services/googleRequestBudget'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
   looksChinese,
@@ -17,6 +31,11 @@ import { placeOriginalLabel, placeTitleLines } from '../../../shared/utils/place
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GoogleReviewsList } from './GoogleReviewsList'
+import {
+  PlaceSourceMark,
+  placeSourceLabel,
+  type PlaceInfoSource,
+} from './PlaceSourceMark'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import {
   fetchWikimediaPlacePhoto,
@@ -50,6 +69,7 @@ interface Props {
   name: string
   nameLocal?: string
   googlePlaceId?: string
+  tripadvisorContentId?: string
   location?: Coordinates
   placeType?: PlaceType
   fallbackImage?: string
@@ -90,6 +110,101 @@ interface Props {
   /** Persist a recovered Google identity in the owning trip record. */
   onDetailsResolved?: (details: GooglePlaceDetails) => void
   onClose: () => void
+}
+
+function isUsablePhotoHttp(url: string): boolean {
+  return (
+    /^https?:\/\//i.test(url) &&
+    !url.includes('places.googleapis.com') &&
+    !url.includes('maps.googleapis.com/maps/api/place/photo')
+  )
+}
+
+function sourceFromPhotoUrl(url: string): PlaceInfoSource | null {
+  const value = url.toLowerCase()
+  if (value.includes('tripadvisor.com') || value.includes('media-cdn.tripadvisor')) {
+    return 'tripadvisor'
+  }
+  if (
+    value.includes('googleusercontent.com') ||
+    value.includes('googleapis.com') ||
+    value.includes('ggpht.com')
+  ) {
+    return 'google'
+  }
+  if (value.includes('bstatic.com') || value.includes('booking.com')) return 'booking'
+  if (value.includes('wikimedia') || value.includes('wikipedia')) return 'wikimedia'
+  return null
+}
+
+function resolvePhotoSource(input: {
+  url: string
+  galleryVariant?: 'carousel' | 'booking'
+  websitePhotos: string[]
+  tripadvisorPhotos: string[]
+  googlePhotos: string[]
+  wikimediaUrl?: string
+}): PlaceInfoSource | null {
+  const url = input.url
+  if (!url) return null
+  if (input.galleryVariant === 'booking') return 'booking'
+  if (input.wikimediaUrl && url === input.wikimediaUrl) return 'wikimedia'
+  if (input.websitePhotos.includes(url)) return 'website'
+  if (input.tripadvisorPhotos.includes(url)) return 'tripadvisor'
+  if (input.googlePhotos.includes(url)) return 'google'
+  return sourceFromPhotoUrl(url)
+}
+
+function GalleryThumb({
+  url,
+  selected,
+  onSelect,
+  onError,
+  buttonRef,
+}: {
+  url?: string
+  selected: boolean
+  onSelect: () => void
+  onError: (url: string) => void
+  buttonRef: (el: HTMLButtonElement | null) => void
+}) {
+  const [ready, setReady] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const urlRef = useRef(url)
+  if (urlRef.current !== url) {
+    urlRef.current = url
+    setReady(false)
+  }
+  useLayoutEffect(() => {
+    const img = imgRef.current
+    if (img?.complete && img.naturalWidth > 0) setReady(true)
+  }, [url])
+
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={onSelect}
+      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
+        selected ? 'border-[var(--copper)]' : 'border-transparent'
+      }`}
+    >
+      <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
+      {url ? (
+        <img
+          ref={imgRef}
+          src={url}
+          alt=""
+          className={`relative h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-300 ${
+            ready ? 'opacity-100' : 'opacity-0'
+          }`}
+          referrerPolicy="no-referrer"
+          onLoad={() => setReady(true)}
+          onError={() => onError(url)}
+        />
+      ) : null}
+    </button>
+  )
 }
 
 function LlmNarrativeSingleBody({
@@ -158,6 +273,7 @@ export function GooglePlacePage({
   name,
   nameLocal,
   googlePlaceId,
+  tripadvisorContentId,
   location,
   placeType,
   fallbackImage,
@@ -183,12 +299,21 @@ export function GooglePlacePage({
 }: Props) {
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
+  const [googleLookupReady, setGoogleLookupReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = useState(0)
   const [failedPhotos, setFailedPhotos] = useState<string[]>([])
+  const [websitePhotos, setWebsitePhotos] = useState<string[]>([])
+  const [websitePhotosResolved, setWebsitePhotosResolved] = useState(false)
+  const [tripadvisorFallbackPhotos, setTripadvisorFallbackPhotos] = useState<string[]>([])
+  const [tripadvisorFallbackResolved, setTripadvisorFallbackResolved] = useState(false)
+  const [heroReady, setHeroReady] = useState(false)
   const pendingGalleryAdvanceRef = useRef(false)
   const [wikimediaPhoto, setWikimediaPhoto] =
     useState<WikimediaPlacePhoto | null>(null)
+  const [tripadvisorInfo, setTripadvisorInfo] =
+    useState<TripadvisorAttractionInfo | null>(null)
+  const [tripadvisorResolved, setTripadvisorResolved] = useState(false)
   const [llmZh, setLlmZh] = useState<string | null>(null)
   /** idle = not finished; loading = in flight; done = success or gave up */
   const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
@@ -208,17 +333,111 @@ export function GooglePlacePage({
     setNameZhPhase('idle')
   }
 
-  const rawPhotos = wikimediaPhoto?.url
-    ? [wikimediaPhoto.url]
-    : details?.photos?.length
-      ? details.photos
+  const isAttraction = placeType === 'attraction'
+  const isRestaurantLike = placeType === 'restaurant' || placeType === 'cafe'
+  const skipGoogleLookup =
+    skipProviderLookup || isAttraction || placeType === 'hotel'
+  const displayNarrative = llmNarrative
+    ? {
+        ...llmNarrative,
+        intro:
+          isAttraction && tripadvisorInfo?.description
+            ? tripadvisorInfo.description
+            : llmNarrative.intro,
+      }
+    : null
+  const tripadvisorCached = peekTripadvisorPlacePhotos(
+    name,
+    nameLocal,
+    placeType,
+    tripadvisorContentId,
+  )
+  const photoRefs = isAttraction
+    ? tripadvisorInfo?.photos.length
+      ? tripadvisorInfo.photos
+      : tripadvisorCached
+    : websitePhotos.length
+      ? websitePhotos
+      : tripadvisorFallbackPhotos.length
+        ? tripadvisorFallbackPhotos
+        : tripadvisorCached.length
+          ? tripadvisorCached
+          : (details?.photos || []).filter(isUsablePhotoHttp)
+  const googlePhotos = photoRefs.filter(
+    (url) => isUsablePhotoHttp(url) && !failedPhotos.includes(url),
+  )
+  const survivingGoogle = googlePhotos.filter((url) => !failedPhotos.includes(url))
+  const rawPhotos = survivingGoogle.length
+    ? survivingGoogle
+    : wikimediaPhoto?.url
+      ? [wikimediaPhoto.url]
       : fallbackImage
         ? [fallbackImage]
         : []
   const photos = rawPhotos.filter((url) => !failedPhotos.includes(url))
-  const activePhoto = photos[photoIndex] || photos[0]
-  const showThumbStrip = photos.length > 1
-  const [thumbStripExpanded, setThumbStripExpanded] = useState(false)
+  const currentRef = photoRefs[photoIndex]
+  const currentResolved =
+    currentRef && isUsablePhotoHttp(currentRef) && !failedPhotos.includes(currentRef)
+      ? currentRef
+      : undefined
+  const activePhoto =
+    (currentResolved && !failedPhotos.includes(currentResolved)
+      ? currentResolved
+      : null) ||
+    photos[0] ||
+    wikimediaPhoto?.url ||
+    fallbackImage ||
+    ''
+  const awaitingOfficialPhotos =
+    galleryVariant !== 'booking' &&
+    !skipGoogleLookup &&
+    !isAttraction &&
+    websitePhotos.length === 0 &&
+    !websitePhotosResolved
+  const galleryPending =
+    galleryVariant !== 'booking' &&
+    (isAttraction
+      ? !tripadvisorResolved
+      : !skipGoogleLookup &&
+        (!websitePhotosResolved ||
+          (isRestaurantLike &&
+            websitePhotos.length === 0 &&
+            !tripadvisorFallbackResolved)))
+  const awaitingTripadvisorPhotos =
+    galleryPending &&
+    (isAttraction ||
+      (isRestaurantLike && websitePhotosResolved && websitePhotos.length === 0))
+  const displayPhoto =
+    awaitingOfficialPhotos || awaitingTripadvisorPhotos ? '' : activePhoto
+  const photoSource = resolvePhotoSource({
+    url: displayPhoto,
+    galleryVariant,
+    websitePhotos,
+    tripadvisorPhotos: [
+      ...(tripadvisorInfo?.photos || []),
+      ...tripadvisorFallbackPhotos,
+      ...tripadvisorCached,
+    ],
+    googlePhotos: details?.photos || [],
+    wikimediaUrl: wikimediaPhoto?.url,
+  })
+  const factsSource: PlaceInfoSource | null = isAttraction
+    ? tripadvisorInfo?.rating != null || tripadvisorInfo?.address
+      ? 'tripadvisor'
+      : null
+    : details && !skipGoogleLookup
+      ? 'google'
+      : null
+  const photoSectionReady = !galleryPending && Boolean(displayPhoto) && heroReady
+  const showPhotoShimmer = !photoSectionReady
+  const displayPhotoRef = useRef(displayPhoto)
+  const heroImgRef = useRef<HTMLImageElement>(null)
+  if (displayPhotoRef.current !== displayPhoto) {
+    displayPhotoRef.current = displayPhoto
+    setHeroReady(false)
+  }
+  const galleryLength = Math.max(photoRefs.length, photos.length)
+  const showThumbStrip = galleryLength > 1
   const googleMapsPlaceUrl = details?.id
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         details.nameOriginal || details.name || query,
@@ -227,8 +446,8 @@ export function GooglePlacePage({
 
   function stepPhoto(delta: number) {
     if (delta < 0) {
-      if (photos.length < 2) return
-      setPhotoIndex((i) => (i - 1 + photos.length) % photos.length)
+      if (galleryLength < 2) return
+      setPhotoIndex((i) => (i - 1 + galleryLength) % galleryLength)
       return
     }
 
@@ -243,18 +462,22 @@ export function GooglePlacePage({
       return
     }
 
-    if (photos.length < 2) return
-    setPhotoIndex((i) => (i + 1) % photos.length)
+    if (galleryLength < 2) return
+    setPhotoIndex((i) => (i + 1) % galleryLength)
   }
 
   const showGalleryNav =
-    photos.length > 1 ||
+    photoRefs.length > 1 ||
     (galleryVariant === 'booking' &&
       !bookingPhotosFullyLoaded &&
       Boolean(onBookingGalleryAdvance))
 
   useEffect(() => {
-    if (!open || placeType !== 'attraction' || !location) {
+    if (!open || !isAttraction || !location) {
+      setWikimediaPhoto(null)
+      return
+    }
+    if (tripadvisorInfo?.photos.length || tripadvisorCached.length) {
       setWikimediaPhoto(null)
       return
     }
@@ -272,32 +495,161 @@ export function GooglePlacePage({
     return () => {
       cancelled = true
     }
-  }, [open, placeType, name, nameLocal, location])
+  }, [
+    open,
+    isAttraction,
+    name,
+    nameLocal,
+    location,
+    tripadvisorInfo?.photos.length,
+    tripadvisorCached.length,
+  ])
 
   useEffect(() => {
     setFailedPhotos([])
+    setWebsitePhotos([])
+    setWebsitePhotosResolved(false)
+    setTripadvisorFallbackPhotos([])
+    setTripadvisorFallbackResolved(false)
+    setGoogleLookupReady(false)
+    setHeroReady(false)
+    setPhotoIndex(0)
     pendingGalleryAdvanceRef.current = false
   }, [open, name])
 
+  useLayoutEffect(() => {
+    const img = heroImgRef.current
+    if (img?.complete && img.naturalWidth > 0) setHeroReady(true)
+  }, [displayPhoto])
+
   useEffect(() => {
-    if (!open) return
-    setPhotoIndex(0)
-  }, [open, name])
+    if (!open || skipGoogleLookup || galleryVariant === 'booking' || isAttraction) {
+      setWebsitePhotosResolved(true)
+      return
+    }
+    if (!googleLookupReady || loading) return
+    const cached = peekCachedPlaceWebsitePhotos({
+      website: details?.website,
+      name: details?.name || name,
+      nameLocal: details?.nameOriginal || nameLocal,
+      address: details?.address,
+    })
+    if (cached.photos.length) {
+      setWebsitePhotos(cached.photos)
+      setWebsitePhotosResolved(true)
+      return
+    }
+    let cancelled = false
+    setWebsitePhotosResolved(false)
+    void fetchPlaceWebsitePhotosWithFallback({
+      website: details?.website,
+      name: details?.name || name,
+      nameLocal: details?.nameOriginal || nameLocal,
+      address: details?.address,
+    })
+      .then((result) => {
+        if (cancelled || !result.photos.length) return
+        setWebsitePhotos(result.photos)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setWebsitePhotosResolved(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    open,
+    loading,
+    details?.website,
+    details?.name,
+    details?.nameOriginal,
+    details?.address,
+    name,
+    nameLocal,
+    placeType,
+    skipGoogleLookup,
+    galleryVariant,
+    isAttraction,
+    googleLookupReady,
+  ])
+
+  useEffect(() => {
+    if (!open || skipGoogleLookup || galleryVariant === 'booking' || isAttraction) {
+      setTripadvisorFallbackResolved(true)
+      return
+    }
+    if (loading || !googleLookupReady || !websitePhotosResolved) return
+    if (websitePhotos.length || !isRestaurantLike) {
+      setTripadvisorFallbackResolved(true)
+      return
+    }
+    const officialCached = peekCachedPlaceWebsitePhotos({
+      website: details?.website,
+      name: details?.name || name,
+      nameLocal: details?.nameOriginal || nameLocal,
+      address: details?.address,
+    })
+    if (officialCached.photos.length) {
+      setWebsitePhotos(officialCached.photos)
+      setTripadvisorFallbackResolved(true)
+      return
+    }
+    const cachedPhotos = [
+      peekTripadvisorPlacePhotos(name, nameLocal, placeType, tripadvisorContentId),
+      peekTripadvisorPlacePhotos(
+        details?.name || name,
+        details?.nameOriginal || nameLocal,
+        placeType,
+        tripadvisorContentId,
+      ),
+    ].find((photos) => photos.length) || []
+    if (cachedPhotos.length) {
+      setTripadvisorFallbackPhotos(cachedPhotos)
+      setTripadvisorFallbackResolved(true)
+      return
+    }
+    let cancelled = false
+    void fetchTripadvisorPlaceGallery({
+      name: details?.name || name,
+      nameLocal: details?.nameOriginal || nameLocal || name,
+      type: placeType,
+      contentId: tripadvisorContentId,
+    })
+      .then((gallery) => {
+        if (cancelled || !gallery?.photos.length) return
+        setTripadvisorFallbackPhotos(gallery.photos)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setTripadvisorFallbackResolved(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    open,
+    loading,
+    googleLookupReady,
+    websitePhotosResolved,
+    websitePhotos.length,
+    isRestaurantLike,
+    details?.name,
+    details?.nameOriginal,
+    name,
+    nameLocal,
+    placeType,
+    tripadvisorContentId,
+    skipGoogleLookup,
+    galleryVariant,
+    isAttraction,
+  ])
 
   useEffect(() => {
     if (!pendingGalleryAdvanceRef.current || photos.length < 1) return
     pendingGalleryAdvanceRef.current = false
     setPhotoIndex((i) => Math.min(i + 1, photos.length - 1))
   }, [photos.length])
-
-  useEffect(() => {
-    if (!showThumbStrip) {
-      setThumbStripExpanded(false)
-      return
-    }
-    const frame = requestAnimationFrame(() => setThumbStripExpanded(true))
-    return () => cancelAnimationFrame(frame)
-  }, [showThumbStrip])
 
   useEffect(() => {
     thumbRefs.current[photoIndex]?.scrollIntoView({
@@ -333,28 +685,51 @@ export function GooglePlacePage({
       setDetails(detailsOverride)
       setLoading(false)
       setError(null)
+      setGoogleLookupReady(true)
       return
     }
-    if (skipProviderLookup) {
+    if (skipGoogleLookup) {
       setDetails(null)
       setLoading(false)
       setError(null)
       setPhotoIndex(0)
+      setGoogleLookupReady(true)
       return
     }
     let cancelled = false
+    const queryLocation =
+      location?.lat != null && location?.lng != null
+        ? { lat: location.lat, lng: location.lng }
+        : undefined
+    const peeked = peekGooglePlaceDetails(name, nameLocal, queryLocation, googlePlaceId)
+    if (peeked) {
+      setDetails(peeked)
+      setLoading(false)
+      setError(null)
+      setPhotoIndex(0)
+      setGoogleLookupReady(true)
+      onDetailsResolvedRef.current?.(peeked)
+      return
+    }
+
     setLoading(true)
     setError(null)
     setPhotoIndex(0)
+    setGoogleLookupReady(false)
 
-    void fetchGooglePlaceDetails(query, location, {
+    void fetchGooglePlaceDetails(query, queryLocation, {
       placeId: googlePlaceId,
       recoverFromLocation: !googlePlaceId && !query,
     })
       .then((result) => {
         if (cancelled) return
         if (!result) {
-          setError('未找到该地点的 Google 详情。')
+          const budget = getGoogleRequestBudgetSnapshot()
+          setError(
+            budget.remaining <= 0
+              ? '今日 Google 地点查询次数已用完。已打开过的地点仍可从缓存查看。'
+              : '未找到该地点的 Google 详情。',
+          )
           setDetails(null)
         } else {
           setDetails(result)
@@ -365,13 +740,51 @@ export function GooglePlacePage({
         if (!cancelled) setError('加载地点详情失败，请稍后再试。')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setGoogleLookupReady(true)
+        }
       })
 
     return () => {
       cancelled = true
     }
-  }, [open, query, googlePlaceId, location, detailsOverride, skipProviderLookup])
+  }, [open, query, googlePlaceId, location?.lat, location?.lng, detailsOverride, skipGoogleLookup])
+
+  useEffect(() => {
+    if (!open || !isAttraction) {
+      setTripadvisorInfo(null)
+      setTripadvisorResolved(true)
+      return
+    }
+    const peeked = peekTripadvisorAttractionInfo(
+      name,
+      nameLocal,
+      tripadvisorContentId,
+    )
+    if (peeked) setTripadvisorInfo(peeked)
+    if (peeked && hasCachedTripadvisorGallery(peeked.contentId)) {
+      setTripadvisorResolved(true)
+      return
+    }
+    setTripadvisorResolved(false)
+    let cancelled = false
+    void fetchTripadvisorAttractionInfo({
+      name,
+      nameLocal,
+      contentId: tripadvisorContentId,
+    })
+      .then((result) => {
+        if (!cancelled && result) setTripadvisorInfo(result)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setTripadvisorResolved(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, isAttraction, name, nameLocal, tripadvisorContentId])
 
   // When Google / trip data has no Chinese display name, LLM-translate the original.
   useEffect(() => {
@@ -564,16 +977,24 @@ export function GooglePlacePage({
           <CloseIconButton onClick={onClose} className="mt-0.5" />
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
-          {loading && (
-            <LoadingIndicator label="正在加载 Google 地点信息…" showDots size="sm" />
-          )}
+        <div
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
+          aria-busy={
+            loading ||
+            (isAttraction && !tripadvisorResolved && !tripadvisorInfo) ||
+            undefined
+          }
+        >
           {error && <p className="text-sm text-amber-800">{error}</p>}
 
-          {activePhoto && (
+          {(displayPhoto ||
+            awaitingOfficialPhotos ||
+            awaitingTripadvisorPhotos ||
+            fallbackImage) && (
             <div className="space-y-2">
               <div
-                className="relative overflow-hidden rounded-2xl select-none"
+                className="relative h-56 overflow-hidden rounded-2xl bg-[var(--mist)] select-none sm:h-72"
+                aria-busy={showPhotoShimmer || undefined}
                 onPointerDown={(e) => {
                   if (!showGalleryNav) return
                   swipeStartX.current = e.clientX
@@ -589,45 +1010,84 @@ export function GooglePlacePage({
                   swipeStartX.current = null
                 }}
               >
-                <img
-                  src={activePhoto}
-                  alt={details?.name || name}
-                  className="h-56 w-full object-cover sm:h-72"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  draggable={false}
-                  onError={() =>
-                    setFailedPhotos((current) =>
-                      current.includes(activePhoto)
-                        ? current
-                        : [...current, activePhoto],
-                    )
-                  }
+                <span
+                  className={`absolute inset-0 z-[2] place-hero-shimmer motion-safe:transition-opacity motion-safe:duration-300 ${
+                    showPhotoShimmer ? 'opacity-100' : 'pointer-events-none opacity-0'
+                  }`}
+                  aria-hidden
                 />
-                {wikimediaPhoto && activePhoto === wikimediaPhoto.url && (
+                {showPhotoShimmer ? (
+                  <span className="sr-only">正在加载地点照片</span>
+                ) : null}
+                {displayPhoto ? (
+                  <>
+                    <img
+                      src={displayPhoto}
+                      alt=""
+                      aria-hidden
+                      className={`pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-2xl motion-safe:transition-opacity motion-safe:duration-300 ${
+                        heroReady ? 'opacity-80' : 'opacity-0'
+                      }`}
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                    />
+                    <span
+                      className={`pointer-events-none absolute inset-0 bg-white/25 motion-safe:transition-opacity motion-safe:duration-300 ${
+                        heroReady ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      aria-hidden
+                    />
+                    <img
+                      ref={heroImgRef}
+                      src={displayPhoto}
+                      alt={details?.name || name}
+                      className={`relative z-[1] h-full w-full object-contain motion-safe:transition-opacity motion-safe:duration-300 ${
+                        heroReady ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                      onLoad={() => setHeroReady(true)}
+                      onError={() =>
+                        setFailedPhotos((current) =>
+                          current.includes(displayPhoto)
+                            ? current
+                            : [...current, displayPhoto],
+                        )
+                      }
+                    />
+                  </>
+                ) : null}
+                {wikimediaPhoto && displayPhoto === wikimediaPhoto.url && heroReady && (
                   <a
                     href={wikimediaPhoto.sourcePage}
                     target="_blank"
                     rel="noreferrer"
-                    className="absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
+                    className="absolute bottom-2 left-2 z-10 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
                     title={`${wikimediaPhoto.attribution || 'Wikimedia Commons'}${wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}`}
                   >
                     图片：{wikimediaPhoto.attribution || 'Wikimedia Commons'}
                     {wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}
                   </a>
                 )}
-                {bookingGalleryPhotosLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/35 backdrop-blur-[1px]">
-                    <LoadingIndicator label="正在加载更多照片" showDots size="sm" />
-                  </div>
-                )}
+                {photoSource &&
+                  photoSource !== 'wikimedia' &&
+                  displayPhoto &&
+                  heroReady && (
+                    <span
+                      className="absolute bottom-2 left-2 z-10"
+                      aria-label={`图片来自 ${placeSourceLabel(photoSource)}`}
+                    >
+                      <PlaceSourceMark source={photoSource} onPhoto />
+                    </span>
+                  )}
                 {showGalleryNav && (
                   <>
                     <button
                       type="button"
                       aria-label="上一张"
                       onClick={() => stepPhoto(-1)}
-                      disabled={photos.length < 2}
-                      className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-40"
+                      disabled={galleryLength < 2}
+                      className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-40"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M15 18l-6-6 6-6" />
@@ -638,14 +1098,14 @@ export function GooglePlacePage({
                       aria-label="下一张"
                       onClick={() => stepPhoto(1)}
                       disabled={bookingGalleryPhotosLoading}
-                      className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:opacity-60"
+                      className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:opacity-60"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M9 18l6-6-6-6" />
                       </svg>
                     </button>
-                    <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
-                      {photoIndex + 1} / {photos.length}
+                    <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                      {photoIndex + 1} / {galleryLength}
                       {galleryVariant === 'booking' &&
                       !bookingPhotosFullyLoaded &&
                       onBookingGalleryAdvance
@@ -655,74 +1115,68 @@ export function GooglePlacePage({
                   </>
                 )}
               </div>
+              {showPhotoShimmer ? (
+                <div className="flex gap-2 overflow-hidden" aria-hidden>
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <span
+                      key={i}
+                      className="relative h-14 w-20 shrink-0 rounded-lg place-hero-shimmer"
+                    />
+                  ))}
+                </div>
+              ) : showThumbStrip ? (
+                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {photoRefs.map((ref, i) => {
+                    const url = isUsablePhotoHttp(ref) ? ref : undefined
+                    return (
+                      <GalleryThumb
+                        key={ref + i}
+                        url={url}
+                        selected={i === photoIndex}
+                        onSelect={() => setPhotoIndex(i)}
+                        onError={(failedUrl) =>
+                          setFailedPhotos((current) =>
+                            current.includes(failedUrl)
+                              ? current
+                              : [...current, failedUrl],
+                          )
+                        }
+                        buttonRef={(el) => {
+                          thumbRefs.current[i] = el
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              ) : null}
               {bookingGalleryPhotosError && !bookingGalleryPhotosLoading && (
                 <p className="text-xs text-amber-800">{bookingGalleryPhotosError}</p>
               )}
-              <div
-                className={`grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  showThumbStrip && thumbStripExpanded
-                    ? 'grid-rows-[1fr] opacity-100'
-                    : 'grid-rows-[0fr] opacity-0'
-                }`}
-                aria-hidden={!showThumbStrip}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  {showThumbStrip && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {photos.map((url, i) => (
-                        <button
-                          key={url + i}
-                          ref={(el) => {
-                            thumbRefs.current[i] = el
-                          }}
-                          type="button"
-                          onClick={() => setPhotoIndex(i)}
-                          className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
-                            i === photoIndex ? 'border-[var(--copper)]' : 'border-transparent'
-                          }`}
-                        >
-                          <img
-                            src={url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            referrerPolicy="no-referrer-when-downgrade"
-                            onError={() =>
-                              setFailedPhotos((current) =>
-                                current.includes(url) ? current : [...current, url],
-                              )
-                            }
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           )}
 
-          {llmNarrative &&
-            (llmNarrative.loading ||
-              llmNarrative.intro ||
-              llmNarrative.reason ||
-              llmNarrative.tripFit) && (
+          {displayNarrative &&
+            (displayNarrative.loading ||
+              displayNarrative.intro ||
+              displayNarrative.reason ||
+              displayNarrative.tripFit) && (
               <div className="space-y-3 rounded-2xl border border-[var(--sage)]/25 bg-[var(--sage)]/8 px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-[0.16em] text-[var(--sage)]">
-                    {llmNarrative.labels?.title || '行程顾问点评'}
+                    {displayNarrative.labels?.title || '行程顾问点评'}
                   </p>
-                  {llmNarrative.onRegenerate &&
-                    (llmNarrative.intro ||
-                      llmNarrative.reason ||
-                      llmNarrative.tripFit ||
-                      llmNarrative.regenerating) && (
+                  {displayNarrative.onRegenerate &&
+                    (displayNarrative.intro ||
+                      displayNarrative.reason ||
+                      displayNarrative.tripFit ||
+                      displayNarrative.regenerating) && (
                       <button
                         type="button"
                         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--sage)]/30 bg-white/70 text-[var(--sage)] transition hover:bg-white disabled:opacity-60"
-                        disabled={Boolean(llmNarrative.loading || llmNarrative.regenerating)}
-                        aria-label={llmNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
-                        title={llmNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
-                        onClick={llmNarrative.onRegenerate}
+                        disabled={Boolean(displayNarrative.loading || displayNarrative.regenerating)}
+                        aria-label={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
+                        title={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
+                        onClick={displayNarrative.onRegenerate}
                       >
                         <svg
                           width="13"
@@ -734,7 +1188,7 @@ export function GooglePlacePage({
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           className={
-                            llmNarrative.regenerating || llmNarrative.loading
+                            displayNarrative.regenerating || displayNarrative.loading
                               ? 'animate-spin'
                               : undefined
                           }
@@ -746,19 +1200,19 @@ export function GooglePlacePage({
                       </button>
                     )}
                 </div>
-                {llmNarrative.variant === 'single' ? (
+                {displayNarrative.variant === 'single' ? (
                   <LlmNarrativeSingleBody
-                    reason={llmNarrative.reason}
-                    loading={Boolean(llmNarrative.loading)}
-                    loadingLabel={llmNarrative.labels?.loadingText}
+                    reason={displayNarrative.reason}
+                    loading={Boolean(displayNarrative.loading)}
+                    loadingLabel={displayNarrative.labels?.loadingText}
                   />
                 ) : (
                   <>
-                {llmNarrative.loading && !llmNarrative.intro && !llmNarrative.reason && (
+                {displayNarrative.loading && !displayNarrative.intro && !displayNarrative.reason && (
                   <LoadingIndicator
                     thinkingLabel="正在思考简介与推荐理由…"
                     generatingLabel={
-                      llmNarrative.labels?.loadingText || '正在生成简介与推荐理由…'
+                      displayNarrative.labels?.loadingText || '正在生成简介与推荐理由…'
                     }
                     showDots
                     size="sm"
@@ -766,16 +1220,16 @@ export function GooglePlacePage({
                     task="placeDetail"
                   />
                 )}
-                {llmNarrative.intro && (
+                {displayNarrative.intro && (
                   <div>
                     <p className="text-sm font-medium">
-                      {llmNarrative.labels?.intro || '简介'}
+                      {displayNarrative.labels?.intro || '简介'}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
-                      {llmNarrative.intro}
-                      {llmNarrative.loading &&
-                      !llmNarrative.reason &&
-                      !llmNarrative.labels?.tripFit ? (
+                      {displayNarrative.intro}
+                      {displayNarrative.loading &&
+                      !displayNarrative.reason &&
+                      !displayNarrative.labels?.tripFit ? (
                         <span
                           className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
                           aria-hidden
@@ -784,14 +1238,14 @@ export function GooglePlacePage({
                     </p>
                   </div>
                 )}
-                {llmNarrative.reason && (
+                {displayNarrative.reason && (
                   <div>
                     <p className="text-sm font-medium">
-                      {llmNarrative.labels?.reason || '为什么推荐'}
+                      {displayNarrative.labels?.reason || '为什么推荐'}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
-                      {llmNarrative.reason}
-                      {llmNarrative.loading && !llmNarrative.labels?.tripFit ? (
+                      {displayNarrative.reason}
+                      {displayNarrative.loading && !displayNarrative.labels?.tripFit ? (
                         <span
                           className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
                           aria-hidden
@@ -800,24 +1254,24 @@ export function GooglePlacePage({
                     </p>
                   </div>
                 )}
-                {llmNarrative.tripFit && (
+                {displayNarrative.tripFit && (
                   <div>
                     <p className="text-sm font-medium">
-                      {llmNarrative.labels?.tripFit || '与行程 / 要求的关系'}
+                      {displayNarrative.labels?.tripFit || '与行程 / 要求的关系'}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
-                      {llmNarrative.tripFit}
+                      {displayNarrative.tripFit}
                     </p>
                   </div>
                 )}
-                {llmNarrative.loading &&
-                  (llmNarrative.intro || llmNarrative.reason) &&
-                  !llmNarrative.tripFit &&
-                  llmNarrative.labels?.tripFit &&
-                  llmNarrative.labels?.loadingMoreText && (
+                {displayNarrative.loading &&
+                  (displayNarrative.intro || displayNarrative.reason) &&
+                  !displayNarrative.tripFit &&
+                  displayNarrative.labels?.tripFit &&
+                  displayNarrative.labels?.loadingMoreText && (
                     <LoadingIndicator
-                      thinkingLabel={llmNarrative.labels.loadingMoreText}
-                      generatingLabel={llmNarrative.labels.loadingMoreText}
+                      thinkingLabel={displayNarrative.labels.loadingMoreText}
+                      generatingLabel={displayNarrative.labels.loadingMoreText}
                       showDots
                       size="sm"
                       mode="thinking"
@@ -830,10 +1284,23 @@ export function GooglePlacePage({
             )}
 
           {!providerOwnsSummary && <div className="flex flex-wrap gap-2 text-sm">
-            {details?.rating != null && (
-              <span className="rounded-full bg-[var(--gold)]/25 px-3 py-1">
-                ★ {details.rating.toFixed(1)}
-                {details.userRatingCount != null ? `（${details.userRatingCount}）` : ''}
+            {(isAttraction ? tripadvisorInfo?.rating : details?.rating) != null && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
+                title={factsSource ? `评分来自 ${placeSourceLabel(factsSource)}` : undefined}
+              >
+                {factsSource && (factsSource === 'google' || factsSource === 'tripadvisor') ? (
+                  <PlaceSourceMark source={factsSource} showLabel={false} />
+                ) : null}
+                <span className="sr-only">
+                  {factsSource ? `${placeSourceLabel(factsSource)} 评分 ` : '评分 '}
+                </span>
+                ★ {(isAttraction ? tripadvisorInfo?.rating : details?.rating)!.toFixed(1)}
+                {(isAttraction
+                  ? tripadvisorInfo?.userRatingCount
+                  : details?.userRatingCount) != null
+                  ? `（${isAttraction ? tripadvisorInfo?.userRatingCount : details?.userRatingCount}）`
+                  : ''}
               </span>
             )}
             {priceLevelLabel && (
@@ -844,23 +1311,38 @@ export function GooglePlacePage({
             )}
           </div>}
 
-          {!providerOwnsSummary && details?.address && <p className="text-sm text-[var(--stone)]">{details.address}</p>}
+          {!providerOwnsSummary &&
+            (isAttraction ? tripadvisorInfo?.address : details?.address) && (
+              <p className="text-sm text-[var(--stone)]">
+                {isAttraction ? tripadvisorInfo?.address : details?.address}
+              </p>
+            )}
 
           {providerDetails}
 
-          {reviewsSection !== undefined ? reviewsSection : details?.reviews?.length ? (
-            <GoogleReviewsList
-              reviews={details.reviews}
-              sourceLabel={reviewSourceLabel}
-            />
-          ) : null}
+          {isAttraction
+            ? null
+            : reviewsSection !== undefined
+              ? reviewsSection
+              : details?.reviews?.length
+                ? (
+                    <GoogleReviewsList
+                      reviews={details.reviews}
+                      sourceLabel={reviewSourceLabel}
+                      source="google"
+                    />
+                  )
+                : null}
 
-          {reviewsSection === undefined && details &&
+          {!isAttraction && reviewsSection === undefined && details &&
             !loading &&
             !details.reviews.length &&
             (details.userRatingCount || 0) > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium">{reviewSourceLabel}</p>
+                <p className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+                  <PlaceSourceMark source="google" showLabel={false} />
+                  {reviewSourceLabel}
+                </p>
                 <div className="rounded-xl bg-white/70 px-3 py-2 text-sm">
                   <p className="leading-relaxed text-[var(--stone)]">
                     Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。
@@ -889,7 +1371,7 @@ export function GooglePlacePage({
                   src={embedSrc}
                   className="h-[260px] w-full border-0"
                   loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
+                  referrerPolicy="no-referrer"
                   allowFullScreen
                 />
               </div>

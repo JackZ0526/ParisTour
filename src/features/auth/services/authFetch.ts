@@ -3,6 +3,10 @@
  * Server verifies the JWT then replaces Authorization with the provider key.
  */
 import { getSupabase, isSupabaseConfigured } from '../../../shared/lib/supabase'
+import {
+  classifyApiRequest,
+  recordApiRequest,
+} from '../../../shared/services/apiRequestMeter'
 
 export async function authApiHeaders(
   extra?: HeadersInit,
@@ -32,5 +36,7 @@ export async function authApiHeaders(
 
 export async function authFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers = await authApiHeaders(init?.headers)
+  const kind = classifyApiRequest(input)
+  if (kind) recordApiRequest(kind)
   return fetch(input, { ...init, headers })
 }

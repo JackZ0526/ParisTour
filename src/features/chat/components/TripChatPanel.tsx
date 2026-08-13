@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
+import { fetchPlaceWebsitePhotosWithFallback } from '../../place/services/placeWebsitePhotos'
+import { fetchTripadvisorAttractionInfo } from '../../place/services/tripadvisorPlacePhotos'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -459,6 +461,35 @@ export function TripChatPanel({
     if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加地点。')
 
     const placeType: PlaceType = input.placeType || 'attraction'
+    if (placeType === 'attraction') {
+      const ta = await fetchTripadvisorAttractionInfo({
+        name: input.placeName,
+      })
+      if (!ta?.location) {
+        throw new Error(`找不到景点「${input.placeName}」，请换个更完整的名称。`)
+      }
+      const travelerNote = !isOperationalStopNote(input.note) ? input.note?.trim() : undefined
+      const hasUsefulNote = Boolean(travelerNote && travelerNote.length >= 12)
+      return {
+        id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        tripadvisorContentId: ta.contentId,
+        name: ta.name || input.placeName,
+        type: 'attraction',
+        description:
+          (hasUsefulNote ? travelerNote : undefined) ||
+          ta.description ||
+          `${ta.name}，适合安排进第 ${input.dayNum} 天行程。`,
+        ratingHint:
+          ta.rating != null ? `Tripadvisor ★ ${ta.rating.toFixed(1)}` : 'Tripadvisor 景点',
+        image: ta.photos[0] || FALLBACK_IMAGE,
+        location: ta.location,
+        googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          `${ta.name} Paris`,
+        )}`,
+        durationHint: '90 分钟',
+      }
+    }
+
     const hotelLocation =
       Number.isFinite(hotel.lat) &&
       Number.isFinite(hotel.lng) &&
@@ -506,8 +537,17 @@ export function TripChatPanel({
       if (blurb) description = blurb
     }
 
+    const websitePhotos = (
+      await fetchPlaceWebsitePhotosWithFallback({
+        website: details.website,
+        name: details.name,
+        nameLocal: details.nameOriginal,
+        address: details.address,
+      }).catch(() => ({ photos: [] }))
+    ).photos
+    const websitePhoto = websitePhotos[0] || null
     const wikimediaPhoto =
-      placeType === 'attraction'
+      placeType === 'attraction' && !websitePhoto
         ? await fetchWikimediaPlacePhoto(details.name, details.location)
         : null
 
@@ -517,7 +557,10 @@ export function TripChatPanel({
       type: placeType,
       description,
       ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
-      image: wikimediaPhoto?.url || details.photos[0] || FALLBACK_IMAGE,
+      image:
+        websitePhoto ||
+        wikimediaPhoto?.url ||
+        FALLBACK_IMAGE,
       location: details.location,
       googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
       durationHint: placeType === 'cafe' ? '45 分钟' : '90 分钟',

@@ -1836,6 +1836,8 @@ export function DayTimeline({
                 <GooglePlacePhoto
                   name={place.name}
                   nameLocal={place.nameLocal}
+                  googlePlaceId={place.googlePlaceId}
+                  tripadvisorContentId={place.tripadvisorContentId}
                   location={place.location}
                   type={place.type}
                   fallback={place.image}
@@ -2003,6 +2005,8 @@ export function DayTimeline({
                           <GooglePlacePhoto
                             name={oldSwapPlace.name}
                             nameLocal={oldSwapPlace.nameLocal}
+                            googlePlaceId={oldSwapPlace.googlePlaceId}
+                            tripadvisorContentId={oldSwapPlace.tripadvisorContentId}
                             location={oldSwapPlace.location}
                             type={oldSwapPlace.type}
                             fallback={oldSwapPlace.image}
@@ -2161,6 +2165,8 @@ export function DayTimeline({
                   <GooglePlacePhoto
                     name={place.name}
                     nameLocal={place.nameLocal}
+                    googlePlaceId={place.googlePlaceId}
+                    tripadvisorContentId={place.tripadvisorContentId}
                     location={place.location}
                     type={place.type}
                     fallback={place.image}

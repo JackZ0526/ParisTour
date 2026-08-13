@@ -81,6 +81,35 @@
   );
 }
 
+/* Large photo skeleton: higher contrast so the sweep reads on a mist block.
+   Do not set position here — the hero overlay must stay `absolute`. */
+.place-hero-shimmer {
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--stone) 18%, var(--mist));
+}
+
+.place-hero-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    100deg,
+    transparent 8%,
+    color-mix(in srgb, white 88%, var(--paper)) 50%,
+    transparent 92%
+  );
+  animation: day-tab-shimmer-slide 1.35s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .place-hero-shimmer::after {
+    animation: none;
+  }
+}
+
 .day-tab-shimmer-on-ink::after {
   background: linear-gradient(
     100deg,
@@ -403,6 +432,163 @@ select {
 @media (min-width: 640px) {
   .cloud-save-toast {
     bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+.api-meter {
+  --api-meter-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --api-meter-ease-in: cubic-bezier(0.4, 0.05, 0.2, 1);
+  --api-meter-rail: 1.85rem;
+  position: fixed;
+  z-index: 1900;
+  left: 0;
+  top: max(6.75rem, calc(env(safe-area-inset-top) + 5.5rem));
+}
+
+@media (min-width: 1024px) {
+  .api-meter {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
+.api-meter-shell {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  width: max-content;
+  margin-left: max(0.45rem, env(safe-area-inset-left));
+}
+
+.api-meter-rail,
+.api-meter-details-panel {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.api-meter-rail {
+  display: flex;
+  width: var(--api-meter-rail);
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  padding: 0.6rem 0.08rem 0.65rem;
+  border-radius: 0.95rem;
+}
+
+.api-meter-rail-label,
+.api-meter-rail-value,
+.api-meter-rail-group-value {
+  margin: 0;
+  text-align: center;
+}
+
+.api-meter-rail-label {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: var(--stone);
+}
+
+.api-meter-rail-value {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.api-meter-rail-groups {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.42rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.api-meter-rail-groups > li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.api-meter-rail-group-value {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--stone) 65%, transparent);
+}
+
+.api-meter-rail-group-value.is-active {
+  color: var(--sage);
+}
+
+.api-meter-details {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 22.5rem;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition:
+    max-width 520ms var(--api-meter-ease-out),
+    opacity 280ms var(--api-meter-ease-out),
+    transform 520ms var(--api-meter-ease-out);
+}
+
+.api-meter:not(.is-details-open) .api-meter-details {
+  transition-duration: 360ms, 220ms, 360ms;
+  transition-timing-function: var(--api-meter-ease-in);
+}
+
+.api-meter.is-details-open .api-meter-details {
+  max-width: 22.5rem;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.api-meter-details-panel {
+  width: 21.5rem;
+  margin-left: 0.45rem;
+  overflow: visible;
+  border-radius: 1rem;
+  padding: 0.65rem 0.7rem 0.7rem;
+}
+
+.api-meter-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.4rem;
+}
+
+.api-meter-details-grid > li {
+  border-radius: 0.55rem;
+  padding: 0.38rem 0.45rem 0.42rem;
+  background: color-mix(in srgb, var(--mist) 32%, white 68%);
+}
+
+.api-meter-details-grid > li:nth-child(even) {
+  background: color-mix(in srgb, var(--sage) 8%, white 92%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-meter-details {
+    transition: none;
   }
 }
 

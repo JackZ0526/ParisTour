@@ -37,7 +37,12 @@ export function googleMapsEmbedApiUrl(query: string, apiKey: string): string {
 export function withGoogleMapsPhotoKey(url: string): string {
   const key = getGoogleMapsApiKey()
   if (!url || !key) return url
-  if (!url.includes('places.googleapis.com')) return url
+  if (
+    !url.includes('places.googleapis.com') &&
+    !url.includes('maps.googleapis.com/maps/api/place/photo')
+  ) {
+    return url
+  }
   try {
     const u = new URL(url)
     if (!u.searchParams.get('key')) {
@@ -51,7 +56,13 @@ export function withGoogleMapsPhotoKey(url: string): string {
 
 /** Keep browser credentials out of durable/cloud snapshots; re-add on read. */
 export function withoutGoogleMapsPhotoKey(url: string): string {
-  if (!url || !url.includes('places.googleapis.com')) return url
+  if (
+    !url ||
+    (!url.includes('places.googleapis.com') &&
+      !url.includes('maps.googleapis.com/maps/api/place/photo'))
+  ) {
+    return url
+  }
   try {
     const u = new URL(url)
     u.searchParams.delete('key')

@@ -61,8 +61,10 @@ export async function proxyRequest(
 
   const accept = req.headers.get('accept')
   if (accept) headers.set('accept', accept)
-  const contentType = req.headers.get('content-type')
-  if (contentType) headers.set('content-type', contentType)
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const contentType = req.headers.get('content-type')
+    if (contentType) headers.set('content-type', contentType)
+  }
 
   const init: RequestInit = {
     method: req.method,

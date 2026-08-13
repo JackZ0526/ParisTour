@@ -167,6 +167,9 @@ export {
   generatePlaceDetailCopy,
   generateDayCopy,
   recommendPlacesForDay,
+  resolveOfficialWebsite,
+  resolveAttractionCanonicalName,
+  type AttractionCanonicalName,
 } from './business/place'
 
 export {

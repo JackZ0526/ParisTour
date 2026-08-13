@@ -4,7 +4,14 @@ import {
   placeIdentitySimilarity,
   PLACE_NAME_MATCH_MIN,
 } from '../../../shared/utils/placeTitle'
-import { tryConsumeGoogleRequest } from './googleRequestBudget'
+import {
+  getGoogleRequestBudgetSnapshot,
+  tryConsumeGoogleRequest,
+} from './googleRequestBudget'
+import {
+  withGoogleMapsPhotoKey,
+  withoutGoogleMapsPhotoKey,
+} from './googleMapsKey'
 
 export interface GoogleReview {
   text: string
@@ -22,7 +29,7 @@ export interface GooglePlaceDetails {
   address?: string
   rating?: number
   userRatingCount?: number
-  /** Empty unless a previously persisted image is available; photo media costs another request. */
+  /** Place Photo media URLs built from `photos[].name` already in the Place payload. */
   photos: string[]
   reviews: GoogleReview[]
   summary?: string
@@ -41,6 +48,12 @@ export interface GooglePlaceSearchOptions {
   placeId?: string
   /** Legacy option retained for call-site compatibility. */
   recoverFromLocation?: boolean
+  /**
+   * When a cached search hit has no website, try Place Details once so we can
+   * scrape official photos. Never retry on later opens — missing website is a
+   * stable Google field, and retries burn the daily Places quota.
+   */
+  recoverPhotos?: boolean
 }
 
 export interface NearbyGooglePlaceCandidate {
@@ -82,7 +95,13 @@ interface RapidPlace {
   regularOpeningHours?: { weekdayDescriptions?: string[] }
   currentOpeningHours?: { weekdayDescriptions?: string[] }
   priceLevel?: string
-  photos?: Array<{ name?: string }>
+  photos?: Array<{
+    name?: string
+    photoUri?: string
+    uri?: string
+    photo_reference?: string
+    photoReference?: string
+  }>
   reviews?: Array<{
     text?: LocalizedText
     originalText?: LocalizedText
@@ -96,11 +115,18 @@ interface RapidSearchResponse {
   places?: RapidPlace[]
 }
 
-const DETAILS_PREFIX = 'rapid-google-place:v1:'
-const CANDIDATES_PREFIX = 'rapid-google-candidates:v2:'
+const DETAILS_PREFIX = 'rapid-google-place:v4:'
+const CANDIDATES_PREFIX = 'rapid-google-candidates:v3:'
+const PHOTO_URI_PREFIX = 'rapid-google-photo-uri:v1:'
+const WEBSITE_RECOVERY_PREFIX = 'rapid-google-website-recovery:v1:'
+const MAX_PLACE_PHOTOS = 8
+const PLACE_PHOTO_MAX_PX = 900
 const detailMemory = new Map<string, GooglePlaceDetails>()
 const candidateMemory = new Map<string, NearbyGooglePlaceCandidate[]>()
 const inflight = new Map<string, Promise<GooglePlaceDetails | null>>()
+const photoUriMemory = new Map<string, string>()
+const photoInflight = new Map<string, Promise<string | null>>()
+const websiteRecoveryMemory = new Set<string>()
 
 function textOf(value: LocalizedText): string {
   if (typeof value === 'string') return value.trim()
@@ -133,6 +159,173 @@ function detailKey(kind: 'id' | 'query' | 'name', value: string, location?: Coor
   return `${DETAILS_PREFIX}${kind}:${normalizeLookup(value)}${suffix}`
 }
 
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value)
+}
+
+function isResolvedPhotoUri(value: string): boolean {
+  return (
+    isHttpUrl(value) &&
+    !value.includes('places.googleapis.com') &&
+    !value.includes('maps.googleapis.com/maps/api/place/photo')
+  )
+}
+
+/** Parse a Place Photo (New) resource from a name, media URL, or legacy photo URL. */
+export function parseGooglePhotoResource(
+  value: string,
+  placeId?: string,
+): { placeId: string; photoResource: string } | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const fallbackId = placeId?.replace(/^places\//, '').trim()
+
+  if (trimmed.includes('maps.googleapis.com/maps/api/place/photo')) {
+    try {
+      const ref = new URL(trimmed).searchParams.get('photoreference')
+      if (ref && fallbackId) return { placeId: fallbackId, photoResource: ref }
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
+
+  const fromPath = trimmed.match(/places\/([^/]+)\/photos\/([^/?]+)/)
+  if (fromPath) {
+    return {
+      placeId: fromPath[1],
+      photoResource: fromPath[2].replace(/\/media$/, ''),
+    }
+  }
+
+  if (fallbackId && !trimmed.includes('/') && !isHttpUrl(trimmed)) {
+    return { placeId: fallbackId, photoResource: trimmed }
+  }
+  return null
+}
+
+function storedPhotoRef(
+  parsed: { placeId: string; photoResource: string },
+): string {
+  return `places/${parsed.placeId}/photos/${parsed.photoResource}`
+}
+
+/** @deprecated Kept for tests; photos no longer resolve through Place Photo. */
+export function googlePlacePhotoMediaUrl(
+  photoName: string,
+  maxPx = PLACE_PHOTO_MAX_PX,
+): string | null {
+  const parsed = parseGooglePhotoResource(photoName)
+  if (!parsed) {
+    return isHttpUrl(photoName) ? withoutGoogleMapsPhotoKey(photoName) : null
+  }
+  return `https://places.googleapis.com/v1/${storedPhotoRef(parsed)}/media?maxHeightPx=${maxPx}&maxWidthPx=${maxPx}`
+}
+
+function photoResourceName(photo: {
+  name?: string
+  photo_reference?: string
+  photoReference?: string
+}): string | null {
+  const named = [photo.name, photo.photo_reference, photo.photoReference].find(
+    (value) => typeof value === 'string' && value.trim(),
+  )
+  return named?.trim() || null
+}
+
+function extractPlacePhotoUrls(
+  photos: RapidPlace['photos'] | string[] | undefined,
+  placeId?: string,
+): string[] {
+  if (!Array.isArray(photos)) return []
+  const urls: string[] = []
+  const seen = new Set<string>()
+  const id = placeId?.replace(/^places\//, '').trim()
+  for (const photo of photos) {
+    let url: string | null = null
+    if (typeof photo === 'string') {
+      if (isResolvedPhotoUri(photo)) url = withoutGoogleMapsPhotoKey(photo)
+      else {
+        const parsed = parseGooglePhotoResource(photo, id)
+        url = parsed ? storedPhotoRef(parsed) : null
+      }
+    } else if (photo && typeof photo === 'object') {
+      const direct = [photo.photoUri, photo.uri].find(
+        (value) => typeof value === 'string' && isResolvedPhotoUri(value),
+      )
+      if (direct) {
+        url = withoutGoogleMapsPhotoKey(direct)
+      } else {
+        const parsed = parseGooglePhotoResource(photoResourceName(photo) || '', id)
+        url = parsed ? storedPhotoRef(parsed) : null
+      }
+    }
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    urls.push(url)
+    if (urls.length >= MAX_PLACE_PHOTOS) break
+  }
+  return urls
+}
+
+function photoCacheKey(photoName: string, placeId?: string): string | null {
+  if (isResolvedPhotoUri(photoName)) return null
+  const parsed = parseGooglePhotoResource(photoName, placeId)
+  return parsed ? `${parsed.placeId}/${parsed.photoResource}` : null
+}
+
+function readStoredPhotoUri(cacheKey: string): string | null {
+  const memory = photoUriMemory.get(cacheKey)
+  if (memory) return memory
+  const stored = getLlmArtifact<{ photoUri: string }>(`${PHOTO_URI_PREFIX}${cacheKey}`)
+  if (stored?.photoUri) {
+    photoUriMemory.set(cacheKey, stored.photoUri)
+    return stored.photoUri
+  }
+  return null
+}
+
+/** Sync cache read — cards must not start a Place Photo request. */
+export function peekGooglePlacePhotoMedia(
+  photoName: string,
+  placeId?: string,
+): string | null {
+  if (isResolvedPhotoUri(photoName)) return photoName
+  const cacheKey = photoCacheKey(photoName, placeId)
+  return cacheKey ? readStoredPhotoUri(cacheKey) : null
+}
+
+/**
+ * Place Photo (New) is no longer used. Search/Details photo resource names
+ * are not display URLs; Tripadvisor media-gallery supplies the album.
+ */
+export async function fetchGooglePlacePhotoMedia(
+  photoName: string,
+  placeId?: string,
+): Promise<string | null> {
+  return peekGooglePlacePhotoMedia(photoName, placeId)
+}
+
+function withDisplayPhotos(details: GooglePlaceDetails): GooglePlaceDetails {
+  if (!details.photos.length) return details
+  return {
+    ...details,
+    photos: details.photos.map((url) =>
+      isResolvedPhotoUri(url) ? withGoogleMapsPhotoKey(url) : url,
+    ),
+  }
+}
+
+function forStorage(details: GooglePlaceDetails): GooglePlaceDetails {
+  if (!details.photos.length) return details
+  return {
+    ...details,
+    photos: details.photos.map((url) =>
+      isResolvedPhotoUri(url) ? withoutGoogleMapsPhotoKey(url) : url,
+    ),
+  }
+}
+
 function reviveDetails(value: unknown): GooglePlaceDetails | null {
   if (!value || typeof value !== 'object') return null
   const item = value as Partial<GooglePlaceDetails>
@@ -141,9 +334,10 @@ function reviveDetails(value: unknown): GooglePlaceDetails | null {
     ...item,
     name: item.name,
     query: item.query,
-    photos: Array.isArray(item.photos)
-      ? item.photos.filter((url): url is string => typeof url === 'string' && Boolean(url))
-      : [],
+    photos: extractPlacePhotoUrls(
+      item.photos as RapidPlace['photos'] | string[] | undefined,
+      item.id,
+    ),
     reviews: Array.isArray(item.reviews)
       ? item.reviews.filter(
           (review): review is GoogleReview =>
@@ -156,11 +350,11 @@ function reviveDetails(value: unknown): GooglePlaceDetails | null {
 function readDetails(keys: string[]): GooglePlaceDetails | null {
   for (const key of keys) {
     const memory = detailMemory.get(key)
-    if (memory) return memory
+    if (memory) return withDisplayPhotos(memory)
     const stored = reviveDetails(getLlmArtifact<GooglePlaceDetails>(key))
     if (stored) {
       detailMemory.set(key, stored)
-      return stored
+      return withDisplayPhotos(stored)
     }
   }
   return null
@@ -190,10 +384,11 @@ function storeDetails(
   location?: Coordinates,
   options?: { silent?: boolean },
 ) {
-  const keys = aliasesFor(details, query, location)
+  const stored = forStorage(details)
+  const keys = aliasesFor(stored, query, location)
   if (!keys.length) return
-  for (const key of keys) detailMemory.set(key, details)
-  setLlmArtifact(keys[0], details, {
+  for (const key of keys) detailMemory.set(key, stored)
+  setLlmArtifact(keys[0], stored, {
     aliases: keys.slice(1),
     silent: options?.silent,
   })
@@ -230,9 +425,10 @@ function normalizeRapidPlace(place: RapidPlace, query: string): GooglePlaceDetai
     address: place.formattedAddress || place.shortFormattedAddress,
     rating: place.rating,
     userRatingCount: place.userRatingCount,
-    // The response sample confirms `photos[].name` is only a media handle.
-    // Following it would be another endpoint call, so UI images remain cached/fallback.
-    photos: [],
+    photos: extractPlacePhotoUrls(
+      place.photos,
+      place.id || place.name?.replace(/^places\//, ''),
+    ),
     reviews,
     summary: textOf(place.editorialSummary) || undefined,
     phone: place.nationalPhoneNumber || place.internationalPhoneNumber,
@@ -294,6 +490,13 @@ async function rapidRequest<T>(
     `/api/google-places?rest=${encodeURIComponent(path)}${upstreamSearch ? `&${upstreamSearch}` : ''}`,
     init,
   )
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const budget = getGoogleRequestBudgetSnapshot()
+    const provider = response.headers.get('x-paristour-places-provider') || 'unknown'
+    console.info(
+      `[places] ${kind} ${path} via ${provider} (${response.status}) used ${budget.used}/${budget.limit}`,
+    )
+  }
   if (!response.ok) {
     const message = await response.text().catch(() => '')
     throw new Error(`Places request failed (${response.status})${message ? `: ${message}` : ''}`)
@@ -340,13 +543,15 @@ async function searchFullPlaces(
 }
 
 async function detailsById(placeId: string, query: string): Promise<GooglePlaceDetails | null> {
+  const id = placeId.replace(/^places\//, '').trim()
+  if (!id) return null
   const raw = await rapidRequest<RapidPlace>(
     'place-details',
-    `v1/places/${encodeURIComponent(placeId)}?languageCode=fr&regionCode=FR`,
+    `v1/places/${encodeURIComponent(id)}?languageCode=fr&regionCode=FR`,
   )
   const details = raw ? normalizeRapidPlace(raw, query) : null
   if (details) storeDetails(details, query)
-  return details
+  return details ? withDisplayPhotos(details) : null
 }
 
 export async function searchNearbyGooglePlaceCandidates(input: {
@@ -357,7 +562,7 @@ export async function searchNearbyGooglePlaceCandidates(input: {
 }): Promise<NearbyGooglePlaceCandidate[]> {
   const textQuery = originalSearchLabel(input.textQuery)
   if (!textQuery) return []
-  const limit = Math.max(1, Math.min(10, input.limit || 5))
+  const limit = Math.max(1, Math.min(15, input.limit || 5))
   const key = `${CANDIDATES_PREFIX}${normalizeLookup(textQuery)}|${input.location.lat.toFixed(4)},${input.location.lng.toFixed(4)}|${Math.round(input.maxDistanceMeters)}|${limit}`
   const memory = candidateMemory.get(key)
   if (memory) return memory
@@ -404,6 +609,21 @@ export async function searchNearbyGooglePlaceCandidates(input: {
   return result
 }
 
+function hasAttemptedWebsiteRecovery(placeId: string): boolean {
+  if (websiteRecoveryMemory.has(placeId)) return true
+  const stored = getLlmArtifact<{ done: true }>(`${WEBSITE_RECOVERY_PREFIX}${placeId}`)
+  if (stored?.done) {
+    websiteRecoveryMemory.add(placeId)
+    return true
+  }
+  return false
+}
+
+function markWebsiteRecoveryAttempted(placeId: string) {
+  websiteRecoveryMemory.add(placeId)
+  setLlmArtifact(`${WEBSITE_RECOVERY_PREFIX}${placeId}`, { done: true }, { silent: true })
+}
+
 /**
  * Returns one complete shared place record. A cache miss costs exactly one
  * RapidAPI endpoint request: details when an ID is known, otherwise Text Search.
@@ -421,7 +641,13 @@ export async function fetchGooglePlaceDetails(
     ...(lookupQuery ? [detailKey('query', lookupQuery)] : []),
   ]
   const cached = readDetails(keys)
-  if (cached) return cached
+  const recoverWebsite =
+    Boolean(cached) &&
+    !cached?.website &&
+    Boolean(placeId) &&
+    options.recoverPhotos !== false &&
+    !hasAttemptedWebsiteRecovery(placeId)
+  if (cached && !recoverWebsite) return cached
   if (!placeId && !lookupQuery) return null
 
   const inflightKey = placeId ? `id:${placeId}` : `query:${lookupQuery}|${location?.lat},${location?.lng}`
@@ -429,6 +655,11 @@ export async function fetchGooglePlaceDetails(
   if (pending) return pending
 
   const task = (async () => {
+    if (cached && recoverWebsite && placeId) {
+      markWebsiteRecoveryAttempted(placeId)
+      const recovered = await detailsById(placeId, lookupQuery)
+      return recovered || cached
+    }
     if (placeId) return detailsById(placeId, lookupQuery)
     const places = await searchFullPlaces(
       lookupQuery,
@@ -452,7 +683,7 @@ export async function fetchGooglePlaceDetails(
     }
     if (!best || !Number.isFinite(bestScore)) return null
     storeDetails(best, lookupQuery, location)
-    return best
+    return withDisplayPhotos(best)
   })()
 
   inflight.set(inflightKey, task)
@@ -475,12 +706,15 @@ export function peekGooglePlaceDetails(
   name: string,
   nameLocal?: string,
   location?: Coordinates,
+  placeId?: string,
 ): GooglePlaceDetails | null {
   const query = placeDetailsQuery(name, nameLocal)
-  if (!query) return null
+  const id = placeId?.trim()
+  if (!query && !id) return null
   return readDetails([
-    ...(location ? [detailKey('query', query, location)] : []),
-    ...(location
+    ...(id ? [detailKey('id', id)] : []),
+    ...(query && location ? [detailKey('query', query, location)] : []),
+    ...(query && location
       ? [
           detailKey(
             'name',
@@ -489,7 +723,18 @@ export function peekGooglePlaceDetails(
           ),
         ]
       : []),
-    detailKey('query', query),
-    detailKey('name', originalSearchLabel(nameLocal) || originalSearchLabel(name)),
+    ...(query ? [detailKey('query', query)] : []),
+    ...(query
+      ? [detailKey('name', originalSearchLabel(nameLocal) || originalSearchLabel(name))]
+      : []),
   ])
+}
+
+export function resetGooglePlaceDetailsCacheForTests() {
+  detailMemory.clear()
+  candidateMemory.clear()
+  inflight.clear()
+  photoUriMemory.clear()
+  photoInflight.clear()
+  websiteRecoveryMemory.clear()
 }

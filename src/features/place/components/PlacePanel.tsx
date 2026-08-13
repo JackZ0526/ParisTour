@@ -12,6 +12,7 @@ import {
 } from '../services/placeDetailMemo'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from './GooglePlacePage'
+import { SELECTED_HOTEL_PLACE_ID } from '../../itinerary/utils/dayOrigin'
 
 interface Props {
   placeId: string | null
@@ -48,7 +49,7 @@ export function PlacePanel({
   const [regenToken, setRegenToken] = useState(0)
 
   const place = useMemo(() => {
-    if (!placeId) return null
+    if (!placeId || placeId === SELECTED_HOTEL_PLACE_ID) return null
     try {
       return getPlace(placeId, customPlaces)
     } catch {
@@ -68,6 +69,16 @@ export function PlacePanel({
   useEffect(() => {
     if (!placeId || !place) {
       setStory(null)
+      setStoryLoading(false)
+      return
+    }
+
+    if (place.type === 'attraction') {
+      setStory({
+        intro: place.description,
+        reason: stopNote || '',
+        tripFit: '',
+      })
       setStoryLoading(false)
       return
     }
@@ -160,6 +171,7 @@ export function PlacePanel({
       name={place?.name || ''}
       nameLocal={place?.nameLocal}
       googlePlaceId={place?.googlePlaceId}
+      tripadvisorContentId={place?.tripadvisorContentId}
       location={place?.location}
       placeType={place?.type}
       fallbackImage={place?.image}
@@ -175,9 +187,12 @@ export function PlacePanel({
                 (!storyLoading ? stopNote || undefined : undefined),
               loading: storyLoading,
               labels: PLACE_LABELS,
-              onRegenerate: isLlmConfigured()
-                ? () => setRegenToken((n) => n + 1)
-                : undefined,
+              onRegenerate:
+                place.type === 'attraction'
+                  ? undefined
+                  : isLlmConfigured()
+                    ? () => setRegenToken((n) => n + 1)
+                    : undefined,
               regenerating: storyLoading && regenToken > 0,
             }
           : null

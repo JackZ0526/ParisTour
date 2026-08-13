@@ -6,6 +6,8 @@ import {
   searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
+import { fetchPlaceWebsitePhotosWithFallback } from '../services/placeWebsitePhotos'
+import { fetchTripadvisorPlaceGallery } from '../services/tripadvisorPlacePhotos'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -567,14 +569,40 @@ export function AddPlaceDialog({
       const details = await fetchGooglePlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
       })
+      const websitePhotos = (
+        await fetchPlaceWebsitePhotosWithFallback({
+          website: details?.website,
+          name: details?.name || item.name,
+          nameLocal: details?.nameOriginal || item.nameLocal,
+          address: details?.address,
+        }).catch(() => ({ photos: [] }))
+      ).photos
+      const tripadvisorPhotos =
+        !websitePhotos.length && (item.type === 'restaurant' || item.type === 'cafe')
+          ? (
+              await fetchTripadvisorPlaceGallery({
+                name: details?.name || item.name,
+                nameLocal: details?.nameOriginal || item.nameLocal,
+                type: item.type,
+              }).catch(() => null)
+            )?.photos || []
+          : []
+      const displayPhotos = websitePhotos.length ? websitePhotos : tripadvisorPhotos
+      const detailsWithPhotos = details
+        ? { ...details, photos: displayPhotos }
+        : details
+      const hasDisplayPhotos = Boolean(detailsWithPhotos?.photos?.length)
       const wikimedia =
-        item.type === 'attraction' && details?.location
-          ? await fetchWikimediaPlacePhoto(details.name || item.name, details.location)
+        !hasDisplayPhotos && item.type === 'attraction' && detailsWithPhotos?.location
+          ? await fetchWikimediaPlacePhoto(
+              detailsWithPhotos.name || item.name,
+              detailsWithPhotos.location,
+            )
           : null
       const resolved =
-        details && wikimedia
-          ? { ...details, photos: [wikimedia.url] }
-          : details
+        detailsWithPhotos && wikimedia && !hasDisplayPhotos
+          ? { ...detailsWithPhotos, photos: [wikimedia.url] }
+          : detailsWithPhotos
       setDetailsByKey((prev) => ({ ...prev, [key]: resolved }))
       if (wikimedia) {
         setWikimediaByKey((prev) => ({ ...prev, [key]: wikimedia }))
@@ -638,8 +666,27 @@ export function AddPlaceDialog({
         if (blurb) description = blurb
       }
 
+      const websitePhotos = (
+        await fetchPlaceWebsitePhotosWithFallback({
+          website: details.website,
+          name: details.name,
+          nameLocal: details.nameOriginal,
+          address: details.address,
+        }).catch(() => ({ photos: [] }))
+      ).photos
+      const tripadvisorPhotos =
+        !websitePhotos.length && (type === 'restaurant' || type === 'cafe')
+          ? (
+              await fetchTripadvisorPlaceGallery({
+                name: details.name,
+                nameLocal: details.nameOriginal,
+                type,
+              }).catch(() => null)
+            )?.photos || []
+          : []
+      const websitePhoto = websitePhotos[0] || tripadvisorPhotos[0] || null
       const wikimediaPhoto =
-        type === 'attraction'
+        type === 'attraction' && !websitePhoto
           ? await fetchWikimediaPlacePhoto(details.name, details.location)
           : null
 
@@ -655,7 +702,7 @@ export function AddPlaceDialog({
             ? `Google ★ ${details.rating.toFixed(1)}`
             : 'AI 推荐 / Google 地点',
         priceHint: details.priceLevel,
-        image: wikimediaPhoto?.url || details.photos[0] || FALLBACK_IMAGE,
+        image: websitePhoto || wikimediaPhoto?.url || FALLBACK_IMAGE,
         location: details.location,
         googleMapsUrl: details.id
           ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(

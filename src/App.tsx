@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useAuth } from './features/auth/AuthProvider'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
@@ -12,6 +12,7 @@ import { FlightPanel } from './features/flight/components/FlightPanel'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
+import { ApiRequestMeter } from './shared/components/ApiRequestMeter'
 import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {
   RecommendationPreferencesButton,
@@ -26,6 +27,7 @@ import { TripMap } from './features/map/components/TripMap'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import { PENDING_HOTEL } from './features/hotel/constants/hotels'
 import { getPlace } from './features/place/constants/places'
+import { SELECTED_HOTEL_PLACE_ID } from './features/itinerary/utils/dayOrigin'
 import { clearDayNavCache, useDayNav } from './features/itinerary/hooks/useDayNav'
 import { clearAllFlightCache } from './features/flight/services/flightCache'
 import { clearFlightSelection } from './features/flight/services/flightSelection'
@@ -127,6 +129,18 @@ export default function App() {
       customPlaces: initialItinerary.customPlaces,
     },
     { numberOfDaysRef },
+  )
+  const [openHotelDetailToken, setOpenHotelDetailToken] = useState(0)
+  const handleSelectPlace = useCallback(
+    (id: string) => {
+      if (id === SELECTED_HOTEL_PLACE_ID) {
+        setSelectedPlaceId(null)
+        setOpenHotelDetailToken((n) => n + 1)
+        return
+      }
+      setSelectedPlaceId(id)
+    },
+    [setSelectedPlaceId],
   )
   const {
     itineraryStart,
@@ -262,7 +276,7 @@ export default function App() {
   )
   /** Detail overlay for trip chat: PlacePanel selection wins over hotel popup. */
   const tripChatViewing = useMemo((): TripChatViewingTarget | null => {
-    if (selectedPlaceId) {
+    if (selectedPlaceId && selectedPlaceId !== SELECTED_HOTEL_PLACE_ID) {
       try {
         const place = getPlace(selectedPlaceId, placesWithHotel)
         const stop = day.stops.find((s) => s.placeId === selectedPlaceId)
@@ -422,6 +436,7 @@ export default function App() {
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
+      <ApiRequestMeter />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
           <span className="max-w-[11rem] truncate text-[var(--stone)] sm:max-w-[16rem]">
@@ -638,6 +653,7 @@ export default function App() {
           onCandidatesChange={setHotelCandidates}
           readOnly={readOnly}
           onDetailChange={setViewingHotelDetail}
+          openSelectedDetailToken={openHotelDetailToken}
         />
 
         <section className="space-y-4">
@@ -928,7 +944,7 @@ export default function App() {
                           dayRestoring={dayRestoring}
                           dayPending={dayPending}
                           isLastDay={day.day === lastDayNum}
-                          onSelectPlace={setSelectedPlaceId}
+                          onSelectPlace={handleSelectPlace}
                           onReorder={handleReorder}
                           onDelete={handleDelete}
                           onAddCustom={handleAddCustom}
@@ -959,7 +975,7 @@ export default function App() {
                             day={day}
                             customPlaces={placesWithHotel}
                             selectedPlaceId={selectedPlaceId}
-                            onSelectPlace={setSelectedPlaceId}
+                            onSelectPlace={handleSelectPlace}
                           />
                         </MapErrorBoundary>
                         <PlacePanel
@@ -1017,7 +1033,7 @@ export default function App() {
           ).join('；')}
           handlers={{
             switchDay: handleSwitchDay,
-            selectPlace: setSelectedPlaceId,
+            selectPlace: handleSelectPlace,
             removeStop: handleDeleteOnDay,
             addPlace: handleAddOnDay,
             replaceStop: handleReplaceOnDay,

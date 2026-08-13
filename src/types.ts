@@ -78,6 +78,8 @@ export interface Place {
   id: string
   /** Stable Google Places identity. Prefer this over text search when available. */
   googlePlaceId?: string
+  /** Tripadvisor location id for attractions (photos + description). */
+  tripadvisorContentId?: string
   name: string
   nameLocal?: string
   type: PlaceType

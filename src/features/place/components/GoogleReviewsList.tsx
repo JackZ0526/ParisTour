@@ -3,10 +3,12 @@ import type { GoogleReview } from '../../map/services/googlePlaceDetails'
 import { looksChinese, translateTextsToChinese } from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import { ShimmerLines } from '../../../shared/components/ShimmerLines'
+import { PlaceSourceMark } from './PlaceSourceMark'
 
 interface Props {
   reviews: GoogleReview[]
   sourceLabel?: string
+  source?: 'google' | 'tripadvisor' | 'booking'
   showHeader?: boolean
   showShimmer?: boolean
   onPendingChange?: (pending: boolean) => void
@@ -15,6 +17,7 @@ interface Props {
 export function GoogleReviewsList({
   reviews,
   sourceLabel = 'Google 评论',
+  source,
   showHeader = true,
   showShimmer = true,
   onPendingChange,
@@ -92,7 +95,14 @@ export function GoogleReviewsList({
   return (
     <div>
       <div className={`${showHeader ? 'mb-2' : 'mb-3'} flex flex-wrap items-center justify-between gap-2`}>
-        {showHeader && <p className="text-sm font-medium">{sourceLabel}</p>}
+        {showHeader && (
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            {source === 'google' || source === 'tripadvisor' ? (
+              <PlaceSourceMark source={source} showLabel={false} />
+            ) : null}
+            {sourceLabel}
+          </p>
+        )}
         {translationFailed && !translating && (
           <button
             type="button"

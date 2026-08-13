@@ -6,7 +6,9 @@ vi.mock('../features/auth/services/authFetch', () => ({ authFetch }))
 
 import {
   fetchGooglePlaceDetails,
+  googlePlacePhotoMediaUrl,
   peekGooglePlaceDetails,
+  resetGooglePlaceDetailsCacheForTests,
 } from '../features/map/services/googlePlaceDetails'
 import { resetGoogleRequestBudgetForTests } from '../features/map/services/googleRequestBudget'
 import { resetLlmArtifactStoreForTests } from '../shared/services/llm/llmArtifactStore'
@@ -16,6 +18,7 @@ describe('RapidAPI place cache', () => {
     authFetch.mockReset()
     resetGoogleRequestBudgetForTests()
     resetLlmArtifactStoreForTests()
+    resetGooglePlaceDetailsCacheForTests()
   })
 
   it('reuses a complete Text Search result for later ID and component reads', async () => {
@@ -78,9 +81,114 @@ describe('RapidAPI place cache', () => {
       text: 'Magnifique.',
       author: 'Camille',
     })
-    // Photo media is a second endpoint and is intentionally not followed.
-    expect(first?.photos).toEqual([])
+    // Search/Details only store photo resource names; Place Photo (New) resolves them later.
+    expect(first?.photos[0]).toBe('places/ChIJ-test-place/photos/photo-1')
     expect(byId).toEqual(first)
     expect(fromComponentCache).toEqual(first)
+  })
+
+  it('turns a Place photo resource name into a media URL without a RapidAPI call', () => {
+    expect(
+      googlePlacePhotoMediaUrl('places/ChIJ-test-place/photos/photo-1'),
+    ).toBe(
+      'https://places.googleapis.com/v1/places/ChIJ-test-place/photos/photo-1/media?maxHeightPx=900&maxWidthPx=900',
+    )
+  })
+
+  it('recovers a missing website once, then reuses the cache', async () => {
+    authFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            places: [
+              {
+                id: 'ChIJ-no-website',
+                displayName: { text: 'Le Maxan', languageCode: 'fr' },
+                location: { latitude: 48.86, longitude: 2.3 },
+                photos: [{ name: 'places/ChIJ-no-website/photos/room-1' }],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'ChIJ-no-website',
+            displayName: { text: 'Le Maxan', languageCode: 'fr' },
+            location: { latitude: 48.86, longitude: 2.3 },
+            websiteUri: 'https://www.rest-maxan.com/',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+
+    const first = await fetchGooglePlaceDetails('Le Maxan Paris', undefined)
+    expect(first?.website).toBeUndefined()
+    const withWebsite = await fetchGooglePlaceDetails('Le Maxan Paris', undefined, {
+      placeId: 'ChIJ-no-website',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(withWebsite?.website).toBe('https://www.rest-maxan.com/')
+
+    const again = await fetchGooglePlaceDetails('Le Maxan Paris', undefined, {
+      placeId: 'ChIJ-no-website',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(again?.website).toBe('https://www.rest-maxan.com/')
+  })
+
+  it('keeps the cached place when website recovery finds nothing', async () => {
+    authFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            places: [
+              {
+                id: 'ChIJ-still-no-site',
+                displayName: { text: 'Sogno', languageCode: 'fr' },
+                location: { latitude: 48.87, longitude: 2.29 },
+                rating: 4.8,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'ChIJ-still-no-site',
+            displayName: { text: 'Sogno', languageCode: 'fr' },
+            location: { latitude: 48.87, longitude: 2.29 },
+            rating: 4.8,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+
+    const first = await fetchGooglePlaceDetails('Sogno Paris', undefined)
+    expect(first?.rating).toBe(4.8)
+    const recovered = await fetchGooglePlaceDetails('Sogno Paris', undefined, {
+      placeId: 'ChIJ-still-no-site',
+    })
+    expect(recovered?.rating).toBe(4.8)
+    const third = await fetchGooglePlaceDetails('Sogno Paris', undefined, {
+      placeId: 'ChIJ-still-no-site',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(third?.rating).toBe(4.8)
+  })
+
+  it('does not call Place Photo (New) for a resource name', async () => {
+    const { fetchGooglePlacePhotoMedia } = await import(
+      '../features/map/services/googlePlaceDetails'
+    )
+    const uri = await fetchGooglePlacePhotoMedia(
+      'places/ChIJ-test-place/photos/photo-1',
+    )
+    expect(uri).toBeNull()
+    expect(authFetch).not.toHaveBeenCalled()
   })
 })

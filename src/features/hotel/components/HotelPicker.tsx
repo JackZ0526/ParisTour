@@ -92,6 +92,8 @@ interface Props {
   readOnly?: boolean
   /** Fired when hotel GooglePlacePage opens/closes (for trip chat viewing context). */
   onDetailChange?: (hotel: HotelCandidate | null) => void
+  /** Increment to open the selected hotel's Booking detail overlay. */
+  openSelectedDetailToken?: number
 }
 
 /** Match DayTimeline float settle. */
@@ -945,6 +947,7 @@ export function HotelPicker({
   onCandidatesChange,
   readOnly = false,
   onDetailChange,
+  openSelectedDetailToken = 0,
 }: Props) {
   const { isLoaded } = useGoogleMapsReady()
   const [customQuery, setCustomQuery] = useState('')
@@ -979,6 +982,7 @@ export function HotelPicker({
   const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
   const [dropping, setDropping] = useState(false)
   const bootstrappedRef = useRef(false)
+  const lastOpenSelectedDetailTokenRef = useRef(openSelectedDetailToken)
   const candidatesRef = useRef(candidates)
   const daysRef = useRef(days)
   const selectedRef = useRef(selected)
@@ -1262,6 +1266,16 @@ export function HotelPicker({
   useEffect(() => {
     onDetailChange?.(popupCandidate)
   }, [popupCandidate, onDetailChange])
+
+  useEffect(() => {
+    if (!openSelectedDetailToken) return
+    if (openSelectedDetailToken === lastOpenSelectedDetailTokenRef.current) return
+    lastOpenSelectedDetailTokenRef.current = openSelectedDetailToken
+    const card = candidatesRef.current.find((h) => h.id === selectedRef.current.id)
+    if (!card) return
+    setPendingCustom(null)
+    setPopupHotelId(card.id)
+  }, [openSelectedDetailToken])
 
   const decidingCustom = Boolean(pendingCustom)
 
@@ -2513,7 +2527,10 @@ export function HotelPicker({
             : null
         }
         footer={
-          popupCandidate ? (
+          popupCandidate &&
+          (decidingCustom ||
+            !isHotelSelected(selected) ||
+            popupCandidate.id !== selected.id) ? (
             <div className="space-y-2">
               <p className="text-sm text-[var(--stone)]">
                 {decidingCustom ? '要把这家酒店加入候选项吗？' : '如何处理这家酒店？'}

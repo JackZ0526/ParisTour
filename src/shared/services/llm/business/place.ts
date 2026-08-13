@@ -16,7 +16,7 @@ import {
 } from '../prompts'
 import { LlmRequestError } from '../errors'
 import { callOpenAIMessagesStream } from '../transport'
-import { extractPartialJsonStringField } from '../stream'
+import { extractPartialJsonStringField, openaiResponsesWithWebSearch } from '../stream'
 import { extractJsonObject } from '../json'
 import {
   recommendationPreferencesPrompt,
@@ -29,11 +29,136 @@ import type {
   VerifiedPlaceCandidate,
 } from '../types'
 import { generateText, isLlmConfigured } from './_service'
+import { officialWebsiteFromCandidate } from '../../../../../api/_lib/websitePhotos'
 
 export type {
   RecommendPlaceType,
   PlaceRecommendation,
   VerifiedPlaceCandidate,
+}
+
+function parseOfficialWebsiteFromLlm(text: string): string | null {
+  const json = extractJsonObject(text)
+  const fromJson = typeof json?.website === 'string' ? json.website.trim() : ''
+  const fromText = text.match(/https?:\/\/[^\s"'<>]+/i)?.[0] || ''
+  return officialWebsiteFromCandidate(fromJson || fromText)
+}
+
+/**
+ * Web-search fallback when Google `websiteUri` is missing, a social page,
+ * or otherwise unusable. Returns a first-party https URL or null.
+ * Cached durably so opening the same place does not search again.
+ */
+export async function resolveOfficialWebsite(input: {
+  name: string
+  nameLocal?: string
+  address?: string
+  googleWebsite?: string
+}): Promise<string | null> {
+  if (!isLlmConfigured()) return null
+  const name = input.name.trim()
+  if (!name) return null
+  const key = `place-official-website:v1:${name}|${input.nameLocal || ''}|${input.address || ''}`
+  const hit = await memoizeLlmCall(
+    key,
+    async () => {
+      const research = await openaiResponsesWithWebSearch({
+        instructions: buildPrompt(
+          '查找商家自己的官方网站。只根据检索到的公开结果作答，禁止编造域名。',
+          null,
+          `<hard_rules>
+- 只要该店自己的官网（他们自己的域名）。
+- 不要 Google Maps、Tripadvisor、Yelp、TheFork、Booking、Instagram、Facebook、Wikipedia。
+- 若 Google 给的网址是社交主页、404 或不存在，改找真正的官网。
+- 不确定就返回 null。
+</hard_rules>`,
+          jsonContract(
+            '{ website: "https://..." | null }',
+            '{ "website": "https://www.rest-maxan.com/" }',
+          ),
+        ),
+        user: [
+          `地点：${name}`,
+          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
+          input.address ? `地址：${input.address}` : '',
+          input.googleWebsite ? `Google websiteUri：${input.googleWebsite}` : 'Google 未提供 websiteUri',
+          '输出 JSON：{"website":"https://..."} 或 {"website":null}',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      })
+      return { website: parseOfficialWebsiteFromLlm(research.text) }
+    },
+    { durable: true },
+  )
+  return hit.website
+}
+
+export interface AttractionCanonicalName {
+  nameEn: string
+  nameFr?: string
+  aliases: string[]
+}
+
+function parseAttractionCanonicalName(text: string): AttractionCanonicalName | null {
+  const json = extractJsonObject(text)
+  if (!json) return null
+  const nameEn = String(json.nameEn || json.name || '').trim()
+  if (!nameEn || /[\u3400-\u9fff]/.test(nameEn)) return null
+  const nameFr = String(json.nameFr || json.nameLocal || '').trim() || undefined
+  const aliases = Array.isArray(json.aliases)
+    ? json.aliases
+        .map((value) => String(value || '').trim())
+        .filter((value) => value && value !== nameEn && value !== nameFr)
+    : []
+  return { nameEn, nameFr, aliases }
+}
+
+/**
+ * Last-resort identity for attractions whose Chinese / nickname / qualified
+ * label does not match Tripadvisor. Returns a Latin listing name, or null
+ * when the model is not sure. Callers must still verify via catalog or
+ * Tripadvisor autocomplete — never trust this name alone.
+ */
+export async function resolveAttractionCanonicalName(input: {
+  name: string
+  nameLocal?: string
+}): Promise<AttractionCanonicalName | null> {
+  if (!isLlmConfigured()) return null
+  const name = input.name.trim()
+  if (!name) return null
+  const key = `attraction-canonical-name:v1:${name}|${input.nameLocal || ''}`
+  return memoizeLlmCall(
+    key,
+    async () => {
+      const text = await generateText(
+        buildPrompt(
+          '把旅行者口中的巴黎景点名称解析成 Tripadvisor 上常用的正式名称。',
+          null,
+          `<hard_rules>
+- 只处理巴黎都会区的真实景点、博物馆、街道、公园。
+- nameEn 必须是拉丁字母的常用英文名（Tripadvisor 列表里会出现的那种，例如 "Champs-Elysees"、"Pont Neuf"、"Eiffel Tower"）。
+- 不确定、不是景点、或找不到对应地点时返回 {"nameEn":null}。
+- 禁止编造不存在的景点。
+</hard_rules>`,
+          jsonContract(
+            '{ nameEn: string | null, nameFr?: string, aliases?: string[] }',
+            '{ "nameEn": "Champs-Elysees", "nameFr": "Avenue des Champs-Élysées", "aliases": ["Champs-Élysées"] }',
+          ),
+        ),
+        [
+          `地点：${name}`,
+          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
+          '城市：Paris',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        { json: true, task: 'placeName' },
+      )
+      return parseAttractionCanonicalName(text || '')
+    },
+    { durable: true },
+  )
 }
 
 /** Cheap, always-cached place blurb. */
