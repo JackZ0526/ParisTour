@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { authFetch, resolveAttractionCanonicalName } = vi.hoisted(() => ({
-  authFetch: vi.fn(),
-  resolveAttractionCanonicalName: vi.fn(async () => null),
-}))
+const { authFetch, resolveAttractionCanonicalName, resolveTripadvisorRestaurantListing } =
+  vi.hoisted(() => ({
+    authFetch: vi.fn(),
+    resolveAttractionCanonicalName: vi.fn(async () => null),
+    resolveTripadvisorRestaurantListing: vi.fn(async () => null),
+  }))
 
 vi.mock('../features/auth/services/authFetch', () => ({ authFetch }))
 vi.mock('../shared/services/llm/llm', async (importOriginal) => {
@@ -11,33 +13,183 @@ vi.mock('../shared/services/llm/llm', async (importOriginal) => {
   return {
     ...actual,
     resolveAttractionCanonicalName,
+    resolveTripadvisorRestaurantListing,
   }
 })
 
 import {
   fetchTripadvisorAttractionInfo,
   fetchTripadvisorPlaceGallery,
+  fetchTripadvisorRestaurantInfo,
   listSeededTripadvisorAttractions,
+  listSeededTripadvisorRestaurants,
   matchTripadvisorCatalogItem,
   normalizeTripadvisorAttractionDetails,
   normalizeTripadvisorAutocomplete,
   normalizeTripadvisorCatalog,
   normalizeTripadvisorGallery,
+  normalizeTripadvisorReviews,
+  peekTripadvisorRestaurantInfo,
+  hasCachedTripadvisorGallery,
+  hasCachedTripadvisorRestaurantDetails,
+  hasSettledTripadvisorRestaurantDetails,
   pickTripadvisorPhotoUrl,
   resetTripadvisorPlacePhotosForTests,
   selectBestTripadvisorGalleryPhotos,
   tripadvisorAutocompleteQuery,
   tripadvisorContentIdFromCandidate,
+  tripadvisorContentIdFromUrl,
   tripadvisorPhotoUrl,
+  type TripadvisorAttractionInfo,
 } from '../features/place/services/tripadvisorPlacePhotos'
-import { resetTripadvisorRequestBudgetForTests } from '../features/place/services/tripadvisorRequestBudget'
-import { resetLlmArtifactStoreForTests } from '../shared/services/llm/llmArtifactStore'
+import {
+  TRIPADVISOR_MONTHLY_LIMIT,
+  resetTripadvisorRequestBudgetForTests,
+  tryConsumeTripadvisorRequest,
+} from '../features/place/services/tripadvisorRequestBudget'
+import {
+  resetLlmArtifactStoreForTests,
+  setLlmArtifact,
+} from '../shared/services/llm/llmArtifactStore'
 import { placeSearchQuery } from '../shared/utils/placeTitle'
+import { formatPriceLevelLabel } from '../shared/utils/priceLevel'
+
+const SPHERE_LISTING_URL =
+  'https://www.tripadvisor.ca/Restaurant_Review-g187147-d25158864-Reviews-Sphere-Paris_Ile_de_France.html'
+const ALSACE_LISTING_URL =
+  'https://www.tripadvisor.com/Restaurant_Review-g187147-d5943832-Reviews-Brasserie_L_Alsace-Paris_Ile_de_France.html'
+const SOGNO_LISTING_URL =
+  'https://www.tripadvisor.com/Restaurant_Review-g187147-d24052281-Reviews-Sogno_Paris-Paris_Ile_de_France.html'
+
+function restaurantListingUrl(locationId: number | string, name: string): string {
+  const slug = name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')
+  return `https://www.tripadvisor.com/Restaurant_Review-g187147-d${locationId}-Reviews-${slug}-Paris_Ile_de_France.html`
+}
+
+function attractionListingUrl(locationId: number | string, name: string): string {
+  const slug = name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')
+  return `https://www.tripadvisor.com/Attraction_Review-g187147-d${locationId}-Reviews-${slug}-Paris_Ile_de_France.html`
+}
+
+function expectRestaurantDetailsQuery(href: string, listingUrl: string) {
+  expect(href).toContain('rest=api%2Fv1%2Frestaurants%2Fdetail')
+  expect(href).toContain(`url=${encodeURIComponent(listingUrl)}`)
+  expect(href).toContain('locale=en_US')
+  expect(href).toContain('currency=USD')
+  expect(href).not.toContain('locationId=')
+  expect(href).not.toMatch(/Restaurant_Review-d\d+-Reviews\.html/)
+}
+
+function expectAttractionDetailsQuery(href: string, listingUrl: string) {
+  expect(href).toContain('rest=api%2Fv1%2Fthings-to-do%2Fdetail')
+  expect(href).toContain(`url=${encodeURIComponent(listingUrl)}`)
+  expect(href).toContain('locale=en_US')
+  expect(href).toContain('currency=USD')
+  expect(href).not.toContain('locationId=')
+  expect(href).not.toMatch(/Attraction_Review-d\d+-Reviews\.html/)
+}
+
+function expectAttractionLocationIdQuery(href: string, locationId: string) {
+  expect(href).toContain('rest=api%2Fv1%2Fthings-to-do%2Fdetail')
+  expect(href).toContain(`locationId=${locationId}`)
+  expect(href).toContain('locale=en_US')
+  expect(href).toContain('currency=USD')
+  expect(href).not.toContain('url=')
+  expect(href).not.toMatch(/Attraction_Review-d\d+-Reviews\.html/)
+}
+
+function tripadvisor34DetailResponse(input: {
+  id?: string
+  name?: string
+  photos?: string[]
+  address?: string | Record<string, string>
+  website?: string
+  phone?: string
+  rating?: number
+  reviewCount?: number
+  reviews?: unknown[]
+  category?: string
+  cuisine?: unknown
+  cuisines?: unknown
+  priceLevel?: string
+  priceRange?: string
+}) {
+  const photos = input.photos || []
+  return new Response(
+    JSON.stringify({
+      success: true,
+      id: input.id || '0',
+      name: input.name || 'Listing',
+      category: input.category || 'RESTAURANT',
+      image: photos[0],
+      images: photos.map((url) => ({ url })),
+      address: input.address,
+      website: input.website,
+      phone: input.phone,
+      rating: input.rating,
+      reviewCount: input.reviewCount,
+      reviews: input.reviews,
+      cuisine: input.cuisine,
+      cuisines: input.cuisines,
+      priceLevel: input.priceLevel,
+      priceRange: input.priceRange,
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+}
+
+function restaurantMediaGalleryResponse(...urls: string[]) {
+  return tripadvisor34DetailResponse({ photos: urls })
+}
+
+function tripadvisor34AutocompleteResponse(
+  items: Array<{
+    locationId: number | string
+    name: string
+    type: string
+    image?: string
+    description?: string
+    url?: string
+  }>,
+) {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data: {
+        items: items.map((item) => ({
+          id: `loc;${item.locationId}`,
+          locationId: item.locationId,
+          name: item.name,
+          type: item.type,
+          description: item.description ?? 'Paris, Ile-de-France, France',
+          image: item.image,
+          url:
+            item.url ||
+            (/restaurant|eatery|cafe/i.test(item.type)
+              ? restaurantListingUrl(item.locationId, item.name)
+              : /attraction|activity|poi|landmark|museum/i.test(item.type)
+                ? attractionListingUrl(item.locationId, item.name)
+                : undefined),
+        })),
+      },
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+}
+
+function tripadvisorMissingResponse() {
+  return new Response(
+    JSON.stringify({ success: false, message: 'Location not found' }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+}
 
 describe('Tripadvisor place photos', () => {
   beforeEach(() => {
     resolveAttractionCanonicalName.mockReset()
     resolveAttractionCanonicalName.mockResolvedValue(null)
+    resolveTripadvisorRestaurantListing.mockReset()
+    resolveTripadvisorRestaurantListing.mockResolvedValue(null)
   })
   it('fills dynamic CDN templates to a display size', () => {
     expect(
@@ -47,6 +199,23 @@ describe('Tripadvisor place photos', () => {
     ).toBe(
       'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1a/9e.jpg?w=1200&h=900&s=1',
     )
+  })
+
+  it('rewrites Tripadvisor CDN heights of -1 so the browser can load the image', () => {
+    expect(
+      tripadvisorPhotoUrl(
+        'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/82/2c/00/salle.jpg?w=800&h=-1&s=1',
+      ),
+    ).toBe(
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/82/2c/00/salle.jpg?w=800&h=900&s=1',
+    )
+  })
+
+  it('maps Tripadvisor dollar and euro price marks onto the same chips as Google', () => {
+    expect(formatPriceLevelLabel('PRICE_LEVEL_EXPENSIVE')).toBe('€€€ · 约会烧钱档')
+    expect(formatPriceLevelLabel('$$$$')).toBe('€€€€ · 存款消失术')
+    expect(formatPriceLevelLabel('€€')).toBe('€€ · 钱包暂安')
+    expect(formatPriceLevelLabel('$ - $$')).toBe('€€ · 钱包暂安')
   })
 
   it('picks a large gallery size from one media-gallery payload', () => {
@@ -91,7 +260,53 @@ describe('Tripadvisor place photos', () => {
     ])
   })
 
-  it('keeps the 15 sharpest still photos and drops tiny or video items', () => {
+  it('reads restaurant media-gallery photoSizeDynamic templates', () => {
+    const gallery = normalizeTripadvisorGallery(
+      {
+        data: {
+          sections: [
+            {
+              mediaList: [
+                {
+                  item: {
+                    data: {
+                      mediaType: 'PHOTO',
+                      photoSizeDynamic: {
+                        maxWidth: 1500,
+                        maxHeight: 1125,
+                        urlTemplate:
+                          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w={width}&h={height}&s=1',
+                      },
+                    },
+                  },
+                },
+                {
+                  item: {
+                    data: {
+                      photoSizeDynamic: {
+                        maxWidth: 578,
+                        urlTemplate:
+                          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/26/5b/77/eb/dessert.jpg?w={width}&h={height}&s=1',
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      'restaurant',
+      '24052281',
+      'Sogno Paris',
+    )
+    expect(gallery.photos).toEqual([
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w=1200&h=900&s=1',
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/26/5b/77/eb/dessert.jpg?w=1200&h=900&s=1',
+    ])
+  })
+
+  it('keeps the sharpest still photos and drops tiny or video items', () => {
     const ranked = selectBestTripadvisorGalleryPhotos([
       {
         url: 'https://media-cdn.tripadvisor.com/icon.jpg',
@@ -159,9 +374,9 @@ describe('Tripadvisor place photos', () => {
       '188709',
       'Arc de Triomphe',
     )
-    expect(gallery.photos).toHaveLength(15)
+    expect(gallery.photos).toHaveLength(18)
     expect(gallery.photos[0]).toBe('https://media-cdn.tripadvisor.com/p17.jpg')
-    expect(gallery.photos[14]).toBe('https://media-cdn.tripadvisor.com/p3.jpg')
+    expect(gallery.photos[17]).toBe('https://media-cdn.tripadvisor.com/p0.jpg')
     expect(gallery.photos).not.toContain('https://media-cdn.tripadvisor.com/clip.mp4')
   })
 
@@ -371,7 +586,129 @@ describe('Tripadvisor place photos', () => {
     expect(info.photos).toEqual(['https://media-cdn.tripadvisor.com/arc.jpg'])
   })
 
-  it('keeps Paris in restaurant autocomplete queries', () => {
+  it('reads restaurant website, phone, and Tripadvisor reviews', () => {
+    const info = normalizeTripadvisorAttractionDetails(
+      {
+        data: {
+          sections: [
+            {
+              __typename: 'AppPresentation_PoiOverview',
+              name: "Brasserie L'Alsace",
+              rating: 3.3,
+              numberReviews: 2439,
+              contactLinks: [
+                {
+                  linkType: 'WEBSITE',
+                  link: {
+                    externalUrl: 'https://www.restaurantalsace.com/?y_source=1',
+                    trackingContext: 'server_website',
+                  },
+                },
+                {
+                  linkType: 'PHONE',
+                  link: { externalUrl: 'tel:%2B33%201%2053%2093%2097%2000' },
+                },
+              ],
+            },
+            {
+              __typename: 'AppPresentation_PoiLocation',
+              address: {
+                address: '39 Avenue Des Champs-élysées, 75008 Paris France',
+                geoPoint: { latitude: 48.86998, longitude: 2.305772 },
+              },
+            },
+          ],
+        },
+      },
+      '5943832',
+    )
+    expect(info).toMatchObject({
+      contentId: '5943832',
+      name: "Brasserie L'Alsace",
+      rating: 3.3,
+      userRatingCount: 2439,
+      address: '39 Avenue Des Champs-élysées, 75008 Paris France',
+      website: 'https://www.restaurantalsace.com/?y_source=1',
+      phone: '+33 1 53 93 97 00',
+    })
+    expect(info.reviews).toEqual([])
+
+    expect(
+      normalizeTripadvisorReviews({
+        data: {
+          reviews: [
+            {
+              __typename: 'Review',
+              title: 'Classic Alsatian',
+              htmlString:
+                '<p>Sauerkraut and pork knuckle just like in Strasbourg, busy but friendly room.</p>',
+              rating: 5,
+              username: 'MarieB',
+              publishedDate: '2026-07-02',
+            },
+            {
+              __typename: 'Review',
+              text: 'Great location near the Arc, choucroute for two was plenty.',
+              bubbleRating: { rating: 4 },
+              user: { displayName: 'Tom' },
+            },
+            {
+              __typename: 'AppPresentation_UserReviewSection',
+              htmlTitle: { htmlString: 'Paris' },
+              htmlText: {
+                htmlString:
+                  'The bad service <br />Poorly polite <br />We wanted to eat a meat, house specialty.',
+              },
+              bubbleRating: { rating: 1 },
+              publishedDate: { string: '1 week ago' },
+              userProfile: { displayName: 'Daydream26671292796' },
+            },
+          ],
+        },
+      }),
+    ).toEqual([
+      {
+        text: 'Classic Alsatian\nSauerkraut and pork knuckle just like in Strasbourg, busy but friendly room.',
+        rating: 5,
+        author: 'MarieB',
+        relativeTime: '2026-07-02',
+      },
+      {
+        text: 'Great location near the Arc, choucroute for two was plenty.',
+        rating: 4,
+        author: 'Tom',
+        relativeTime: undefined,
+      },
+      {
+        text: 'The bad service Poorly polite We wanted to eat a meat, house specialty.',
+        rating: 1,
+        author: 'Daydream26671292796',
+        relativeTime: '1 week ago',
+      },
+    ])
+  })
+
+  it('reads restaurant photos from details urlTemplate fields', () => {
+    const info = normalizeTripadvisorAttractionDetails(
+      {
+        data: {
+          localizedName: 'SOGNO PARIS',
+          photoSizeDynamic: {
+            maxWidth: 1600,
+            urlTemplate:
+              'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno.jpg?w={width}&h={height}&s=1',
+          },
+        },
+      },
+      '28091234',
+    )
+    expect(info.name).toBe('SOGNO PARIS')
+    expect(info.photos).toEqual([
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno.jpg?w=1200&h=900&s=1',
+    ])
+  })
+
+  it('appends the trip city to restaurant queries and accepts another city', () => {
     expect(tripadvisorAutocompleteQuery('Sogno', undefined, 'restaurant')).toBe(
       'Sogno Paris',
     )
@@ -381,6 +718,93 @@ describe('Tripadvisor place photos', () => {
     expect(
       tripadvisorAutocompleteQuery('索尼奥', 'Sogno Paris', 'restaurant'),
     ).toBe('Sogno Paris')
+    expect(
+      tripadvisorAutocompleteQuery('斯菲尔', 'Sphère', 'restaurant'),
+    ).toBe('Sphère Paris')
+    expect(
+      tripadvisorAutocompleteQuery('斯菲尔 (Sphère)', undefined, 'restaurant'),
+    ).toBe('Sphère Paris')
+    expect(
+      tripadvisorAutocompleteQuery("L'Alsace", undefined, 'restaurant', 'Lyon'),
+    ).toBe("L'Alsace Lyon")
+    expect(
+      tripadvisorAutocompleteQuery('香榭丽舍大街', 'Avenue des Champs-Élysées', 'attraction'),
+    ).toBe('Avenue des Champs-Élysées Paris')
+    expect(tripadvisorAutocompleteQuery('斯菲尔', undefined, 'restaurant')).toBe('')
+  })
+
+  it('matches Brasserie L\'Alsace from the shorter Google/itinerary name', () => {
+    const items = [
+      { contentId: '188151', name: 'Eiffel Tower', kind: 'attraction' as const },
+      {
+        contentId: '5943832',
+        name: "Brasserie L'Alsace",
+        kind: 'restaurant' as const,
+      },
+    ]
+    expect(matchTripadvisorCatalogItem(items, "L'Alsace")?.contentId).toBe('5943832')
+    expect(matchTripadvisorCatalogItem(items, '阿尔萨斯', "L'Alsace")?.contentId).toBe(
+      '5943832',
+    )
+    expect(
+      matchTripadvisorCatalogItem(listSeededTripadvisorRestaurants(), "L'Alsace")
+        ?.contentId,
+    ).toBe('5943832')
+    expect(
+      matchTripadvisorCatalogItem(listSeededTripadvisorRestaurants(), '阿尔萨斯')
+        ?.contentId,
+    ).toBe('5943832')
+  })
+
+  it('matches Sphere from the Chinese itinerary name and accented local name', () => {
+    const items = [
+      {
+        contentId: '25158864',
+        name: 'Sphere',
+        kind: 'restaurant' as const,
+      },
+    ]
+    expect(matchTripadvisorCatalogItem(items, '斯菲尔', 'Sphère')?.contentId).toBe(
+      '25158864',
+    )
+    expect(
+      matchTripadvisorCatalogItem(items, '斯菲尔 (Sphère)')?.contentId,
+    ).toBe('25158864')
+    expect(
+      listSeededTripadvisorRestaurants().find((item) => item.contentId === '25158864')
+        ?.listingUrl,
+    ).toBe(SPHERE_LISTING_URL)
+  })
+
+  it('loads Brasserie L\'Alsace details photos when the listing is seeded', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockResolvedValueOnce(
+      tripadvisor34DetailResponse({
+        id: '5943832',
+        name: "Brasserie L'Alsace",
+        photos: [
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=1200&h=900&s=1',
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/alsace-2.jpg?w=1200&h=900&s=1',
+        ],
+      }),
+    )
+
+    const gallery = await fetchTripadvisorPlaceGallery({
+      name: '阿尔萨斯',
+      nameLocal: "L'Alsace",
+      type: 'restaurant',
+    })
+    expect(gallery?.contentId).toBe('5943832')
+    expect(gallery?.photos).toEqual([
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=1200&h=900&s=1',
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/alsace-2.jpg?w=1200&h=900&s=1',
+    ])
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expectRestaurantDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), ALSACE_LISTING_URL)
+    expect(resolveTripadvisorRestaurantListing).not.toHaveBeenCalled()
   })
 
   it('reads an attraction contentId from auto-complete suggestions', () => {
@@ -389,6 +813,7 @@ describe('Tripadvisor place photos', () => {
         {
           localizedName: 'Eiffel Tower',
           type: 'ATTRACTION',
+          url: 'https://www.tripadvisor.com/Attraction_Review-g187147-d188151-Reviews-Eiffel_Tower-Paris_Ile_de_France.html',
           route: { params: { contentId: '188151' } },
         },
         {
@@ -399,7 +824,13 @@ describe('Tripadvisor place photos', () => {
       ],
     })
     expect(items).toEqual([
-      { contentId: '188151', name: 'Eiffel Tower', kind: 'attraction' },
+      {
+        contentId: '188151',
+        name: 'Eiffel Tower',
+        kind: 'attraction',
+        listingUrl:
+          'https://www.tripadvisor.com/Attraction_Review-g187147-d188151-Reviews-Eiffel_Tower-Paris_Ile_de_France.html',
+      },
     ])
   })
 
@@ -434,7 +865,168 @@ describe('Tripadvisor place photos', () => {
 
   it('parses ta- candidate ids used by itinerary drafts', () => {
     expect(tripadvisorContentIdFromCandidate('ta-188709')).toBe('188709')
+    expect(tripadvisorContentIdFromCandidate('loc;188709')).toBe('188709')
     expect(tripadvisorContentIdFromCandidate('ChIJ-google')).toBeUndefined()
+    expect(
+      tripadvisorContentIdFromUrl(
+        'https://www.tripadvisor.com/Restaurant_Review-g187147-d28091234-Reviews-SOGNO_PARIS-Paris_Ile_de_France.html',
+      ),
+    ).toBe('28091234')
+  })
+
+  it('reads restaurant eateries from Tripadvisor typeahead payloads', () => {
+    const items = normalizeTripadvisorAutocomplete(
+      {
+        data: [
+          {
+            heading: { htmlString: '<b>La Conca del Sogno</b>' },
+            secondaryTextLineOne: { string: 'Nerano, Campania, Italy' },
+            trackingItems: {
+              dataType: 'LOCATION',
+              placeType: 'ACCOMMODATION',
+              locationId: 1809050,
+              text: 'La Conca del Sogno',
+            },
+          },
+          {
+            heading: { htmlString: '<b>SOGNO PARIS</b>' },
+            secondaryTextLineOne: { string: '16th Arr. - Trocadero, Paris' },
+            graphic: {
+              image: {
+                sizes: {
+                  urlTemplate:
+                    'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno.jpg?w={width}&h={height}&s=1',
+                },
+              },
+            },
+            trackingItems: {
+              dataType: 'LOCATION',
+              placeType: 'EATERY',
+              locationId: 28091234,
+              text: 'SOGNO PARIS',
+            },
+          },
+        ],
+      },
+      'restaurant',
+    )
+    expect(items).toEqual([
+      {
+        contentId: '28091234',
+        name: 'SOGNO PARIS',
+        kind: 'restaurant',
+        coverUrl:
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno.jpg?w=1200&h=900&s=1',
+      },
+    ])
+  })
+
+  it('reads tripadvisor34 autocomplete items and restaurant details', () => {
+    expect(
+      normalizeTripadvisorAutocomplete(
+        {
+          success: true,
+          data: {
+            items: [
+              {
+                id: 'loc;5943832',
+                locationId: 5943832,
+                name: "Brasserie L'Alsace",
+                type: 'restaurant',
+                description: 'Paris, Ile-de-France, France',
+                image:
+                  'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=500&h=-1&s=1',
+                url: 'https://www.tripadvisor.com/Restaurant_Review-g187147-d5943832-Reviews-Brasserie_L_Alsace-Paris_Ile_de_France.html',
+                latitude: 48.86998,
+                longitude: 2.305772,
+              },
+              { id: 'RESCUE', kind: 'rescue', name: 'Add a place' },
+              {
+                id: 'loc;188151',
+                locationId: 188151,
+                name: 'Eiffel Tower',
+                type: 'attraction',
+              },
+            ],
+          },
+        },
+        'restaurant',
+      ),
+    ).toEqual([
+      {
+        contentId: '5943832',
+        name: "Brasserie L'Alsace",
+        kind: 'restaurant',
+        coverUrl:
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=500&h=900&s=1',
+        listingUrl:
+          'https://www.tripadvisor.com/Restaurant_Review-g187147-d5943832-Reviews-Brasserie_L_Alsace-Paris_Ile_de_France.html',
+        location: { lat: 48.86998, lng: 2.305772 },
+      },
+    ])
+
+    const info = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '5943832',
+        name: "Brasserie L'Alsace",
+        category: 'RESTAURANT',
+        image:
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=1200&h=-1&s=1',
+        images: [
+          {
+            url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=1200&h=-1&s=1',
+          },
+          {
+            url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/alsace-2.jpg?w=800&h=800&s=1',
+          },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/tiny.jpg?w=100&h=100' },
+        ],
+        phone: '+33 1 53 93 97 00',
+        rating: 3.3,
+        reviewCount: 844,
+        address: {
+          street: '39 Avenue Des Champs-élysées',
+          city: 'Paris',
+          postalCode: '75008',
+          country: 'FR',
+        },
+        coordinates: { latitude: 48.86998, longitude: 2.305772 },
+        priceRange: '€€€',
+        cuisines: ['French', 'European', 'Alsatian'],
+        reviews: [
+          {
+            rating: 2,
+            title: 'Overpriced tourist trap',
+            text: 'Food was average and the terrace was packed with tour groups all evening.',
+            publishedDate: '2026-05-19',
+            author: { name: 'JP T' },
+          },
+        ],
+      },
+      '5943832',
+    )
+    expect(info).toMatchObject({
+      contentId: '5943832',
+      name: "Brasserie L'Alsace",
+      rating: 3.3,
+      userRatingCount: 844,
+      phone: '+33 1 53 93 97 00',
+      address: '39 Avenue Des Champs-élysées, 75008 Paris, FR',
+      location: { lat: 48.86998, lng: 2.305772 },
+      priceLevel: '€€€',
+      cuisine: 'French · European · Alsatian',
+    })
+    expect(info.photos[0]).toContain('terrasse.jpg')
+    expect(info.photos).toContain(
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/alsace-2.jpg?w=800&h=800&s=1',
+    )
+    expect(info.photos.join(' ')).not.toContain('tiny.jpg')
+    expect(info.reviews[0]).toMatchObject({
+      rating: 2,
+      author: 'JP T',
+      relativeTime: '2026-05-19',
+    })
   })
 
   it('calls Tripadvisor autocomplete once for an unmatched cafe and skips the gallery', async () => {
@@ -442,12 +1034,7 @@ describe('Tripadvisor place photos', () => {
     resetTripadvisorRequestBudgetForTests()
     resetLlmArtifactStoreForTests()
     resetTripadvisorPlacePhotosForTests()
-    authFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: [] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    authFetch.mockResolvedValueOnce(tripadvisor34AutocompleteResponse([]))
 
     const unmatched = await fetchTripadvisorPlaceGallery({
       name: 'Some Unknown Cafe',
@@ -455,8 +1042,16 @@ describe('Tripadvisor place photos', () => {
     })
     expect(unmatched).toBeNull()
     expect(authFetch).toHaveBeenCalledTimes(1)
-    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain('rest=auto-complete')
-    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('media-gallery')
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
+      'rest=api%2Fv1%2Fautocomplete',
+    )
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
+      'location=Some+Unknown+Cafe+Paris',
+    )
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain(
+      'restaurants%2Fsearch',
+    )
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('restaurants%2Fdetail')
 
     authFetch.mockClear()
     const again = await fetchTripadvisorPlaceGallery({
@@ -474,46 +1069,15 @@ describe('Tripadvisor place photos', () => {
     resetTripadvisorPlacePhotosForTests()
     authFetch
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: [
-              {
-                localizedName: 'Bouillon Chartier',
-                type: 'RESTAURANT',
-                route: { params: { contentId: '698123' } },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+        tripadvisor34AutocompleteResponse([
+          {
+            locationId: 698123,
+            name: 'Bouillon Chartier',
+            type: 'restaurant',
+          },
+        ]),
       )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: {
-              sections: [
-                {
-                  mediaList: [
-                    {
-                      item: {
-                        data: {
-                          sizes: [
-                            {
-                              width: 1200,
-                              url: 'https://media-cdn.tripadvisor.com/chartier.jpg',
-                            },
-                          ],
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
-      )
+      .mockResolvedValueOnce(restaurantMediaGalleryResponse('https://media-cdn.tripadvisor.com/chartier.jpg'))
 
     const gallery = await fetchTripadvisorPlaceGallery({
       name: 'Bouillon Chartier',
@@ -523,14 +1087,19 @@ describe('Tripadvisor place photos', () => {
     expect(gallery?.kind).toBe('restaurant')
     expect(gallery?.photos).toEqual(['https://media-cdn.tripadvisor.com/chartier.jpg'])
     expect(authFetch).toHaveBeenCalledTimes(2)
-    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain('rest=auto-complete')
     expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
-      'query=Bouillon+Chartier+Paris',
+      'rest=api%2Fv1%2Fautocomplete',
+    )
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
+      'location=Bouillon+Chartier+Paris',
     )
     expect(String(authFetch.mock.calls[1]?.[0] || '')).toContain(
-      'rest=restaurants%2Fmedia-gallery',
+      'rest=api%2Fv1%2Frestaurants%2Fdetail',
     )
-    expect(String(authFetch.mock.calls[1]?.[0] || '')).toContain('contentId=698123')
+    expectRestaurantDetailsQuery(
+      String(authFetch.mock.calls[1]?.[0] || ''),
+      restaurantListingUrl(698123, 'Bouillon Chartier'),
+    )
 
     authFetch.mockClear()
     const cached = await fetchTripadvisorPlaceGallery({
@@ -551,6 +1120,525 @@ describe('Tripadvisor place photos', () => {
     expect(authFetch).not.toHaveBeenCalled()
   })
 
+  it('returns the seeded Sphere cover without waiting for restaurant details', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    let resolveDetails!: (value: Response) => void
+    const detailsPromise = new Promise<Response>((resolve) => {
+      resolveDetails = resolve
+    })
+    authFetch.mockImplementation(async (input) => {
+      const href = String(input)
+      if (href.includes('restaurants%2Fdetail')) return detailsPromise
+      throw new Error(`unexpected Tripadvisor request ${href}`)
+    })
+
+    const previews: string[][] = []
+    let detailsSettled = false
+    const started = Date.now()
+    const info = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+      onPreview: (preview) => {
+        previews.push(preview.photos)
+      },
+      onDetails: () => {
+        detailsSettled = true
+      },
+    })
+    expect(Date.now() - started).toBeLessThan(250)
+    expect(info?.contentId).toBe('25158864')
+    expect(info?.photos[0]).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(previews[0]?.[0]).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(detailsSettled).toBe(false)
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expectRestaurantDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), SPHERE_LISTING_URL)
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('media-gallery')
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('restaurants%2Fsearch')
+    expect(resolveTripadvisorRestaurantListing).not.toHaveBeenCalled()
+
+    resolveDetails(new Response('upstream timeout', { status: 502 }))
+    await Promise.resolve()
+  })
+
+  it('upgrades the Sphere cover with restaurant details photos and facts', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    let resolveDetails!: (value: Response) => void
+    const detailsPromise = new Promise<Response>((resolve) => {
+      resolveDetails = resolve
+    })
+    authFetch.mockImplementation(async (input) => {
+      const href = String(input)
+      if (href.includes('restaurants%2Fdetail')) return detailsPromise
+      throw new Error(`unexpected Tripadvisor request ${href}`)
+    })
+
+    const previews: TripadvisorAttractionInfo[] = []
+    let detailsInfo: TripadvisorAttractionInfo | null | undefined
+    const started = Date.now()
+    const info = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+      onPreview: (preview) => {
+        previews.push(preview)
+      },
+      onDetails: (result) => {
+        detailsInfo = result
+      },
+    })
+    expect(Date.now() - started).toBeLessThan(250)
+    expect(info?.photos).toHaveLength(1)
+    expect(previews[0]?.photos).toHaveLength(1)
+
+    resolveDetails(
+      tripadvisor34DetailResponse({
+        id: '25158864',
+        name: 'Sphere',
+        photos: [
+          'https://media-cdn.tripadvisor.com/sphere-1.jpg',
+          'https://media-cdn.tripadvisor.com/sphere-2.jpg',
+          'https://media-cdn.tripadvisor.com/sphere-3.jpg',
+        ],
+        address: '10 Rue de Moscou, 75008 Paris',
+        rating: 4.6,
+        reviewCount: 120,
+        priceRange: '€€€€',
+        cuisines: ['French', 'European'],
+        reviews: [
+          {
+            text: 'A memorable tasting menu in a quiet dining room near Parc Monceau.',
+            rating: 5,
+            author: { name: 'Ada' },
+            publishedDate: '2026-04-01',
+          },
+        ],
+      }),
+    )
+    await vi.waitFor(() => {
+      expect(detailsInfo?.photos.length).toBeGreaterThan(1)
+    })
+    expect(detailsInfo?.photos[0]).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(detailsInfo?.photos).toEqual(
+      expect.arrayContaining([
+        'https://media-cdn.tripadvisor.com/sphere-1.jpg',
+        'https://media-cdn.tripadvisor.com/sphere-2.jpg',
+      ]),
+    )
+    expect(detailsInfo?.address).toBe('10 Rue de Moscou, 75008 Paris')
+    expect(detailsInfo?.rating).toBe(4.6)
+    expect(detailsInfo?.priceLevel).toBe('€€€€')
+    expect(detailsInfo?.cuisine).toBe('French · European')
+    expect(detailsInfo?.reviews[0]?.author).toBe('Ada')
+    expect(previews.at(-1)?.photos.length).toBeGreaterThan(1)
+  })
+
+  it('maps tripadvisor34 Sphere detail keys into photos, rating, reviews, address, price, and cuisine', () => {
+    const info = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '25158864',
+        name: 'Sphere',
+        category: 'RESTAURANT',
+        image:
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/82/2c/00/salle-du-restaurant-gastronomi.jpg?w=500&h=-1&s=1',
+        images: [
+          {
+            url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/28/b4/16/d3/caption.jpg?w=1100&h=600&',
+          },
+          {
+            url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2d/b1/49/51/caption.jpg?w=1400&h=-1&',
+          },
+        ],
+        cuisines: ['French'],
+        phone: '+33 1 71 25 26 91',
+        priceRange: '$$$$',
+        rating: 3.7,
+        reviewCount: 200,
+        address: {
+          street: '18 Rue La Boétie',
+          city: 'Paris',
+          postalCode: '75008',
+          country: 'FR',
+        },
+        coordinates: { latitude: 48.874268, longitude: 2.31694 },
+        reviews: [
+          {
+            rating: 3,
+            title: 'Lack of soul, a sommelier, and a real wine list',
+            text: 'We went there for dinner and the experience is mixed. The dishes are good but not extraordinary because there are too many condiments.',
+            publishedDate: '2026-07-08',
+            author: { name: 'Stephane L' },
+          },
+        ],
+      },
+      '25158864',
+    )
+    expect(info.name).toBe('Sphere')
+    expect(info.rating).toBe(3.7)
+    expect(info.userRatingCount).toBe(200)
+    expect(info.cuisine).toBe('French')
+    expect(info.priceLevel).toBe('$$$$')
+    expect(formatPriceLevelLabel(info.priceLevel)).toContain('€€€€')
+    expect(info.address).toContain('18 Rue La Boétie')
+    expect(info.phone).toBe('+33 1 71 25 26 91')
+    expect(info.photos.length).toBeGreaterThan(1)
+    expect(info.reviews[0]?.author).toBe('Stephane L')
+    expect(info.reviews[0]?.text).toContain('experience is mixed')
+  })
+
+  it('does not treat a seeded restaurant cover as settled Tripadvisor details', () => {
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    const peeked = peekTripadvisorRestaurantInfo('斯菲尔', 'Sphère')
+    expect(peeked?.contentId).toBe('25158864')
+    expect(peeked?.photos).toHaveLength(1)
+    expect(hasSettledTripadvisorRestaurantDetails(peeked)).toBe(false)
+    expect(hasCachedTripadvisorRestaurantDetails(peeked?.contentId)).toBe(false)
+    expect(hasCachedTripadvisorGallery(peeked?.contentId, 'restaurant')).toBe(false)
+  })
+
+  it('ignores stale v7/v9 mixed albums and refetches restaurant details', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    const mixedPhotos = [
+      'https://media-cdn.tripadvisor.com/sphere-salle.jpg',
+      'https://media-cdn.tripadvisor.com/sogno-pasta.jpg',
+      'https://media-cdn.tripadvisor.com/king-cap-selfie.jpg',
+    ]
+    const staleDetails = {
+      contentId: '25158864',
+      name: 'Sphere',
+      address: '18 Rue La Boétie, 75008 Paris',
+      rating: 3.7,
+      photos: mixedPhotos,
+      reviews: [{ text: 'stale mixed album', rating: 3, author: 'Old' }],
+    }
+    setLlmArtifact('tripadvisor-gallery:v9:restaurant:25158864', {
+      contentId: '25158864',
+      kind: 'restaurant',
+      name: 'Sphere',
+      photos: mixedPhotos,
+    })
+    setLlmArtifact('tripadvisor-place-details:v7:25158864', staleDetails)
+    setLlmArtifact('tripadvisor-gallery:v9:restaurant:24052281', {
+      contentId: '24052281',
+      kind: 'restaurant',
+      name: 'Sogno Paris',
+      photos: mixedPhotos,
+    })
+    setLlmArtifact('tripadvisor-place-details:v7:24052281', {
+      ...staleDetails,
+      contentId: '24052281',
+      name: 'Sogno Paris',
+    })
+    resetTripadvisorPlacePhotosForTests()
+
+    const spherePeek = peekTripadvisorRestaurantInfo('斯菲尔', 'Sphère')
+    expect(spherePeek?.photos.join(' ')).not.toContain('sogno-pasta')
+    expect(hasSettledTripadvisorRestaurantDetails(spherePeek)).toBe(false)
+    expect(hasCachedTripadvisorRestaurantDetails('25158864')).toBe(false)
+    expect(hasCachedTripadvisorGallery('25158864', 'restaurant')).toBe(false)
+    expect(peekTripadvisorRestaurantInfo('Sogno')?.photos.join(' ')).not.toContain('sphere-salle')
+    expect(hasCachedTripadvisorRestaurantDetails('24052281')).toBe(false)
+
+    authFetch.mockImplementation(async (input) => {
+      const href = String(input)
+      if (href.includes('restaurants%2Freviews')) {
+        return new Response(JSON.stringify({ success: true, reviews: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      if (href.includes(encodeURIComponent(SPHERE_LISTING_URL))) {
+        return tripadvisor34DetailResponse({
+          id: '25158864',
+          name: 'Sphere',
+          photos: [
+            'https://media-cdn.tripadvisor.com/sphere-listing-1.jpg',
+            'https://media-cdn.tripadvisor.com/sphere-listing-2.jpg',
+          ],
+          address: '18 Rue La Boétie, 75008 Paris',
+          rating: 3.7,
+          reviews: [
+            {
+              text: 'Listing-only Sphere album from restaurants detail.',
+              rating: 4,
+              author: 'Pat',
+            },
+          ],
+        })
+      }
+      if (href.includes(encodeURIComponent(SOGNO_LISTING_URL))) {
+        return tripadvisor34DetailResponse({
+          id: '24052281',
+          name: 'Sogno Paris',
+          photos: [
+            'https://media-cdn.tripadvisor.com/sogno-listing-1.jpg',
+            'https://media-cdn.tripadvisor.com/sogno-listing-2.jpg',
+          ],
+          address: "42 Rue de l'Amiral Hamelin, 75016 Paris",
+          rating: 4.5,
+          reviews: [
+            {
+              text: 'Listing-only Sogno album from restaurants detail.',
+              rating: 5,
+              author: 'Sam',
+            },
+          ],
+        })
+      }
+      throw new Error(`unexpected Tripadvisor request ${href}`)
+    })
+
+    const sphere = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    const sogno = await fetchTripadvisorRestaurantInfo({ name: 'Sogno' })
+    const detailUrls = authFetch.mock.calls
+      .map((call) => String(call[0] || ''))
+      .filter((href) => href.includes('restaurants%2Fdetail'))
+    expect(detailUrls).toHaveLength(2)
+    expectRestaurantDetailsQuery(detailUrls[0], SPHERE_LISTING_URL)
+    expectRestaurantDetailsQuery(detailUrls[1], SOGNO_LISTING_URL)
+    expect(sphere?.photos.join(' ')).toContain('sphere-listing-1')
+    expect(sphere?.photos.join(' ')).not.toContain('sogno-pasta')
+    expect(sogno?.photos.join(' ')).toContain('sogno-listing-1')
+    expect(sogno?.photos.join(' ')).not.toContain('sphere-salle')
+    expect(hasCachedTripadvisorRestaurantDetails('25158864')).toBe(true)
+    expect(hasCachedTripadvisorRestaurantDetails('24052281')).toBe(true)
+  })
+
+  it('still requests restaurant details after a cover preview and fires onDetails later', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    let resolveDetails!: (value: Response) => void
+    const detailsPromise = new Promise<Response>((resolve) => {
+      resolveDetails = resolve
+    })
+    authFetch.mockImplementation(async (input) => {
+      const href = String(input)
+      if (href.includes('restaurants%2Fdetail')) return detailsPromise
+      throw new Error(`unexpected Tripadvisor request ${href}`)
+    })
+
+    const firstOnDetails = vi.fn()
+    const secondOnDetails = vi.fn()
+    const preview = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+      onPreview: (info) => {
+        expect(info.photos.length).toBeGreaterThan(0)
+      },
+      onDetails: firstOnDetails,
+    })
+    expect(preview?.photos).toHaveLength(1)
+    expect(firstOnDetails).not.toHaveBeenCalled()
+    expect(authFetch).toHaveBeenCalledTimes(1)
+
+    const joined = fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+      onPreview: () => {},
+      onDetails: secondOnDetails,
+    })
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expect(secondOnDetails).not.toHaveBeenCalled()
+
+    resolveDetails(
+      tripadvisor34DetailResponse({
+        id: '25158864',
+        name: 'Sphere',
+        photos: [
+          'https://media-cdn.tripadvisor.com/sphere-1.jpg',
+          'https://media-cdn.tripadvisor.com/sphere-2.jpg',
+        ],
+        address: '10 Rue de Moscou, 75008 Paris',
+        rating: 4.6,
+      }),
+    )
+    await vi.waitFor(() => {
+      expect(firstOnDetails).toHaveBeenCalled()
+      expect(secondOnDetails).toHaveBeenCalled()
+    })
+    const detailsInfo = firstOnDetails.mock.calls[0]?.[0] as TripadvisorAttractionInfo
+    expect(detailsInfo.photos.length).toBeGreaterThan(1)
+    expect(detailsInfo.address).toBe('10 Rue de Moscou, 75008 Paris')
+    expect(detailsInfo.rating).toBe(4.6)
+    await joined
+  })
+
+
+  it('keeps the Sphere cover when restaurant details fail', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockResolvedValueOnce(new Response('upstream timeout', { status: 502 }))
+
+    const info = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    expect(info?.contentId).toBe('25158864')
+    expect(info?.photos[0]).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expect(resolveTripadvisorRestaurantListing).not.toHaveBeenCalled()
+  })
+
+  it('still requests Sphere details after other Tripadvisor calls have used budget', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    for (let index = 0; index < TRIPADVISOR_MONTHLY_LIMIT - 1; index += 1) {
+      expect(tryConsumeTripadvisorRequest('auto-complete')).toBe(true)
+    }
+    authFetch.mockResolvedValueOnce(
+      tripadvisor34DetailResponse({
+        id: '25158864',
+        name: 'Sphere',
+        photos: [
+          'https://media-cdn.tripadvisor.com/sphere-1.jpg',
+          'https://media-cdn.tripadvisor.com/sphere-2.jpg',
+        ],
+        address: '18 Rue La Boétie, 75008 Paris',
+        rating: 3.7,
+        reviewCount: 200,
+        priceRange: '$$$$',
+        cuisines: ['French'],
+        reviews: [
+          {
+            text: 'A memorable tasting menu in a quiet dining room near Parc Monceau.',
+            rating: 5,
+            author: { name: 'Ada' },
+            publishedDate: '2026-04-01',
+          },
+        ],
+      }),
+    )
+
+    const info = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expectRestaurantDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), SPHERE_LISTING_URL)
+    expect(info?.rating).toBe(3.7)
+    expect(info?.address).toContain('18 Rue La Boétie')
+    expect(info?.photos.length).toBeGreaterThan(1)
+  })
+
+  it('does not request restaurant details after the monthly cap is used', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    for (let index = 0; index < TRIPADVISOR_MONTHLY_LIMIT; index += 1) {
+      expect(tryConsumeTripadvisorRequest('auto-complete')).toBe(true)
+    }
+
+    const info = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    expect(authFetch).not.toHaveBeenCalled()
+    expect(info?.contentId).toBe('25158864')
+    expect(info?.photos).toHaveLength(1)
+    expect(info?.photos[0]).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(info?.rating).toBeUndefined()
+  })
+
+  it('does not request restaurant details after the monthly cap is used', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    for (let index = 0; index < TRIPADVISOR_MONTHLY_LIMIT; index += 1) {
+      expect(tryConsumeTripadvisorRequest('auto-complete')).toBe(true)
+    }
+
+    const info = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    expect(authFetch).not.toHaveBeenCalled()
+    expect(info?.contentId).toBe('25158864')
+    expect(info?.photos).toHaveLength(1)
+    expect(info?.photos[0]).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(info?.rating).toBeUndefined()
+  })
+
+  it('still requests restaurant details when only the seeded cover is cached', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    let detailCalls = 0
+    const sphereCover =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/82/2c/00/salle-du-restaurant-gastronomi.jpg?w=1200&h=900&s=1'
+    authFetch.mockImplementation(async (input) => {
+      const href = String(input)
+      if (href.includes('restaurants%2Freviews')) {
+        return new Response(JSON.stringify({ success: true, reviews: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      if (!href.includes('restaurants%2Fdetail')) {
+        throw new Error(`unexpected Tripadvisor request ${href}`)
+      }
+      detailCalls += 1
+      if (detailCalls === 1) {
+        return tripadvisor34DetailResponse({
+          id: '25158864',
+          name: 'Sphere',
+          photos: [sphereCover],
+        })
+      }
+      return tripadvisor34DetailResponse({
+        id: '25158864',
+        name: 'Sphere',
+        photos: [
+          'https://media-cdn.tripadvisor.com/sphere-1.jpg',
+          'https://media-cdn.tripadvisor.com/sphere-2.jpg',
+        ],
+        address: '18 Rue La Boétie, 75008 Paris',
+        rating: 3.7,
+        cuisines: ['French'],
+        priceRange: '$$$$',
+      })
+    })
+
+    const first = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    expect(first?.photos).toEqual([sphereCover])
+    expect(hasSettledTripadvisorRestaurantDetails(first)).toBe(false)
+    expect(detailCalls).toBe(1)
+
+    const second = await fetchTripadvisorRestaurantInfo({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+    })
+    expect(detailCalls).toBe(2)
+    expectRestaurantDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), SPHERE_LISTING_URL)
+    expect(second?.rating).toBe(3.7)
+    expect(second?.cuisine).toBe('French')
+    expect(second?.photos.length).toBeGreaterThan(1)
+  })
+
   it('reuses a cafe gallery when the Chinese/English labels are swapped', async () => {
     authFetch.mockReset()
     resetTripadvisorRequestBudgetForTests()
@@ -558,46 +1646,15 @@ describe('Tripadvisor place photos', () => {
     resetTripadvisorPlacePhotosForTests()
     authFetch
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: [
-              {
-                localizedName: 'Parallel Coffee',
-                type: 'RESTAURANT',
-                route: { params: { contentId: '778899' } },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+        tripadvisor34AutocompleteResponse([
+          {
+            locationId: 778899,
+            name: 'Parallel Coffee',
+            type: 'restaurant',
+          },
+        ]),
       )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: {
-              sections: [
-                {
-                  mediaList: [
-                    {
-                      item: {
-                        data: {
-                          sizes: [
-                            {
-                              width: 1200,
-                              url: 'https://media-cdn.tripadvisor.com/parallel.jpg',
-                            },
-                          ],
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
-      )
+      .mockResolvedValueOnce(restaurantMediaGalleryResponse('https://media-cdn.tripadvisor.com/parallel.jpg'))
 
     const first = await fetchTripadvisorPlaceGallery({
       name: 'Parallel Coffee',
@@ -623,18 +1680,13 @@ describe('Tripadvisor place photos', () => {
     resetLlmArtifactStoreForTests()
     resetTripadvisorPlacePhotosForTests()
     authFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          data: [
-            {
-              localizedName: 'Some Other Bistro',
-              type: 'RESTAURANT',
-              route: { params: { contentId: '111000' } },
-            },
-          ],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
+      tripadvisor34AutocompleteResponse([
+        {
+          locationId: 111000,
+          name: 'Some Other Bistro',
+          type: 'restaurant',
+        },
+      ]),
     )
 
     const unmatched = await fetchTripadvisorPlaceGallery({
@@ -643,37 +1695,577 @@ describe('Tripadvisor place photos', () => {
     })
     expect(unmatched).toBeNull()
     expect(authFetch).toHaveBeenCalledTimes(1)
-    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('media-gallery')
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
+      'rest=api%2Fv1%2Fautocomplete',
+    )
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain(
+      'restaurants%2Fsearch',
+    )
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).not.toContain('restaurants%2Fdetail')
   })
 
-  it('loads a seeded attraction with media-gallery only, not the dated details endpoint', async () => {
+  it('matches the seeded Sogno Paris listing from the Google/itinerary name', () => {
+    const items = listSeededTripadvisorRestaurants()
+    expect(matchTripadvisorCatalogItem(items, 'Sogno')?.contentId).toBe('24052281')
+    expect(matchTripadvisorCatalogItem(items, '多恋', 'Sogno Paris')?.contentId).toBe(
+      '24052281',
+    )
+    const seeded = listSeededTripadvisorRestaurants()
+    const sognoCover = seeded.find((item) => item.contentId === '24052281')?.coverUrl || ''
+    const sphereCover = seeded.find((item) => item.contentId === '25158864')?.coverUrl || ''
+    expect(sognoCover).toContain('penne-all-arrabbiata.jpg')
+    expect(sphereCover).toContain('salle-du-restaurant-gastronomi.jpg')
+    expect(sognoCover).not.toBe(sphereCover)
+  })
+
+  it('does not ingest nested related listing photos into a restaurant gallery', () => {
+    const sognoHero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno-pasta.jpg?w=1200&h=900&s=1'
+    const sognoDish =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno-pizza.jpg?w=1200&h=900&s=1'
+    const sphereHero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sphere-salle.jpg?w=1200&h=900&s=1'
+    const selfie =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/king-cap-selfie.jpg?w=1200&h=900&s=1'
+    const eiffel =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/eiffel-tower.jpg?w=1200&h=900&s=1'
+    const beach =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/traveler-beach.jpg?w=1200&h=900&s=1'
+
+    const sogno = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '24052281',
+        name: 'Sogno Paris',
+        category: 'RESTAURANT',
+        image: sognoHero,
+        images: [{ url: sognoHero }, { url: sognoDish }],
+        similarRestaurants: [
+          {
+            id: '25158864',
+            name: 'Sphere',
+            image: sphereHero,
+            images: [{ url: selfie }, { url: eiffel }, { url: beach }],
+          },
+        ],
+        nearbyAttractions: [{ images: [{ url: eiffel }] }],
+      },
+      '24052281',
+    )
+    const sphere = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '25158864',
+        name: 'Sphere',
+        category: 'RESTAURANT',
+        image: sphereHero,
+        images: [{ url: sphereHero }],
+        similarRestaurants: [
+          {
+            id: '24052281',
+            name: 'Sogno Paris',
+            images: [{ url: sognoHero }, { url: sognoDish }, { url: selfie }],
+          },
+        ],
+      },
+      '25158864',
+    )
+
+    expect(sogno.photos.join(' ')).toContain('sogno-pasta')
+    expect(sogno.photos.join(' ')).toContain('sogno-pizza')
+    expect(sogno.photos.join(' ')).not.toContain('king-cap-selfie')
+    expect(sogno.photos.join(' ')).not.toContain('eiffel-tower')
+    expect(sogno.photos.join(' ')).not.toContain('traveler-beach')
+    expect(sogno.photos.join(' ')).not.toContain('sphere-salle')
+
+    expect(sphere.photos.join(' ')).toContain('sphere-salle')
+    expect(sphere.photos.join(' ')).not.toContain('sogno-pasta')
+    expect(sphere.photos.join(' ')).not.toContain('sogno-pizza')
+    expect(sphere.photos.join(' ')).not.toContain('king-cap-selfie')
+
+    const wrapped = normalizeTripadvisorGallery(
+      {
+        success: true,
+        data: {
+          id: '24052281',
+          name: 'Sogno Paris',
+          category: 'RESTAURANT',
+          image: sognoHero,
+          images: [{ url: sognoDish }],
+          relatedListings: [{ images: [{ url: selfie }, { url: eiffel }, { url: beach }] }],
+        },
+      },
+      'restaurant',
+      '24052281',
+      'Sogno Paris',
+    )
+    expect(wrapped.photos.join(' ')).toContain('sogno-pizza')
+    expect(wrapped.photos.join(' ')).not.toContain('king-cap-selfie')
+    expect(wrapped.photos.join(' ')).not.toContain('eiffel-tower')
+    expect(wrapped.photos.join(' ')).not.toContain('traveler-beach')
+
+    const walked = normalizeTripadvisorAttractionDetails(
+      {
+        data: {
+          localizedName: 'Sogno Paris',
+          photoSizeDynamic: {
+            urlTemplate:
+              'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno-hero.jpg?w={width}&h={height}&s=1',
+          },
+          similarRestaurants: [
+            {
+              photoSizeDynamic: {
+                urlTemplate:
+                  'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/king-cap-selfie.jpg?w={width}&h={height}&s=1',
+              },
+            },
+          ],
+        },
+      },
+      '24052281',
+    )
+    expect(walked.photos.join(' ')).toContain('sogno-hero')
+    expect(walked.photos.join(' ')).not.toContain('king-cap-selfie')
+  })
+
+  it('drops Related Stories and nearby restaurant photos from tripadvisor34 details', () => {
+    const listingHero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/82/2c/00/salle-du-restaurant-gastronomi.jpg?w=500&h=-1&s=1'
+    const listingDish =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/28/b4/16/d3/caption.jpg?w=1100&h=600&'
+    const listingInterior =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2d/b1/49/51/caption.jpg?w=1400&h=-1&'
+    const tinyThumb =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/34/22/fe/68/caption.jpg?w=300&h=300&'
+    const seaCouple =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/33/c9/52/3c/caption.jpg?w=2400&h=-1&'
+    const eiffelCroissant =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/30/0f/25/01/caption.jpg?w=2400&h=-1&'
+    const groupSelfie =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2e/ca/54/84/caption.jpg?w=2400&h=-1&'
+    const nearbyPizza =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0b/e3/d1/28/maigre-confit-a-l-huile.jpg?w=1600&h=1200&'
+    const nearbyHotel =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/26/f4/b2/e3/hotel-la-canopee.jpg?w=400&h=400&'
+    const nearbyBurger =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/related-burger.jpg?w=1600&h=1200&'
+    const beach =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/traveler-beach.jpg?w=1600&h=1200&'
+
+    const mixedAlbum = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '25158864',
+        name: 'Sphere',
+        category: 'RESTAURANT',
+        image: listingHero,
+        images: [
+          { url: listingHero },
+          { url: listingDish },
+          { url: listingInterior },
+          { url: tinyThumb },
+          { url: seaCouple },
+          { url: eiffelCroissant },
+          { url: groupSelfie },
+          { url: nearbyPizza },
+          { url: nearbyHotel },
+        ],
+        relatedStories: [
+          {
+            title: 'The most beautiful beaches near Paris',
+            caption: '5 min read',
+            author: 'Tripadvisor Editors',
+            image: seaCouple,
+          },
+          {
+            title: 'A croissant under the Eiffel Tower',
+            caption: '4 min read',
+            image: eiffelCroissant,
+          },
+          {
+            title: '10 literary trips with friends',
+            caption: '6 min read',
+            images: [{ url: groupSelfie }, { url: beach }],
+          },
+        ],
+        nearbyRestaurants: [
+          {
+            name: 'Best moderately priced restaurants',
+            images: [{ url: nearbyPizza }, { url: nearbyBurger }],
+          },
+          { name: 'Best nearby', image: nearbyHotel },
+        ],
+      },
+      '25158864',
+    )
+    const mixed = mixedAlbum.photos.join(' ')
+    expect(mixed).toContain('salle-du-restaurant-gastronomi')
+    expect(mixed).toContain('28/b4/16/d3')
+    expect(mixed).toContain('2d/b1/49/51')
+    expect(mixed).not.toContain('33/c9/52/3c')
+    expect(mixed).not.toContain('30/0f/25/01')
+    expect(mixed).not.toContain('2e/ca/54/84')
+    expect(mixed).not.toContain('maigre-confit')
+    expect(mixed).not.toContain('hotel-la-canopee')
+    expect(mixed).not.toContain('related-burger')
+    expect(mixed).not.toContain('traveler-beach')
+    expect(mixed).not.toContain('34/22/fe/68')
+
+    const captioned = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '24052281',
+        name: 'Sogno Paris',
+        category: 'RESTAURANT',
+        image:
+          'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno-pasta.jpg?w=1200&h=900&s=1',
+        images: [
+          {
+            url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno-pasta.jpg?w=1200&h=900&s=1',
+          },
+          {
+            url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/sogno-pizza.jpg?w=1200&h=900&s=1',
+          },
+          {
+            url: seaCouple,
+            type: 'article',
+            section: 'Related Stories',
+            caption: '5 min read',
+          },
+          {
+            url: nearbyBurger,
+            kind: 'nearby',
+            source: 'Best nearby',
+          },
+        ],
+      },
+      '24052281',
+    )
+    expect(captioned.photos.join(' ')).toContain('sogno-pasta')
+    expect(captioned.photos.join(' ')).toContain('sogno-pizza')
+    expect(captioned.photos.join(' ')).not.toContain('33/c9/52/3c')
+    expect(captioned.photos.join(' ')).not.toContain('related-burger')
+
+    const gallery = normalizeTripadvisorGallery(
+      {
+        success: true,
+        data: {
+          id: '188486',
+          name: 'Grand Palais',
+          category: 'ATTRACTION',
+          image:
+            'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/grand-palais.jpg?w=1200&h=900&s=1',
+          images: [
+            {
+              url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/grand-palais.jpg?w=1200&h=900&s=1',
+            },
+            { url: tinyThumb },
+            { url: seaCouple },
+            { url: eiffelCroissant },
+            { url: groupSelfie },
+          ],
+          related_stories: [{ image: seaCouple }, { image: eiffelCroissant }],
+        },
+      },
+      'attraction',
+      '188486',
+      'Grand Palais',
+    )
+    expect(gallery.photos.join(' ')).toContain('grand-palais')
+    expect(gallery.photos.join(' ')).not.toContain('33/c9/52/3c')
+    expect(gallery.photos.join(' ')).not.toContain('30/0f/25/01')
+    expect(gallery.photos.join(' ')).not.toContain('2e/ca/54/84')
+  })
+
+  it('keeps Sphere and Sogno details galleries on separate contentIds', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockImplementation(async (input) => {
+      const href = String(input)
+      if (href.includes(encodeURIComponent(SPHERE_LISTING_URL))) {
+        return tripadvisor34DetailResponse({
+          id: '25158864',
+          name: 'Sphere',
+          photos: [
+            'https://media-cdn.tripadvisor.com/sphere-salle.jpg',
+            'https://media-cdn.tripadvisor.com/sphere-dish.jpg',
+          ],
+        })
+      }
+      if (href.includes(encodeURIComponent(SOGNO_LISTING_URL))) {
+        return tripadvisor34DetailResponse({
+          id: '24052281',
+          name: 'Sogno Paris',
+          photos: [
+            'https://media-cdn.tripadvisor.com/sogno-pasta.jpg',
+            'https://media-cdn.tripadvisor.com/sogno-pizza.jpg',
+          ],
+        })
+      }
+      throw new Error(`unexpected Tripadvisor request ${href}`)
+    })
+
+    const sphere = await fetchTripadvisorPlaceGallery({
+      name: '斯菲尔',
+      nameLocal: 'Sphère',
+      type: 'restaurant',
+    })
+    const sogno = await fetchTripadvisorPlaceGallery({
+      name: 'Sogno',
+      type: 'restaurant',
+    })
+    expect(sphere?.contentId).toBe('25158864')
+    expect(sogno?.contentId).toBe('24052281')
+    expect(sphere?.photos.join(' ')).toContain('sphere-salle')
+    expect(sphere?.photos.join(' ')).not.toContain('sogno-pasta')
+    expect(sogno?.photos.join(' ')).toContain('sogno-pasta')
+    expect(sogno?.photos.join(' ')).not.toContain('sphere-salle')
+    expect(peekTripadvisorRestaurantInfo('斯菲尔', 'Sphère')?.photos.join(' ')).not.toContain(
+      'sogno-pasta',
+    )
+    expect(peekTripadvisorRestaurantInfo('Sogno')?.photos.join(' ')).not.toContain('sphere-salle')
+  })
+
+  it('loads seeded Sogno Paris from restaurant details without autocomplete', async () => {
     authFetch.mockReset()
     resetTripadvisorRequestBudgetForTests()
     resetLlmArtifactStoreForTests()
     resetTripadvisorPlacePhotosForTests()
     authFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          data: {
-            sections: [
-              {
-                mediaList: [
-                  {
-                    item: {
-                      data: {
-                        sizes: [
-                          { width: 1024, url: 'https://media-cdn.tripadvisor.com/arc.jpg' },
-                        ],
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
+      restaurantMediaGalleryResponse(
+        'https://media-cdn.tripadvisor.com/sogno-1.jpg',
+        'https://media-cdn.tripadvisor.com/sogno-2.jpg',
+        'https://media-cdn.tripadvisor.com/sogno-3.jpg',
       ),
+    )
+
+    const gallery = await fetchTripadvisorPlaceGallery({
+      name: 'Sogno',
+      type: 'restaurant',
+      address: "42 Rue de l'Amiral Hamelin, 75016 Paris",
+    })
+    expect(gallery?.contentId).toBe('24052281')
+    expect(gallery?.photos).toEqual([
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w=1200&h=900&s=1',
+      'https://media-cdn.tripadvisor.com/sogno-1.jpg',
+      'https://media-cdn.tripadvisor.com/sogno-2.jpg',
+      'https://media-cdn.tripadvisor.com/sogno-3.jpg',
+    ])
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expectRestaurantDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), SOGNO_LISTING_URL)
+    expect(resolveTripadvisorRestaurantListing).not.toHaveBeenCalled()
+  })
+
+  it('does not cache a cover-only gallery when restaurant details fail', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch
+      .mockResolvedValueOnce(tripadvisorMissingResponse())
+      .mockResolvedValueOnce(
+        restaurantMediaGalleryResponse(
+          'https://media-cdn.tripadvisor.com/sogno-1.jpg',
+          'https://media-cdn.tripadvisor.com/sogno-2.jpg',
+        ),
+      )
+
+    const first = await fetchTripadvisorPlaceGallery({
+      name: 'Sogno',
+      type: 'restaurant',
+    })
+    expect(first?.photos).toEqual([
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w=1200&h=900&s=1',
+    ])
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
+      'rest=api%2Fv1%2Frestaurants%2Fdetail',
+    )
+    expect(authFetch).toHaveBeenCalledTimes(1)
+
+    const second = await fetchTripadvisorPlaceGallery({
+      name: 'Sogno',
+      type: 'restaurant',
+    })
+    expect(second?.photos).toEqual([
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w=1200&h=900&s=1',
+      'https://media-cdn.tripadvisor.com/sogno-1.jpg',
+      'https://media-cdn.tripadvisor.com/sogno-2.jpg',
+    ])
+    expect(authFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('loads restaurant address, website, reviews and photos from Tripadvisor', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockResolvedValueOnce(
+      tripadvisor34DetailResponse({
+        id: '24052281',
+        name: 'Sogno Paris',
+        photos: ['https://media-cdn.tripadvisor.com/sogno-1.jpg'],
+        address: "42 Rue de l'Amiral Hamelin, 75016 Paris",
+        website: 'https://www.sognoparis.com/',
+        phone: '+33 1 47 04 00 00',
+        rating: 4.5,
+        reviewCount: 77,
+        priceLevel: '$$',
+        cuisine: 'Italian',
+        reviews: [
+          {
+            text: 'Penne all arrabbiata was spicy and the room felt like a neighborhood trattoria.',
+            rating: 5,
+            author: { name: 'Luca' },
+            publishedDate: '2026-06-18',
+          },
+        ],
+      }),
+    )
+
+    const info = await fetchTripadvisorRestaurantInfo({ name: 'Sogno' })
+    expect(info?.contentId).toBe('24052281')
+    expect(info?.address).toBe("42 Rue de l'Amiral Hamelin, 75016 Paris")
+    expect(info?.website).toBe('https://www.sognoparis.com/')
+    expect(info?.phone).toBe('+33 1 47 04 00 00')
+    expect(info?.rating).toBe(4.5)
+    expect(info?.reviews).toEqual([
+      {
+        text: 'Penne all arrabbiata was spicy and the room felt like a neighborhood trattoria.',
+        rating: 5,
+        author: 'Luca',
+        relativeTime: '2026-06-18',
+      },
+    ])
+    expect(info?.photos).toContain('https://media-cdn.tripadvisor.com/sogno-1.jpg')
+    expect(info?.priceLevel).toBe('$$')
+    expect(info?.cuisine).toBe('Italian')
+    const urls = authFetch.mock.calls.map((call) => String(call[0] || ''))
+    expect(urls).toHaveLength(1)
+    expectRestaurantDetailsQuery(urls[0], SOGNO_LISTING_URL)
+    expect(urls[0]).not.toContain('restaurants%2Freviews')
+  })
+
+  it('uses a Tripadvisor listing URL when autocomplete only returns hotels', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    resolveTripadvisorRestaurantListing.mockResolvedValueOnce({
+      url: 'https://www.tripadvisor.com/Restaurant_Review-g187147-d712345-Reviews-Le_Baratin-Paris_Ile_de_France.html',
+      name: 'Le Baratin',
+    })
+    authFetch
+      .mockResolvedValueOnce(
+        tripadvisor34AutocompleteResponse([
+          {
+            locationId: 1809050,
+            name: 'La Conca del Sogno',
+            type: 'hotel',
+            description: 'Nerano, Campania, Italy',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        tripadvisor34DetailResponse({
+          id: '712345',
+          name: 'Le Baratin',
+          photos: ['https://media-cdn.tripadvisor.com/baratin.jpg'],
+          rating: 4.4,
+          reviewCount: 800,
+        }),
+      )
+
+    const gallery = await fetchTripadvisorPlaceGallery({
+      name: 'Le Baratin',
+      type: 'restaurant',
+      address: '3 Rue Jouye-Rouve, 75020 Paris',
+    })
+    expect(gallery?.photos).toEqual(['https://media-cdn.tripadvisor.com/baratin.jpg'])
+    expect(resolveTripadvisorRestaurantListing).toHaveBeenCalledWith({
+      name: 'Le Baratin',
+      nameLocal: undefined,
+      address: '3 Rue Jouye-Rouve, 75020 Paris',
+      city: 'Paris',
+    })
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(String(authFetch.mock.calls[0]?.[0] || '')).toContain(
+      'rest=api%2Fv1%2Fautocomplete',
+    )
+    expect(String(authFetch.mock.calls[1]?.[0] || '')).toContain(
+      'rest=api%2Fv1%2Frestaurants%2Fdetail',
+    )
+    expectRestaurantDetailsQuery(
+      String(authFetch.mock.calls[1]?.[0] || ''),
+      'https://www.tripadvisor.com/Restaurant_Review-g187147-d712345-Reviews-Le_Baratin-Paris_Ile_de_France.html',
+    )
+  })
+
+  it('ignores a Tripadvisor contentId that is not in a Restaurant_Review URL', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    resolveTripadvisorRestaurantListing.mockResolvedValueOnce({
+      contentId: '715944',
+      name: "Brasserie L'Alsace",
+    })
+    authFetch.mockResolvedValueOnce(tripadvisor34AutocompleteResponse([]))
+
+    const gallery = await fetchTripadvisorPlaceGallery({
+      name: 'Maison Invented Bistro',
+      type: 'restaurant',
+    })
+    expect(gallery).toBeNull()
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    expect(authFetch.mock.calls.some((call) => String(call[0] || '').includes('detail'))).toBe(
+      false,
+    )
+  })
+
+  it('does not keep a listing URL whose Tripadvisor details page is gone', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    resolveTripadvisorRestaurantListing.mockResolvedValueOnce({
+      url: 'https://www.tripadvisor.com/Restaurant_Review-g187147-d715944-Reviews-Gone-Paris.html',
+      name: 'Maison Vanished Bistro',
+    })
+    authFetch
+      .mockResolvedValueOnce(tripadvisor34AutocompleteResponse([]))
+      .mockResolvedValueOnce(tripadvisorMissingResponse())
+
+    const gallery = await fetchTripadvisorPlaceGallery({
+      name: 'Maison Vanished Bistro',
+      type: 'restaurant',
+    })
+    expect(gallery).toBeNull()
+    expect(String(authFetch.mock.calls[1]?.[0] || '')).toContain(
+      'rest=api%2Fv1%2Frestaurants%2Fdetail',
+    )
+    expectRestaurantDetailsQuery(
+      String(authFetch.mock.calls[1]?.[0] || ''),
+      'https://www.tripadvisor.com/Restaurant_Review-g187147-d715944-Reviews-Gone-Paris.html',
+    )
+    expect(authFetch.mock.calls.some((call) => String(call[0] || '').includes('media-gallery'))).toBe(
+      false,
+    )
+  })
+
+  it('loads a seeded attraction from things-to-do details, not a city search', async () => {
+    authFetch.mockReset()
+    resetTripadvisorRequestBudgetForTests()
+    resetLlmArtifactStoreForTests()
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockResolvedValueOnce(
+      tripadvisor34DetailResponse({
+        id: '188709',
+        name: 'Arc de Triomphe',
+        category: 'ATTRACTION',
+        photos: ['https://media-cdn.tripadvisor.com/arc.jpg'],
+      }),
     )
 
     const info = await fetchTripadvisorAttractionInfo({ name: '凯旋门', nameLocal: 'Arc de Triomphe' })
@@ -682,10 +2274,10 @@ describe('Tripadvisor place photos', () => {
     expect(info?.photos).toContain('https://media-cdn.tripadvisor.com/arc.jpg')
     expect(authFetch).toHaveBeenCalledTimes(1)
     const url = String(authFetch.mock.calls[0]?.[0] || '')
-    expect(url).toContain('rest=attractions%2Fmedia-gallery')
-    expect(url).toContain('contentId=188709')
+    expectAttractionLocationIdQuery(url, '188709')
     expect(url).not.toContain('startDate')
     expect(url).not.toContain('attractions%2Fdetails')
+    expect(url).not.toContain('autocomplete')
   })
 
   it('loads Champs-Élysées from the seeded Tripadvisor id without autocomplete', async () => {
@@ -694,28 +2286,12 @@ describe('Tripadvisor place photos', () => {
     resetLlmArtifactStoreForTests()
     resetTripadvisorPlacePhotosForTests()
     authFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          data: {
-            sections: [
-              {
-                mediaList: [
-                  {
-                    item: {
-                      data: {
-                        sizes: [
-                          { width: 1200, url: 'https://media-cdn.tripadvisor.com/champs.jpg' },
-                        ],
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
+      tripadvisor34DetailResponse({
+        id: '209760',
+        name: 'Champs-Elysees',
+        category: 'ATTRACTION',
+        photos: ['https://media-cdn.tripadvisor.com/champs.jpg'],
+      }),
     )
 
     const info = await fetchTripadvisorAttractionInfo({
@@ -727,8 +2303,8 @@ describe('Tripadvisor place photos', () => {
     expect(info?.photos).toContain('https://media-cdn.tripadvisor.com/champs.jpg')
     expect(authFetch).toHaveBeenCalledTimes(1)
     const url = String(authFetch.mock.calls[0]?.[0] || '')
-    expect(url).toContain('contentId=209760')
-    expect(url).not.toContain('auto-complete')
+    expectAttractionLocationIdQuery(url, '209760')
+    expect(url).not.toContain('autocomplete')
   })
 
   it('looks up an unseeded attraction by a cleaned name, then loads the gallery', async () => {
@@ -738,47 +2314,26 @@ describe('Tripadvisor place photos', () => {
     resetTripadvisorPlacePhotosForTests()
     authFetch
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: [
-              {
-                localizedName: 'Pont Neuf',
-                type: 'ATTRACTION',
-                route: { params: { contentId: '188678' } },
-              },
-              {
-                title: 'Pont Neuf Hotel',
-                type: 'HOTEL',
-                route: { params: { contentId: '999002' } },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+        tripadvisor34AutocompleteResponse([
+          {
+            locationId: 188678,
+            name: 'Pont Neuf',
+            type: 'attraction',
+          },
+          {
+            locationId: 999002,
+            name: 'Pont Neuf Hotel',
+            type: 'hotel',
+          },
+        ]),
       )
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: {
-              sections: [
-                {
-                  mediaList: [
-                    {
-                      item: {
-                        data: {
-                          sizes: [
-                            { width: 1200, url: 'https://media-cdn.tripadvisor.com/pont.jpg' },
-                          ],
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+        tripadvisor34DetailResponse({
+          id: '188678',
+          name: 'Pont Neuf',
+          category: 'ATTRACTION',
+          photos: ['https://media-cdn.tripadvisor.com/pont.jpg'],
+        }),
       )
 
     const gallery = await fetchTripadvisorPlaceGallery({
@@ -790,10 +2345,14 @@ describe('Tripadvisor place photos', () => {
     expect(gallery?.photos).toEqual(['https://media-cdn.tripadvisor.com/pont.jpg'])
     expect(authFetch).toHaveBeenCalledTimes(2)
     const autocompleteUrl = String(authFetch.mock.calls[0]?.[0] || '')
-    expect(autocompleteUrl).toContain('rest=auto-complete')
-    expect(autocompleteUrl).toContain('query=pont+neuf+Paris')
-    expect(String(authFetch.mock.calls[1]?.[0] || '')).toContain('contentId=188678')
+    expect(autocompleteUrl).toContain('rest=api%2Fv1%2Fautocomplete')
+    expect(autocompleteUrl).toContain('location=Pont+Neuf+Paris')
+    expectAttractionDetailsQuery(
+      String(authFetch.mock.calls[1]?.[0] || ''),
+      attractionListingUrl(188678, 'Pont Neuf'),
+    )
   })
+})
 
   it('does not attach an unrelated autocomplete hit just because it was first', async () => {
     authFetch.mockReset()
@@ -801,18 +2360,13 @@ describe('Tripadvisor place photos', () => {
     resetLlmArtifactStoreForTests()
     resetTripadvisorPlacePhotosForTests()
     authFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          data: [
-            {
-              localizedName: 'Eiffel Tower',
-              type: 'ATTRACTION',
-              route: { params: { contentId: '188151' } },
-            },
-          ],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
+      tripadvisor34AutocompleteResponse([
+        {
+          locationId: 188151,
+          name: 'Eiffel Tower',
+          type: 'attraction',
+        },
+      ]),
     )
 
     const gallery = await fetchTripadvisorPlaceGallery({
@@ -835,28 +2389,12 @@ describe('Tripadvisor place photos', () => {
       aliases: ['Tour Eiffel'],
     })
     authFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          data: {
-            sections: [
-              {
-                mediaList: [
-                  {
-                    item: {
-                      data: {
-                        sizes: [
-                          { width: 1200, url: 'https://media-cdn.tripadvisor.com/eiffel.jpg' },
-                        ],
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
+      tripadvisor34DetailResponse({
+        id: '188151',
+        name: 'Eiffel Tower',
+        category: 'ATTRACTION',
+        photos: ['https://media-cdn.tripadvisor.com/eiffel.jpg'],
+      }),
     )
 
     const gallery = await fetchTripadvisorPlaceGallery({
@@ -871,8 +2409,8 @@ describe('Tripadvisor place photos', () => {
     })
     expect(authFetch).toHaveBeenCalledTimes(1)
     const url = String(authFetch.mock.calls[0]?.[0] || '')
-    expect(url).toContain('contentId=188151')
-    expect(url).not.toContain('auto-complete')
+    expectAttractionLocationIdQuery(url, '188151')
+    expect(url).not.toContain('autocomplete')
   })
 
   it('retries Tripadvisor autocomplete with the LLM English name', async () => {
@@ -887,42 +2425,21 @@ describe('Tripadvisor place photos', () => {
     })
     authFetch
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: [
-              {
-                localizedName: 'Pont Neuf',
-                type: 'ATTRACTION',
-                route: { params: { contentId: '188678' } },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+        tripadvisor34AutocompleteResponse([
+          {
+            locationId: 188678,
+            name: 'Pont Neuf',
+            type: 'attraction',
+          },
+        ]),
       )
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: {
-              sections: [
-                {
-                  mediaList: [
-                    {
-                      item: {
-                        data: {
-                          sizes: [
-                            { width: 1200, url: 'https://media-cdn.tripadvisor.com/pont.jpg' },
-                          ],
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+        tripadvisor34DetailResponse({
+          id: '188678',
+          name: 'Pont Neuf',
+          category: 'ATTRACTION',
+          photos: ['https://media-cdn.tripadvisor.com/pont.jpg'],
+        }),
       )
 
     const gallery = await fetchTripadvisorPlaceGallery({
@@ -933,7 +2450,10 @@ describe('Tripadvisor place photos', () => {
     expect(gallery?.photos).toEqual(['https://media-cdn.tripadvisor.com/pont.jpg'])
     expect(authFetch).toHaveBeenCalledTimes(2)
     const autocompleteUrl = String(authFetch.mock.calls[0]?.[0] || '')
-    expect(autocompleteUrl).toContain('rest=auto-complete')
-    expect(autocompleteUrl).toContain('query=pont+neuf+Paris')
-  })
+    expect(autocompleteUrl).toContain('rest=api%2Fv1%2Fautocomplete')
+    expect(autocompleteUrl).toContain('location=Pont+Neuf+Paris')
+    expectAttractionDetailsQuery(
+      String(authFetch.mock.calls[1]?.[0] || ''),
+      attractionListingUrl(188678, 'Pont Neuf'),
+    )
 })

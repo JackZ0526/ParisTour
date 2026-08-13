@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   TRIPADVISOR_MONTHLY_LIMIT,
   getTripadvisorRequestBudgetSnapshot,
+  refundTripadvisorRequest,
   resetTripadvisorRequestBudgetForTests,
   tryConsumeTripadvisorRequest,
 } from '../features/place/services/tripadvisorRequestBudget'
@@ -23,6 +24,26 @@ describe('Tripadvisor request budget', () => {
       remaining: 0,
       month: '2026-08',
     })
+  })
+
+  it('stops restaurant details at the same monthly cap as other calls', () => {
+    const now = new Date(2026, 7, 12, 12)
+    for (let index = 0; index < TRIPADVISOR_MONTHLY_LIMIT; index += 1) {
+      expect(tryConsumeTripadvisorRequest('auto-complete', 1, now)).toBe(true)
+    }
+    expect(tryConsumeTripadvisorRequest('auto-complete', 1, now)).toBe(false)
+    expect(tryConsumeTripadvisorRequest('details', 1, now)).toBe(false)
+    expect(tryConsumeTripadvisorRequest('reviews', 1, now)).toBe(false)
+  })
+
+  it('refunds a details slot after a failed HTTP so the next open can retry', () => {
+    const now = new Date(2026, 7, 12, 12)
+    for (let index = 0; index < TRIPADVISOR_MONTHLY_LIMIT; index += 1) {
+      expect(tryConsumeTripadvisorRequest('details', 1, now)).toBe(true)
+    }
+    expect(tryConsumeTripadvisorRequest('details', 1, now)).toBe(false)
+    refundTripadvisorRequest('details', 1, now)
+    expect(tryConsumeTripadvisorRequest('details', 1, now)).toBe(true)
   })
 
   it('starts a fresh budget on the next local month', () => {

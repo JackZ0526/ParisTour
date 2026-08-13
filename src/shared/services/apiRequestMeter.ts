@@ -184,8 +184,10 @@ export function classifyApiRequest(input: string): ApiRequestKind | null {
   }
   if (path === '/api/tripadvisor' || path.startsWith('/api/tripadvisor/')) {
     if (rest.includes('media-gallery')) return 'tripadvisor-gallery'
-    if (rest.includes('auto-complete')) return 'tripadvisor-autocomplete'
-    if (rest.includes('details')) return 'tripadvisor-details'
+    if (rest.includes('autocomplete') || rest.includes('auto-complete')) {
+      return 'tripadvisor-autocomplete'
+    }
+    if (rest.includes('detail') || rest.includes('review')) return 'tripadvisor-details'
     return 'tripadvisor-search'
   }
   if (path === '/api/booking' || path.startsWith('/api/booking/')) {

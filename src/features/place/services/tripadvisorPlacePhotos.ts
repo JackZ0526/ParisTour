@@ -1,4 +1,5 @@
 import type { Coordinates, PlaceType } from '../../../types'
+import type { GoogleReview } from '../../map/services/googlePlaceDetails'
 import { authFetch } from '../../auth/services/authFetch'
 import {
   getLlmArtifact,
@@ -6,14 +7,21 @@ import {
 } from '../../../shared/services/llm/llmArtifactStore'
 import {
   placeIdentitySimilarity,
-  placeSearchQuery,
+  placeLatinLabel,
   PLACE_NAME_MATCH_MIN,
 } from '../../../shared/utils/placeTitle'
 import {
   resolveAttractionCanonicalName,
+  resolveTripadvisorRestaurantListing,
   type AttractionCanonicalName,
 } from '../../../shared/services/llm/llm'
 import {
+  appendCityToQuery,
+  locationBelongsToCity,
+  tripCityFromDestination,
+} from '../../destination/services/tripCity'
+import {
+  refundTripadvisorRequest,
   tryConsumeTripadvisorRequest,
   type TripadvisorRequestKind,
 } from './tripadvisorRequestBudget'
@@ -24,6 +32,7 @@ export interface TripadvisorCatalogItem {
   contentId: string
   name: string
   coverUrl?: string
+  listingUrl?: string
   kind: TripadvisorGalleryKind
   location?: Coordinates
   aliases?: string[]
@@ -43,19 +52,34 @@ export interface TripadvisorAttractionInfo {
   rating?: number
   userRatingCount?: number
   address?: string
+  website?: string
+  phone?: string
+  priceLevel?: string
+  cuisine?: string
   location?: Coordinates
   photos: string[]
+  reviews: GoogleReview[]
 }
 
-const PARIS_GEO_ID = '187147'
 const CATALOG_PREFIX = 'tripadvisor-catalog:v1:'
-const GALLERY_PREFIX = 'tripadvisor-gallery:v4:'
-const DETAILS_PREFIX = 'tripadvisor-attraction-details:v1:'
-const QUERY_MATCH_PREFIX = 'tripadvisor-query-match:v1:'
-const MAX_GALLERY_PHOTOS = 15
+const GALLERY_PREFIX = 'tripadvisor-gallery:v10:'
+const DETAILS_PREFIX = 'tripadvisor-place-details:v8:'
+const QUERY_MATCH_PREFIX = 'tripadvisor-query-match:v3:'
+const MAX_GALLERY_PHOTOS = 48
+const MAX_REVIEWS = 8
 const MIN_GALLERY_WIDTH = 400
 const DISPLAY_WIDTH = 1200
 const DISPLAY_HEIGHT = 900
+const TA_AUTOCOMPLETE = 'api/v1/autocomplete'
+const TA_RESTAURANT_DETAIL = 'api/v1/restaurants/detail'
+const TA_RESTAURANT_REVIEWS = 'api/v1/restaurants/reviews'
+const TA_ATTRACTION_DETAIL = 'api/v1/things-to-do/detail'
+const TA_ATTRACTION_REVIEWS = 'api/v1/things-to-do/reviews'
+const TA_LOCALE = 'en_US'
+const TA_AUTOCOMPLETE_LOCALE = 'en-US'
+const TA_CURRENCY = 'USD'
+const SPHERE_LISTING_URL =
+  'https://www.tripadvisor.ca/Restaurant_Review-g187147-d25158864-Reviews-Sphere-Paris_Ile_de_France.html'
 
 /**
  * Stable Tripadvisor location ids for well-known Paris attractions.
@@ -87,6 +111,44 @@ const SEEDED_ATTRACTIONS: TripadvisorCatalogItem[] = [
       'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/10/4b/8b/6d/les-collections-permanentes.jpg?w=1200&h=900&s=1',
   },
 ]
+/**
+ * Verified restaurant listings used as cache warmers and alias maps.
+ * Keep this list small; live matching uses autocomplete, then an LLM URL.
+ */
+const SEEDED_RESTAURANTS: TripadvisorCatalogItem[] = [
+  {
+    contentId: '24052281',
+    name: 'Sogno Paris',
+    kind: 'restaurant',
+    location: { lat: 48.8689, lng: 2.2936 },
+    aliases: ['Sogno', 'SOGNO PARIS', '多恋'],
+    listingUrl:
+      'https://www.tripadvisor.com/Restaurant_Review-g187147-d24052281-Reviews-Sogno_Paris-Paris_Ile_de_France.html',
+    coverUrl:
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w=1200&h=900&s=1',
+  },
+  {
+    contentId: '5943832',
+    name: "Brasserie L'Alsace",
+    kind: 'restaurant',
+    location: { lat: 48.86998, lng: 2.305772 },
+    aliases: ["L'Alsace", '阿尔萨斯'],
+    listingUrl:
+      'https://www.tripadvisor.com/Restaurant_Review-g187147-d5943832-Reviews-Brasserie_L_Alsace-Paris_Ile_de_France.html',
+    coverUrl:
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/23/5d/95/29/terrasse.jpg?w=1200&h=900&s=1',
+  },
+  {
+    contentId: '25158864',
+    name: 'Sphere',
+    kind: 'restaurant',
+    location: { lat: 48.874268, lng: 2.31694 },
+    aliases: ['Sphère', '斯菲尔'],
+    listingUrl: SPHERE_LISTING_URL,
+    coverUrl:
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/82/2c/00/salle-du-restaurant-gastronomi.jpg?w=1200&h=900&s=1',
+  },
+]
 const catalogMemory = new Map<string, TripadvisorCatalogItem[]>()
 const galleryMemory = new Map<string, TripadvisorPlaceGallery>()
 const galleryInflight = new Map<string, Promise<TripadvisorPlaceGallery | null>>()
@@ -112,6 +174,73 @@ function textOf(value: unknown): string {
   )
 }
 
+function httpUrl(value: string): string {
+  const raw = value.trim()
+  if (!raw) return ''
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    return url.toString()
+  } catch {
+    return ''
+  }
+}
+
+function officialWebsiteFromRecord(row: Record<string, unknown>): string {
+  const nested = asRecord(row.website)
+  const candidates = [
+    textOf(row.website),
+    textOf(row.websiteUrl),
+    textOf(row.websiteURI),
+    textOf(row.officialWebsite),
+    textOf(nested?.url),
+    textOf(nested?.href),
+  ]
+  for (const raw of candidates) {
+    const url = httpUrl(raw)
+    if (!url) continue
+    if (/tripadvisor\.|google\.|rapidapi\.|facebook\.|instagram\./i.test(url)) continue
+    return url
+  }
+  return ''
+}
+
+function phoneFromRecord(row: Record<string, unknown>): string {
+  const nested = asRecord(row.phone) || asRecord(row.telephone)
+  const tel =
+    typeof row.externalUrl === 'string' && row.externalUrl.toLowerCase().startsWith('tel:')
+      ? phoneFromTelUrl(row.externalUrl)
+      : ''
+  const raw =
+    tel ||
+    textOf(row.phone) ||
+    textOf(row.phoneNumber) ||
+    textOf(row.telephone) ||
+    textOf(nested?.displayString) ||
+    textOf(nested?.formatted)
+  const value = raw.replace(/\s+/g, ' ').trim()
+  if (!value || !/[+]?\d[\d\s().-]{6,}\d/.test(value)) return ''
+  return value
+}
+
+function phoneFromTelUrl(value: string): string {
+  if (!/^tel:/i.test(value)) return ''
+  try {
+    return decodeURIComponent(value.slice(4)).replace(/\s+/g, ' ').trim()
+  } catch {
+    return value.slice(4).replace(/\s+/g, ' ').trim()
+  }
+}
+
+function contactLinkType(row: Record<string, unknown>): string {
+  return String(row.linkType || '').toUpperCase()
+}
+
+function contactExternalUrl(row: Record<string, unknown>): string {
+  const link = asRecord(row.link)
+  return String(link?.externalUrl || row.externalUrl || '').trim()
+}
+
 function stripRankPrefix(name: string): string {
   return name.replace(/^\s*\d+\.\s*/, '').trim()
 }
@@ -129,12 +258,26 @@ export function tripadvisorPhotoUrl(value: unknown): string {
   if (typeof value !== 'string') return ''
   const url = value.trim()
   if (!url) return ''
-  if (url.includes('{width}') || url.includes('{height}')) {
-    return url
+  let resolved = url
+  if (resolved.includes('{width}') || resolved.includes('{height}')) {
+    resolved = resolved
       .replaceAll('{width}', String(DISPLAY_WIDTH))
       .replaceAll('{height}', String(DISPLAY_HEIGHT))
   }
-  return url
+  try {
+    const parsed = new URL(resolved)
+    if (!/tripadvisor\.com$/i.test(parsed.hostname) && !parsed.hostname.endsWith('.tripadvisor.com')) {
+      return resolved
+    }
+    const height = parsed.searchParams.get('h')
+    if (height === '-1' || height === '0') {
+      parsed.searchParams.set('h', String(DISPLAY_HEIGHT))
+      return parsed.toString()
+    }
+    return resolved
+  } catch {
+    return resolved
+  }
 }
 
 export function pickTripadvisorPhotoUrl(
@@ -203,7 +346,8 @@ export function selectBestTripadvisorGalleryPhotos(
 ): string[] {
   const bestByIdentity = new Map<string, TripadvisorGalleryPhotoCandidate>()
   for (const candidate of candidates) {
-    if (!candidate.url || candidate.maxWidth < MIN_GALLERY_WIDTH) continue
+    if (!candidate.url) continue
+    if (candidate.maxWidth > 0 && candidate.maxWidth < MIN_GALLERY_WIDTH) continue
     const current = bestByIdentity.get(candidate.identity)
     if (!current || compareGalleryPhotos(candidate, current) < 0) {
       bestByIdentity.set(candidate.identity, candidate)
@@ -233,17 +377,123 @@ export function galleryKindForPlaceType(
 
 export function tripadvisorContentIdFromCandidate(id?: string): string | undefined {
   const value = id?.trim() || ''
-  if (value.startsWith('ta-')) return value.slice(3)
+  if (value.startsWith('ta-')) return tripadvisorContentIdFromCandidate(value.slice(3))
+  const locId = value.match(/^loc;(\d{5,})$/i)?.[1]
+  if (locId) return locId
   if (/^\d{5,}$/.test(value)) return value
+  return tripadvisorContentIdFromUrl(value)
+}
+
+/** Real Tripadvisor listing pages include geo (`-g`) and location (`-d`) ids. */
+export function isTripadvisorListingUrl(value?: string): boolean {
+  const text = value?.trim() || ''
+  if (!/^https?:\/\//i.test(text)) return false
+  return /(?:Restaurant_Review|Attraction_Review)-g\d+-d\d{5,}-/i.test(text)
+}
+
+export function tripadvisorListingUrl(
+  _kind: TripadvisorGalleryKind,
+  _contentId: string,
+  listingUrl?: string,
+): string {
+  const existing = listingUrl?.trim() || ''
+  return isTripadvisorListingUrl(existing) ? existing : ''
+}
+
+function tripadvisorDetailPath(kind: TripadvisorGalleryKind): string {
+  return kind === 'attraction' ? TA_ATTRACTION_DETAIL : TA_RESTAURANT_DETAIL
+}
+
+function tripadvisorReviewsPath(kind: TripadvisorGalleryKind): string {
+  return kind === 'attraction' ? TA_ATTRACTION_REVIEWS : TA_RESTAURANT_REVIEWS
+}
+
+/**
+ * tripadvisor34 details: `url` is required. `locationId` is only a fallback
+ * when autocomplete did not return a listing page.
+ */
+function seededCatalogItem(contentId: string): TripadvisorCatalogItem | undefined {
+  return (
+    SEEDED_RESTAURANTS.find((item) => item.contentId === contentId) ||
+    SEEDED_ATTRACTIONS.find((item) => item.contentId === contentId)
+  )
+}
+
+function resolvedListingUrl(
+  kind: TripadvisorGalleryKind,
+  contentId: string,
+  listingUrl?: string,
+): string {
+  return (
+    tripadvisorListingUrl(kind, contentId, listingUrl) ||
+    tripadvisorListingUrl(kind, contentId, seededCatalogItem(contentId)?.listingUrl)
+  )
+}
+
+function tripadvisorDetailParams(
+  kind: TripadvisorGalleryKind,
+  contentId: string,
+  listingUrl?: string,
+): Record<string, string> {
+  const params: Record<string, string> = {
+    locale: TA_LOCALE,
+    currency: TA_CURRENCY,
+  }
+  const url = resolvedListingUrl(kind, contentId, listingUrl)
+  if (url) {
+    params.url = url
+    return params
+  }
+  if (kind === 'attraction' && contentId) params.locationId = contentId
+  return params
+}
+
+function tripadvisorReviewParams(
+  kind: TripadvisorGalleryKind,
+  contentId: string,
+  listingUrl?: string,
+): Record<string, string> {
+  const params: Record<string, string> = {
+    language: 'en',
+    limit: String(MAX_REVIEWS),
+  }
+  const url = resolvedListingUrl(kind, contentId, listingUrl)
+  if (url) {
+    params.url = url
+    return params
+  }
+  if (kind === 'attraction' && contentId) params.locationId = contentId
+  return params
+}
+
+/** Tripadvisor restaurant/attraction review URLs use `-d12345-`. */
+export function tripadvisorContentIdFromUrl(value?: string): string | undefined {
+  const text = value?.trim() || ''
+  if (!text) return undefined
+  const review = text.match(
+    /(?:Restaurant_Review|Attraction_Review|Hotel_Review)-[^/\s"'<>]*?-d(\d{5,})/i,
+  )
+  if (review?.[1]) return review[1]
+  const location = text.match(/[?&](?:geoId|locationId|contentId)=(\d{5,})/i)
+  if (location?.[1]) return location[1]
   return undefined
+}
+
+function restaurantLocationAllowed(label: string): boolean {
+  return locationBelongsToCity(label, tripCityFromDestination())
 }
 
 export function listSeededTripadvisorAttractions(): TripadvisorCatalogItem[] {
   return SEEDED_ATTRACTIONS.map((item) => ({ ...item }))
 }
 
+export function listSeededTripadvisorRestaurants(): TripadvisorCatalogItem[] {
+  return SEEDED_RESTAURANTS.map((item) => ({ ...item }))
+}
+
 function catalogKey(kind: TripadvisorGalleryKind): string {
-  return `${CATALOG_PREFIX}${kind}:${PARIS_GEO_ID}`
+  const city = tripCityFromDestination()
+  return `${CATALOG_PREFIX}${kind}:${city.tripadvisorGeoId || city.nameEn}`
 }
 
 function galleryKey(kind: TripadvisorGalleryKind, contentId: string): string {
@@ -275,17 +525,20 @@ function mediaEntryCandidate(entry: unknown): TripadvisorGalleryPhotoCandidate |
   const sizes = Array.isArray(photo.sizes)
     ? (photo.sizes as Array<{ width?: number; height?: number; url?: string }>)
     : []
+  const dynamic = asRecord(photo.photoSizeDynamic)
   const maxWidth = Math.max(
     0,
     ...sizes.map((size) => Number(size.width) || 0),
     num(photo.maxWidth) || 0,
     num(photo.width) || 0,
+    num(dynamic?.maxWidth) || 0,
   )
   const maxHeight = Math.max(
     0,
     ...sizes.map((size) => Number(size.height) || 0),
     num(photo.maxHeight) || 0,
     num(photo.height) || 0,
+    num(dynamic?.maxHeight) || 0,
   )
   const nestedSizes = asRecord(photo.sizes)
   const url = pickTripadvisorPhotoUrl(
@@ -294,7 +547,9 @@ function mediaEntryCandidate(entry: unknown): TripadvisorGalleryPhotoCandidate |
       ? photo.urlTemplate
       : typeof nestedSizes?.urlTemplate === 'string'
         ? nestedSizes.urlTemplate
-        : undefined,
+        : typeof dynamic?.urlTemplate === 'string'
+          ? dynamic.urlTemplate
+          : undefined,
   )
   if (!url) return null
   return {
@@ -305,6 +560,40 @@ function mediaEntryCandidate(entry: unknown): TripadvisorGalleryPhotoCandidate |
   }
 }
 
+/**
+ * Nested RapidAPI / page-footer shelves that are not this listing's album.
+ * tripadvisor34 often flattens the same photos into top-level `images[]` too.
+ */
+const RELATED_SECTION_KEY =
+  /^(related|similar|recommended|nearby|associated|also[_-]?viewed|recently[_-]?viewed|location[_-]?list|carousels?$|stories$|articles$|editorial$)/i
+
+function isRelatedSectionKey(key: string): boolean {
+  const normalized = key.replace(/[_-]/g, '').toLowerCase()
+  if (
+    normalized === 'stories' ||
+    normalized === 'articles' ||
+    normalized === 'editorial' ||
+    normalized === 'nearby' ||
+    normalized === 'locationlist' ||
+    normalized === 'carousel' ||
+    normalized === 'carousels'
+  ) {
+    return true
+  }
+  return RELATED_SECTION_KEY.test(key)
+}
+
+/**
+ * Editorial Related Stories covers that tripadvisor34 concatenates onto every
+ * Paris details `images[]` after the listing album (sea/palm couple, croissant
+ * Eiffel, literary-trips group photo). Path ids are from those footer cards.
+ */
+const RELATED_STORY_PHOTO_IDENTITIES = new Set([
+  '/media/photo/33/c9/52/3c/caption.jpg',
+  '/media/photo/30/0f/25/01/caption.jpg',
+  '/media/photo/2e/ca/54/84/caption.jpg',
+])
+
 function walkRecords(
   value: unknown,
   visit: (row: Record<string, unknown>) => void,
@@ -314,11 +603,14 @@ function walkRecords(
   const row = asRecord(value)
   if (row) {
     visit(row)
-    for (const nested of Object.values(row)) walkRecords(nested, visit, depth + 1)
+    for (const [key, nested] of Object.entries(row)) {
+      if (isRelatedSectionKey(key)) continue
+      walkRecords(nested, visit, depth + 1)
+    }
     return
   }
   if (Array.isArray(value)) {
-    for (const item of value.slice(0, 50)) walkRecords(item, visit, depth + 1)
+    for (const item of value.slice(0, 80)) walkRecords(item, visit, depth + 1)
   }
 }
 
@@ -327,17 +619,339 @@ function photoFromRecord(row: Record<string, unknown>): string {
     ? (row.sizes as Array<{ width?: number; url?: string }>)
     : undefined
   const nestedSizes = asRecord(row.sizes)
-  if (!sizes && !nestedSizes?.urlTemplate && typeof row.urlTemplate !== 'string') {
-    return ''
-  }
-  return pickTripadvisorPhotoUrl(
-    sizes,
+  const dynamic = asRecord(row.photoSizeDynamic)
+  const template =
     typeof row.urlTemplate === 'string'
       ? row.urlTemplate
       : typeof nestedSizes?.urlTemplate === 'string'
         ? nestedSizes.urlTemplate
-        : undefined,
+        : typeof dynamic?.urlTemplate === 'string'
+          ? dynamic.urlTemplate
+          : undefined
+  if (!sizes && !template) return ''
+  return pickTripadvisorPhotoUrl(sizes, template)
+}
+
+function photoWidthFromUrl(url: string): number {
+  const match = url.match(/[?&]w=(\d+)/i)
+  return match ? Number(match[1]) : 0
+}
+
+function photoHeightFromUrl(url: string): number {
+  const match = url.match(/[?&]h=(-?\d+)/i)
+  const height = match ? Number(match[1]) : 0
+  return height > 0 ? height : 0
+}
+
+function candidateFromPhotoUrl(url: string): TripadvisorGalleryPhotoCandidate | null {
+  const resolved = tripadvisorPhotoUrl(url)
+  if (!resolved || /\.(mp4|webm|mov)(?:$|\?)/i.test(resolved)) return null
+  return {
+    url: resolved,
+    maxWidth: photoWidthFromUrl(resolved),
+    maxHeight: photoHeightFromUrl(resolved),
+    identity: tripadvisorPhotoIdentity(resolved),
+  }
+}
+
+function formatTripadvisorAddress(value: unknown): string {
+  if (typeof value === 'string') return value.replace(/<[^>]+>/g, '').trim()
+  const row = asRecord(value)
+  if (!row) return ''
+  const cityLine = [textOf(row.postalCode), textOf(row.city)].filter(Boolean).join(' ')
+  return [textOf(row.street) || textOf(row.address) || textOf(row.address_string), cityLine, textOf(row.country) || textOf(row.countryName)]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(', ')
+}
+
+function photoUrlFromUnknown(value: unknown): string {
+  if (typeof value === 'string') return tripadvisorPhotoUrl(value)
+  const row = asRecord(value)
+  if (!row) return ''
+  return (
+    tripadvisorPhotoUrl(row.url) ||
+    tripadvisorPhotoUrl(row.image) ||
+    tripadvisorPhotoUrl(row.src) ||
+    tripadvisorPhotoUrl(row.original) ||
+    tripadvisorPhotoUrl(row.urlTemplate) ||
+    tripadvisorPhotoUrl(row.photoUrl)
   )
+}
+
+function looksLikeTripadvisor34Listing(
+  row: Record<string, unknown>,
+  wrapperSuccess?: boolean,
+): boolean {
+  const success = row.success === true || wrapperSuccess === true
+  if (success && (row.id || row.name || row.locationId)) return true
+  const category = String(row.category || '').toUpperCase()
+  return Boolean(
+    (row.id || row.locationId) &&
+      row.name &&
+      /RESTAURANT|ATTRACTION/.test(category),
+  )
+}
+
+/**
+ * The listing record for this details payload — never a nested related place.
+ * Tripadvisor34 sometimes wraps the listing in `data`.
+ */
+function tripadvisor34ListingRecord(
+  payload: unknown,
+): Record<string, unknown> | null {
+  const root = asRecord(payload)
+  if (!root) return null
+  if (looksLikeTripadvisor34Listing(root)) return root
+  const data = asRecord(root.data)
+  if (data && looksLikeTripadvisor34Listing(data, root.success === true)) {
+    return data
+  }
+  return null
+}
+
+function listingRecordWithTopLevelPhotos(
+  payload: unknown,
+): Record<string, unknown> | null {
+  const listing = tripadvisor34ListingRecord(payload)
+  if (listing) return listing
+  const root = asRecord(payload)
+  if (!root) return null
+  if (root.image != null || Array.isArray(root.images)) return root
+  const data = asRecord(root.data)
+  if (data && (data.image != null || Array.isArray(data.images))) return data
+  return null
+}
+
+function photoBelongsToListing(entry: unknown, contentId?: string): boolean {
+  if (!contentId) return true
+  const row = asRecord(entry)
+  if (!row) return true
+  const raw = String(row.locationId || row.contentId || row.location_id || '').trim()
+  const id = raw.replace(/^d/i, '')
+  if (!/^\d{5,}$/.test(id)) return true
+  return id === contentId
+}
+
+function collectPhotoIdentities(value: unknown, into: Set<string>, depth = 0) {
+  if (depth > 6) return
+  if (typeof value === 'string') {
+    if (/tripadvisor\.com\/media\/|dynamic-media-cdn\.tripadvisor/i.test(value)) {
+      const url = tripadvisorPhotoUrl(value)
+      if (url) into.add(tripadvisorPhotoIdentity(url))
+    }
+    return
+  }
+  const row = asRecord(value)
+  if (row) {
+    const url = photoUrlFromUnknown(row)
+    if (url) into.add(tripadvisorPhotoIdentity(url))
+    for (const nested of Object.values(row)) collectPhotoIdentities(nested, into, depth + 1)
+    return
+  }
+  if (Array.isArray(value)) {
+    for (const item of value.slice(0, 80)) collectPhotoIdentities(item, into, depth + 1)
+  }
+}
+
+/** Photo identities from Related Stories / nearby shelves in this payload. */
+function relatedPhotoIdentities(payload: unknown): Set<string> {
+  const into = new Set<string>(RELATED_STORY_PHOTO_IDENTITIES)
+  const harvest = (row: Record<string, unknown>) => {
+    for (const [key, nested] of Object.entries(row)) {
+      if (!isRelatedSectionKey(key)) continue
+      collectPhotoIdentities(nested, into)
+    }
+  }
+  walkRecords(payload, harvest)
+  const listing = listingRecordWithTopLevelPhotos(payload)
+  if (listing) harvest(listing)
+  return into
+}
+
+function imageEntryLooksRelated(entry: unknown): boolean {
+  const row = asRecord(entry)
+  if (!row) return false
+  const blob = [
+    row.type,
+    row.kind,
+    row.source,
+    row.section,
+    row.album,
+    row.caption,
+    row.title,
+    row.subtitle,
+    row.category,
+    row.label,
+  ]
+    .map((value) => textOf(value))
+    .join(' ')
+  return /related\s*stor|min read|\barticle\b|\beditorial\b|\bnearby\b|best moderately|associated restaurant/i.test(
+    blob,
+  )
+}
+
+function isExcludedGalleryPhoto(url: string, excluded: Set<string>): boolean {
+  const identity = tripadvisorPhotoIdentity(url)
+  return excluded.has(identity) || RELATED_STORY_PHOTO_IDENTITIES.has(identity)
+}
+
+function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] {
+  const listing = listingRecordWithTopLevelPhotos(payload)
+  if (!listing) return []
+  const excluded = relatedPhotoIdentities(payload)
+  const urls: string[] = []
+  const cover = photoUrlFromUnknown(listing.image)
+  if (cover && !isExcludedGalleryPhoto(cover, excluded)) urls.push(cover)
+  const images = Array.isArray(listing.images) ? listing.images : []
+  let seenListingSizedFromAlbum = false
+  for (const entry of images) {
+    if (!photoBelongsToListing(entry, contentId)) continue
+    if (imageEntryLooksRelated(entry)) continue
+    const url = photoUrlFromUnknown(entry)
+    if (!url) continue
+    if (isExcludedGalleryPhoto(url, excluded)) continue
+    const width = photoWidthFromUrl(url)
+    if (width > 0 && width < MIN_GALLERY_WIDTH) {
+      // tripadvisor34 concatenates relatedStories / nearby thumbs after the album.
+      if (seenListingSizedFromAlbum) break
+      continue
+    }
+    seenListingSizedFromAlbum = true
+    urls.push(url)
+  }
+  return urls
+}
+
+/** Listing hero only: top-level image/images, listing photo fields, or PoiHero. */
+function listingLevelPhotos(payload: unknown, contentId?: string): string[] {
+  const from34 = tripadvisor34PhotoUrls(payload, contentId)
+  if (from34.length) return from34
+  const root = asRecord(payload)
+  const listing = asRecord(root?.data) || root
+  const urls: string[] = []
+  if (listing) {
+    const direct = photoFromRecord(listing)
+    if (direct) urls.push(direct)
+    const nested = asRecord(listing.photo)
+    if (nested) {
+      const url = photoFromRecord(nested)
+      if (url) urls.push(url)
+    }
+  }
+  urls.push(...photosFromDetailsHero(payload))
+  return urls
+}
+
+function labelsFromUnknown(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return value
+      .split(/[,;/|]/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+  }
+  if (Array.isArray(value)) return value.flatMap(labelsFromUnknown)
+  const row = asRecord(value)
+  if (!row) return []
+  const label =
+    textOf(row.name) ||
+    textOf(row.localizedName) ||
+    textOf(row.label) ||
+    textOf(row.title) ||
+    textOf(row.value)
+  return label ? [label] : []
+}
+
+function cuisineFromRecord(row: Record<string, unknown>): string | undefined {
+  const labels = uniqueLabels([
+    ...labelsFromUnknown(row.cuisines),
+    ...labelsFromUnknown(row.cuisine),
+    ...labelsFromUnknown(row.cuisineTypes),
+    ...labelsFromUnknown(row.cuisinesList),
+  ]).filter((label) => label && !/^restaurants?$/i.test(label))
+  return labels.slice(0, 4).join(' · ') || undefined
+}
+
+function priceLevelFromRecord(row: Record<string, unknown>): string | undefined {
+  const raw =
+    textOf(row.priceLevel) ||
+    textOf(row.priceRange) ||
+    textOf(row.price) ||
+    textOf(row.price_level) ||
+    textOf(row.priceTag)
+  return raw || undefined
+}
+
+function autocompleteRows(payload: unknown): unknown[] {
+  const root = asRecord(payload)
+  const data = asRecord(root?.data)
+  if (Array.isArray(data?.items)) return data.items
+  if (Array.isArray(root?.items)) return root.items
+  if (Array.isArray(root?.data)) return root.data
+  return []
+}
+
+function coordinatesFromRecord(row: Record<string, unknown>): Coordinates | undefined {
+  const nested = asRecord(row.coordinates) || asRecord(row.geoPoint) || asRecord(row.location)
+  const latitude =
+    num(row.latitude) ?? num(nested?.latitude) ?? num(nested?.lat)
+  const longitude =
+    num(row.longitude) ?? num(nested?.longitude) ?? num(nested?.lng)
+  if (latitude == null || longitude == null) return undefined
+  return { lat: latitude, lng: longitude }
+}
+
+function tripadvisorPayloadFailed(payload: unknown): boolean {
+  const root = asRecord(payload)
+  if (!root) return true
+  if (root.success === false) return true
+  if (typeof root.message === 'string' && /too many requests/i.test(root.message)) {
+    return true
+  }
+  return Array.isArray(root.errors) && root.errors.length > 0
+}
+
+function tripadvisorPlaceMissing(payload: unknown): boolean {
+  const root = asRecord(payload)
+  if (!root) return true
+  if (root.success === false) return true
+  if (typeof root.message === 'string' && /not found|locationnotfound/i.test(root.message)) {
+    return true
+  }
+  const data = asRecord(root.data) || root
+  const sections = Array.isArray(data?.sections) ? data.sections : []
+  return sections.some((section) => {
+    const row = asRecord(section)
+    const type = `${row?.__typename || ''} ${row?.stableDiffingType || ''}`
+    return /LocationNotFound|ErrorMessage/i.test(type)
+  })
+}
+
+function photosFromDetailsHero(payload: unknown): string[] {
+  const root = asRecord(payload)
+  const data = asRecord(root?.data) || root
+  const sections = Array.isArray(data?.sections) ? data.sections : []
+  const photos: string[] = []
+  for (const section of sections) {
+    const row = asRecord(section)
+    if (!String(row?.__typename || '').includes('PoiHero')) continue
+    walkRecords(section, (nested) => {
+      const photo = photoFromRecord(nested)
+      if (photo) photos.push(photo)
+    })
+    break
+  }
+  return uniquePhotos(photos)
+}
+
+function coverOnlyGallery(match: TripadvisorCatalogItem): TripadvisorPlaceGallery | null {
+  if (!match.coverUrl) return null
+  return {
+    contentId: match.contentId,
+    kind: match.kind,
+    name: match.name,
+    photos: [match.coverUrl],
+  }
 }
 
 export function normalizeTripadvisorCatalog(
@@ -383,12 +997,29 @@ export function normalizeTripadvisorGallery(
   name: string,
   coverUrl?: string,
 ): TripadvisorPlaceGallery {
+  const pinned = coverUrl ? [coverUrl] : []
+  const fromDetails = tripadvisor34PhotoUrls(payload, contentId)
+    .map((url) => candidateFromPhotoUrl(url))
+    .filter((candidate): candidate is TripadvisorGalleryPhotoCandidate => Boolean(candidate))
+  if (fromDetails.length) {
+    return {
+      contentId,
+      kind,
+      name,
+      photos: selectBestTripadvisorGalleryPhotos(fromDetails, MAX_GALLERY_PHOTOS, pinned),
+    }
+  }
   const root = asRecord(payload)
   const data = asRecord(root?.data) || root
   const sections = Array.isArray(data?.sections) ? data.sections : []
   const candidates: TripadvisorGalleryPhotoCandidate[] = []
   for (const section of sections) {
-    const mediaList = asRecord(section)?.mediaList
+    const row = asRecord(section)
+    const type = `${row?.__typename || ''} ${row?.stableDiffingType || ''} ${row?.type || ''}`
+    if (/Nearby|Related|Similar|Carousel|AlsoViewed|RecentlyViewed|Stories|Article|Editorial|Recommended/i.test(type)) {
+      continue
+    }
+    const mediaList = row?.mediaList
     if (!Array.isArray(mediaList)) continue
     for (const entry of mediaList) {
       const candidate = mediaEntryCandidate(entry)
@@ -399,7 +1030,7 @@ export function normalizeTripadvisorGallery(
     contentId,
     kind,
     name,
-    photos: selectBestTripadvisorGalleryPhotos(candidates, MAX_GALLERY_PHOTOS, coverUrl ? [coverUrl] : []),
+    photos: selectBestTripadvisorGalleryPhotos(candidates, MAX_GALLERY_PHOTOS, pinned),
   }
 }
 
@@ -413,41 +1044,135 @@ export function normalizeTripadvisorAutocomplete(
     kind === 'restaurant'
       ? /restaurant|eatery|cafe|bistro|food|dining/
       : /attraction|activity|poi|landmark|museum/
-  walkRecords(payload, (row) => {
+  const ingest = (row: Record<string, unknown>) => {
+    const tracking = asRecord(row.trackingItems)
+    if (
+      String(row.kind || '').toLowerCase() === 'rescue' ||
+      String(row.id || '').toUpperCase() === 'RESCUE' ||
+      String(tracking?.dataType || row.dataType || '').toLowerCase() === 'rescue' ||
+      String(tracking?.dataType || '').toLowerCase() === 'add_a_place'
+    ) {
+      return
+    }
     const contentId = String(
-      row.contentId ||
-        row.locationId ||
+      row.locationId ||
+        tripadvisorContentIdFromCandidate(String(row.id || '')) ||
+        row.contentId ||
+        tracking?.locationId ||
+        tracking?.documentId ||
         asRecord(asRecord(row.route)?.params)?.contentId ||
         asRecord(asRecord(row.route)?.params)?.locationId ||
         asRecord(asRecord(asRecord(row.cardLink)?.route)?.params)?.contentId ||
         '',
     ).trim()
     if (!/^\d{5,}$/.test(contentId) || seen.has(contentId)) return
-    const typeBlob = `${row.type || ''} ${row.placeType || ''} ${row.category || ''}`.toLowerCase()
+    const dataType = String(tracking?.dataType || row.dataType || '').toLowerCase()
+    if (dataType === 'rescue' || dataType === 'add_a_place') return
+    const typeBlob = `${row.type || ''} ${row.placeType || ''} ${tracking?.placeType || ''} ${row.category || ''}`.toLowerCase()
     if (typeBlob && !typePattern.test(typeBlob)) return
+    const locationLabel =
+      textOf(row.description) ||
+      textOf(row.secondaryTextLineOne) ||
+      formatTripadvisorAddress(row.address)
+    if (kind === 'restaurant' && locationLabel && !restaurantLocationAllowed(locationLabel)) {
+      return
+    }
     const name = stripRankPrefix(
       textOf(row.localizedName) ||
+        textOf(row.heading) ||
+        textOf(tracking?.text) ||
         textOf(row.title) ||
         textOf(row.cardTitle) ||
-        textOf(row.name),
+        textOf(row.name) ||
+        textOf(row.text),
     )
     if (!name) return
+    const graphic = asRecord(row.graphic)
+    const photo = asRecord(graphic?.image) || asRecord(row.cardPhoto)
+    const sizes = asRecord(photo?.sizes)
+    const coverUrl =
+      (typeof row.image === 'string' ? tripadvisorPhotoUrl(row.image) : '') ||
+      pickTripadvisorPhotoUrl(
+        Array.isArray(photo?.sizes)
+          ? (photo?.sizes as Array<{ width?: number; url?: string }>)
+          : undefined,
+        typeof sizes?.urlTemplate === 'string' ? sizes.urlTemplate : undefined,
+      ) ||
+      undefined
+    const listingUrl = httpUrl(textOf(row.url) || textOf(row.webUrl))
+    const location = coordinatesFromRecord(row)
     seen.add(contentId)
-    items.push({ contentId, name, kind })
-  })
+    items.push({
+      contentId,
+      name,
+      kind,
+      ...(coverUrl ? { coverUrl } : {}),
+      ...(listingUrl ? { listingUrl } : {}),
+      ...(location ? { location } : {}),
+    })
+  }
+  const rows = autocompleteRows(payload)
+  if (rows.length) {
+    for (const raw of rows) {
+      const row = asRecord(raw)
+      if (row) ingest(row)
+    }
+    if (items.length) return items
+  }
+  walkRecords(payload, ingest)
   return items
+}
+
+function parseTripadvisor34Details(
+  payload: unknown,
+  contentId: string,
+): TripadvisorAttractionInfo | null {
+  const listing = tripadvisor34ListingRecord(payload)
+  if (!listing) return null
+  const photos = uniquePhotos(
+    tripadvisor34PhotoUrls(listing, contentId)
+      .map((url) => tripadvisorPhotoUrl(url))
+      .filter(Boolean),
+  )
+  return {
+    contentId,
+    name: stripRankPrefix(textOf(listing.name)) || contentId,
+    description: textOf(listing.description) || textOf(listing.about) || undefined,
+    rating: num(listing.rating) ?? num(listing.averageRating),
+    userRatingCount:
+      num(listing.reviewCount) ??
+      num(listing.numberOfReviews) ??
+      num(listing.numberReviews),
+    address:
+      formatTripadvisorAddress(listing.address) ||
+      formatTripadvisorAddress(listing.addressObj) ||
+      formatTripadvisorAddress(listing.address_obj) ||
+      undefined,
+    website: officialWebsiteFromRecord(listing) || undefined,
+    phone: phoneFromRecord(listing) || undefined,
+    priceLevel: priceLevelFromRecord(listing),
+    cuisine: cuisineFromRecord(listing),
+    location: coordinatesFromRecord(listing),
+    photos,
+    reviews: normalizeTripadvisorReviews(listing),
+  }
 }
 
 export function normalizeTripadvisorAttractionDetails(
   payload: unknown,
   contentId: string,
 ): TripadvisorAttractionInfo {
-  const photos: string[] = []
+  const parsed = parseTripadvisor34Details(payload, contentId)
+  if (parsed) return parsed
   let name = ''
   let description = ''
   let rating: number | undefined
   let userRatingCount: number | undefined
   let address = ''
+  let website = ''
+  let phone = ''
+  let priceLevel = ''
+  let cuisine = ''
   let latitude: number | undefined
   let longitude: number | undefined
 
@@ -455,6 +1180,7 @@ export function normalizeTripadvisorAttractionDetails(
     if (!name) {
       name =
         textOf(row.localizedName) ||
+        textOf(row.navTitle) ||
         textOf(row.cardTitle) ||
         textOf(row.name) ||
         name
@@ -470,28 +1196,35 @@ export function normalizeTripadvisorAttractionDetails(
     rating = rating ?? num(row.rating) ?? num(row.averageRating) ?? num(asRecord(row.bubbleRating)?.rating)
     userRatingCount =
       userRatingCount ??
+      num(row.numberReviews) ??
       num(row.numberOfReviews) ??
       num(row.reviewCount) ??
       num(row.num_reviews) ??
       num(row.userRatingCount)
     if (!address) {
       address =
+        formatTripadvisorAddress(row.address) ||
         textOf(row.address) ||
+        textOf(asRecord(row.address)?.address) ||
         textOf(asRecord(row.address)?.address_string) ||
         textOf(row.addressString)
     }
-    latitude =
-      latitude ??
-      num(row.latitude) ??
-      num(asRecord(row.geoPoint)?.latitude) ??
-      num(asRecord(row.location)?.latitude)
-    longitude =
-      longitude ??
-      num(row.longitude) ??
-      num(asRecord(row.geoPoint)?.longitude) ??
-      num(asRecord(row.location)?.longitude)
-    const photo = photoFromRecord(row)
-    if (photo) photos.push(photo)
+    const linkType = contactLinkType(row)
+    const external = contactExternalUrl(row)
+    if (!website && (linkType === 'WEBSITE' || /server_website/i.test(String(asRecord(row.link)?.trackingContext || '')))) {
+      const url = httpUrl(external)
+      if (url && !/tripadvisor\.|google\.|rapidapi\.|facebook\.|instagram\./i.test(url)) {
+        website = url
+      }
+    }
+    if (!website) website = officialWebsiteFromRecord(row)
+    if (!phone && linkType === 'PHONE') phone = phoneFromTelUrl(external)
+    if (!phone) phone = phoneFromRecord(row)
+    if (!priceLevel) priceLevel = priceLevelFromRecord(row) || ''
+    if (!cuisine) cuisine = cuisineFromRecord(row) || ''
+    const coords = coordinatesFromRecord(row)
+    latitude = latitude ?? coords?.lat ?? num(row.latitude)
+    longitude = longitude ?? coords?.lng ?? num(row.longitude)
   })
 
   return {
@@ -501,11 +1234,128 @@ export function normalizeTripadvisorAttractionDetails(
     rating,
     userRatingCount,
     address: address || undefined,
+    website: website || undefined,
+    phone: phone || undefined,
+    priceLevel: priceLevel || undefined,
+    cuisine: cuisine || undefined,
     location:
       latitude != null && longitude != null
         ? { lat: latitude, lng: longitude }
         : undefined,
-    photos: uniquePhotos(photos),
+    photos: uniquePhotos(listingLevelPhotos(payload, contentId)),
+    reviews: [],
+  }
+}
+
+export function normalizeTripadvisorReviews(payload: unknown): GoogleReview[] {
+  const reviews: GoogleReview[] = []
+  const seen = new Set<string>()
+  walkRecords(payload, (row) => {
+    const typeName = String(row.__typename || row.type || '').toLowerCase()
+    if (
+      typeName.includes('photo') ||
+      typeName.includes('video') ||
+      typeName.includes('media') ||
+      typeName.includes('ownerresponse') ||
+      typeName.includes('gaisummary') ||
+      typeName.includes('gai_reviews')
+    ) {
+      return
+    }
+    const body =
+      textOf(row.htmlText) ||
+      textOf(row.review) ||
+      textOf(row.reviewText) ||
+      textOf(asRecord(row.text)?.htmlString) ||
+      textOf(row.htmlString) ||
+      textOf(row.text)
+    if (body.length < 24) return
+    const rating =
+      num(row.rating) ??
+      num(asRecord(row.bubbleRating)?.rating) ??
+      num(row.score)
+    const titleRaw = textOf(row.htmlTitle) || textOf(row.title) || textOf(row.reviewTitle)
+    const title = titleRaw.length >= 8 && /\s/.test(titleRaw) ? titleRaw : titleRaw.length >= 12 ? titleRaw : ''
+    const looksReview =
+      typeName.includes('review') ||
+      (rating != null && rating >= 1 && rating <= 5) ||
+      Boolean(title && body.length >= 40)
+    if (!looksReview) return
+    const identity = body.slice(0, 96)
+    if (seen.has(identity)) return
+    seen.add(identity)
+    const user = asRecord(row.user) || asRecord(row.author) || asRecord(row.userProfile)
+    reviews.push({
+      text: title && !body.startsWith(title) ? `${title}\n${body}` : body,
+      rating: rating != null && rating >= 1 && rating <= 5 ? rating : undefined,
+      author:
+        textOf(user?.displayName) ||
+        textOf(user?.username) ||
+        textOf(user?.name) ||
+        textOf(row.username) ||
+        textOf(row.displayName) ||
+        undefined,
+      relativeTime:
+        textOf(row.publishedDate) ||
+        textOf(row.published_date) ||
+        textOf(row.relativePublishedDate) ||
+        textOf(row.createdDate) ||
+        undefined,
+    })
+  })
+  return reviews.slice(0, MAX_REVIEWS)
+}
+
+function galleryFromDetailsPayload(
+  payload: unknown,
+  match: TripadvisorCatalogItem,
+): TripadvisorPlaceGallery {
+  const gallery = normalizeTripadvisorGallery(
+    payload,
+    match.kind,
+    match.contentId,
+    match.name,
+    match.coverUrl,
+  )
+  if (gallery.photos.length) return gallery
+  const info = normalizeTripadvisorAttractionDetails(payload, match.contentId)
+  return {
+    contentId: match.contentId,
+    kind: match.kind,
+    name: info.name || match.name,
+    photos: uniquePhotos([
+      ...(match.coverUrl ? [match.coverUrl] : []),
+      ...info.photos,
+    ]),
+  }
+}
+
+function rememberDetailsFromPayload(
+  payload: unknown,
+  match: TripadvisorCatalogItem,
+) {
+  const info = normalizeTripadvisorAttractionDetails(payload, match.contentId)
+  const gallery = galleryFromDetailsPayload(payload, match)
+  const photos = uniquePhotos([
+    ...(match.coverUrl ? [match.coverUrl] : []),
+    ...gallery.photos,
+    ...info.photos,
+  ])
+  if (photos.length || info.address || info.rating != null || info.reviews.length) {
+    storeDetails({
+      ...info,
+      name: info.name || match.name,
+      location: info.location || match.location,
+      photos,
+    })
+  }
+  if (photos.length) {
+    storeGallery({
+      contentId: match.contentId,
+      kind: match.kind,
+      name: info.name || match.name,
+      photos,
+    })
   }
 }
 
@@ -520,7 +1370,9 @@ export function matchTripadvisorCatalogItem(
   name: string,
   nameLocal?: string,
 ): TripadvisorCatalogItem | null {
-  const queries = [name, nameLocal].map((value) => value?.trim() || '').filter(Boolean)
+  const queries = [name, nameLocal, placeLatinLabel(name, nameLocal)]
+    .map((value) => value?.trim() || '')
+    .filter(Boolean)
   let best: TripadvisorCatalogItem | null = null
   let bestScore = PLACE_NAME_MATCH_MIN
   for (const item of items) {
@@ -546,17 +1398,31 @@ async function requestTripadvisor(
   timeoutMs = 12_000,
 ): Promise<unknown | null> {
   if (!tryConsumeTripadvisorRequest(kind)) return null
-  const query = new URLSearchParams({ rest, language: 'en_US', ...params })
-  const response = await authFetch(`/api/tripadvisor?${query}`, {
-    signal: AbortSignal.timeout(timeoutMs),
-  })
-  if (!response.ok) {
-    const message = await response.text().catch(() => '')
-    throw new Error(
-      `Tripadvisor request failed (${response.status})${message ? `: ${message}` : ''}`,
-    )
+  const query = new URLSearchParams({ rest })
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value)
   }
-  return response.json() as Promise<unknown>
+  try {
+    const response = await authFetch(`/api/tripadvisor?${query}`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!response.ok) {
+      refundTripadvisorRequest(kind)
+      const message = await response.text().catch(() => '')
+      throw new Error(
+        `Tripadvisor request failed (${response.status})${message ? `: ${message}` : ''}`,
+      )
+    }
+    return await (response.json() as Promise<unknown>)
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !error.message.startsWith('Tripadvisor request failed')
+    ) {
+      refundTripadvisorRequest(kind)
+    }
+    throw error
+  }
 }
 
 function mergeSeededAttractions(items: TripadvisorCatalogItem[]): TripadvisorCatalogItem[] {
@@ -574,23 +1440,63 @@ function mergeSeededAttractions(items: TripadvisorCatalogItem[]): TripadvisorCat
   return [...byId.values()]
 }
 
+function mergeSeededRestaurants(items: TripadvisorCatalogItem[]): TripadvisorCatalogItem[] {
+  const byId = new Map(items.map((item) => [item.contentId, item]))
+  for (const seed of SEEDED_RESTAURANTS) {
+    const current = byId.get(seed.contentId)
+    if (!current) {
+      byId.set(seed.contentId, { ...seed })
+      continue
+    }
+    const aliases = uniqueLabels([...(current.aliases || []), ...(seed.aliases || [])])
+    byId.set(seed.contentId, {
+      ...current,
+      coverUrl: current.coverUrl || seed.coverUrl,
+      listingUrl: current.listingUrl || seed.listingUrl,
+      aliases: aliases.length ? aliases : current.aliases,
+    })
+  }
+  return [...byId.values()]
+}
+
+function isParisTripCity(): boolean {
+  return tripCityFromDestination().tripadvisorGeoId === '187147'
+}
+
 function readCatalog(kind: TripadvisorGalleryKind): TripadvisorCatalogItem[] {
   const key = catalogKey(kind)
   const memory = catalogMemory.get(key)
   if (memory?.length) {
-    if (kind !== 'attraction') return memory
-    const merged = mergeSeededAttractions(memory)
-    if (merged.length !== memory.length) catalogMemory.set(key, merged)
-    return merged
+    if (kind === 'attraction' && isParisTripCity()) {
+      const merged = mergeSeededAttractions(memory)
+      if (merged.length !== memory.length) catalogMemory.set(key, merged)
+      return merged
+    }
+    if (kind === 'restaurant' && isParisTripCity()) {
+      const merged = mergeSeededRestaurants(memory)
+      if (merged.length !== memory.length) catalogMemory.set(key, merged)
+      return merged
+    }
+    return memory
   }
   const stored = getLlmArtifact<TripadvisorCatalogItem[]>(key)
   if (Array.isArray(stored) && stored.length) {
-    const next = kind === 'attraction' ? mergeSeededAttractions(stored) : stored
+    const next =
+      kind === 'attraction' && isParisTripCity()
+        ? mergeSeededAttractions(stored)
+        : kind === 'restaurant' && isParisTripCity()
+          ? mergeSeededRestaurants(stored)
+          : stored
     catalogMemory.set(key, next)
     return next
   }
-  if (kind === 'attraction') {
+  if (kind === 'attraction' && isParisTripCity()) {
     const seeded = SEEDED_ATTRACTIONS.map((item) => ({ ...item }))
+    catalogMemory.set(key, seeded)
+    return seeded
+  }
+  if (kind === 'restaurant' && isParisTripCity()) {
+    const seeded = SEEDED_RESTAURANTS.map((item) => ({ ...item }))
     catalogMemory.set(key, seeded)
     return seeded
   }
@@ -628,9 +1534,22 @@ function rememberCatalogItem(
   if (index >= 0) {
     const existing = current[index]
     const merged = uniqueLabels([...(existing.aliases || []), ...extra])
-    if (merged.length === (existing.aliases || []).length) return
+    const listingUrl = existing.listingUrl || item.listingUrl
+    const coverUrl = existing.coverUrl || item.coverUrl
+    if (
+      merged.length === (existing.aliases || []).length &&
+      listingUrl === existing.listingUrl &&
+      coverUrl === existing.coverUrl
+    ) {
+      return
+    }
     const next = [...current]
-    next[index] = { ...existing, aliases: merged }
+    next[index] = {
+      ...existing,
+      aliases: merged.length ? merged : existing.aliases,
+      listingUrl,
+      coverUrl,
+    }
     catalogMemory.set(catalogKey(item.kind), next)
     setLlmArtifact(catalogKey(item.kind), next, { silent: true })
     return
@@ -692,6 +1611,7 @@ function rememberMatchLookup(
   ]
   for (const key of keys) {
     matchLookup.set(key, contentId)
+    if (contentId === 'miss') continue
     setLlmArtifact(`${QUERY_MATCH_PREFIX}${key}`, contentId, { silent: true })
   }
 }
@@ -767,7 +1687,7 @@ export function peekTripadvisorPlacePhotos(
     }
   }
   if (match) {
-    const details = match.kind === 'attraction' ? readDetails(match.contentId) : null
+    const details = readDetails(match.contentId)
     if (details?.photos.length) return details.photos
     const gallery = readGallery(kind, match.contentId)
     if (gallery?.photos.length) return gallery.photos
@@ -776,25 +1696,16 @@ export function peekTripadvisorPlacePhotos(
   return []
 }
 
-export function peekTripadvisorAttractionInfo(
-  name: string,
-  nameLocal?: string,
-  contentId?: string,
-): TripadvisorAttractionInfo | null {
-  const catalog = readCatalog('attraction')
-  const match = findCatalogItem(catalog, { name, nameLocal, contentId })
-  if (!match) return null
-  const details = readDetails(match.contentId)
-  const gallery = readGallery('attraction', match.contentId)
-  const photos =
-    gallery?.photos.length
-      ? gallery.photos
-      : details?.photos.length
-        ? details.photos
-        : match.coverUrl
-          ? [match.coverUrl]
-          : []
-  if (!details && !photos.length && !match.location) return null
+function placeInfoFromParts(
+  match: TripadvisorCatalogItem,
+  details: TripadvisorAttractionInfo | null,
+  gallery: TripadvisorPlaceGallery | null,
+): TripadvisorAttractionInfo {
+  const photos = uniquePhotos([
+    ...(match.coverUrl ? [match.coverUrl] : []),
+    ...(gallery?.photos || []),
+    ...(details?.photos || []),
+  ])
   return {
     contentId: match.contentId,
     name: details?.name || match.name,
@@ -802,9 +1713,45 @@ export function peekTripadvisorAttractionInfo(
     rating: details?.rating,
     userRatingCount: details?.userRatingCount,
     address: details?.address,
+    website: details?.website,
+    phone: details?.phone,
+    priceLevel: details?.priceLevel,
+    cuisine: details?.cuisine,
     location: details?.location || match.location,
     photos,
+    reviews: details?.reviews || [],
   }
+}
+
+export function peekTripadvisorAttractionInfo(
+  name: string,
+  nameLocal?: string,
+  contentId?: string,
+): TripadvisorAttractionInfo | null {
+  return peekTripadvisorPlaceInfo('attraction', name, nameLocal, contentId)
+}
+
+export function peekTripadvisorRestaurantInfo(
+  name: string,
+  nameLocal?: string,
+  contentId?: string,
+): TripadvisorAttractionInfo | null {
+  return peekTripadvisorPlaceInfo('restaurant', name, nameLocal, contentId)
+}
+
+function peekTripadvisorPlaceInfo(
+  kind: TripadvisorGalleryKind,
+  name: string,
+  nameLocal?: string,
+  contentId?: string,
+): TripadvisorAttractionInfo | null {
+  const catalog = readCatalog(kind)
+  const match = findCatalogItem(catalog, { name, nameLocal, contentId })
+  if (!match) return null
+  const details = readDetails(match.contentId)
+  const gallery = readGallery(kind, match.contentId)
+  if (!details && !gallery?.photos.length && !match.coverUrl && !match.location) return null
+  return placeInfoFromParts(match, details, gallery)
 }
 
 export function hasCachedTripadvisorGallery(
@@ -815,37 +1762,88 @@ export function hasCachedTripadvisorGallery(
   return Boolean(readGallery(kind, contentId)?.photos.length)
 }
 
+/** Cover / autocomplete photos are not restaurant details. */
+export function hasSettledTripadvisorRestaurantDetails(
+  info: TripadvisorAttractionInfo | null | undefined,
+): boolean {
+  return Boolean(
+    info &&
+      (info.rating != null ||
+        info.address ||
+        info.reviews.length > 0 ||
+        info.priceLevel ||
+        info.cuisine),
+  )
+}
+
+/** True only when the current details prefix has settled listing facts. */
+export function hasCachedTripadvisorRestaurantDetails(contentId?: string): boolean {
+  if (!contentId) return false
+  return hasSettledTripadvisorRestaurantDetails(readDetails(contentId))
+}
+
+function galleryLooksCoverOnly(match: TripadvisorCatalogItem): boolean {
+  const gallery = readGallery(match.kind, match.contentId)
+  const photos = gallery?.photos || []
+  if (photos.length > 1) return false
+  if (!photos.length) return true
+  const cover = match.coverUrl ? tripadvisorPhotoUrl(match.coverUrl) : ''
+  if (!cover) return false
+  return tripadvisorPhotoIdentity(photos[0]) === tripadvisorPhotoIdentity(cover)
+}
+
+function hasFetchedTripadvisorDetails(match: TripadvisorCatalogItem): boolean {
+  if (hasSettledTripadvisorRestaurantDetails(readDetails(match.contentId))) return true
+  const gallery = readGallery(match.kind, match.contentId)
+  if (!gallery?.photos.length) return false
+  return !galleryLooksCoverOnly(match)
+}
+
 async function loadGalleryFor(
   match: TripadvisorCatalogItem,
 ): Promise<TripadvisorPlaceGallery | null> {
   const cached = readGallery(match.kind, match.contentId)
-  if (cached) return cached
+  if (cached?.photos.length && hasFetchedTripadvisorDetails(match)) {
+    return cached
+  }
   const inflightKey = galleryKey(match.kind, match.contentId)
   const pending = galleryInflight.get(inflightKey)
   if (pending) return pending
 
   const task = (async () => {
-    const payload = await requestTripadvisor(
-      'media-gallery',
-      match.kind === 'attraction'
-        ? 'attractions/media-gallery'
-        : 'restaurants/media-gallery',
-      { contentId: match.contentId },
-    )
-    if (!payload) return null
-    const gallery = normalizeTripadvisorGallery(
-      payload,
-      match.kind,
-      match.contentId,
-      match.name,
-      match.coverUrl,
-    )
-    if (!gallery.photos.length && match.coverUrl) {
-      gallery.photos = [match.coverUrl]
+    try {
+      const listingUrl = resolvedListingUrl(
+        match.kind,
+        match.contentId,
+        match.listingUrl,
+      )
+      if (match.kind === 'restaurant' && !isTripadvisorListingUrl(listingUrl)) {
+        return coverOnlyGallery(match)
+      }
+      const payload = await requestTripadvisor(
+        'details',
+        tripadvisorDetailPath(match.kind),
+        tripadvisorDetailParams(match.kind, match.contentId, listingUrl),
+        match.kind === 'restaurant' ? 45_000 : 20_000,
+      )
+      if (!payload || tripadvisorPayloadFailed(payload) || tripadvisorPlaceMissing(payload)) {
+        return coverOnlyGallery(match)
+      }
+      rememberDetailsFromPayload(payload, {
+        ...match,
+        listingUrl: listingUrl || match.listingUrl,
+      })
+      const gallery = readGallery(match.kind, match.contentId)
+      if (gallery?.photos.length) return gallery
+      const fromDetails = galleryFromDetailsPayload(payload, match)
+      if (fromDetails.photos.length) {
+        storeGallery(fromDetails)
+        return fromDetails
+      }
+    } catch {
+      /* details timeouts/5xx must not hide the autocomplete cover */
     }
-    if (!gallery.photos.length) return null
-    storeGallery(gallery)
-    return gallery
+    return coverOnlyGallery(match)
   })()
 
   galleryInflight.set(inflightKey, task)
@@ -861,28 +1859,29 @@ export async function fetchTripadvisorPlaceGallery(input: {
   nameLocal?: string
   type?: PlaceType
   contentId?: string
+  address?: string
 }): Promise<TripadvisorPlaceGallery | null> {
   const kind = galleryKindForPlaceType(input.type)
   if (!kind || (!input.name.trim() && !input.contentId)) return null
   const catalog = readCatalog(kind)
   const remembered = readMatchLookup(kind, input)
-  if (remembered === 'miss') return null
   const cachedMatch =
-    (remembered && remembered !== 'miss'
-      ? catalog.find((item) => item.contentId === remembered)
-      : null) ||
     findCatalogItem(catalog, {
       name: input.name,
       nameLocal: input.nameLocal,
-      contentId: input.contentId || (remembered !== 'miss' ? remembered : undefined),
-    })
+      contentId: input.contentId,
+    }) ||
+    (remembered && remembered !== 'miss'
+      ? catalog.find((item) => item.contentId === remembered) || {
+          contentId: remembered,
+          name: input.name,
+          kind,
+        }
+      : null)
   if (cachedMatch) {
-    const gallery = readGallery(kind, cachedMatch.contentId)
-    if (gallery?.photos.length) return gallery
-  } else if (remembered && remembered !== 'miss') {
-    const gallery = readGallery(kind, remembered)
-    if (gallery?.photos.length) return gallery
+    return loadGalleryFor(cachedMatch)
   }
+  if (remembered === 'miss') return null
   const match =
     kind === 'attraction'
       ? await resolveAttractionMatch({
@@ -894,6 +1893,7 @@ export async function fetchTripadvisorPlaceGallery(input: {
           name: input.name,
           nameLocal: input.nameLocal,
           contentId: input.contentId,
+          address: input.address,
         })
   if (!match) return null
   return loadGalleryFor(match)
@@ -947,74 +1947,135 @@ async function autocompleteHits(
 ): Promise<TripadvisorCatalogItem[]> {
   const query = tripadvisorAutocompleteQuery(name, nameLocal, kind)
   if (!query) return []
-  const payload = await requestTripadvisor('auto-complete', 'auto-complete', {
-    query,
+  const payload = await requestTripadvisor('auto-complete', TA_AUTOCOMPLETE, {
+    location: query,
+    limit: '10',
+    locale: TA_AUTOCOMPLETE_LOCALE,
   })
-  if (!payload) return []
+  if (!payload || tripadvisorPayloadFailed(payload)) return []
   return normalizeTripadvisorAutocomplete(payload, kind)
 }
 
-/** Keep the listing name, and always include the city for disambiguation. */
+/** Search Tripadvisor with the original local name, never a translation. */
 export function tripadvisorAutocompleteQuery(
   name: string,
   nameLocal?: string,
-  kind: TripadvisorGalleryKind = 'attraction',
+  _kind: TripadvisorGalleryKind = 'attraction',
+  cityName?: string,
 ): string {
-  if (kind === 'restaurant') {
-    const labels = [nameLocal, name].map((value) => value?.trim() || '').filter(Boolean)
-    const latin = labels.find((label) => !/[\u3400-\u9fff]/.test(label)) || labels[0] || ''
-    const core = latin.replace(/[（(][^）)]*[）)]/g, ' ').replace(/\s+/g, ' ').trim()
-    if (!core) return 'Paris'
-    return /\bparis\b/i.test(core) ? core : `${core} Paris`
-  }
-  const search = placeSearchQuery(name, nameLocal)
-  if (!search) return ''
-  return /\bparis\b/i.test(search) ? search : `${search} Paris`
+  const city = cityName?.trim() || tripCityFromDestination().nameEn
+  const core = placeLatinLabel(name, nameLocal)
+  if (!core) return ''
+  return appendCityToQuery(core, city)
 }
 
 function searchIsLatin(name: string, nameLocal?: string): boolean {
-  return /[a-z]/i.test(placeSearchQuery(name, nameLocal))
+  return /[a-z]/i.test(placeLatinLabel(name, nameLocal))
 }
 
-/** Last-resort restaurant match: catalog / contentId, else one autocomplete. No LLM retry. */
+function listingMatchesRestaurant(
+  listingName: string | undefined,
+  input: { name: string; nameLocal?: string },
+): boolean {
+  if (!listingName?.trim()) return false
+  const latin = placeLatinLabel(input.name, input.nameLocal)
+  const score = Math.max(
+    placeIdentitySimilarity(input.name, listingName),
+    input.nameLocal ? placeIdentitySimilarity(input.nameLocal, listingName) : 0,
+    latin ? placeIdentitySimilarity(latin, listingName) : 0,
+  )
+  return score >= PLACE_NAME_MATCH_MIN
+}
+
+async function verifyRestaurantContentId(
+  contentId: string,
+  input: { name: string; nameLocal?: string },
+  listingUrl?: string,
+): Promise<TripadvisorCatalogItem | null> {
+  if (!isTripadvisorListingUrl(listingUrl)) return null
+  const details = await requestTripadvisor(
+    'details',
+    TA_RESTAURANT_DETAIL,
+    tripadvisorDetailParams('restaurant', contentId, listingUrl),
+    45_000,
+  )
+  if (!details || tripadvisorPayloadFailed(details) || tripadvisorPlaceMissing(details)) {
+    return null
+  }
+  const info = normalizeTripadvisorAttractionDetails(details, contentId)
+  if (!listingMatchesRestaurant(info.name, input)) return null
+  const match: TripadvisorCatalogItem = {
+    contentId,
+    name: info.name,
+    kind: 'restaurant',
+    location: info.location,
+    coverUrl: info.photos[0],
+    listingUrl,
+  }
+  rememberDetailsFromPayload(details, match)
+  return match
+}
+
+/** Last-resort restaurant match: catalog / contentId, else autocomplete, else listing URL. */
 async function resolveRestaurantMatch(input: {
   name: string
   nameLocal?: string
   contentId?: string
+  address?: string
 }): Promise<TripadvisorCatalogItem | null> {
   const catalog = await loadCatalog('restaurant')
-  const lookup = readMatchLookup('restaurant', input)
-  if (lookup === 'miss') return null
-  if (lookup) {
-    const byId = catalog.find((item) => item.contentId === lookup)
-    if (byId) return byId
-  }
   const existing = findCatalogItem(catalog, input)
   if (existing) {
     rememberCatalogItem(existing, [input.name, input.nameLocal])
     rememberMatchLookup('restaurant', input, existing.contentId)
     return existing
   }
+  const lookup = readMatchLookup('restaurant', input)
+  if (lookup === 'miss') return null
+  if (lookup) {
+    const byId = catalog.find((item) => item.contentId === lookup)
+    if (byId) return byId
+  }
   if (input.contentId) {
-    const item = {
-      contentId: input.contentId,
-      name: input.nameLocal || input.name,
-      kind: 'restaurant' as const,
+    const verified = await verifyRestaurantContentId(input.contentId, input)
+    if (verified) {
+      rememberCatalogItem(verified, [input.name, input.nameLocal])
+      rememberMatchLookup('restaurant', input, verified.contentId)
+      return verified
     }
-    rememberCatalogItem(item, [input.name, input.nameLocal])
-    rememberMatchLookup('restaurant', input, item.contentId)
-    return item
   }
 
   const hits = await autocompleteHits(input.name, input.nameLocal, 'restaurant')
   const match = matchTripadvisorCatalogItem(hits, input.name, input.nameLocal)
-  if (!match) {
-    rememberMatchLookup('restaurant', input, 'miss')
-    return null
+  if (match) {
+    rememberCatalogItem(match, [input.name, input.nameLocal])
+    rememberMatchLookup('restaurant', input, match.contentId)
+    return match
   }
-  rememberCatalogItem(match, [input.name, input.nameLocal])
-  rememberMatchLookup('restaurant', input, match.contentId)
-  return match
+
+  const city = tripCityFromDestination()
+  const listing = await resolveTripadvisorRestaurantListing({
+    name: input.name,
+    nameLocal: input.nameLocal,
+    address: input.address,
+    city: city.nameEn,
+  }).catch(() => null)
+  const contentId = tripadvisorContentIdFromUrl(listing?.url)
+  if (
+    contentId &&
+    isTripadvisorListingUrl(listing?.url) &&
+    (!listing?.name || listingMatchesRestaurant(listing.name, input))
+  ) {
+    const verified = await verifyRestaurantContentId(contentId, input, listing?.url)
+    if (verified) {
+      rememberCatalogItem(verified, [input.name, input.nameLocal])
+      rememberMatchLookup('restaurant', input, verified.contentId)
+      return verified
+    }
+  }
+
+  rememberMatchLookup('restaurant', input, 'miss')
+  return null
 }
 
 async function resolveAttractionMatch(input: {
@@ -1052,10 +2113,14 @@ async function resolveAttractionMatch(input: {
   const labels = canonicalLookupLabels(input.name, input.nameLocal, canonical)
   match = matchLabels(catalog, hits, labels)
   if (!match) {
-    const retrySearch = placeSearchQuery(canonical.nameEn, canonical.nameFr)
-    const firstSearch = placeSearchQuery(input.name, input.nameLocal)
+    const retrySearch = placeLatinLabel(canonical.nameEn, canonical.nameFr)
+    const firstSearch = placeLatinLabel(input.name, input.nameLocal)
     if (retrySearch && retrySearch !== firstSearch) {
-      hits = await autocompleteHits(canonical.nameEn, canonical.nameFr, 'attraction')
+      hits = await autocompleteHits(
+        canonical.nameFr || canonical.nameEn,
+        canonical.nameFr,
+        'attraction',
+      )
       match = matchLabels(catalog, hits, labels)
     }
   }
@@ -1081,27 +2146,9 @@ export async function fetchTripadvisorAttractionInfo(input: {
     const match = await resolveAttractionMatch(input)
     if (!match) return null
 
-    const cachedDetails = readDetails(match.contentId)
     const gallery = await loadGalleryFor(match)
-    const photos =
-      gallery?.photos.length
-        ? gallery.photos
-        : cachedDetails?.photos.length
-          ? cachedDetails.photos
-          : match.coverUrl
-            ? [match.coverUrl]
-            : []
-
-    const info: TripadvisorAttractionInfo = {
-      contentId: match.contentId,
-      name: cachedDetails?.name || match.name,
-      description: cachedDetails?.description,
-      rating: cachedDetails?.rating,
-      userRatingCount: cachedDetails?.userRatingCount,
-      address: cachedDetails?.address,
-      location: cachedDetails?.location || match.location,
-      photos,
-    }
+    const details = readDetails(match.contentId)
+    const info = placeInfoFromParts(match, details, gallery)
     if (info.photos.length || info.location) {
       storeDetails(info)
       return info
@@ -1114,6 +2161,134 @@ export async function fetchTripadvisorAttractionInfo(input: {
     return await task
   } finally {
     infoInflight.delete(inflightKey)
+  }
+}
+
+async function loadReviewsIfMissing(
+  match: TripadvisorCatalogItem,
+  details: TripadvisorAttractionInfo | null,
+): Promise<TripadvisorAttractionInfo | null> {
+  if (!details || details.reviews.length) return details
+  const params = tripadvisorReviewParams(match.kind, match.contentId, match.listingUrl)
+  if (!params.url && !params.locationId) return details
+  try {
+    const reviewsPayload = await requestTripadvisor(
+      'reviews',
+      tripadvisorReviewsPath(match.kind),
+      params,
+    )
+    const reviews =
+      reviewsPayload && !tripadvisorPayloadFailed(reviewsPayload)
+        ? normalizeTripadvisorReviews(reviewsPayload)
+        : []
+    if (!reviews.length) return details
+    const next = { ...details, reviews }
+    storeDetails(next)
+    return next
+  } catch {
+    return details
+  }
+}
+
+async function enrichRestaurantInfo(
+  match: TripadvisorCatalogItem,
+  onUpdate?: (info: TripadvisorAttractionInfo) => void,
+): Promise<TripadvisorAttractionInfo | null> {
+  const gallery = await loadGalleryFor(match)
+  let details = readDetails(match.contentId)
+  const first = placeInfoFromParts(match, details, gallery)
+  if (first.photos.length || first.address || first.rating != null || first.cuisine) {
+    onUpdate?.(first)
+  }
+  details = await loadReviewsIfMissing(match, details)
+  const info = placeInfoFromParts(match, details, gallery)
+  if (hasSettledTripadvisorRestaurantDetails(info) || (info.photos.length > 1 && readDetails(match.contentId))) {
+    storeDetails(info)
+    return info
+  }
+  return first.photos.length ? first : null
+}
+
+export async function fetchTripadvisorRestaurantInfo(input: {
+  name: string
+  nameLocal?: string
+  contentId?: string
+  address?: string
+  onPreview?: (info: TripadvisorAttractionInfo) => void
+  onDetails?: (info: TripadvisorAttractionInfo | null) => void
+}): Promise<TripadvisorAttractionInfo | null> {
+  if (!input.name.trim() && !input.contentId) return null
+  const peeked = peekTripadvisorRestaurantInfo(input.name, input.nameLocal, input.contentId)
+  if (hasCachedTripadvisorRestaurantDetails(peeked?.contentId)) {
+    input.onDetails?.(peeked)
+    return peeked
+  }
+
+  const inflightKey = `restaurant:${input.contentId || ''}:${tripadvisorAutocompleteQuery(input.name, input.nameLocal, 'restaurant')}`
+  const pending = infoInflight.get(inflightKey)
+  if (pending) {
+    if (peeked?.photos.length) input.onPreview?.(peeked)
+    void pending.then((info) => {
+      if (info) input.onPreview?.(info)
+      input.onDetails?.(info)
+    })
+    return pending
+  }
+
+  let resolveFull!: (info: TripadvisorAttractionInfo | null) => void
+  const fullPromise = new Promise<TripadvisorAttractionInfo | null>((resolve) => {
+    resolveFull = resolve
+  })
+  infoInflight.set(inflightKey, fullPromise)
+
+  const task = (async () => {
+    try {
+      const match = await resolveRestaurantMatch(input)
+      if (!match) {
+        input.onDetails?.(null)
+        resolveFull(null)
+        return null
+      }
+      const preview = placeInfoFromParts(
+        match,
+        readDetails(match.contentId),
+        readGallery(match.kind, match.contentId) || coverOnlyGallery(match),
+      )
+      const hasPreview =
+        preview.photos.length > 0 || Boolean(preview.address) || preview.reviews.length > 0
+
+      if (input.onPreview && hasPreview) {
+        input.onPreview(preview)
+        void enrichRestaurantInfo(match, input.onPreview)
+          .then((info) => {
+            if (info) input.onPreview?.(info)
+            input.onDetails?.(info)
+            resolveFull(info || preview)
+          })
+          .catch(() => {
+            input.onDetails?.(null)
+            resolveFull(preview)
+          })
+        return preview
+      }
+
+      const info = await enrichRestaurantInfo(match, input.onPreview)
+      input.onDetails?.(info)
+      resolveFull(info)
+      return info
+    } catch (error) {
+      input.onDetails?.(null)
+      resolveFull(null)
+      throw error
+    }
+  })()
+
+  try {
+    return await task
+  } finally {
+    void fullPromise.finally(() => {
+      if (infoInflight.get(inflightKey) === fullPromise) infoInflight.delete(inflightKey)
+    })
   }
 }
 

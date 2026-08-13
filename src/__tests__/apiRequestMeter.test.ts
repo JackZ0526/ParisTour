@@ -25,12 +25,21 @@ describe('API request meter', () => {
   })
 
   it('classifies Tripadvisor, Booking, LLM, and other paid routes', () => {
+    expect(classifyApiRequest('/api/tripadvisor?rest=restaurants%2Fmedia-gallery')).toBe(
+      'tripadvisor-gallery',
+    )
     expect(
-      classifyApiRequest('/api/tripadvisor?rest=restaurants%2Fmedia-gallery'),
-    ).toBe('tripadvisor-gallery')
+      classifyApiRequest('/api/tripadvisor?rest=api%2Fv1%2Fautocomplete'),
+    ).toBe('tripadvisor-autocomplete')
     expect(classifyApiRequest('/api/tripadvisor?rest=auto-complete')).toBe(
       'tripadvisor-autocomplete',
     )
+    expect(
+      classifyApiRequest('/api/tripadvisor?rest=api%2Fv1%2Frestaurants%2Fdetail'),
+    ).toBe('tripadvisor-details')
+    expect(
+      classifyApiRequest('/api/tripadvisor?rest=restaurants%2Freviews'),
+    ).toBe('tripadvisor-details')
     expect(classifyApiRequest('/api/booking?rest=stays%2Fsearch-by-geo')).toBe(
       'booking-search',
     )

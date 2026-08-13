@@ -41,16 +41,16 @@ function GoogleMark({ className }: { className?: string }) {
   )
 }
 
-function TripadvisorMark({
+function BrandImage({
+  src,
   className,
-  onPhoto = false,
 }: {
+  src: string
   className?: string
-  onPhoto?: boolean
 }) {
   return (
     <img
-      src="/brand/tripadvisor.svg"
+      src={src}
       alt=""
       aria-hidden
       draggable={false}
@@ -59,17 +59,18 @@ function TripadvisorMark({
   )
 }
 
-function SourceLogo({
-  source,
-  onPhoto = false,
-}: {
-  source: PlaceInfoSource
-  onPhoto?: boolean
-}) {
-  const className = 'h-3.5 w-3.5 shrink-0'
-  if (source === 'google') return <GoogleMark className={className} />
+function SourceLogo({ source }: { source: PlaceInfoSource }) {
+  if (source === 'google') return <GoogleMark className="h-3.5 w-3.5 shrink-0" />
   if (source === 'tripadvisor') {
-    return <TripadvisorMark className={className} onPhoto={onPhoto} />
+    return <BrandImage src="/brand/tripadvisor.svg" className="h-3.5 w-3.5 shrink-0" />
+  }
+  if (source === 'booking') {
+    return (
+      <BrandImage
+        src="/brand/booking-com.png"
+        className="h-3.5 w-[3.6rem] shrink-0 object-left"
+      />
+    )
   }
   return null
 }
@@ -90,19 +91,21 @@ export function PlaceSourceMark({
   className?: string
 }) {
   const label = SOURCE_LABEL[source]
+  const showText = showLabel && source !== 'booking'
   const inner = (
     <>
-      <SourceLogo source={source} onPhoto={onPhoto} />
-      {showLabel ? <span>{label}</span> : null}
+      <SourceLogo source={source} />
+      {showText ? <span>{label}</span> : null}
     </>
   )
 
   if (onPhoto) {
+    const photoClass =
+      source === 'booking'
+        ? 'inline-flex items-center rounded-full bg-white/92 px-2 py-1 shadow-sm backdrop-blur-sm'
+        : 'inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm'
     return (
-      <span
-        className={`inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm ${className}`}
-        title={`图片来自 ${label}`}
-      >
+      <span className={`${photoClass} ${className}`} title={`图片来自 ${label}`}>
         {inner}
       </span>
     )

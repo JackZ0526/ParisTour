@@ -8,16 +8,15 @@ import {
 import { requireAllowlistedUser } from './_lib/auth.js'
 
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 60
 
-const DEFAULT_HOST = 'tripadvisor-com1.p.rapidapi.com'
+const DEFAULT_HOST = 'tripadvisor34.p.rapidapi.com'
 const ALLOWED_PATHS = new Set([
-  'attractions/search',
-  'attractions/details',
-  'attractions/media-gallery',
-  'restaurants/search',
-  'restaurants/media-gallery',
-  'auto-complete',
+  'api/v1/autocomplete',
+  'api/v1/restaurants/detail',
+  'api/v1/restaurants/reviews',
+  'api/v1/things-to-do/detail',
+  'api/v1/things-to-do/reviews',
 ])
 
 export async function GET(req: Request): Promise<Response> {

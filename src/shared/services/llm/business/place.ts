@@ -94,6 +94,83 @@ export async function resolveOfficialWebsite(input: {
   return hit.website
 }
 
+export interface TripadvisorRestaurantListing {
+  url?: string
+  contentId?: string
+  name?: string
+}
+
+function parseTripadvisorRestaurantListing(
+  text: string,
+): TripadvisorRestaurantListing | null {
+  const json = extractJsonObject(text)
+  const urlRaw = json?.url || json?.tripadvisorUrl
+  const urlFromJson = typeof urlRaw === 'string' && urlRaw.trim() ? urlRaw.trim() : ''
+  const urlFromText =
+    text.match(
+      /https?:\/\/[^\s"'<>]*tripadvisor\.[^\s"'<>]*Restaurant_Review[^\s"'<>]*/i,
+    )?.[0] || ''
+  const url = urlFromJson || urlFromText
+  if (!url) return null
+  const contentId = url.match(
+    /(?:Restaurant_Review)-[^/\s"'<>]*?-d(\d{5,})/i,
+  )?.[1]
+  if (!contentId) return null
+  const nameRaw = json?.name || json?.title
+  const name = typeof nameRaw === 'string' && nameRaw.trim() ? nameRaw.trim() : undefined
+  return { url, contentId, name }
+}
+
+/**
+ * Last-resort Tripadvisor restaurant identity when auto-complete only returns
+ * hotels/cities. Returns a listing URL / contentId, or null when unsure.
+ */
+export async function resolveTripadvisorRestaurantListing(input: {
+  name: string
+  nameLocal?: string
+  address?: string
+  city?: string
+}): Promise<TripadvisorRestaurantListing | null> {
+  if (!isLlmConfigured()) return null
+  const name = input.name.trim()
+  if (!name) return null
+  const city = input.city?.trim() || ''
+  const key = `tripadvisor-restaurant-listing:v2:${name}|${input.nameLocal || ''}|${input.address || ''}|${city}`
+  const hit = await memoizeLlmCall(
+    key,
+    async () => {
+      const research = await openaiResponsesWithWebSearch({
+        instructions: buildPrompt(
+          '查找这家餐厅在 Tripadvisor 上的餐厅详情页。只根据检索到的公开结果作答，禁止编造。',
+          null,
+          `<hard_rules>
+- 只要 tripadvisor.com / tripadvisor.fr 的 Restaurant_Review 链接，且 URL 里必须带 -d 数字 id（例如 -d5943832-）。
+- 不要酒店、景点、城市页，也不要搜索结果页。
+- 店名和地址必须能对上；不确定就返回 {"url":null}。
+- 禁止编造 URL，也禁止只输出 contentId / locationId 数字。
+</hard_rules>`,
+          jsonContract(
+            '{ url: "https://www.tripadvisor.com/Restaurant_Review-..." | null, name?: string }',
+            '{ "url": "https://www.tripadvisor.com/Restaurant_Review-g187147-d698123-Reviews-Bouillon_Chartier-Paris_Ile_de_France.html", "name": "Bouillon Chartier" }',
+          ),
+        ),
+        user: [
+          `地点：${name}`,
+          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
+          input.address ? `地址：${input.address}` : '',
+          city ? `城市：${city}` : '',
+          '输出 JSON：{"url":"https://www.tripadvisor.com/Restaurant_Review-...","name":"..."} 或 {"url":null}',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      })
+      return { listing: parseTripadvisorRestaurantListing(research.text) }
+    },
+    { durable: true },
+  )
+  return hit.listing
+}
+
 export interface AttractionCanonicalName {
   nameEn: string
   nameFr?: string

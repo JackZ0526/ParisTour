@@ -3,6 +3,7 @@ import {
   withGoogleMapsPhotoKey,
 } from './googleMapsKey'
 import { getLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
+import { appendCityToQuery, tripCityFromDestination } from '../../destination/services/tripCity'
 
 export interface PlacePhotoResult {
   url: string
@@ -63,6 +64,9 @@ export async function fetchGooglePlacePhoto(
 
 export function placePhotoQuery(name: string, nameLocal?: string): string {
   const label = nameLocal || name
-  if (/paris|france|迪士尼|枫丹白露|cdg|airport/i.test(label)) return label
-  return `${label} Paris`
+  const city = tripCityFromDestination().nameEn
+  if (new RegExp(`\\b${city}\\b`, 'i').test(label) || /france|迪士尼|枫丹白露|cdg|airport/i.test(label)) {
+    return label
+  }
+  return appendCityToQuery(label, city)
 }

@@ -43,4 +43,32 @@ describe('place website photo cache', () => {
       }).photos,
     ).toEqual(['https://cdn.example/parallel.jpg'])
   })
+
+  it('remembers a failed website scrape so the next open skips it', () => {
+    setLlmArtifact(
+      websiteCacheKeys('https://www.sognoparis.com/')[0],
+      { photos: [], miss: true },
+      { silent: true },
+    )
+
+    expect(
+      peekCachedPlaceWebsitePhotos({
+        website: 'https://sognoparis.com',
+        name: 'Sogno',
+      }),
+    ).toEqual({ photos: [], miss: true })
+  })
+
+  it('treats a cached null official website as a miss', () => {
+    setLlmArtifact(
+      'place-official-website:v1:Sogno||',
+      { website: null },
+      { silent: true },
+    )
+
+    expect(peekCachedPlaceWebsitePhotos({ name: 'Sogno' })).toEqual({
+      photos: [],
+      miss: true,
+    })
+  })
 })

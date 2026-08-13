@@ -168,6 +168,7 @@ export {
   generateDayCopy,
   recommendPlacesForDay,
   resolveOfficialWebsite,
+  resolveTripadvisorRestaurantListing,
   resolveAttractionCanonicalName,
   type AttractionCanonicalName,
 } from './business/place'

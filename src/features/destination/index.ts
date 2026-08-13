@@ -2,6 +2,12 @@
 export { DestinationPanel } from './components/DestinationPanel'
 export { loadDestination, saveDestination } from './services/destination'
 export {
+  appendCityToQuery,
+  locationBelongsToCity,
+  tripCityFromDestination,
+} from './services/tripCity'
+export type { TripCity } from './services/tripCity'
+export {
   FALLBACK_DESTINATIONS,
   loadPopularDestinations,
   refreshPopularDestinations,

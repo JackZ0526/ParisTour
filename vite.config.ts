@@ -274,7 +274,7 @@ export default defineConfig(({ mode }) => {
   const bookingRapidHost =
     env.RAPIDAPI_BOOKING_HOST || 'booking-com18.p.rapidapi.com'
   const tripadvisorRapidHost =
-    env.RAPIDAPI_TRIPADVISOR_HOST || 'tripadvisor-com1.p.rapidapi.com'
+    env.RAPIDAPI_TRIPADVISOR_HOST || 'tripadvisor34.p.rapidapi.com'
   const openaiKey = env.OPENAI_API_KEY || ''
   const deepseekKey = env.DEEPSEEK_API_KEY || ''
   const geminiKey = env.GEMINI_API_KEY || ''
@@ -342,6 +342,8 @@ export default defineConfig(({ mode }) => {
         '/api/tripadvisor': {
           target: `https://${tripadvisorRapidHost}`,
           changeOrigin: true,
+          timeout: 60_000,
+          proxyTimeout: 60_000,
           rewrite: (path) => {
             const url = new URL(path, 'http://localhost')
             const rest = (url.searchParams.get('rest') || '').replace(/^\/+/, '')

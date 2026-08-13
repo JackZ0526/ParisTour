@@ -9,6 +9,8 @@ import { isDirectoryOrSocialUrl } from '../../../../api/_lib/websitePhotos'
 export interface PlaceWebsitePhotos {
   photos: string[]
   instagram?: string | null
+  /** True when we already scraped / looked up this place and found no photos. */
+  miss?: boolean
 }
 
 const ARTIFACT_PREFIX = 'place-website-photos:v6:'
@@ -73,11 +75,11 @@ function placeIndexKeys(name?: string, nameLocal?: string): string[] {
   return [...keys]
 }
 
-function peekOfficialWebsiteUrl(
+function peekOfficialWebsiteLookup(
   name?: string,
   nameLocal?: string,
   address?: string,
-): string | null {
+): { website: string | null; resolved: boolean } {
   const names = [name?.trim() || ''].filter(Boolean)
   const locals = [...new Set([nameLocal?.trim() || '', ''])]
   const addresses = [...new Set([address?.trim() || '', ''])]
@@ -87,18 +89,21 @@ function peekOfficialWebsiteUrl(
         const stored = getLlmArtifact<{ website: string | null }>(
           `place-official-website:v1:${n}|${local}|${addr}`,
         )
-        if (stored?.website?.trim()) return stored.website.trim()
+        if (stored && typeof stored === 'object' && 'website' in stored) {
+          const website = stored.website?.trim() || null
+          return { website, resolved: true }
+        }
       }
     }
   }
-  return null
+  return { website: null, resolved: false }
 }
 
 function readCached(key: string): PlaceWebsitePhotos | null {
   const memoryHit = memory.get(key)
-  if (memoryHit?.photos?.length) return memoryHit
+  if (memoryHit?.photos?.length || memoryHit?.miss) return memoryHit
   const stored = getLlmArtifact<PlaceWebsitePhotos>(key)
-  if (stored?.photos?.length) {
+  if (stored?.photos?.length || stored?.miss) {
     memory.set(key, stored)
     return stored
   }
@@ -106,18 +111,22 @@ function readCached(key: string): PlaceWebsitePhotos | null {
 }
 
 function remember(
-  website: string,
+  website: string | undefined,
   result: PlaceWebsitePhotos,
   aliases?: { name?: string; nameLocal?: string },
 ) {
-  if (!result.photos.length) return
-  for (const key of websiteCacheKeys(website)) {
-    memory.set(key, result)
-    setLlmArtifact(key, result, { silent: true })
+  const stored: PlaceWebsitePhotos = result.photos.length
+    ? { photos: result.photos, instagram: result.instagram || null }
+    : { photos: [], miss: true, instagram: result.instagram || null }
+  if (website?.trim()) {
+    for (const key of websiteCacheKeys(website)) {
+      memory.set(key, stored)
+      setLlmArtifact(key, stored, { silent: true })
+    }
   }
   for (const key of placeIndexKeys(aliases?.name, aliases?.nameLocal)) {
-    memory.set(key, result)
-    setLlmArtifact(key, result, { silent: true })
+    memory.set(key, stored)
+    setLlmArtifact(key, stored, { silent: true })
   }
 }
 
@@ -131,17 +140,28 @@ export function peekCachedPlaceWebsitePhotos(input: {
   nameLocal?: string
   address?: string
 }): PlaceWebsitePhotos {
-  const official = peekOfficialWebsiteUrl(input.name, input.nameLocal, input.address)
+  const official = peekOfficialWebsiteLookup(input.name, input.nameLocal, input.address)
   const keys = [
     ...(input.website ? websiteCacheKeys(input.website) : []),
-    ...(official ? websiteCacheKeys(official) : []),
+    ...(official.website ? websiteCacheKeys(official.website) : []),
     ...placeIndexKeys(input.name, input.nameLocal),
   ]
+  let miss = false
   for (const key of keys) {
     const cached = readCached(key)
-    if (cached?.photos?.length) return cached
+    if (cached?.photos?.length) {
+      return { photos: cached.photos, instagram: cached.instagram }
+    }
+    if (cached?.miss) miss = true
   }
-  return { photos: [] }
+  if (
+    official.resolved &&
+    !official.website &&
+    (!input.website?.trim() || isDirectoryOrSocialUrl(input.website))
+  ) {
+    miss = true
+  }
+  return miss ? { photos: [], miss: true } : { photos: [] }
 }
 
 export async function fetchPlaceWebsitePhotos(
@@ -159,6 +179,7 @@ export async function fetchPlaceWebsitePhotos(
     remember(url, cached, aliases)
     return cached
   }
+  if (cached.miss) return { photos: [], miss: true }
   const pending = inflight.get(cacheKey(url))
   if (pending) return pending
 
@@ -208,6 +229,7 @@ export async function fetchPlaceWebsitePhotosWithFallback(input: {
     if (input.website?.trim()) remember(input.website, cached, aliases)
     return cached
   }
+  if (cached.miss) return { photos: [], miss: true }
 
   const googleSite = input.website?.trim()
   if (googleSite && !isDirectoryOrSocialUrl(googleSite)) {
@@ -216,7 +238,11 @@ export async function fetchPlaceWebsitePhotosWithFallback(input: {
   }
 
   if (!isLlmConfigured() || !input.name.trim()) {
-    return googleSite ? fetchPlaceWebsitePhotos(googleSite, aliases) : { photos: [] }
+    const scraped = googleSite
+      ? await fetchPlaceWebsitePhotos(googleSite, aliases)
+      : { photos: [] as string[] }
+    if (!scraped.photos.length) remember(googleSite, { photos: [] }, aliases)
+    return scraped.photos.length ? scraped : { photos: [], miss: true }
   }
 
   const resolved = await resolveOfficialWebsite({
@@ -226,10 +252,14 @@ export async function fetchPlaceWebsitePhotosWithFallback(input: {
     googleWebsite: googleSite,
   }).catch(() => null)
 
-  if (!resolved) return { photos: [] }
+  if (!resolved) {
+    remember(googleSite, { photos: [] }, aliases)
+    return { photos: [], miss: true }
+  }
   const scraped = await fetchPlaceWebsitePhotos(resolved, aliases)
   if (scraped.photos.length && googleSite) remember(googleSite, scraped, aliases)
-  return scraped
+  if (!scraped.photos.length) remember(resolved, { photos: [] }, aliases)
+  return scraped.photos.length ? scraped : { photos: [], miss: true }
 }
 
 export function resetPlaceWebsitePhotosForTests() {

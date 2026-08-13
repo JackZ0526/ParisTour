@@ -14,6 +14,27 @@ function stripPlaceQualifiers(s: string): string {
   return s.replace(/[（(][^）)]*[）)]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Latin / original venue name for Tripadvisor search.
+ * Prefer a CJK-free label, then a parenthetical like `斯菲尔 (Sphère)`.
+ */
+export function placeLatinLabel(name: string, nameLocal?: string): string {
+  const labels = [nameLocal, name].map(trimLabel).filter(Boolean)
+  const pure = labels.find((label) => !hasCjk(label) && /[a-z]/i.test(label))
+  const pick = (value: string) =>
+    stripPlaceQualifiers(value.replace(/\bparis\b/gi, ' ')).replace(/\s+/g, ' ').trim()
+  if (pure) return pick(pure)
+  for (const label of labels) {
+    const parenthetical = [...label.matchAll(/[（(]([^）)]+)[）)]/g)]
+      .map((match) => match[1].trim())
+      .find((value) => value && !hasCjk(value) && /[a-z]/i.test(value))
+    if (parenthetical) return pick(parenthetical)
+    const remainder = pick(label.replace(/[\u3400-\u9fff]+/g, ' '))
+    if (remainder && !hasCjk(remainder) && /[a-z]/i.test(remainder)) return remainder
+  }
+  return ''
+}
+
 function normalizeLabel(s: string): string {
   return stripPlaceQualifiers(s)
     .normalize('NFKD')
@@ -41,6 +62,30 @@ const PLACE_NAME_STOPWORDS = new Set([
   'boulevard',
   'blvd',
   'bd',
+])
+
+/** Venue-type words Tripadvisor adds but Google / itinerary labels often omit. */
+const VENUE_TYPE_WORDS = new Set([
+  'brasserie',
+  'restaurant',
+  'restaurants',
+  'cafe',
+  'bistro',
+  'bistrot',
+  'trattoria',
+  'pizzeria',
+  'osteria',
+  'bar',
+  'pub',
+  'tavern',
+  'auberge',
+  'maison',
+  'hotel',
+  'grill',
+  'steakhouse',
+  'boulangerie',
+  'patisserie',
+  'salon',
 ])
 
 /** Fold French/English landmark words so Musée/Museum and moderne/modern match. */
@@ -73,15 +118,15 @@ function foldToken(token: string): string {
   return TOKEN_EQUIVALENCE[token] || token
 }
 
-function significantTokens(normalized: string, fold = false): string[] {
+function significantTokens(normalized: string, fold = false, extraStopwords?: Set<string>): string[] {
   const tokens = normalized
     .split(' ')
-    .filter((token) => token.length > 1 && !PLACE_NAME_STOPWORDS.has(token))
+    .filter((token) => token.length > 1 && !PLACE_NAME_STOPWORDS.has(token) && !extraStopwords?.has(token))
   return fold ? tokens.map(foldToken) : tokens
 }
 
-function significantLabel(normalized: string, fold = false): string {
-  return significantTokens(normalized, fold).join(' ')
+function significantLabel(normalized: string, fold = false, extraStopwords?: Set<string>): string {
+  return significantTokens(normalized, fold, extraStopwords).join(' ')
 }
 
 /**
@@ -121,7 +166,14 @@ export function nameSimilarity(query: string, displayName: string): number {
   if (!qTokens.size || !nTokens.size) return 0
   let overlap = 0
   for (const t of qTokens) if (nTokens.has(t)) overlap += 1
-  return overlap / Math.max(qTokens.size, nTokens.size)
+  const tokenScore = overlap / Math.max(qTokens.size, nTokens.size)
+
+  const qVenue = significantLabel(q, true, VENUE_TYPE_WORDS)
+  const nVenue = significantLabel(n, true, VENUE_TYPE_WORDS)
+  if (qVenue && nVenue && (qVenue === nVenue || nVenue.includes(qVenue) || qVenue.includes(nVenue))) {
+    return Math.max(tokenScore, 0.9)
+  }
+  return tokenScore
 }
 
 /**

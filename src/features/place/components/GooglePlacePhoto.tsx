@@ -45,6 +45,45 @@ function isUnsplashFallback(url: string): boolean {
   return /images\.unsplash\.com/i.test(url)
 }
 
+/** Google Place Photo URLs 403 without a live photo fetch; never put them on <img>. */
+function isDisplayablePhotoUrl(url: string): boolean {
+  if (!/^https?:\/\//i.test(url)) return false
+  if (url.includes('places.googleapis.com')) return false
+  if (url.includes('maps.googleapis.com/maps/api/place/photo')) return false
+  return true
+}
+
+function isPlaceholderFallback(url: string): boolean {
+  return !isDisplayablePhotoUrl(url) || isUnsplashFallback(url)
+}
+
+function displayableSrc(url: string): string {
+  return isDisplayablePhotoUrl(url) ? url : ''
+}
+
+function PhotoPlaceholder() {
+  return (
+    <span
+      className="absolute inset-0 flex items-center justify-center bg-[var(--mist)]"
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-6 w-6 text-[var(--stone)]/40"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="5" width="18" height="14" rx="2.2" />
+        <circle cx="8.5" cy="9.5" r="1.2" />
+        <path d="m21 16-4.2-4.2a1.5 1.5 0 0 0-2.1 0L6 20" />
+      </svg>
+    </span>
+  )
+}
+
 export function GooglePlacePhoto({
   name,
   nameLocal,
@@ -59,8 +98,8 @@ export function GooglePlacePhoto({
   showBadge = true,
 }: Props) {
   const fallbackSrc = withGoogleMapsPhotoKey(fallback) || fallback
-  const [src, setSrc] = useState(() => (isUnsplashFallback(fallbackSrc) ? '' : fallbackSrc))
-  const [loading, setLoading] = useState(() => isUnsplashFallback(fallbackSrc))
+  const [src, setSrc] = useState(() => (isPlaceholderFallback(fallbackSrc) ? '' : fallbackSrc))
+  const [loading, setLoading] = useState(() => isPlaceholderFallback(fallbackSrc))
   const [attribution, setAttribution] = useState<string | undefined>()
   const [fromGoogle, setFromGoogle] = useState(false)
   const [wikimedia, setWikimedia] = useState<WikimediaPlacePhoto | null>(null)
@@ -70,7 +109,7 @@ export function GooglePlacePhoto({
 
   useEffect(() => {
     let cancelled = false
-    const genericFallback = isUnsplashFallback(fallbackSrc)
+    const genericFallback = isPlaceholderFallback(fallbackSrc)
     setSrc(genericFallback ? '' : fallbackSrc)
     setLoading(genericFallback)
     setFromGoogle(false)
@@ -83,7 +122,7 @@ export function GooglePlacePhoto({
         : undefined
 
     if (type === 'hotel' || type === 'transport' || asBackground) {
-      setSrc(fallbackSrc)
+      setSrc(displayableSrc(fallbackSrc))
       setLoading(false)
       return
     }
@@ -132,7 +171,7 @@ export function GooglePlacePhoto({
           }
         }
         if (!cancelled) {
-          setSrc(fallbackSrc)
+          setSrc(displayableSrc(fallbackSrc))
           setLoading(false)
         }
       })()
@@ -145,14 +184,14 @@ export function GooglePlacePhoto({
       queryLocation,
       googlePlaceId,
     )
-    const websitePhoto = peekCachedPlaceWebsitePhotos({
+    const websiteCache = peekCachedPlaceWebsitePhotos({
       website: cachedDetails?.website,
       name: cachedDetails?.name || name,
       nameLocal: cachedDetails?.nameOriginal || nameLocal,
       address: cachedDetails?.address,
-    }).photos[0]
-    if (websitePhoto) {
-      setSrc(websitePhoto)
+    })
+    if (websiteCache.photos[0]) {
+      setSrc(websiteCache.photos[0])
       setLoading(false)
       return
     }
@@ -166,8 +205,9 @@ export function GooglePlacePhoto({
     const cachedUri = googlePhoto
       ? peekGooglePlacePhotoMedia(googlePhoto, cachedDetails?.id)
       : null
-    if (cachedUri) {
-      setSrc(withGoogleMapsPhotoKey(cachedUri) || cachedUri)
+    const keyedGoogleUri = cachedUri ? withGoogleMapsPhotoKey(cachedUri) || cachedUri : ''
+    if (keyedGoogleUri && isDisplayablePhotoUrl(keyedGoogleUri)) {
+      setSrc(keyedGoogleUri)
       setFromGoogle(true)
       setLoading(false)
       return
@@ -176,7 +216,7 @@ export function GooglePlacePhoto({
     const originalName = name.trim() || nameLocal?.trim() || ''
 
     void (async () => {
-      if (originalName) {
+      if (originalName && !websiteCache.miss) {
         const website = await fetchPlaceWebsitePhotosWithFallback({
           website: cachedDetails?.website,
           name: cachedDetails?.name || name,
@@ -216,7 +256,7 @@ export function GooglePlacePhoto({
       }
 
       if (!cancelled) {
-        setSrc(fallbackSrc)
+        setSrc(displayableSrc(fallbackSrc))
         setLoading(false)
       }
     })()
@@ -242,16 +282,17 @@ export function GooglePlacePhoto({
       setSrc(withCacheBust(src))
       return
     }
-    if (src !== fallbackSrc) {
-      setSrc(fallbackSrc)
-      setFromGoogle(false)
-      setWikimedia(null)
-      setAttribution(undefined)
-      setLoading(false)
-    }
+    const next =
+      src !== fallbackSrc && isDisplayablePhotoUrl(fallbackSrc) ? fallbackSrc : ''
+    setSrc(next)
+    setFromGoogle(false)
+    setWikimedia(null)
+    setAttribution(undefined)
+    setLoading(false)
   }
 
-  const showShimmer = loading || !src
+  const showShimmer = loading
+  const showPlaceholder = !loading && !src
 
   if (asBackground) {
     return (
@@ -272,6 +313,7 @@ export function GooglePlacePhoto({
         {showShimmer ? (
           <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
         ) : null}
+        {showPlaceholder ? <PhotoPlaceholder /> : null}
       </div>
     )
   }
@@ -284,6 +326,7 @@ export function GooglePlacePhoto({
       {showShimmer ? (
         <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
       ) : null}
+      {showPlaceholder ? <PhotoPlaceholder /> : null}
       {src ? (
         <img
           src={src}

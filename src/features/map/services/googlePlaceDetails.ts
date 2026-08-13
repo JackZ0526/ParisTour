@@ -297,7 +297,7 @@ export function peekGooglePlacePhotoMedia(
 
 /**
  * Place Photo (New) is no longer used. Search/Details photo resource names
- * are not display URLs; Tripadvisor media-gallery supplies the album.
+ * are not display URLs; Tripadvisor listing photos supply the album.
  */
 export async function fetchGooglePlacePhotoMedia(
   photoName: string,
