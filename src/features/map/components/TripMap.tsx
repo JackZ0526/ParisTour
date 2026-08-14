@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FullscreenControl,
   LngLatBounds,
@@ -23,11 +23,17 @@ import {
 import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
 import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
 import {
-  getCachedMapRoute,
-  type MapRouteCacheEntry,
+  getCachedMapRouteSegment,
+  type MapRouteSegmentEntry,
 } from '../services/mapRouteCache'
-import { getOrFetchMapRoute } from '../services/openRouteService'
-import { buildDayMapRouteRequest } from '../services/mapDayRoute'
+import {
+  dayRouteSegmentsToRequests,
+  buildDayMapRouteSegments,
+} from '../services/mapDayRoute'
+import {
+  getOrFetchMapRouteSegments,
+  type MapRouteSegmentsResult,
+} from '../services/openRouteService'
 
 const OPEN_STREET_MAP_STYLE: StyleSpecification = {
   version: 8,
@@ -87,27 +93,21 @@ function markerElement(
   return element
 }
 
-function syncRouteOverlay(
+interface SegmentPathHandles {
+  casing: SVGPathElement | null
+  line: SVGPathElement | null
+}
+
+function pathDFromGeometry(
   map: MapLibreMap,
-  route: MapRouteCacheEntry | null,
-  svg: SVGSVGElement | null,
-  paths: readonly (SVGPathElement | null)[],
-): void {
-  if (!svg) return
-  const width = map.getContainer().clientWidth
-  const height = map.getContainer().clientHeight
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
-  if (!route) {
-    for (const path of paths) path?.setAttribute('d', '')
-    return
-  }
-  const d = route.geometry.coordinates
+  geometry: MapRouteSegmentEntry['geometry'],
+): string {
+  return geometry.coordinates
     .map((coordinate, index) => {
       const point = map.project(coordinate)
       return `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`
     })
     .join(' ')
-  for (const path of paths) path?.setAttribute('d', d)
 }
 
 export function TripMap({
@@ -122,11 +122,12 @@ export function TripMap({
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const routeSvgRef = useRef<SVGSVGElement | null>(null)
-  const routeCasingRef = useRef<SVGPathElement | null>(null)
-  const routeLineRef = useRef<SVGPathElement | null>(null)
-  const lastAnimatedRouteKeyRef = useRef('')
+  const pathHandlesRef = useRef<Map<string, SegmentPathHandles>>(new Map())
+  const seenSegmentCacheKeysRef = useRef<Map<string, string>>(new Map())
   const [mapReady, setMapReady] = useState(false)
-  const [route, setRoute] = useState<MapRouteCacheEntry | null>(null)
+  const [segmentEntries, setSegmentEntries] = useState<
+    Array<MapRouteSegmentEntry | null>
+  >([])
   const [routeError, setRouteError] = useState<string | null>(null)
 
   const stopsFingerprint = useMemo(
@@ -145,7 +146,7 @@ export function TripMap({
   )
 
   const routeRequest = useMemo(
-    () => buildDayMapRouteRequest(day, hotel, customPlaces),
+    () => buildDayMapRouteSegments(day, hotel, customPlaces),
     // The fingerprint captures the only custom-place fields used by the map.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -157,11 +158,8 @@ export function TripMap({
       stopsFingerprint,
     ],
   )
-  const { origin: dayOrigin, stops, markerStops } = routeRequest
+  const { origin: dayOrigin, stops, markerStops, segments } = routeRequest
   const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
-  const routePoints = routeRequest.points
-  const routeProfile = routeRequest.profile
-  const routeKey = routeRequest.key
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -195,29 +193,41 @@ export function TripMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Track the segment list we're currently rendering so the loader effect
+  // can detect when the underlying day changes underneath an in-flight request.
+  const segmentsKeyRef = useRef(routeRequest.fingerprint)
+  segmentsKeyRef.current = routeRequest.fingerprint
+
   useEffect(() => {
-    if (routePoints.length < 2) {
-      setRoute(null)
+    if (segments.length === 0) {
+      setSegmentEntries([])
       setRouteError(null)
       return
     }
     setRouteError(null)
-    const cached = getCachedMapRoute(routeKey)
-    if (cached) setRoute(cached)
-    else setRoute(null)
+
+    // Prime from cache so the first paint shows already-resolved legs while
+    // we wait for the network response for the rest.
+    const primed: Array<MapRouteSegmentEntry | null> = segments.map(
+      (segment) => getCachedMapRouteSegment(segment.cacheKey),
+    )
+    setSegmentEntries(primed)
 
     let cancelled = false
     let retryTimer: number | undefined
     const loadRoute = async (attempt: number) => {
       try {
-        const { route: resolved, fromCache } = await getOrFetchMapRoute(
-          routePoints,
-          routeProfile,
+        const requests = dayRouteSegmentsToRequests(segments)
+        const result: MapRouteSegmentsResult = await getOrFetchMapRouteSegments(
+          routeRequest.profile,
+          requests,
         )
-        if (cancelled) return
-        setRoute(resolved)
+        if (cancelled || segmentsKeyRef.current !== routeRequest.fingerprint) {
+          return
+        }
+        setSegmentEntries(result.segments)
         setRouteError(null)
-        if (!fromCache) onRouteCacheChanged?.()
+        if (result.fetchedFromNetwork) onRouteCacheChanged?.()
       } catch (error: unknown) {
         if (cancelled) return
         if (attempt === 0) {
@@ -234,40 +244,95 @@ export function TripMap({
       cancelled = true
       if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
-  }, [onRouteCacheChanged, routeKey, routePoints, routeProfile])
+  }, [
+    onRouteCacheChanged,
+    routeRequest.fingerprint,
+    routeRequest.profile,
+    segments,
+  ])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
-    const paths = [routeCasingRef.current, routeLineRef.current]
-    const sync = () =>
-      syncRouteOverlay(map, route, routeSvgRef.current, paths)
-    sync()
-    if (route && lastAnimatedRouteKeyRef.current !== route.key) {
-      lastAnimatedRouteKeyRef.current = route.key
-      for (const path of paths) path?.classList.remove('trip-map-route-enter')
-      void routeLineRef.current?.getBoundingClientRect()
-      for (const path of paths) path?.classList.add('trip-map-route-enter')
+    const svg = routeSvgRef.current
+    if (!svg) return
+
+    const sync = () => {
+      const width = map.getContainer().clientWidth
+      const height = map.getContainer().clientHeight
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+      const handles = pathHandlesRef.current
+      for (let i = 0; i < segments.length; i += 1) {
+        const segment = segments[i]
+        const handle = handles.get(segment.reactKey)
+        const entry = segmentEntries[i]
+        if (!handle) continue
+        if (!entry) {
+          handle.casing?.setAttribute('d', '')
+          handle.line?.setAttribute('d', '')
+          continue
+        }
+        const d = pathDFromGeometry(map, entry.geometry)
+        handle.casing?.setAttribute('d', d)
+        handle.line?.setAttribute('d', d)
+      }
     }
+    sync()
     map.on('move', sync)
     map.on('resize', sync)
     return () => {
       map.off('move', sync)
       map.off('resize', sync)
     }
-  }, [mapReady, route])
+  }, [mapReady, segmentEntries, segments])
+
+  useEffect(() => {
+    const seen = seenSegmentCacheKeysRef.current
+    const next = new Map<string, string>()
+    for (let i = 0; i < segments.length; i += 1) {
+      const segment = segments[i]
+      const entry = segmentEntries[i]
+      if (!entry) continue
+      const previous = seen.get(segment.reactKey)
+      const handle = pathHandlesRef.current.get(segment.reactKey)
+      if (handle && previous !== entry.key) {
+        for (const path of [handle.casing, handle.line]) {
+          path?.classList.remove('trip-map-route-enter')
+        }
+        // Force reflow so re-adding the class restarts the animation.
+        void handle.line?.getBoundingClientRect()
+        for (const path of [handle.casing, handle.line]) {
+          path?.classList.add('trip-map-route-enter')
+        }
+      }
+      next.set(segment.reactKey, entry.key)
+    }
+    seenSegmentCacheKeysRef.current = next
+  }, [segmentEntries, segments])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
     const bounds = new LngLatBounds()
-    for (const point of routePoints) bounds.extend([point.lng, point.lat])
-    if (routePoints.length === 1) {
-      map.jumpTo({ center: [routePoints[0].lng, routePoints[0].lat], zoom: 14 })
+    for (const segment of segments) {
+      bounds.extend([segment.from.lng, segment.from.lat])
+      bounds.extend([segment.to.lng, segment.to.lat])
+    }
+    if (segments.length === 1) {
+      map.jumpTo({
+        center: [segments[0].from.lng, segments[0].from.lat],
+        zoom: 14,
+      })
     } else if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { padding: 72, maxZoom: 15, duration: 0 })
     }
-  }, [mapReady, routeKey, routePoints])
+    // Only re-fit on initial load and on day change. Editing a stop on the
+    // same day must not snap the viewport back to the default — that wipes
+    // the user's zoom/pan. We deliberately ignore `routeRequest.fingerprint`
+    // and `segments` here; place changes are handled by the per-segment
+    // route overlay, not by a global re-fit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, day.day])
 
   useEffect(() => {
     const map = mapRef.current
@@ -337,6 +402,17 @@ export function TripMap({
     stopNumbers,
   ])
 
+  const setPathRef =
+    (reactKey: string, kind: 'casing' | 'line') =>
+    (element: SVGPathElement | null) => {
+      let handle = pathHandlesRef.current.get(reactKey)
+      if (!handle) {
+        handle = { casing: null, line: null }
+        pathHandlesRef.current.set(reactKey, handle)
+      }
+      handle[kind] = element
+    }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
@@ -361,25 +437,29 @@ export function TripMap({
           preserveAspectRatio="none"
           aria-hidden="true"
         >
-          <path
-            ref={routeCasingRef}
-            pathLength="1"
-            fill="none"
-            stroke="#fffaf2"
-            strokeWidth="10"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.9"
-          />
-          <path
-            ref={routeLineRef}
-            pathLength="1"
-            fill="none"
-            stroke="#b9572f"
-            strokeWidth="6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          {segments.map((segment) => (
+            <Fragment key={segment.reactKey}>
+              <path
+                ref={setPathRef(segment.reactKey, 'casing')}
+                pathLength="1"
+                fill="none"
+                stroke="#fffaf2"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.9"
+              />
+              <path
+                ref={setPathRef(segment.reactKey, 'line')}
+                pathLength="1"
+                fill="none"
+                stroke="#b9572f"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Fragment>
+          ))}
         </svg>
       </div>
     </div>

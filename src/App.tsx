@@ -25,8 +25,11 @@ import { TripChatPanel } from './features/chat/components/TripChatPanel'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { TripMap } from './features/map/components/TripMap'
-import { buildDayMapRouteRequest } from './features/map/services/mapDayRoute'
-import { getOrFetchMapRoute } from './features/map/services/openRouteService'
+import {
+  buildDayMapRouteSegments,
+  dayRouteSegmentsToRequests,
+} from './features/map/services/mapDayRoute'
+import { getOrFetchMapRouteSegments } from './features/map/services/openRouteService'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import { PENDING_HOTEL } from './features/hotel/constants/hotels'
 import { getPlace } from './features/place/constants/places'
@@ -209,12 +212,12 @@ export default function App() {
   const routePrefetchPlan = useMemo(
     () =>
       days
-        .map((plan) => buildDayMapRouteRequest(plan, hotel, placesWithHotel))
-        .filter((request) => request.points.length >= 2),
+        .map((plan) => buildDayMapRouteSegments(plan, hotel, placesWithHotel))
+        .filter((request) => request.segments.length > 0),
     [days, hotel, placesWithHotel],
   )
   const routePrefetchFingerprint = useMemo(
-    () => routePrefetchPlan.map((request) => request.key).join('||'),
+    () => routePrefetchPlan.map((request) => request.fingerprint).join('||'),
     [routePrefetchPlan],
   )
   const routePrefetchPlanRef = useRef(routePrefetchPlan)
@@ -245,11 +248,11 @@ export default function App() {
           if (!request) return
           for (let attempt = 0; attempt < 2 && active; attempt += 1) {
             try {
-              const result = await getOrFetchMapRoute(
-                request.points,
+              const result = await getOrFetchMapRouteSegments(
                 request.profile,
+                dayRouteSegmentsToRequests(request.segments),
               )
-              if (!result.fromCache) fetchedAny = true
+              if (result.fetchedFromNetwork) fetchedAny = true
               break
             } catch {
               if (attempt === 0) {

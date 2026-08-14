@@ -1,7 +1,26 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DayPlan, Place, SelectedHotel } from '../types'
-import { buildDayMapRouteRequest } from '../features/map/services/mapDayRoute'
+import {
+  buildDayMapRouteRequest,
+  buildDayMapRouteSegments,
+} from '../features/map/services/mapDayRoute'
 import { CDG_LOCATION } from '../features/itinerary/utils/dayOrigin'
+import {
+  buildMapRouteSegmentKey,
+  cacheMapRouteSegments,
+  getCachedMapRouteSegment,
+} from '../features/map/services/mapRouteCache'
+
+const storage = new Map<string, string>()
+
+beforeEach(() => {
+  storage.clear()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+  })
+})
 
 const hotel: SelectedHotel = {
   id: 'hotel-test',
@@ -69,3 +88,89 @@ describe('day map route request', () => {
     expect(request.profile).toBe('foot-walking')
   })
 })
+
+describe('day map route segments', () => {
+  it('splits an itinerary into per-leg segments with stable ids and a day profile', () => {
+    const request = buildDayMapRouteSegments(day(2, ['first', 'second']), hotel, {
+      first: place('first', 48.871, 2.301),
+      second: place('second', 48.872, 2.302),
+    })
+
+    expect(request.segments).toHaveLength(2)
+    expect(request.profile).toBe('foot-walking')
+    expect(request.segments[0]).toMatchObject({
+      fromId: hotel.id,
+      toId: 'first',
+    })
+    expect(request.segments[1]).toMatchObject({
+      fromId: 'first',
+      toId: 'second',
+    })
+    expect(request.fingerprint.split('||')).toHaveLength(2)
+    expect(request.endpoints.map((endpoint) => endpoint.id)).toEqual([
+      hotel.id,
+      'first',
+      'second',
+    ])
+  })
+
+  it('uses CDG as the first endpoint on day 1 and flips to driving', () => {
+    const request = buildDayMapRouteSegments(day(1, ['near-hotel']), hotel, {
+      'near-hotel': place('near-hotel', 48.871, 2.301),
+    })
+
+    expect(request.endpoints[0].point).toEqual(CDG_LOCATION)
+    expect(request.profile).toBe('driving-car')
+    expect(request.segments[0].fromId).toBe('attr-cdg')
+  })
+
+  it('produces a stable React key independent of rounded coordinates', () => {
+    const request = buildDayMapRouteSegments(day(2, ['first']), hotel, {
+      first: place('first', 48.871, 2.301),
+    })
+    expect(request.segments[0].reactKey).toBe('foot-walking|hotel-test->first')
+  })
+
+  it('uses the same cacheKey the segment store writes under, so TripMap priming hits', () => {
+    const request = buildDayMapRouteSegments(day(2, ['first', 'second']), hotel, {
+      first: place('first', 48.871, 2.301),
+      second: place('second', 48.872, 2.302),
+    })
+    const first = request.segments[0]
+    const second = request.segments[1]
+    expect(first.cacheKey).toBe(
+      buildMapRouteSegmentKey('foot-walking', first.from, first.to),
+    )
+    expect(second.cacheKey).toBe(
+      buildMapRouteSegmentKey('foot-walking', second.from, second.to),
+    )
+
+    // Round-trip: cache an entry under the segment's cacheKey, then read it
+    // back through the same key. This is the lookup TripMap performs during
+    // its synchronous priming step.
+    cacheMapRouteSegments([
+      {
+        key: first.cacheKey,
+        profile: 'foot-walking',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [first.from.lng, first.from.lat],
+            [first.to.lng, first.to.lat],
+          ],
+        },
+        distanceMeters: 1,
+        durationSeconds: 1,
+        updatedAt: 0,
+        fromId: first.fromId,
+        toId: first.toId,
+        from: first.from,
+        to: first.to,
+      },
+    ])
+    expect(getCachedMapRouteSegment(first.cacheKey)?.fromId).toBe(
+      first.fromId,
+    )
+  })
+})
+

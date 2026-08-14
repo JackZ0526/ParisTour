@@ -21,6 +21,29 @@ export interface MapRouteCacheEntry {
 
 export type MapRouteCacheMap = Record<string, MapRouteCacheEntry>
 
+/** Identity for a single leg between two consecutive stops (direction preserved). */
+export interface MapRouteSegmentEndpoint {
+  /** Stable stop id: place id for itinerary stops, origin id for the day origin. */
+  id: string
+  point: MapRoutePoint
+}
+
+export interface MapRouteSegmentEntry extends MapRouteCacheEntry {
+  fromId: string
+  toId: string
+  from: MapRoutePoint
+  to: MapRoutePoint
+}
+
+/** Stable React key for a segment: profile + ordered stop ids. */
+export function buildMapRouteSegmentReactKey(
+  profile: MapRouteProfile,
+  fromId: string,
+  toId: string,
+): string {
+  return `${profile}|${fromId}->${toId}`
+}
+
 const STORAGE_KEY = 'paris-tour-map-routes-v1'
 const MAX_CACHE_ENTRIES = 60
 
@@ -49,6 +72,21 @@ function validEntry(value: unknown): value is MapRouteCacheEntry {
   )
 }
 
+function validSegmentEntry(value: unknown): value is MapRouteSegmentEntry {
+  if (!validEntry(value)) return false
+  const entry = value as Partial<MapRouteSegmentEntry>
+  return (
+    typeof entry.fromId === 'string' &&
+    typeof entry.toId === 'string' &&
+    !!entry.from &&
+    !!entry.to &&
+    Number.isFinite(entry.from.lat) &&
+    Number.isFinite(entry.from.lng) &&
+    Number.isFinite(entry.to.lat) &&
+    Number.isFinite(entry.to.lng)
+  )
+}
+
 export function sanitizeMapRouteCache(value: unknown): MapRouteCacheMap {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const entries = Object.entries(value)
@@ -56,6 +94,10 @@ export function sanitizeMapRouteCache(value: unknown): MapRouteCacheMap {
     .sort(([, first], [, second]) => second.updatedAt - first.updatedAt)
     .slice(0, MAX_CACHE_ENTRIES)
   return Object.fromEntries(entries)
+}
+
+function isSegmentCacheEntry(value: unknown): value is MapRouteSegmentEntry {
+  return validSegmentEntry(value)
 }
 
 export function loadMapRouteCache(): MapRouteCacheMap {
@@ -99,6 +141,53 @@ export function buildMapRouteKey(
   return `${profile}|${points
     .map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`)
     .join('|')}`
+}
+
+function formatSegmentPoint(point: MapRoutePoint): string {
+  return `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`
+}
+
+/**
+ * Cache key for a single leg between two consecutive stops. Direction is
+ * preserved because the road network is directed for one-ways and turn
+ * restrictions — A→B and B→A can return different geometries.
+ */
+export function buildMapRouteSegmentKey(
+  profile: MapRouteProfile,
+  from: MapRoutePoint,
+  to: MapRoutePoint,
+): string {
+  return `${profile}|${formatSegmentPoint(from)}->${formatSegmentPoint(to)}`
+}
+
+/** A segment is "stale" when its from/to coordinates don't match the request. */
+export function isSegmentEntryFresh(
+  entry: MapRouteSegmentEntry,
+  from: MapRoutePoint,
+  to: MapRoutePoint,
+): boolean {
+  return (
+    entry.from.lat === from.lat &&
+    entry.from.lng === from.lng &&
+    entry.to.lat === to.lat &&
+    entry.to.lng === to.lng
+  )
+}
+
+export function getCachedMapRouteSegment(
+  key: string,
+): MapRouteSegmentEntry | null {
+  const value = loadMapRouteCache()[key]
+  return value && isSegmentCacheEntry(value) ? value : null
+}
+
+export function cacheMapRouteSegments(entries: readonly MapRouteSegmentEntry[]): void {
+  if (entries.length === 0) return
+  const cache = loadMapRouteCache()
+  for (const entry of entries) {
+    cache[entry.key] = entry
+  }
+  saveMapRouteCache(cache)
 }
 
 function distanceMeters(first: MapRoutePoint, second: MapRoutePoint): number {
