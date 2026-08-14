@@ -8,7 +8,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from 'react'
-import type { FlightSelection } from '../features/flight/components/FlightPanel'
+import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { DayNavPlan } from '../features/map/services/googleNav'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../types'
 import {
@@ -39,6 +39,19 @@ import {
   reorderStops,
 } from '../features/itinerary/utils/itineraryState'
 import { findBestInsertIndex } from '../features/itinerary/utils/itineraryState'
+import {
+  holdTripCloudSaves,
+  releaseTripCloudSaves,
+} from '../features/cloud-sync/services/tripCloud'
+
+const REORDER_SAVE_SETTLE_MS = 1000
+const REORDER_SAVE_FALLBACK_MS = 30_000
+
+type ReorderSaveTransaction = {
+  copyDone: boolean
+  fallbackTimer: ReturnType<typeof setTimeout> | null
+  settleTimer: ReturnType<typeof setTimeout> | null
+}
 
 export interface ItineraryDaysInitialState {
   days: DayPlan[]
@@ -81,6 +94,7 @@ export interface UseItineraryDaysResult {
     placeId: string,
     googlePlaceId: string,
     nameOriginal?: string,
+    googleAddress?: string,
   ) => void
   handleAddOnDay: (
     dayNum: number,
@@ -94,6 +108,7 @@ export interface UseItineraryDaysResult {
     place: Place,
     options?: { select?: boolean },
   ) => void
+  completeReorderSaveTransaction: () => void
 }
 
 /**
@@ -115,6 +130,66 @@ export function useItineraryDays(
   >(() => initial.customPlaces)
   const [dayIndex, setDayIndex] = useState(0)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
+  const reorderSaveTransactionRef = useRef<ReorderSaveTransaction | null>(null)
+
+  const finishReorderSaveTransaction = useCallback(() => {
+    const transaction = reorderSaveTransactionRef.current
+    if (!transaction) return
+    if (transaction.fallbackTimer) clearTimeout(transaction.fallbackTimer)
+    if (transaction.settleTimer) clearTimeout(transaction.settleTimer)
+    reorderSaveTransactionRef.current = null
+    releaseTripCloudSaves()
+  }, [])
+
+  const scheduleReorderSaveRelease = useCallback(() => {
+    const transaction = reorderSaveTransactionRef.current
+    if (!transaction?.copyDone) return
+    if (transaction.settleTimer) clearTimeout(transaction.settleTimer)
+    transaction.settleTimer = setTimeout(
+      finishReorderSaveTransaction,
+      REORDER_SAVE_SETTLE_MS,
+    )
+  }, [finishReorderSaveTransaction])
+
+  const beginReorderSaveTransaction = useCallback(() => {
+    let transaction = reorderSaveTransactionRef.current
+    if (!transaction) {
+      holdTripCloudSaves()
+      transaction = {
+        copyDone: false,
+        fallbackTimer: null,
+        settleTimer: null,
+      }
+      reorderSaveTransactionRef.current = transaction
+    } else {
+      transaction.copyDone = false
+      if (transaction.settleTimer) {
+        clearTimeout(transaction.settleTimer)
+        transaction.settleTimer = null
+      }
+      if (transaction.fallbackTimer) clearTimeout(transaction.fallbackTimer)
+    }
+    transaction.fallbackTimer = setTimeout(
+      finishReorderSaveTransaction,
+      REORDER_SAVE_FALLBACK_MS,
+    )
+  }, [finishReorderSaveTransaction])
+
+  const completeReorderSaveTransaction = useCallback(() => {
+    const transaction = reorderSaveTransactionRef.current
+    if (!transaction) return
+    transaction.copyDone = true
+    scheduleReorderSaveRelease()
+  }, [scheduleReorderSaveRelease])
+
+  useEffect(() => {
+    scheduleReorderSaveRelease()
+  }, [days, scheduleReorderSaveRelease])
+
+  useEffect(
+    () => () => finishReorderSaveTransaction(),
+    [finishReorderSaveTransaction],
+  )
 
   const placesWithHotel = useMemo(
     () => ({
@@ -143,11 +218,19 @@ export function useItineraryDays(
 
   const handleReorder = useCallback(
     (from: number, to: number) => {
+      const reordered = keepFixedHotelPositions(
+        day.day,
+        reorderStops(day.stops, from, to),
+        lastDayNum,
+      )
+      const changed = reordered.some((stop, index) => stop !== day.stops[index])
+      if (!changed) return
+      beginReorderSaveTransaction()
       updateDayStops((stops) =>
         keepFixedHotelPositions(day.day, reorderStops(stops, from, to), lastDayNum),
       )
     },
-    [day.day, lastDayNum, updateDayStops],
+    [beginReorderSaveTransaction, day.day, day.stops, lastDayNum, updateDayStops],
   )
 
   const handleReorderOnDay = useCallback(
@@ -215,27 +298,22 @@ export function useItineraryDays(
     [lastDayNum, selectedPlaceId, setDays],
   )
 
-  const handleAddCustom = useCallback(
-    (place: Place, mode: 'best' | 'end') => {
-      // Don't auto-open PlacePanel / GooglePlacePage after add-from-dialog.
-      handleAddOnDay(day.day, place, { mode, select: false })
-    },
-    [day.day],
-  )
-
   const handleGoogleIdentityResolved = useCallback(
     (
       placeId: string,
       googlePlaceId: string,
       nameOriginal?: string,
+      googleAddress?: string,
     ) => {
       setCustomPlaces((prev) => {
         const current = prev[placeId]
         if (!current) return prev
         const nextNameLocal = nameOriginal || current.nameLocal
+        const nextGoogleAddress = googleAddress || current.googleAddress
         if (
           current.googlePlaceId === googlePlaceId &&
-          current.nameLocal === nextNameLocal
+          current.nameLocal === nextNameLocal &&
+          current.googleAddress === nextGoogleAddress
         ) {
           return prev
         }
@@ -248,6 +326,7 @@ export function useItineraryDays(
             ...current,
             googlePlaceId,
             nameLocal: nextNameLocal,
+            googleAddress: nextGoogleAddress,
             googleMapsUrl,
           },
         }
@@ -366,6 +445,14 @@ export function useItineraryDays(
     ],
   )
 
+  const handleAddCustom = useCallback(
+    (place: Place, mode: 'best' | 'end') => {
+      // Don't auto-open PlacePanel / GooglePlacePage after add-from-dialog.
+      handleAddOnDay(day.day, place, { mode, select: false })
+    },
+    [day.day, handleAddOnDay],
+  )
+
   const handleSwitchDay = useCallback(
     (dayNum: number) => {
       const idx = days.findIndex((d) => d.day === dayNum)
@@ -457,6 +544,7 @@ export function useItineraryDays(
     handleAddOnDay,
     handleSwitchDay,
     handleReplaceOnDay,
+    completeReorderSaveTransaction,
   }
 }
 
@@ -488,6 +576,7 @@ export function useItineraryDaysEffects(
     itineraryStartDate: string | undefined
     numberOfDays: number
     setCopyRefreshing: Dispatch<SetStateAction<boolean>>
+    completeReorderSaveTransaction: () => void
   },
   refs: UseItineraryDaysEffectsRefs,
 ) {
@@ -507,6 +596,7 @@ export function useItineraryDaysEffects(
     itineraryStartDate,
     numberOfDays,
     setCopyRefreshing,
+    completeReorderSaveTransaction,
   } = params
 
   const dayPlacesKey = useMemo(
@@ -645,39 +735,48 @@ export function useItineraryDaysEffects(
   dayStopsRef.current = day.stops
   const dayIndexForCopyRef = useRef(dayIndex)
   dayIndexForCopyRef.current = dayIndex
+  const { copyRequestIdRef, prevStopsKeyRef, suppressCopyRef } = refs
+  const isCurrentCopyRequest = useCallback(
+    (requestId: number) => copyRequestIdRef.current === requestId,
+    [copyRequestIdRef],
+  )
 
   useEffect(() => {
     if (!itineraryReady || !itineraryGenerated || itineraryGenerating) {
       setCopyRefreshing(false)
+      completeReorderSaveTransaction()
       return
     }
 
     const hotelAreaKey = hotel.areaKey
     const key = `${day.day}:${dayPlacesKey}:${dayCalendarDate || ''}:${day.pace}:${hotelAreaKey}`
 
-    if (refs.prevStopsKeyRef.current === null) {
-      refs.prevStopsKeyRef.current = key
+    if (prevStopsKeyRef.current === null) {
+      prevStopsKeyRef.current = key
+      completeReorderSaveTransaction()
       return
     }
-    if (refs.prevStopsKeyRef.current === key) return
+    if (prevStopsKeyRef.current === key) return
 
-    const prevDay = Number(refs.prevStopsKeyRef.current.split(':')[0])
-    refs.prevStopsKeyRef.current = key
+    const prevDay = Number(prevStopsKeyRef.current.split(':')[0])
+    prevStopsKeyRef.current = key
 
-    if (refs.suppressCopyRef.current) {
-      refs.suppressCopyRef.current = false
+    if (suppressCopyRef.current) {
+      suppressCopyRef.current = false
       setCopyRefreshing(false)
+      completeReorderSaveTransaction()
       return
     }
 
     // Switching day tabs should not rewrite copy.
     if (prevDay !== day.day) {
       setCopyRefreshing(false)
+      completeReorderSaveTransaction()
       return
     }
 
     let cancelled = false
-    const requestId = ++refs.copyRequestIdRef.current
+    const requestId = ++copyRequestIdRef.current
     const dayNum = day.day
     const pace = day.pace
     const calendarDate = dayCalendarDate || undefined
@@ -713,7 +812,7 @@ export function useItineraryDaysEffects(
         .then((copy) => {
           if (
             cancelled ||
-            refs.copyRequestIdRef.current !== requestId ||
+            !isCurrentCopyRequest(requestId) ||
             !copy
           )
             return
@@ -734,8 +833,9 @@ export function useItineraryDaysEffects(
           )
         })
         .finally(() => {
-          if (!cancelled && refs.copyRequestIdRef.current === requestId) {
+          if (!cancelled && isCurrentCopyRequest(requestId)) {
             setCopyRefreshing(false)
+            completeReorderSaveTransaction()
           }
         })
     }, 900)
@@ -743,7 +843,7 @@ export function useItineraryDaysEffects(
     return () => {
       cancelled = true
       window.clearTimeout(timer)
-      if (refs.copyRequestIdRef.current === requestId) {
+      if (isCurrentCopyRequest(requestId)) {
         setCopyRefreshing(false)
       }
     }
@@ -756,9 +856,14 @@ export function useItineraryDaysEffects(
     itineraryReady,
     itineraryGenerated,
     itineraryGenerating,
+    isCurrentCopyRequest,
     numberOfDays,
     setCopyRefreshing,
     setDays,
+    completeReorderSaveTransaction,
+    copyRequestIdRef,
+    prevStopsKeyRef,
+    suppressCopyRef,
   ])
 }
 

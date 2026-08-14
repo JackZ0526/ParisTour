@@ -1,4 +1,5 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
+import { RefreshCw, Sparkles } from 'lucide-react'
 import {
   getThinkingMode,
   llmBusyDefaultLabel,
@@ -17,9 +18,6 @@ type Variant = 'inline' | 'block' | 'badge'
  * generating = force non-thinking LLM busy visual.
  */
 type Mode = 'sync' | 'thinking' | 'generating'
-
-export { llmBusyDefaultLabel, llmBusyLabel, resolveLlmBusyVisual } from '../services/llm/llm'
-export type { LlmBusyVisual } from '../services/llm/llm'
 
 const toneClass: Record<Tone, string> = {
   sage: 'text-[var(--sage)]',
@@ -72,30 +70,12 @@ export function SyncOrbitIcon({
   className?: string
 }) {
   return (
-    <svg
+    <RefreshCw
       className={`cloud-sync-orbit ${spinning ? 'is-spinning' : ''} ${className}`}
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
+      size={size}
+      strokeWidth={2}
       aria-hidden
-    >
-      <circle cx="16" cy="16" r="11" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
-      <path
-        d="M16 5a11 11 0 0 1 11 11"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M16 27A11 11 0 0 1 5 16"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeOpacity="0.55"
-      />
-      <circle cx="16" cy="16" r="3.2" fill="currentColor" />
-    </svg>
+    />
   )
 }
 
@@ -111,62 +91,12 @@ export function ThinkingOrbitIcon({
   className?: string
 }) {
   return (
-    <svg
+    <Sparkles
       className={`llm-think-orbit ${className}`}
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
+      size={size}
+      strokeWidth={2}
       aria-hidden
-    >
-      <circle className="llm-think-aura" cx="16" cy="16" r="15" fill="currentColor" />
-      <circle
-        className="llm-think-pulse-ring"
-        cx="16"
-        cy="16"
-        r="13.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <circle cx="16" cy="16" r="11" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.8" />
-      <g className="llm-think-ticks" stroke="currentColor" strokeLinecap="round">
-        <path d="M16 2.8v2.6" strokeWidth="1.7" />
-        <path d="M29.2 16h-2.6" strokeWidth="1.7" />
-        <path d="M16 29.2v-2.6" strokeWidth="1.7" />
-        <path d="M2.8 16h2.6" strokeWidth="1.7" />
-        <path d="M25.4 6.6l-1.8 1.8" strokeWidth="1.4" />
-        <path d="M6.6 25.4l1.8-1.8" strokeWidth="1.4" />
-      </g>
-      <g className="llm-think-arc-a">
-        <path
-          d="M16 5a11 11 0 0 1 11 11"
-          stroke="currentColor"
-          strokeWidth="2.6"
-          strokeLinecap="round"
-        />
-        <circle cx="27" cy="16" r="1.8" fill="currentColor" />
-      </g>
-      <g className="llm-think-arc-b">
-        <path
-          d="M16 27A11 11 0 0 1 5 16"
-          stroke="currentColor"
-          strokeWidth="2.3"
-          strokeLinecap="round"
-          strokeOpacity="0.65"
-        />
-      </g>
-      <circle
-        className="llm-think-core-ring"
-        cx="16"
-        cy="16"
-        r="4.4"
-        stroke="currentColor"
-        strokeOpacity="0.55"
-        strokeWidth="1.2"
-        fill="none"
-      />
-      <circle className="llm-think-core" cx="16" cy="16" r="3.2" fill="currentColor" />
-    </svg>
+    />
   )
 }
 

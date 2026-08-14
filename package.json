@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint && node scripts/check-lucide-icons.mjs",
+    "lint:icons": "node scripts/check-lucide-icons.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:no-void-type": "node scripts/_no-void-type.mjs",
@@ -20,9 +21,10 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@react-google-maps/api": "^2.20.8",
     "@supabase/supabase-js": "^2.110.9",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.31.0",
+    "maplibre-gl": "^6.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-leaflet": "^5.0.0"
@@ -36,9 +38,9 @@
     "@vitejs/plugin-react": "^6.0.3",
     "husky": "^9.0.11",
     "oxlint": "^1.71.0",
-    "vitest": "^2.1.9",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^2.1.9"
   }
 }

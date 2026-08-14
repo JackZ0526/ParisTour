@@ -16,7 +16,7 @@ import {
   formatTripDayLabel,
 } from './features/itinerary/services/tripDates'
 import type { DayPlan, HotelCandidate, ItineraryStop, SelectedHotel } from './types'
-import type { FlightSelection } from './features/flight/components/FlightPanel'
+import type { FlightSelection } from './features/flight/services/flightSelection'
 import type { TripDateRange } from './features/itinerary/services/tripDates'
 
 export const ITINERARY_LOADING_LINES = [

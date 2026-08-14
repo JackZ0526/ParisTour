@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { SlidersHorizontal } from 'lucide-react'
 import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   type RecommendationPreferences,
@@ -59,16 +60,6 @@ const options: Array<{
   },
 ]
 
-function SlidersIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M4 7h5m4 0h7M4 17h9m4 0h3" strokeLinecap="round" />
-      <circle cx="11" cy="7" r="2" />
-      <circle cx="15" cy="17" r="2" />
-    </svg>
-  )
-}
-
 export function RecommendationPreferencesButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -78,7 +69,7 @@ export function RecommendationPreferencesButton({ onClick }: { onClick: () => vo
       title="推荐偏好"
       className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
     >
-      <SlidersIcon />
+      <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} aria-hidden />
     </button>
   )
 }

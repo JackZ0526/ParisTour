@@ -10,14 +10,168 @@ function trimLabel(s?: string) {
   return (s || '').trim()
 }
 
+function stripPlaceQualifiers(s: string): string {
+  return s.replace(/[（(][^）)]*[）)]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Latin / original venue name for Tripadvisor search.
+ * Prefer a CJK-free label, then a parenthetical like `斯菲尔 (Sphère)`.
+ */
+export function placeLatinLabel(name: string, nameLocal?: string): string {
+  const labels = [nameLocal, name].map(trimLabel).filter(Boolean)
+  const pure = labels.find((label) => !hasCjk(label) && /[a-z]/i.test(label))
+  const pick = (value: string) =>
+    stripPlaceQualifiers(value.replace(/\bparis\b/gi, ' ')).replace(/\s+/g, ' ').trim()
+  if (pure) return pick(pure)
+  for (const label of labels) {
+    const parenthetical = [...label.matchAll(/[（(]([^）)]+)[）)]/g)]
+      .map((match) => match[1].trim())
+      .find((value) => value && !hasCjk(value) && /[a-z]/i.test(value))
+    if (parenthetical) return pick(parenthetical)
+    const remainder = pick(label.replace(/[\u3400-\u9fff]+/g, ' '))
+    if (remainder && !hasCjk(remainder) && /[a-z]/i.test(remainder)) return remainder
+  }
+  return ''
+}
+
 function normalizeLabel(s: string): string {
-  return s
+  return stripPlaceQualifiers(s)
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+const PLACE_NAME_STOPWORDS = new Set([
+  'the',
+  'de',
+  'du',
+  'des',
+  'la',
+  'le',
+  'les',
+  'of',
+  'and',
+  'et',
+  'avenue',
+  'ave',
+  'rue',
+  'boulevard',
+  'blvd',
+  'bd',
+])
+
+/** Venue-type words Tripadvisor adds but Google / itinerary labels often omit. */
+const VENUE_TYPE_WORDS = new Set([
+  'brasserie',
+  'restaurant',
+  'restaurants',
+  'cafe',
+  'bistro',
+  'bistrot',
+  'trattoria',
+  'pizzeria',
+  'osteria',
+  'bar',
+  'pub',
+  'tavern',
+  'auberge',
+  'maison',
+  'hotel',
+  'grill',
+  'steakhouse',
+  'boulangerie',
+  'patisserie',
+  'salon',
+])
+
+/** Fold French/English landmark words so Musée/Museum and moderne/modern match. */
+const TOKEN_EQUIVALENCE: Record<string, string> = {
+  musee: 'museum',
+  museum: 'museum',
+  moderne: 'modern',
+  modern: 'modern',
+  cathedrale: 'cathedral',
+  cathedral: 'cathedral',
+  basilique: 'basilica',
+  basilica: 'basilica',
+  jardin: 'garden',
+  jardins: 'garden',
+  garden: 'garden',
+  gardens: 'garden',
+  palais: 'palace',
+  palace: 'palace',
+  eglise: 'church',
+  church: 'church',
+  chapelle: 'chapel',
+  chapel: 'chapel',
+  tour: 'tower',
+  tower: 'tower',
+  ville: 'city',
+  city: 'city',
+  pont: 'bridge',
+  bridge: 'bridge',
+}
+
+/**
+ * Shared venue-class words are not enough to prove two landmarks are the same
+ * place (Grand Palais ≠ Palais Garnier, Musée Rodin ≠ Musée d'Orsay).
+ */
+const LANDMARK_TYPE_WORDS = new Set([
+  'palace',
+  'museum',
+  'garden',
+  'church',
+  'cathedral',
+  'chapel',
+  'tower',
+  'basilica',
+  'bridge',
+  'park',
+  'parc',
+])
+
+function tokensAreTypeOnly(tokens: Iterable<string>): boolean {
+  let count = 0
+  for (const token of tokens) {
+    count += 1
+    if (!LANDMARK_TYPE_WORDS.has(token)) return false
+  }
+  return count > 0
+}
+
+function foldToken(token: string): string {
+  return TOKEN_EQUIVALENCE[token] || token
+}
+
+function significantTokens(normalized: string, fold = false, extraStopwords?: Set<string>): string[] {
+  const tokens = normalized
+    .split(' ')
+    .filter((token) => token.length > 1 && !PLACE_NAME_STOPWORDS.has(token) && !extraStopwords?.has(token))
+  return fold ? tokens.map(foldToken) : tokens
+}
+
+function significantLabel(normalized: string, fold = false, extraStopwords?: Set<string>): string {
+  return significantTokens(normalized, fold, extraStopwords).join(' ')
+}
+
+/**
+ * Best Tripadvisor / Google search string for a bilingual place label.
+ * Prefers the Latin name, drops qualifiers like "（中段）", and strips
+ * street-type words so "Avenue des Champs-Élysées" searches as "champs elysees".
+ */
+export function placeSearchQuery(name: string, nameLocal?: string): string {
+  const labels = [nameLocal, name].map(trimLabel).filter(Boolean)
+  if (!labels.length) return ''
+  const latin = labels.find((label) => !hasCjk(label)) || labels[0]
+  const stripped = stripPlaceQualifiers(latin.replace(/\bparis\b/gi, ' ')).replace(/\s+/g, ' ').trim()
+  if (!stripped) return ''
+  if (hasCjk(stripped)) return stripped
+  const core = significantLabel(normalizeLabel(stripped))
+  return core || normalizeLabel(stripped)
 }
 
 /**
@@ -30,13 +184,29 @@ export function nameSimilarity(query: string, displayName: string): number {
   const n = normalizeLabel(displayName)
   if (!q || !n) return 0
   if (q === n) return 1
-  if (n.includes(q) || q.includes(n)) return 0.85
-  const qTokens = new Set(q.split(' ').filter((t) => t.length > 1))
-  const nTokens = new Set(n.split(' ').filter((t) => t.length > 1))
+  const qCore = significantLabel(q, true)
+  const nCore = significantLabel(n, true)
+  const qTokens = new Set(significantTokens(q, true))
+  const nTokens = new Set(significantTokens(n, true))
+  if (qCore && nCore && qCore === nCore) return 1
+  if (n.includes(q) || q.includes(n) || (qCore && nCore && (nCore.includes(qCore) || qCore.includes(nCore)))) {
+    const shorter = qCore.length <= nCore.length ? qTokens : nTokens
+    if (!tokensAreTypeOnly(shorter)) return 0.85
+  }
   if (!qTokens.size || !nTokens.size) return 0
-  let overlap = 0
-  for (const t of qTokens) if (nTokens.has(t)) overlap += 1
-  return overlap / Math.max(qTokens.size, nTokens.size)
+  const overlapping: string[] = []
+  for (const t of qTokens) if (nTokens.has(t)) overlapping.push(t)
+  if (overlapping.length && overlapping.every((token) => LANDMARK_TYPE_WORDS.has(token))) {
+    return 0
+  }
+  const tokenScore = overlapping.length / Math.max(qTokens.size, nTokens.size)
+
+  const qVenue = significantLabel(q, true, VENUE_TYPE_WORDS)
+  const nVenue = significantLabel(n, true, VENUE_TYPE_WORDS)
+  if (qVenue && nVenue && (qVenue === nVenue || nVenue.includes(qVenue) || qVenue.includes(nVenue))) {
+    return Math.max(tokenScore, 0.9)
+  }
+  return tokenScore
 }
 
 /**
@@ -50,7 +220,28 @@ const PLACE_ALIAS_GROUPS: string[][] = [
   ['卢浮宫', 'Musée du Louvre', 'Musee du Louvre', 'Louvre Museum'],
   ['巴黎圣母院', 'Cathédrale Notre-Dame de Paris', 'Notre-Dame de Paris'],
   ['奥赛博物馆', "Musée d'Orsay", "Musee d'Orsay", 'Orsay Museum'],
-  ['圣心堂', 'Basilique du Sacré-Cœur', 'Sacre Coeur Basilica'],
+  ['圣心堂', 'Basilique du Sacré-Cœur', 'Sacre Coeur Basilica', 'Basilique Du Sacre-Coeur De Montmartre'],
+  ['卢森堡公园', 'Jardin du Luxembourg', 'Luxembourg Gardens'],
+  ['圣礼拜堂', 'Sainte-Chapelle'],
+  ['橘园美术馆', "Musée de l'Orangerie", "Musee de l'Orangerie"],
+  ['罗丹美术馆', 'Musée Rodin', 'Musee Rodin'],
+  ['巴黎歌剧院', 'Palais Garnier'],
+  ['大皇宫', 'Grand Palais'],
+  [
+    '香榭丽舍大街',
+    '香榭丽舍',
+    'Avenue des Champs-Élysées',
+    'Champs-Élysées',
+    'Champs-Elysees',
+    'Champs Elysees',
+  ],
+  [
+    '巴黎现代艺术博物馆',
+    '市现代艺术博物馆',
+    "Musée d'Art Moderne de Paris",
+    "Musee d'Art Moderne de Paris",
+    "Musée d'Art Moderne de la Ville de Paris",
+  ],
 ]
 
 function aliasGroupFor(label: string): string[] | undefined {

@@ -80,6 +80,87 @@ export function extractPartialJsonStringField(
   return null
 }
 
+function readPartialJsonString(
+  text: string,
+  start: number,
+): { value: string; index: number; complete: boolean } {
+  let i = start
+  let out = ''
+  while (i < text.length) {
+    const c = text[i]!
+    if (c === '\\') {
+      if (i + 1 >= text.length) return { value: out, index: i, complete: false }
+      const n = text[i + 1]!
+      if (n === 'n') out += '\n'
+      else if (n === 'r') out += '\r'
+      else if (n === 't') out += '\t'
+      else if (n === '"' || n === '\\' || n === '/') out += n
+      else if (n === 'u') {
+        const hex = text.slice(i + 2, i + 6)
+        if (hex.length < 4) return { value: out, index: i, complete: false }
+        if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
+          out += n
+          i += 2
+          continue
+        }
+        out += String.fromCharCode(parseInt(hex, 16))
+        i += 6
+        continue
+      } else {
+        out += n
+      }
+      i += 2
+      continue
+    }
+    if (c === '"') return { value: out, index: i + 1, complete: true }
+    out += c
+    i++
+  }
+  return { value: out, index: i, complete: false }
+}
+
+/**
+ * Extract a (possibly incomplete) JSON string array while tokens stream in.
+ * Returns null until the field's opening `[` is seen.
+ */
+export function extractPartialJsonStringArray(
+  text: string,
+  field: string,
+): string[] | null {
+  const key = `"${field}"`
+  let searchFrom = 0
+  while (searchFrom < text.length) {
+    const keyAt = text.indexOf(key, searchFrom)
+    if (keyAt < 0) return null
+    let i = keyAt + key.length
+    while (i < text.length && /\s/.test(text[i]!)) i++
+    if (text[i] !== ':') {
+      searchFrom = keyAt + 1
+      continue
+    }
+    i++
+    while (i < text.length && /\s/.test(text[i]!)) i++
+    if (text[i] !== '[') {
+      searchFrom = keyAt + 1
+      continue
+    }
+    i++
+    const items: string[] = []
+    while (i < text.length) {
+      while (i < text.length && /[\s,]/.test(text[i]!)) i++
+      if (i >= text.length) return items.length ? items : null
+      if (text[i] === ']') return items
+      if (text[i] !== '"') return items.length ? items : null
+      const parsed = readPartialJsonString(text, i + 1)
+      items.push(parsed.value)
+      if (!parsed.complete) return items
+      i = parsed.index
+    }
+    return items.length ? items : null
+  }
+  return null
+}
+
 // ── OpenAI Responses API payload shape ──
 
 export type OpenAIResponsesPayload = {

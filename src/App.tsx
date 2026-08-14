@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
-import { useAuth } from './features/auth/AuthProvider'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
+import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
 import { useItineraryDays, useItineraryDaysEffects } from './hooks/useItineraryDays'
@@ -12,6 +13,7 @@ import { FlightPanel } from './features/flight/components/FlightPanel'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
+import { ApiRequestMeter } from './shared/components/ApiRequestMeter'
 import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {
   RecommendationPreferencesButton,
@@ -23,9 +25,15 @@ import { TripChatPanel } from './features/chat/components/TripChatPanel'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { TripMap } from './features/map/components/TripMap'
+import {
+  buildDayMapRouteSegments,
+  dayRouteSegmentsToRequests,
+} from './features/map/services/mapDayRoute'
+import { getOrFetchMapRouteSegments } from './features/map/services/openRouteService'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import { PENDING_HOTEL } from './features/hotel/constants/hotels'
 import { getPlace } from './features/place/constants/places'
+import { SELECTED_HOTEL_PLACE_ID } from './features/itinerary/utils/dayOrigin'
 import { clearDayNavCache, useDayNav } from './features/itinerary/hooks/useDayNav'
 import { clearAllFlightCache } from './features/flight/services/flightCache'
 import { clearFlightSelection } from './features/flight/services/flightSelection'
@@ -119,6 +127,7 @@ export default function App() {
     handleAddOnDay,
     handleSwitchDay,
     handleReplaceOnDay,
+    completeReorderSaveTransaction,
     day,
   } = useItineraryDays(
     hotel,
@@ -128,6 +137,21 @@ export default function App() {
     },
     { numberOfDaysRef },
   )
+  const [openHotelDetailToken, setOpenHotelDetailToken] = useState(0)
+  const handleSelectPlace = useCallback(
+    (id: string) => {
+      if (id === SELECTED_HOTEL_PLACE_ID) {
+        setSelectedPlaceId(null)
+        setOpenHotelDetailToken((n) => n + 1)
+        return
+      }
+      setSelectedPlaceId(id)
+    },
+    [setSelectedPlaceId],
+  )
+  const handleRouteCacheChanged = useCallback(() => {
+    notifyTripChanged()
+  }, [notifyTripChanged])
   const {
     itineraryStart,
     setItineraryStart,
@@ -185,6 +209,82 @@ export default function App() {
     { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
   )
   numberOfDaysRef.current = numberOfDays
+  const routePrefetchPlan = useMemo(
+    () =>
+      days
+        .map((plan) => buildDayMapRouteSegments(plan, hotel, placesWithHotel))
+        .filter((request) => request.segments.length > 0),
+    [days, hotel, placesWithHotel],
+  )
+  const routePrefetchFingerprint = useMemo(
+    () => routePrefetchPlan.map((request) => request.fingerprint).join('||'),
+    [routePrefetchPlan],
+  )
+  const routePrefetchPlanRef = useRef(routePrefetchPlan)
+  routePrefetchPlanRef.current = routePrefetchPlan
+
+  useEffect(() => {
+    if (
+      !showItineraryContent ||
+      itineraryGenerating ||
+      itineraryIncrementalGenerating ||
+      dayRegenerating ||
+      dayRestoring ||
+      !routePrefetchFingerprint
+    ) {
+      return
+    }
+
+    let active = true
+    void (async () => {
+      const requests = routePrefetchPlanRef.current
+      let nextIndex = 0
+      let fetchedAny = false
+      const worker = async () => {
+        while (active) {
+          const index = nextIndex
+          nextIndex += 1
+          const request = requests[index]
+          if (!request) return
+          for (let attempt = 0; attempt < 2 && active; attempt += 1) {
+            try {
+              const result = await getOrFetchMapRouteSegments(
+                request.profile,
+                dayRouteSegmentsToRequests(request.segments),
+              )
+              if (result.fetchedFromNetwork) fetchedAny = true
+              break
+            } catch {
+              if (attempt === 0) {
+                await new Promise((resolve) => window.setTimeout(resolve, 900))
+              }
+              // Keep prefetch silent; TripMap surfaces the final error if opened.
+            }
+          }
+        }
+      }
+      await Promise.all(
+        Array.from(
+          { length: Math.min(2, requests.length) },
+          () => worker(),
+        ),
+      )
+      if (active && fetchedAny && !readOnly) notifyTripChanged()
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [
+    dayRegenerating,
+    dayRestoring,
+    itineraryGenerating,
+    itineraryIncrementalGenerating,
+    notifyTripChanged,
+    readOnly,
+    routePrefetchFingerprint,
+    showItineraryContent,
+  ])
   const [panelResetKey, setPanelResetKey] = useState(0)
   /**
    * Remount input panels / chat after a remote snapshot is reconciled.
@@ -262,7 +362,7 @@ export default function App() {
   )
   /** Detail overlay for trip chat: PlacePanel selection wins over hotel popup. */
   const tripChatViewing = useMemo((): TripChatViewingTarget | null => {
-    if (selectedPlaceId) {
+    if (selectedPlaceId && selectedPlaceId !== SELECTED_HOTEL_PLACE_ID) {
       try {
         const place = getPlace(selectedPlaceId, placesWithHotel)
         const stop = day.stops.find((s) => s.placeId === selectedPlaceId)
@@ -347,6 +447,7 @@ export default function App() {
       itineraryStartDate,
       numberOfDays,
       setCopyRefreshing,
+      completeReorderSaveTransaction,
     },
     {
       prevStopsKeyRef,
@@ -422,6 +523,7 @@ export default function App() {
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
+      <ApiRequestMeter />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
           <span className="max-w-[11rem] truncate text-[var(--stone)] sm:max-w-[16rem]">
@@ -464,21 +566,7 @@ export default function App() {
               title="存档"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <rect x="3" y="4" width="18" height="4" rx="1" />
-                <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
-                <path d="M10 12h4" />
-              </svg>
+              <Archive size={17} strokeWidth={1.8} aria-hidden />
             </button>
           )}
           {role === 'owner' && activeTrip && (
@@ -492,22 +580,7 @@ export default function App() {
               title="分享"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <circle cx="18" cy="5" r="2.5" />
-                <circle cx="6" cy="12" r="2.5" />
-                <circle cx="18" cy="19" r="2.5" />
-                <path d="M8.3 10.8 15.7 6.2M8.3 13.2l7.4 4.6" />
-              </svg>
+              <Share2 size={17} strokeWidth={1.8} aria-hidden />
             </button>
           )}
           {!readOnly && (
@@ -518,22 +591,7 @@ export default function App() {
               title="清空全部"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M3 6h18" />
-                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
-                <path d="M19 6v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
-                <path d="M10 11v6M14 11v6" />
-              </svg>
+              <Trash2 size={17} strokeWidth={1.8} aria-hidden />
             </button>
           )}
           <button
@@ -545,21 +603,7 @@ export default function App() {
             title="退出"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
           >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
-              <path d="M16 8l4 4-4 4" />
-              <path d="M9 12h11" />
-            </svg>
+            <LogOut size={17} strokeWidth={1.8} aria-hidden />
           </button>
         </div>
       </div>
@@ -638,6 +682,7 @@ export default function App() {
           onCandidatesChange={setHotelCandidates}
           readOnly={readOnly}
           onDetailChange={setViewingHotelDetail}
+          openSelectedDetailToken={openHotelDetailToken}
         />
 
         <section className="space-y-4">
@@ -716,21 +761,7 @@ export default function App() {
                     title="恢复默认推荐"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
                   >
-                    <svg
-                      width="17"
-                      height="17"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                      <path d="M3 3v5h5" />
-                      <path d="M12 7v5l3 2" />
-                    </svg>
+                    <History size={17} strokeWidth={1.8} aria-hidden />
                   </button>
                 )}
                 <button
@@ -740,24 +771,7 @@ export default function App() {
                   title="重新生成全部"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
                 >
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="m14.5 4.5 5 5L8 21H3v-5L14.5 4.5Z" />
-                    <path d="m11.5 7.5 5 5" />
-                    <path d="M5 3v4" />
-                    <path d="M3 5h4" />
-                    <path d="M19 16v4" />
-                    <path d="M17 18h4" />
-                  </svg>
+                  <Sparkles size={17} strokeWidth={1.8} aria-hidden />
                 </button>
                   </>
                 )}
@@ -922,14 +936,13 @@ export default function App() {
                           customPlaces={placesWithHotel}
                           selectedPlaceId={selectedPlaceId}
                           navPlan={navPlan}
-                          navLoading={navLoading}
                           copyRefreshing={copyRefreshing}
                           dayRegenerating={dayRegenerating}
                           dayRegenError={dayRegenError}
                           dayRestoring={dayRestoring}
                           dayPending={dayPending}
                           isLastDay={day.day === lastDayNum}
-                          onSelectPlace={setSelectedPlaceId}
+                          onSelectPlace={handleSelectPlace}
                           onReorder={handleReorder}
                           onDelete={handleDelete}
                           onAddCustom={handleAddCustom}
@@ -952,17 +965,14 @@ export default function App() {
                             : 'hidden lg:block'
                         }`}
                       >
-                        <MapErrorBoundary
-                          key={`map-boundary-${day.day}-${hotel.id}`}
-                        >
+                        <MapErrorBoundary>
                           <TripMap
                             hotel={hotel}
                             day={day}
                             customPlaces={placesWithHotel}
-                            navPlan={navPlan}
-                            navLoading={navLoading}
                             selectedPlaceId={selectedPlaceId}
-                            onSelectPlace={setSelectedPlaceId}
+                            onSelectPlace={handleSelectPlace}
+                            onRouteCacheChanged={handleRouteCacheChanged}
                           />
                         </MapErrorBoundary>
                         <PlacePanel
@@ -995,7 +1005,7 @@ export default function App() {
 
         <footer className="rounded-2xl border border-white/60 bg-[var(--card)] px-4 py-5 text-sm text-[var(--stone)]">
           <p>
-            航班与营业信息会变动；餐厅评分以 Google Maps 实时为准。自驾日请确认低排放区（Crit’Air）与租车保险。
+            航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
           </p>
         </footer>
       </main>
@@ -1020,7 +1030,7 @@ export default function App() {
           ).join('；')}
           handlers={{
             switchDay: handleSwitchDay,
-            selectPlace: setSelectedPlaceId,
+            selectPlace: handleSelectPlace,
             removeStop: handleDeleteOnDay,
             addPlace: handleAddOnDay,
             replaceStop: handleReplaceOnDay,

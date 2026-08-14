@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
 
 export interface DateRangeValue {
@@ -222,17 +223,7 @@ export function DateRangePicker({
         <span className={hasCommitted ? 'text-[var(--ink)]' : 'text-[var(--stone)]'}>
           {displayText}
         </span>
-        <svg
-          aria-hidden
-          viewBox="0 0 20 20"
-          className="h-4 w-4 shrink-0 text-[var(--sage)]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-        >
-          <rect x="3" y="4.5" width="14" height="12" rx="2" />
-          <path d="M3 8.5h14M7 2.5v3M13 2.5v3" strokeLinecap="round" />
-        </svg>
+        <CalendarDays className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
       </button>
 
       {open && (
@@ -249,7 +240,7 @@ export function DateRangePicker({
               onClick={() => shiftMonth(-1)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--sage)] transition hover:bg-[var(--sage)]/10"
             >
-              ‹
+              <ChevronLeft size={17} aria-hidden />
             </button>
             <p className="font-display text-lg tracking-wide text-[var(--ink)]">
               {monthLabel(viewY, viewM)}
@@ -260,7 +251,7 @@ export function DateRangePicker({
               onClick={() => shiftMonth(1)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--sage)] transition hover:bg-[var(--sage)]/10"
             >
-              ›
+              <ChevronRight size={17} aria-hidden />
             </button>
           </div>
 

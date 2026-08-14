@@ -67,6 +67,9 @@ create unique index if not exists trips_one_primary_per_owner
 
 create index if not exists trips_owner_id_idx on public.trips (owner_id);
 
+alter table public.trips add column if not exists hotel jsonb;
+alter table public.trips add column if not exists artifacts jsonb not null default '{}'::jsonb;
+
 alter table public.trips enable row level security;
 
 -- ---------------------------------------------------------------------------
@@ -487,6 +490,53 @@ create policy "trip_backups_delete"
   for delete
   to authenticated
   using (public.user_can_edit_trip(trip_id));
+
+-- ---------------------------------------------------------------------------
+-- Incremental artifacts patch (avoid uploading the full JSONB blob)
+-- ---------------------------------------------------------------------------
+create or replace function public.patch_trip_artifacts(
+  p_trip_id uuid,
+  p_upserts jsonb default '{}'::jsonb,
+  p_deletes text[] default '{}'::text[]
+)
+returns timestamptz
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  new_updated_at timestamptz;
+  upserts jsonb := coalesce(p_upserts, '{}'::jsonb);
+  deletes text[] := coalesce(p_deletes, '{}'::text[]);
+begin
+  if jsonb_typeof(upserts) <> 'object' then
+    raise exception 'p_upserts must be a JSON object'
+      using errcode = '22023';
+  end if;
+
+  if not public.user_can_edit_trip(p_trip_id) then
+    raise exception 'not authorized'
+      using errcode = '42501';
+  end if;
+
+  update public.trips
+  set artifacts =
+    (coalesce(artifacts, '{}'::jsonb) - deletes) || upserts
+  where id = p_trip_id
+  returning updated_at into new_updated_at;
+
+  if new_updated_at is null then
+    raise exception 'trip not found'
+      using errcode = 'P0002';
+  end if;
+
+  return new_updated_at;
+end;
+$$;
+
+revoke execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) from public;
+revoke execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) from anon;
+grant execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Bootstrap: add your email(s) to the allowlist, then sign up.

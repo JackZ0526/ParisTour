@@ -1,7 +1,11 @@
 import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../constants/hotels'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
 import { geocodeParisAddress } from '../../map/services/geocode'
-import { fetchGooglePlaceDetails } from '../../map/services/googlePlaceDetails'
+import {
+  peekBookingHotel,
+  resolveBookingHotelIdentity,
+  type BookingHotelRecord,
+} from './bookingHotels'
 
 const FALLBACK_HOTEL_IMAGE =
   'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'
@@ -9,6 +13,7 @@ const FALLBACK_HOTEL_IMAGE =
 export function candidateToSelected(card: HotelCandidate): SelectedHotel {
   return {
     id: card.id,
+    bookingHotelId: card.bookingHotelId,
     googlePlaceId: card.googlePlaceId,
     name: card.name,
     address: card.address,
@@ -23,18 +28,28 @@ export function candidateToSelected(card: HotelCandidate): SelectedHotel {
   }
 }
 
-function ratingHint(details: {
-  rating?: number
-  userRatingCount?: number
-} | null): string | undefined {
+function ratingHint(details: Pick<BookingHotelRecord, 'rating' | 'reviewCount'> | null) {
   if (details?.rating == null) return undefined
-  const count =
-    details.userRatingCount != null ? `（${details.userRatingCount}）` : ''
-  return `Google ★ ${details.rating.toFixed(1)}${count}`
+  const count = details.reviewCount != null ? `（${details.reviewCount}）` : ''
+  return `Booking.com ${details.rating.toFixed(1)}/10${count}`
 }
 
-/** Resolve a hotel name/address into a candidate card via Google Places (+ Nominatim fallback). */
+async function resolveRecord(input: {
+  bookingHotelId?: string
+  name: string
+}): Promise<BookingHotelRecord | null> {
+  const cached = peekBookingHotel(input.bookingHotelId)
+  if (cached) return cached
+  if (!input.bookingHotelId) {
+    return resolveBookingHotelIdentity(input.name).catch(() => null)
+  }
+  return null
+}
+
+/** Resolve a hotel through the Booking provider, with Nominatim as coordinate fallback only. */
 export async function resolveHotelCandidate(input: {
+  bookingHotelId?: string
+  /** Legacy saved identity; never sent to Booking. */
   googlePlaceId?: string
   name: string
   address?: string
@@ -46,20 +61,26 @@ export async function resolveHotelCandidate(input: {
   isBest?: boolean
   source?: 'llm' | 'custom'
 }): Promise<HotelCandidate> {
-  const query = [input.name, input.address, 'Paris'].filter(Boolean).join(' ')
-  const details = await fetchGooglePlaceDetails(query, undefined, {
-    placeId: input.googlePlaceId,
-  }).catch(() => null)
+  let details = await resolveRecord(input).catch(() => null)
 
-  let lat = details?.location?.lat
-  let lng = details?.location?.lng
+  let lat = details?.location.lat
+  let lng = details?.location.lng
   let address = details?.address || input.address || ''
 
   if (lat == null || lng == null) {
-    const geo = await geocodeParisAddress(input.address || input.name)
+    const rawGeocodeQuery = input.address || input.name
+    let geo
+    try {
+      geo = await geocodeParisAddress(rawGeocodeQuery)
+    } catch (cause) {
+      const addressOnly = rawGeocodeQuery.split(',').slice(1).join(',').trim()
+      if (!addressOnly) throw cause
+      geo = await geocodeParisAddress(addressOnly)
+    }
     lat = geo.lat
     lng = geo.lng
     if (!address) address = geo.displayName
+
   }
 
   const name = details?.name || input.name
@@ -74,17 +95,35 @@ export async function resolveHotelCandidate(input: {
 
   return {
     id: `hotel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    googlePlaceId: details?.id || input.googlePlaceId,
+    bookingHotelId: details?.id || input.bookingHotelId,
+    googlePlaceId: input.googlePlaceId,
     name,
     area,
     address: address || `${name}, Paris`,
     description:
       input.description ||
-      details?.summary ||
+      details?.description ||
       `${name}，适合作为巴黎行程住宿起点。`,
     priceHint: hint,
     nearestMetro: input.nearestMetro || '请确认最近地铁站',
-    image: details?.photos?.[0] || FALLBACK_HOTEL_IMAGE,
+    image: details?.image || details?.photos[0] || FALLBACK_HOTEL_IMAGE,
+    photos: details?.photos,
+    rating: details?.rating,
+    reviewCount: details?.reviewCount,
+    starRating: details?.stars,
+    facilities: details?.facilities,
+    reviews: details?.reviews.map((review) => ({
+      text: review.text,
+      negativeText: review.negativeText,
+      rating: review.rating,
+      author: review.author,
+      relativeTime: review.completedAt
+        ? new Date(review.completedAt * 1_000).toLocaleDateString('zh-CN')
+        : undefined,
+    })),
+    checkIn: details?.checkIn,
+    checkOut: details?.checkOut,
+    bookingUrl: details?.sourceUrl,
     lat,
     lng,
     reason: input.reason,
@@ -95,6 +134,7 @@ export async function resolveHotelCandidate(input: {
 
 export async function resolveHotelCandidates(
   rows: Array<{
+    bookingHotelId?: string
     googlePlaceId?: string
     name: string
     address?: string
@@ -107,17 +147,9 @@ export async function resolveHotelCandidates(
   }>,
 ): Promise<HotelCandidate[]> {
   const settled = await Promise.allSettled(
-    rows.map((row) =>
-      resolveHotelCandidate({
-        ...row,
-        source: 'llm',
-      }),
-    ),
+    rows.map((row) => resolveHotelCandidate({ ...row, source: 'llm' })),
   )
-
-  const out: HotelCandidate[] = []
-  for (const result of settled) {
-    if (result.status === 'fulfilled') out.push(result.value)
-  }
-  return out
+  return settled.flatMap((result) =>
+    result.status === 'fulfilled' ? [result.value] : [],
+  )
 }

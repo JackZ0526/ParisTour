@@ -31,6 +31,12 @@ import {
   loadRecommendationPreferences,
   saveRecommendationPreferences,
 } from '../../place/services/recommendationPreferences'
+import {
+  clearMapRouteCache,
+  loadMapRouteCache,
+  saveMapRouteCache,
+  type MapRouteCacheMap,
+} from '../../map/services/mapRouteCache'
 
 export const TRIP_SNAPSHOT_VERSION = 1 as const
 
@@ -44,6 +50,8 @@ export type TripSnapshot = {
   itinerary: PersistedItineraryState | null
   baseline: PersistedBaselineState | null
   recommendationPreferences?: RecommendationPreferences | null
+  /** Cached openrouteservice geometries, shared across devices with the trip. */
+  mapRoutes?: MapRouteCacheMap | null
   /**
    * Durable generated artifacts (place narratives, recommendations,
    * translations, Google place payloads, …), kept under the legacy field name.
@@ -61,6 +69,7 @@ export function emptyTripSnapshot(): TripSnapshot {
     itinerary: null,
     baseline: null,
     recommendationPreferences: loadRecommendationPreferences(),
+    mapRoutes: {},
     llmArtifacts: {},
   }
 }
@@ -89,6 +98,7 @@ export function collectTripSnapshot(): TripSnapshot {
         : null,
     baseline,
     recommendationPreferences: loadRecommendationPreferences(),
+    mapRoutes: loadMapRouteCache(),
     llmArtifacts: Object.keys(llmArtifacts).length ? llmArtifacts : {},
   }
 }
@@ -151,15 +161,25 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
     clearRecommendationPreferences()
   }
 
+  clearMapRouteCache()
+  if (snap.mapRoutes && typeof snap.mapRoutes === 'object') {
+    saveMapRouteCache(snap.mapRoutes)
+  }
+
   const artifacts = snap.llmArtifacts
   if (artifacts && typeof artifacts === 'object') {
-    // Present in snapshot (including explicit empty) — replace local durable store.
-    saveLlmArtifacts(artifacts, { silent: true })
-    seedMemoFromArtifacts(artifacts)
+    hydrateTripArtifacts(artifacts)
   } else {
     // Legacy snapshot without llmArtifacts — keep whatever is already local.
     seedMemoFromArtifacts(loadLlmArtifacts())
   }
+}
+
+/** Replace local durable artifacts from a cloud row without treating it as a local edit. */
+export function hydrateTripArtifacts(map: LlmArtifactMap | null | undefined) {
+  const artifacts = map && typeof map === 'object' ? map : {}
+  saveLlmArtifacts(artifacts, { silent: true })
+  seedMemoFromArtifacts(artifacts)
 }
 
 export function clearLocalTripStorage() {

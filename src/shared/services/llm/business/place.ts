@@ -16,7 +16,7 @@ import {
 } from '../prompts'
 import { LlmRequestError } from '../errors'
 import { callOpenAIMessagesStream } from '../transport'
-import { extractPartialJsonStringField } from '../stream'
+import { extractPartialJsonStringField, openaiResponsesWithWebSearch } from '../stream'
 import { extractJsonObject } from '../json'
 import {
   recommendationPreferencesPrompt,
@@ -29,11 +29,213 @@ import type {
   VerifiedPlaceCandidate,
 } from '../types'
 import { generateText, isLlmConfigured } from './_service'
+import { officialWebsiteFromCandidate } from '../../../../../api/_lib/websitePhotos'
 
 export type {
   RecommendPlaceType,
   PlaceRecommendation,
   VerifiedPlaceCandidate,
+}
+
+function parseOfficialWebsiteFromLlm(text: string): string | null {
+  const json = extractJsonObject(text)
+  const fromJson = typeof json?.website === 'string' ? json.website.trim() : ''
+  const fromText = text.match(/https?:\/\/[^\s"'<>]+/i)?.[0] || ''
+  return officialWebsiteFromCandidate(fromJson || fromText)
+}
+
+/**
+ * Web-search fallback when Google `websiteUri` is missing, a social page,
+ * or otherwise unusable. Returns a first-party https URL or null.
+ * Cached durably so opening the same place does not search again.
+ */
+export async function resolveOfficialWebsite(input: {
+  name: string
+  nameLocal?: string
+  address?: string
+  googleWebsite?: string
+}): Promise<string | null> {
+  if (!isLlmConfigured()) return null
+  const name = input.name.trim()
+  if (!name) return null
+  const key = `place-official-website:v1:${name}|${input.nameLocal || ''}|${input.address || ''}`
+  const hit = await memoizeLlmCall(
+    key,
+    async () => {
+      const research = await openaiResponsesWithWebSearch({
+        instructions: buildPrompt(
+          '查找商家自己的官方网站。只根据检索到的公开结果作答，禁止编造域名。',
+          null,
+          `<hard_rules>
+- 只要该店自己的官网（他们自己的域名）。
+- 不要 Google Maps、Tripadvisor、Yelp、TheFork、Booking、Instagram、Facebook、Wikipedia。
+- 若 Google 给的网址是社交主页、404 或不存在，改找真正的官网。
+- 不确定就返回 null。
+</hard_rules>`,
+          jsonContract(
+            '{ website: "https://..." | null }',
+            '{ "website": "https://www.rest-maxan.com/" }',
+          ),
+        ),
+        user: [
+          `地点：${name}`,
+          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
+          input.address ? `地址：${input.address}` : '',
+          input.googleWebsite ? `Google websiteUri：${input.googleWebsite}` : 'Google 未提供 websiteUri',
+          '输出 JSON：{"website":"https://..."} 或 {"website":null}',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      })
+      return { website: parseOfficialWebsiteFromLlm(research.text) }
+    },
+    { durable: true },
+  )
+  return hit.website
+}
+
+export interface TripadvisorRestaurantListing {
+  url?: string
+  contentId?: string
+  name?: string
+}
+
+function parseTripadvisorRestaurantListing(
+  text: string,
+): TripadvisorRestaurantListing | null {
+  const json = extractJsonObject(text)
+  const urlRaw = json?.url || json?.tripadvisorUrl
+  const urlFromJson = typeof urlRaw === 'string' && urlRaw.trim() ? urlRaw.trim() : ''
+  const urlFromText =
+    text.match(
+      /https?:\/\/[^\s"'<>]*tripadvisor\.[^\s"'<>]*Restaurant_Review[^\s"'<>]*/i,
+    )?.[0] || ''
+  const url = urlFromJson || urlFromText
+  if (!url) return null
+  const contentId = url.match(
+    /(?:Restaurant_Review)-[^/\s"'<>]*?-d(\d{5,})/i,
+  )?.[1]
+  if (!contentId) return null
+  const nameRaw = json?.name || json?.title
+  const name = typeof nameRaw === 'string' && nameRaw.trim() ? nameRaw.trim() : undefined
+  return { url, contentId, name }
+}
+
+/**
+ * Last-resort Tripadvisor restaurant identity when auto-complete only returns
+ * hotels/cities. Returns a listing URL / contentId, or null when unsure.
+ */
+export async function resolveTripadvisorRestaurantListing(input: {
+  name: string
+  nameLocal?: string
+  address?: string
+  city?: string
+}): Promise<TripadvisorRestaurantListing | null> {
+  if (!isLlmConfigured()) return null
+  const name = input.name.trim()
+  if (!name) return null
+  const city = input.city?.trim() || ''
+  const key = `tripadvisor-restaurant-listing:v2:${name}|${input.nameLocal || ''}|${input.address || ''}|${city}`
+  const hit = await memoizeLlmCall(
+    key,
+    async () => {
+      const research = await openaiResponsesWithWebSearch({
+        instructions: buildPrompt(
+          '查找这家餐厅在 Tripadvisor 上的餐厅详情页。只根据检索到的公开结果作答，禁止编造。',
+          null,
+          `<hard_rules>
+- 只要 tripadvisor.com / tripadvisor.fr 的 Restaurant_Review 链接，且 URL 里必须带 -d 数字 id（例如 -d5943832-）。
+- 不要酒店、景点、城市页，也不要搜索结果页。
+- 店名和地址必须能对上；不确定就返回 {"url":null}。
+- 禁止编造 URL，也禁止只输出 contentId / locationId 数字。
+</hard_rules>`,
+          jsonContract(
+            '{ url: "https://www.tripadvisor.com/Restaurant_Review-..." | null, name?: string }',
+            '{ "url": "https://www.tripadvisor.com/Restaurant_Review-g187147-d698123-Reviews-Bouillon_Chartier-Paris_Ile_de_France.html", "name": "Bouillon Chartier" }',
+          ),
+        ),
+        user: [
+          `地点：${name}`,
+          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
+          input.address ? `地址：${input.address}` : '',
+          city ? `城市：${city}` : '',
+          '输出 JSON：{"url":"https://www.tripadvisor.com/Restaurant_Review-...","name":"..."} 或 {"url":null}',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      })
+      return { listing: parseTripadvisorRestaurantListing(research.text) }
+    },
+    { durable: true },
+  )
+  return hit.listing
+}
+
+export interface AttractionCanonicalName {
+  nameEn: string
+  nameFr?: string
+  aliases: string[]
+}
+
+function parseAttractionCanonicalName(text: string): AttractionCanonicalName | null {
+  const json = extractJsonObject(text)
+  if (!json) return null
+  const nameEn = String(json.nameEn || json.name || '').trim()
+  if (!nameEn || /[\u3400-\u9fff]/.test(nameEn)) return null
+  const nameFr = String(json.nameFr || json.nameLocal || '').trim() || undefined
+  const aliases = Array.isArray(json.aliases)
+    ? json.aliases
+        .map((value) => String(value || '').trim())
+        .filter((value) => value && value !== nameEn && value !== nameFr)
+    : []
+  return { nameEn, nameFr, aliases }
+}
+
+/**
+ * Last-resort identity for attractions whose Chinese / nickname / qualified
+ * label does not match Tripadvisor. Returns a Latin listing name, or null
+ * when the model is not sure. Callers must still verify via catalog or
+ * Tripadvisor autocomplete — never trust this name alone.
+ */
+export async function resolveAttractionCanonicalName(input: {
+  name: string
+  nameLocal?: string
+}): Promise<AttractionCanonicalName | null> {
+  if (!isLlmConfigured()) return null
+  const name = input.name.trim()
+  if (!name) return null
+  const key = `attraction-canonical-name:v1:${name}|${input.nameLocal || ''}`
+  return memoizeLlmCall(
+    key,
+    async () => {
+      const text = await generateText(
+        buildPrompt(
+          '把旅行者口中的巴黎景点名称解析成 Tripadvisor 上常用的正式名称。',
+          null,
+          `<hard_rules>
+- 只处理巴黎都会区的真实景点、博物馆、街道、公园。
+- nameEn 必须是拉丁字母的常用英文名（Tripadvisor 列表里会出现的那种，例如 "Champs-Elysees"、"Pont Neuf"、"Eiffel Tower"）。
+- 不确定、不是景点、或找不到对应地点时返回 {"nameEn":null}。
+- 禁止编造不存在的景点。
+</hard_rules>`,
+          jsonContract(
+            '{ nameEn: string | null, nameFr?: string, aliases?: string[] }',
+            '{ "nameEn": "Champs-Elysees", "nameFr": "Avenue des Champs-Élysées", "aliases": ["Champs-Élysées"] }',
+          ),
+        ),
+        [
+          `地点：${name}`,
+          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
+          '城市：Paris',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        { json: true, task: 'placeName' },
+      )
+      return parseAttractionCanonicalName(text || '')
+    },
+    { durable: true },
+  )
 }
 
 /** Cheap, always-cached place blurb. */
@@ -69,6 +271,72 @@ export async function generatePlaceDescription(input: {
   )
 }
 
+function placeDetailKind(type: string): 'attraction' | 'food' | 'other' {
+  const t = type.trim().toLowerCase()
+  if (
+    t === 'attraction' ||
+    t.includes('attraction') ||
+    t.includes('景点') ||
+    t.includes('博物馆') ||
+    t.includes('museum')
+  ) {
+    return 'attraction'
+  }
+  if (
+    t === 'restaurant' ||
+    t === 'cafe' ||
+    t.includes('restaurant') ||
+    t.includes('cafe') ||
+    t.includes('餐') ||
+    t.includes('咖啡')
+  ) {
+    return 'food'
+  }
+  return 'other'
+}
+
+function placeDetailHardRules(kind: 'attraction' | 'food' | 'other'): string {
+  if (kind === 'attraction') {
+    return `<hard_rules>
+- intro：详细、结构清晰的中文简介，2–3 小段，段与段用换行分隔，不要小标题或项目符号。
+  第一段写清楚这是什么地方，以及历史、建造缘由或相关故事；
+  第二段写主要看点、空间气质与参观体验。可吸收 existingDescription 与 listingDescription，不要整段照抄英文。
+- reason：2–3 句。综合参观价值、featuredReviews 里的游客评价要点、以及当天行程主题/节奏/前后停点。不要罗列评论原文。
+- tripFit：固定输出空字符串（地点详情页不展示此项）。
+- 不要推荐卢浮宫或凡尔赛；不要编造精确年代、营业时间、票价或欧元数字。
+- 推荐理由不要出现 Tripadvisor、Google 等产品名。
+- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
+</hard_rules>`
+  }
+  if (kind === 'food') {
+    return `<hard_rules>
+- intro：介绍这家餐厅/咖啡馆的位置或片区、菜系或品类、资料或评论里提到的特色菜/招牌、以及价格档（只用 priceLevel；没有则不要编造具体欧元数字）。1–2 小段，换行分段，不要小标题。
+- reason：2–3 句。综合评论口碑、与当天行程的衔接（餐点时段与路线）、以及性价比。不要罗列评论原文。
+- tripFit：固定输出空字符串（地点详情页不展示此项）。
+- 不要推荐卢浮宫或凡尔赛；不要编造营业时间、菜单或未提供的价格。
+- 推荐理由不要出现 Tripadvisor、Google 等产品名。
+- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
+</hard_rules>`
+  }
+  return `<hard_rules>
+- intro：2–3 句中文简介，写清这是什么、氛围与适合谁。
+- reason：2–3 句，结合当天行程说明为何值得安排。
+- tripFit：固定输出空字符串。
+- 不要编造营业时间与价格；不要出现 Tripadvisor、Google 等产品名。
+- 字段顺序：先写 intro，再写 reason。
+</hard_rules>`
+}
+
+function placeDetailExample(kind: 'attraction' | 'food' | 'other'): string {
+  if (kind === 'attraction') {
+    return '{ "intro": "凯旋门是拿破仑为纪念法国军队胜利下令建造的纪念碑，矗立在星形广场中央，十二条大道从这里向外辐射。门身上的浮雕与阵亡将士名字，把帝国战争的荣耀与代价刻在同一座石头上。\\n\\n登顶可以把香榭丽舍与拉德芳斯尽收眼底；地面的无名战士墓与长明火，让参观不只是看景，也是一次对历史的停留。", "reason": "作为右岸经典日的视觉锚点，它把轴线、城市尺度和仪式感一次讲清楚。游客普遍觉得登顶视野值得排队，安排在当天博物馆之间也能把节奏拉开。", "tripFit": "" }'
+  }
+  if (kind === 'food') {
+    return '{ "intro": "斯菲尔在玛黑区，主打现代法餐小馆，评论里常点季节蔬菜与海鲜前菜。价格大约在 €€，适合当作白天行程之间的正餐，而不是米其林式的仪式感。", "reason": "食客普遍称赞出品稳定、座位相对安静；放在今天右岸经典日的午餐档，能把博物馆人流和晚餐分开。同区里性价比更扎实，排队通常可控。", "tripFit": "" }'
+  }
+  return '{ "intro": "塞纳河畔的经典停留点，适合放慢脚步看城市尺度。", "reason": "和今天的路线顺路，当作转换节奏的短停即可。", "tripFit": "" }'
+}
+
 /** Rich place narrative for the detail popup (same structure as hotel). */
 export async function generatePlaceDetailCopy(input: {
   name: string
@@ -76,7 +344,14 @@ export async function generatePlaceDetailCopy(input: {
   type: string
   address?: string
   existingDescription?: string
+  listingDescription?: string
   stopNote?: string
+  rating?: number
+  reviewCount?: number
+  priceLevel?: string
+  cuisine?: string
+  featuredReviews?: Array<{ text: string; rating?: number; author?: string }>
+  nearbyStops?: Array<{ name: string; type: string }>
   day?: number
   dayTitle?: string
   dayTheme?: string
@@ -89,19 +364,14 @@ export async function generatePlaceDetailCopy(input: {
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
+  const kind = placeDetailKind(input.type)
   const system = buildPrompt(
-    '旅行顾问。为地点详情页写简洁中文点评。',
+    '旅行顾问。为地点详情页写中文点评。',
     null,
-    `<hard_rules>
-- intro：2–3 句地点简介（氛围、看点、适合谁），可吸收 existingDescription。
-- reason：1–2 句说明为何值得放进行程 / 为何出现在当天；可参考 stopNote。
-- tripFit：固定输出空字符串（地点详情页不展示此项）。
-- 不要推荐卢浮宫或凡尔赛；不要编造营业时间与价格。
-- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
-</hard_rules>`,
+    placeDetailHardRules(kind),
     jsonContract(
       '{ intro: "string", reason: "string", tripFit: "" }',
-      '{ "intro": "塞纳河畔的玻璃金字塔入口，馆藏横跨古典与近东。", "reason": "适合安排在右岸经典日的上午，避开下午人流高峰。", "tripFit": "" }',
+      placeDetailExample(kind),
     ),
   )
   const user = JSON.stringify({
@@ -111,8 +381,19 @@ export async function generatePlaceDetailCopy(input: {
       type: input.type,
       address: input.address || '',
       existingDescription: input.existingDescription || '',
+      listingDescription: input.listingDescription || '',
       stopNote: input.stopNote || '',
+      rating: input.rating ?? null,
+      reviewCount: input.reviewCount ?? null,
+      priceLevel: input.priceLevel || '',
+      cuisine: input.cuisine || '',
     },
+    featuredReviews: (input.featuredReviews || []).slice(0, 6).map((review) => ({
+      author: review.author || '',
+      rating: review.rating ?? null,
+      text: String(review.text || '').slice(0, 400),
+    })),
+    nearbyStops: input.nearbyStops || [],
     currentDay: {
       day: input.day || null,
       title: input.dayTitle || '',

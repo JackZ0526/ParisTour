@@ -15,7 +15,7 @@
 | `hotel/` | 酒店推荐 + 缓存 + 区域解析 | `HotelPicker` |
 | `itinerary/` | 多日行程生成 + 时间线 | `DayTimeline`, `TripDatesPanel`, `useDayNav` |
 | `place/` | 地点详情 + 点评 + 翻译 | `AddPlaceDialog`, `PlacePanel`, `GooglePlacePage` |
-| `map/` | Google Maps 集成 | `TripMap`, `GoogleMapsProvider` |
+| `map/` | MapLibre / OpenStreetMap 地图与道路路线 | `TripMap`, `openRouteService` |
 | `chat/` | 行程助手对话 + LLM model picker | `TripChatPanel`, `LlmModelPicker`, `InlineMarkdown` |
 
 ## 跨 feature 复用

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Clock3 } from 'lucide-react'
 
 interface Props {
   value: string
@@ -217,17 +218,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         ].join(' ')}
       >
         <span className="tabular-nums text-[var(--ink)]">{value}</span>
-        <svg
-          aria-hidden
-          viewBox="0 0 20 20"
-          className="h-4 w-4 shrink-0 text-[var(--sage)]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-        >
-          <circle cx="10" cy="10" r="7" />
-          <path d="M10 6v4l2.75 1.75" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Clock3 className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
       </button>
       {panel}
     </div>

@@ -14,7 +14,7 @@
 - **AI 行程生成**：按航班、酒店与偏好生成多日行程；支持单日重排
 - **TripChat**：自然语言改行程（加/换地点、调酒店、切日等）
 - **地点添加**：LLM 推荐或 Google 搜索；地点详情、照片与评论
-- **地图与导航**：Google Maps 展示当日路线；Directions；航班优先 TimeTable Lookup
+- **地图与导航**：MapLibre + OpenStreetMap 展示当日地图；openrouteservice 生成道路连线；Google Maps 免密钥导航链接
 - **酒店 / 航班**：酒店区位推荐与选择；航班模板与实时班次查询
 
 ## 技术栈
@@ -22,7 +22,7 @@
 | 层 | 技术 |
 |----|------|
 | 前端 | Vite · React 19 · TypeScript · Tailwind CSS v4 |
-| 地图 | Google Maps（`@react-google-maps/api`）；Leaflet 备用 |
+| 地图 | MapLibre GL JS + OpenStreetMap；openrouteservice 道路几何 |
 | 后端 / 数据 | Supabase（Auth · Postgres · Realtime · RLS） |
 | API 代理 | Vercel Serverless（`/api/*`）：OpenAI、Gemini、RapidAPI、分享邮件 |
 | 邮件 | Resend（可选；未配置时可复制邀请链接） |
@@ -57,6 +57,7 @@ npm run dev
 # --- 服务端（不要加 VITE_ 前缀）---
 RAPIDAPI_KEY=              # 航班：TimeTable Lookup / AeroDataBox
 DEEPSEEK_API_KEY=          # 默认优先的大模型（行程、聊天、推荐）
+OPENROUTESERVICE_API_KEY=  # 行程地图道路几何（仅服务端）
 # DEEPSEEK_BASE_URL=       # 可选，默认 https://api.deepseek.com/v1
 OPENAI_API_KEY=            # 可选，模型选择器中的 OpenAI 模型
 # OPENAI_BASE_URL=         # 可选，默认 https://api.openai.com/v1
@@ -70,19 +71,19 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- 浏览器（VITE_）---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_MAPS_API_KEY=
+VITE_GOOGLE_MAPS_API_KEY=  # 仅 Google Places 照片/embed；不加载行程地图
 # VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # 默认 DeepSeek 模型（或 deepseek-v4-pro）
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # 覆盖为 OpenAI 模型
 # VITE_LLM_ENABLED=true              # false 可隐藏 LLM 能力
 ```
 
-Google Cloud 建议启用：**Maps JavaScript API**、**Places API (New)**、**Directions API**。HTTP 引荐来源请同时加入：
+行程地图不再使用 Maps JavaScript API 或 Directions API。浏览器端 Google 密钥只用于 Google Places 照片/embed，请启用对应的 Places API，并加入这些 HTTP 引荐来源：
 
 - `http://127.0.0.1:5173/*`
 - `http://localhost:5173/*`
 - `https://paristour.vercel.app/*`
 
-本地若出现 `RefererNotAllowedMapError`，就是缺了上面某一条。
+本地若出现 Google Places 引荐来源错误，就是缺了上面某一条。道路连线需在 [HeiGIT](https://account.heigit.org/) 创建 openrouteservice 密钥，并仅保存为服务端变量 `OPENROUTESERVICE_API_KEY`。
 
 Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + 白名单。未配置 `RESEND_API_KEY` 时分享仍可用，界面会提示手动复制邀请链接。
 

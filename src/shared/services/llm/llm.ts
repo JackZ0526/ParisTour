@@ -120,6 +120,7 @@ export { extractLlmJsonObject, extractJsonObject } from './json'
 export {
   cleanQueryString,
   consumeResponsesStream,
+  extractPartialJsonStringArray,
   extractPartialJsonStringField,
   extractWebSearchQueries,
   openaiResponsesWithWebSearch,
@@ -166,10 +167,15 @@ export {
   generatePlaceDetailCopy,
   generateDayCopy,
   recommendPlacesForDay,
+  resolveOfficialWebsite,
+  resolveTripadvisorRestaurantListing,
+  resolveAttractionCanonicalName,
+  type AttractionCanonicalName,
 } from './business/place'
 
 export {
   generateHotelDetailCopy,
+  generateHotelCardBlurb,
   recommendHotelsForTrip,
   type HotelRecommendation,
 } from './business/hotel'

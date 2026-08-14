@@ -158,7 +158,7 @@ export interface VerifiedPlaceCandidate {
 }
 
 export interface HotelRecommendation {
-  googlePlaceId?: string
+  bookingHotelId?: string
   name: string
   area: string
   address?: string
@@ -184,6 +184,7 @@ export type PlaceTypeForItinerary =
 export interface FullItineraryPlaceDraft {
   key: string
   googlePlaceId?: string
+  googleAddress?: string
   name: string
   nameLocal?: string
   type: PlaceTypeForItinerary

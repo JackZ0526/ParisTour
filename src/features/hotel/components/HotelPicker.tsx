@@ -1,5 +1,7 @@
 import {
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,13 +15,75 @@ import {
   refreshHotelCandidates,
 } from '../services/hotelRecommend'
 import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
-import { generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
+import {
+  hydrateHotelAdvisorFromCache,
+  memoizeHotelAdvisorCopy,
+  rememberHotelAdvisorCopy,
+} from '../services/hotelAdvisorMemo'
+import { generateHotelCardBlurb, generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
+import { looksChinese } from '../../chat/services/translate'
 import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
 import type { DayPlan, HotelCandidate, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
+import { HotelLocationDescription } from './HotelLocationDescription'
+import { HotelExpandablePolicyList, HotelTranslatedText } from './hotelTranslation'
+import { ShimmerLines } from '../../../shared/components/ShimmerLines'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
+import { GoogleReviewsList } from '../../place/components/GoogleReviewsList'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import {
+  fetchBookingHotelFeaturedReviews,
+  fetchBookingHotelDetails,
+  fetchBookingHotelPhotos,
+  isBookingApiEnabled,
+  bookingPhotoUrl,
+  resolveBookingHotelIdentity,
+} from '../services/bookingHotels'
+import {
+  hotelScoreText,
+  localizeFacility,
+  localizePaymentMethod,
+  localizePropertyType,
+} from '../utils/hotelDisplay'
+import {
+  Accessibility,
+  ArrowUpDown,
+  BarChart3,
+  Bath,
+  Bed,
+  Bell,
+  Building2,
+  Check,
+  ChevronDown,
+  CircleMinus,
+  CircleParking,
+  CigaretteOff,
+  Coffee,
+  Dumbbell,
+  ExternalLink,
+  Flame,
+  Info,
+  Lock,
+  Luggage,
+  MapPin,
+  MessageSquareQuote,
+  PawPrint,
+  Refrigerator,
+  ShowerHead,
+  Snowflake,
+  Sparkles,
+  Trees,
+  Trash2,
+  Tv,
+  Utensils,
+  WashingMachine,
+  Waves,
+  Wifi,
+  Wind,
+  Wine,
+  type LucideIcon,
+} from 'lucide-react'
+import { loadTripDates } from '../../itinerary/services/tripDates'
 
 interface Props {
   selected: SelectedHotel
@@ -30,10 +94,13 @@ interface Props {
   readOnly?: boolean
   /** Fired when hotel GooglePlacePage opens/closes (for trip chat viewing context). */
   onDetailChange?: (hotel: HotelCandidate | null) => void
+  /** Increment to open the selected hotel's Booking detail overlay. */
+  openSelectedDetailToken?: number
 }
 
 /** Match DayTimeline float settle. */
 const HOTEL_DRAG_SETTLE_MS = 200
+const BOOKING_DETAILS_VERSION = 6
 /** Start float after this pointer travel so clicks still open the card. */
 const HOTEL_DRAG_THRESHOLD_PX = 6
 /** Viscous follow — same language as DayTimeline tickFloat. */
@@ -62,98 +129,775 @@ function pointInRect(x: number, y: number, rect: DOMRect) {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 }
 
-function HotelCardFace({ hotel }: { hotel: HotelCandidate }) {
+function needsCustomCardBlurb(hotel: HotelCandidate): boolean {
+  if (hotel.source !== 'custom') return false
+  const reason = hotel.reason?.trim() || ''
+  if (!reason) return true
+  return /^替换[「『"]/.test(reason)
+}
+
+function HotelCardFace({
+  hotel,
+  blurb,
+  blurbLoading,
+}: {
+  hotel: HotelCandidate
+  blurb?: string
+  blurbLoading?: boolean
+}) {
+  const customText = (blurb || hotel.reason || '').trim()
+  const showCustomShimmer = hotel.source === 'custom' && blurbLoading && !customText
+
   return (
     <>
       <GooglePlacePhoto
         name={hotel.name}
         location={{ lat: hotel.lat, lng: hotel.lng }}
-        fallback={hotel.image}
+        fallback={bookingPhotoUrl(hotel.image)}
         alt={hotel.name}
         asBackground
         className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
       />
-      <div className="space-y-1 p-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
-          {hotel.isBest && (
-            <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
-              最优推荐
-            </span>
-          )}
-          {hotel.source === 'custom' && (
-            <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
-              自定义
-            </span>
+      <div className="flex min-h-[7.75rem] flex-col p-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
+            {hotel.isBest && (
+              <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
+                最优推荐
+              </span>
+            )}
+            {hotel.source === 'custom' && (
+              <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
+                自定义
+              </span>
+            )}
+          </div>
+          <p className="font-medium leading-snug">{hotel.name}</p>
+          {showCustomShimmer ? (
+            <ShimmerLines lines={2} />
+          ) : hotel.source === 'custom' ? (
+            <p className="m-0 line-clamp-2 text-xs text-[var(--stone)]">{customText}</p>
+          ) : (
+            <HotelTranslatedText
+              text={hotel.reason || hotel.description}
+              loadingLabel="正在翻译酒店简介…"
+              className="line-clamp-2 text-xs text-[var(--stone)]"
+            />
           )}
         </div>
-        <p className="font-medium leading-snug">{hotel.name}</p>
-        <p className="line-clamp-2 text-xs text-[var(--stone)]">
-          {hotel.reason || hotel.description}
-        </p>
-        <p className="text-xs text-[var(--stone)]">{hotel.priceHint}</p>
+        {hotel.rating != null && (
+          <p className="mt-auto flex justify-end pt-2 text-right text-xs leading-tight text-[var(--stone)]">
+            <span>
+              <span className="font-medium">
+                <span className="text-[#003580]">Booking</span>
+                <span className="text-[#006ce4]">.com</span>
+              </span>
+              <span className="ml-1 tabular-nums">
+                {hotel.rating.toFixed(1)}/10
+                {hotel.reviewCount != null ? `（${hotel.reviewCount}）` : ''}
+              </span>
+            </span>
+          </p>
+        )}
       </div>
     </>
   )
 }
 
 function TrashIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  )
+  return <Trash2 size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function UnselectIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M8 12h8" />
-    </svg>
-  )
+  return <CircleMinus size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function ChevronIcon({ up }: { up?: boolean }) {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <ChevronDown
+      size={14}
+      strokeWidth={1.8}
       aria-hidden
       className={`transition-transform duration-300 ${up ? 'rotate-180' : ''}`}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
+    />
+  )
+}
+
+function hasValidParisBookingIdentity(hotel: HotelCandidate): boolean {
+  return Boolean(
+    hotel.bookingHotelId &&
+      hotel.lat >= 48.65 &&
+      hotel.lat <= 49.05 &&
+      hotel.lng >= 1.95 &&
+      hotel.lng <= 2.7,
+  )
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: '英语', fr: '法语', es: '西班牙语', pt: '葡萄牙语', de: '德语',
+  'en-gb': '英语', 'en-us': '英语', it: '意大利语', zh: '中文', ja: '日语', ar: '阿拉伯语', ru: '俄语',
+  'pt-pt': '葡萄牙语',
+}
+
+function localizeLanguage(value: string): string {
+  return LANGUAGE_LABELS[value.trim().toLowerCase()] || value
+}
+
+function BookingSectionHeader({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: LucideIcon
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div className="mb-3 flex items-start gap-2">
+      <span className="mt-0.5 text-[#003b95]">
+        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <h4 className="text-base font-semibold">{title}</h4>
+        {subtitle ? <p className="mt-0.5 text-xs text-[var(--stone)]">{subtitle}</p> : null}
+      </div>
+    </div>
+  )
+}
+
+const HOTEL_FACT_ICONS = {
+  location: MapPin,
+} as const satisfies Record<string, LucideIcon>
+
+function HotelFactIcon({ type }: { type: keyof typeof HOTEL_FACT_ICONS }) {
+  const Icon = HOTEL_FACT_ICONS[type]
+  return (
+    <Icon
+      className="h-[18px] w-[18px] shrink-0"
+      strokeWidth={1.8}
+      aria-hidden
+    />
+  )
+}
+
+function resolveFacilityIcon(facility: string): LucideIcon {
+  const key = facility.trim().toLowerCase()
+  const label = localizeFacility(facility)
+  const haystack = `${key} ${label}`
+  if (/wifi|wi-fi|internet|网络/.test(haystack)) return Wifi
+  if (/restaurant|dining|kitchen|餐厅/.test(haystack)) return Utensils
+  if (/minibar|迷你吧/.test(haystack)) return Wine
+  if (/bar|酒吧/.test(haystack)) return Wine
+  if (/breakfast|早餐/.test(haystack)) return Coffee
+  if (/non-smoking|smoke-free|禁烟/.test(haystack)) return CigaretteOff
+  if (/disabled|wheelchair|无障碍/.test(haystack)) return Accessibility
+  if (/front desk|24-hour|reception|前台/.test(haystack)) return Bell
+  if (/elevator|lift|电梯/.test(haystack)) return ArrowUpDown
+  if (/heating|暖气/.test(haystack)) return Flame
+  if (/laundry|洗衣/.test(haystack)) return WashingMachine
+  if (/parking|停车/.test(haystack)) return CircleParking
+  if (/pool|swimming|游泳/.test(haystack)) return Waves
+  if (/fitness|gym|健身/.test(haystack)) return Dumbbell
+  if (/air conditioning|空调/.test(haystack)) return Snowflake
+  if (/pet|宠物/.test(haystack)) return PawPrint
+  if (/hot tub|jacuzzi|按摩浴缸/.test(haystack)) return Sparkles
+  if (/shower|淋浴/.test(haystack)) return ShowerHead
+  if (/private bathroom|attached bathroom|独立浴室|\bbath\b|浴缸/.test(haystack)) return Bath
+  if (/flat-screen|television|\btv\b|电视/.test(haystack)) return Tv
+  if (/refrigerator|fridge|冰箱/.test(haystack)) return Refrigerator
+  if (/family room|bed|客房|床/.test(haystack)) return Bed
+  if (/safe|deposit box|保险箱/.test(haystack)) return Lock
+  if (/hairdryer|hair dryer|吹风机/.test(haystack)) return Wind
+  if (/baggage storage|行李寄存/.test(haystack)) return Luggage
+  if (/room service|客房服务/.test(haystack)) return Bell
+  if (/sauna|spa|水疗|桑拿/.test(haystack)) return Sparkles
+  if (/terrace|garden|露台|花园/.test(haystack)) return Trees
+  return Check
+}
+
+function FacilityItemIcon({ facility }: { facility: string }) {
+  const Icon = resolveFacilityIcon(facility)
+  return (
+    <Icon
+      className="h-[18px] w-[18px] shrink-0 text-[#008009]"
+      strokeWidth={1.8}
+      aria-hidden
+    />
+  )
+}
+
+const REVIEW_SCORE_ANIM_DURATION_MS = 1500
+const REVIEW_SCORE_ANIM_STAGGER_MS = 100
+const reviewScoreEase = cubicBezier(0.22, 1, 0.36, 1)
+
+function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  return (t: number): number => {
+    let cx = t
+    for (let i = 0; i < 8; i++) {
+      const currentX =
+        3 * x1 * (1 - cx) * (1 - cx) * cx +
+        3 * x2 * (1 - cx) * cx * cx +
+        cx * cx * cx
+      const slope =
+        3 * x1 * (1 - cx) * (1 - cx) -
+        6 * x1 * (1 - cx) * cx +
+        6 * x2 * (1 - cx) * cx -
+        3 * x2 * cx * cx +
+        3 * cx * cx
+      const delta = currentX - t
+      if (Math.abs(delta) < 1e-6) break
+      cx -= delta / slope
+    }
+    return (
+      3 * y1 * (1 - cx) * (1 - cx) * cx +
+      3 * y2 * (1 - cx) * cx * cx +
+      cx * cx * cx
+    )
+  }
+}
+
+function ReviewScoreBarItem({
+  label,
+  score,
+  start,
+  delayMs,
+  highlighted,
+  className,
+}: {
+  label: string
+  score: number
+  start: boolean
+  delayMs: number
+  highlighted: boolean
+  className: string
+}) {
+  const [displayScore, setDisplayScore] = useState(0)
+  const [widthPct, setWidthPct] = useState(0)
+  const completedRef = useRef(false)
+
+  useEffect(() => {
+    completedRef.current = false
+  }, [score, delayMs])
+
+  useEffect(() => {
+    if (!start) {
+      if (!completedRef.current) {
+        setDisplayScore(0)
+        setWidthPct(0)
+      }
+      return
+    }
+
+    if (completedRef.current) return
+
+    const targetWidth = Math.min(100, score * 10)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplayScore(score)
+      setWidthPct(targetWidth)
+      completedRef.current = true
+      return
+    }
+
+    let raf = 0
+    const timeout = window.setTimeout(() => {
+      const startTime = performance.now()
+      const tick = (now: number) => {
+        const progress = Math.min(1, (now - startTime) / REVIEW_SCORE_ANIM_DURATION_MS)
+        const eased = reviewScoreEase(progress)
+        setDisplayScore(score * eased)
+        setWidthPct(targetWidth * eased)
+        if (progress < 1) {
+          raf = requestAnimationFrame(tick)
+        } else {
+          completedRef.current = true
+        }
+      }
+      raf = requestAnimationFrame(tick)
+    }, delayMs)
+
+    return () => {
+      clearTimeout(timeout)
+      cancelAnimationFrame(raf)
+    }
+  }, [start, score, delayMs])
+
+  return (
+    <div className={className}>
+      <div className="mb-1 flex justify-between text-xs">
+        <span>{label}</span>
+        <span
+          className={`inline-block origin-right font-semibold tabular-nums transition-all duration-500 ease-out ${
+            highlighted ? 'scale-125 text-[var(--gold)]' : 'scale-100'
+          }`}
+        >
+          {displayScore.toFixed(1)}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-[#dbe7f6]">
+        <div
+          className={`h-full rounded-full transition-colors duration-500 ease-out ${
+            highlighted ? 'bg-[var(--gold)]' : 'bg-[#006ce4]'
+          }`}
+          style={{ width: `${widthPct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ReviewScoreBars({
+  items,
+  layoutClassName,
+  itemClassName,
+}: {
+  items: Array<{ label: string; score: number }>
+  layoutClassName: string
+  itemClassName: string
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const animatedKeyRef = useRef<string | null>(null)
+  const [animate, setAnimate] = useState(false)
+  const [highlightTop, setHighlightTop] = useState(false)
+  const itemsKey = items.map((item) => `${item.label}:${item.score}`).join('|')
+
+  const topLabel = (() => {
+    if (items.length === 0) return null
+    const maxScore = Math.max(...items.map((item) => item.score))
+    return items.find((item) => item.score === maxScore)?.label ?? null
+  })()
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    if (animatedKeyRef.current === itemsKey) {
+      setAnimate(true)
+      setHighlightTop(true)
+      return
+    }
+
+    setAnimate(false)
+    setHighlightTop(false)
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setAnimate(true)
+      setHighlightTop(true)
+      animatedKeyRef.current = itemsKey
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setAnimate(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -24px 0px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [itemsKey])
+
+  useEffect(() => {
+    if (!animate || !topLabel) return
+    if (animatedKeyRef.current === itemsKey) return
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setHighlightTop(true)
+      animatedKeyRef.current = itemsKey
+      return
+    }
+
+    const totalMs =
+      (items.length - 1) * REVIEW_SCORE_ANIM_STAGGER_MS + REVIEW_SCORE_ANIM_DURATION_MS
+    const timeout = window.setTimeout(() => {
+      setHighlightTop(true)
+      animatedKeyRef.current = itemsKey
+    }, totalMs)
+    return () => clearTimeout(timeout)
+  }, [animate, items.length, itemsKey, topLabel])
+
+  return (
+    <div ref={containerRef} className={layoutClassName}>
+      {items.map((item, index) => (
+        <ReviewScoreBarItem
+          key={item.label}
+          label={item.label}
+          score={item.score}
+          start={animate}
+          delayMs={index * REVIEW_SCORE_ANIM_STAGGER_MS}
+          highlighted={highlightTop && item.label === topLabel}
+          className={itemClassName}
+        />
+      ))}
+    </div>
+  )
+}
+
+function BookingHotelFacts({
+  hotel,
+  identityLoading,
+  identityError,
+  loading,
+  error,
+  onIdentityRetry,
+  onRetry,
+}: {
+  hotel: HotelCandidate
+  identityLoading: boolean
+  identityError: string | null
+  loading: boolean
+  error: string | null
+  onIdentityRetry: () => void
+  onRetry: () => void
+}) {
+  const [policiesExpanded, setPoliciesExpanded] = useState(false)
+  const [locationRevealed, setLocationRevealed] = useState(false)
+  const [policiesRevealed, setPoliciesRevealed] = useState(false)
+  const popularFacilities = hotel.facilities || []
+  const visibleLanguages = (hotel.languages || []).map(localizeLanguage)
+  const reviewScores = (hotel.reviewScores || []).filter((item) => item.score > 0)
+  const policies = hotel.policies || []
+  const paymentMethods = (hotel.paymentMethods || []).map(localizePaymentMethod)
+  const hasLocationDetails = Boolean(hotel.locationDescription)
+  const factsPending = identityLoading || loading
+  const locationNeedsTranslate = Boolean(
+    hotel.locationDescription &&
+      !looksChinese(hotel.locationDescription) &&
+      isLlmConfigured(),
+  )
+  const policiesNeedTranslate =
+    policies.some((policy) => !looksChinese(policy)) && isLlmConfigured()
+  const showLocationShimmer =
+    (factsPending && !hasLocationDetails) || (locationNeedsTranslate && !locationRevealed)
+  const showPolicySkeleton =
+    (factsPending && policies.length === 0) || (policiesNeedTranslate && !policiesRevealed)
+  const policiesKey = policies.join('\n---\n')
+
+  useLayoutEffect(() => {
+    setLocationRevealed(!locationNeedsTranslate)
+  }, [hotel.id, hotel.locationDescription, locationNeedsTranslate])
+
+  useLayoutEffect(() => {
+    setPoliciesRevealed(!policiesNeedTranslate)
+  }, [hotel.id, policiesKey, policiesNeedTranslate])
+  const starCount =
+    hotel.starRating != null && hotel.starRating > 0
+      ? Math.min(5, Math.round(hotel.starRating))
+      : 0
+  const showHotelOverview = Boolean(
+    hotel.name ||
+      hotel.propertyType ||
+      starCount > 0 ||
+      hotel.sustainability ||
+      hotel.address ||
+      hotel.area ||
+      hotel.rating != null ||
+      hasLocationDetails ||
+      (hasValidParisBookingIdentity(hotel) && hotel.bookingUrl),
+  )
+
+  return (
+    <section className="space-y-4">
+      {showHotelOverview && (
+        <div className="rounded-2xl border border-[var(--mist)] bg-white/65 p-4">
+          <div className="flex items-stretch justify-between gap-3">
+            <div
+              className={`flex min-w-0 flex-1 flex-col ${
+                hotel.address ? 'justify-between' : ''
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold leading-snug text-[var(--ink)]">
+                  {hotel.name}
+                </h3>
+                {(hotel.propertyType || starCount > 0) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
+                    {starCount > 0 && (
+                      <span
+                        className="text-[12px] leading-none tracking-[0.08em] text-[#f5a623]"
+                        aria-label={`${starCount} 星酒店`}
+                      >
+                        {'★'.repeat(starCount)}
+                      </span>
+                    )}
+                    {hotel.propertyType ? localizePropertyType(hotel.propertyType) : '酒店'}
+                  </span>
+                )}
+                {factsPending && !hotel.propertyType && starCount === 0 && (
+                  <span className="h-6 w-24 rounded-md day-tab-shimmer" aria-hidden />
+                )}
+              </div>
+              {hotel.address && (
+                <div className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-1 text-sm leading-relaxed">
+                  <span className="mt-0.5 text-[#003b95]">
+                    <HotelFactIcon type="location" />
+                  </span>
+                  <p className="min-w-0">{hotel.address}</p>
+                </div>
+              )}
+            </div>
+            {hotel.rating != null && (
+              <div className="flex shrink-0 items-center gap-2 text-right">
+                <div>
+                  <p className="text-sm font-semibold">{hotelScoreText(hotel.rating)}</p>
+                  {hotel.reviewCount != null && <p className="text-[11px] text-[var(--stone)]">{hotel.reviewCount.toLocaleString('zh-CN')} 条住客点评</p>}
+                </div>
+                <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] px-2 text-sm font-semibold text-white">
+                  {hotel.rating.toFixed(1)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {hotel.sustainability && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
+                可持续住宿 · {hotel.sustainability}
+              </span>
+            </div>
+          )}
+
+          {hasLocationDetails || showLocationShimmer ? (
+            <div className="mt-2 text-sm leading-relaxed">
+              {showLocationShimmer && <ShimmerLines lines={4} />}
+              {hasLocationDetails && (
+                <div className={showLocationShimmer ? 'hidden' : undefined}>
+                  <HotelLocationDescription
+                    text={hotel.locationDescription!}
+                    className="min-w-0 text-[var(--ink)]/85"
+                    showShimmer={false}
+                    onPendingChange={(pending) => setLocationRevealed(!pending)}
+                  />
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {hasValidParisBookingIdentity(hotel) && hotel.bookingUrl && (
+            <div className="mt-2 flex justify-end">
+              <a
+                href={hotel.bookingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-[var(--mist)] bg-white/70 px-2.5 py-1.5 text-xs font-medium text-[#003b95]/85 transition hover:border-[#003b95]/20 hover:bg-[#003b95]/5 hover:text-[#003b95]"
+              >
+                前往{' '}
+                <span>
+                  <span className="text-[#003580]">Booking</span>
+                  <span className="text-[#006ce4]">.com</span>
+                </span>
+                <ExternalLink className="h-3 w-3" strokeWidth={2} aria-hidden />
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {identityError && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <span>{identityError}</span>
+            <button
+              type="button"
+              onClick={onIdentityRetry}
+              className="font-medium underline underline-offset-2"
+            >
+              重试匹配
+            </button>
+          </div>
+        )}
+        {error && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="font-medium underline underline-offset-2"
+            >
+              重试
+            </button>
+          </div>
+        )}
+
+        {factsPending && (
+          <>
+            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+              <ShimmerLines lines={1} className="mb-3 max-w-[8rem]" />
+              <div className="flex flex-wrap gap-x-5 gap-y-3">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <span key={index} className="h-5 w-24 rounded-full day-tab-shimmer" />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+              <ShimmerLines lines={1} className="mb-3 max-w-[8rem]" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <span className="h-3 w-16 rounded-full day-tab-shimmer" />
+                    <span className="h-2 flex-1 rounded-full day-tab-shimmer" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        {showPolicySkeleton && (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+            <ShimmerLines lines={1} className="mb-3 max-w-[10rem]" />
+            <ShimmerLines lines={4} />
+          </div>
+        )}
+
+        {popularFacilities.length ? (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+            <BookingSectionHeader icon={Building2} title="热门设施" />
+            <div className="flex flex-wrap gap-x-5 gap-y-3">
+              {popularFacilities.map((facility) => (
+                <span key={facility} className="inline-flex items-center gap-2 text-sm">
+                  <FacilityItemIcon facility={facility} />
+                  {localizeFacility(facility)}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : !factsPending && !error && hotel.bookingDetailsLoaded ? (
+          <p className="text-xs text-[var(--stone)]">该酒店没有返回可展示的设施信息。</p>
+        ) : null}
+
+        {reviewScores.length > 0 && (
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+            <BookingSectionHeader icon={BarChart3} title="住客评分细项" />
+            <ReviewScoreBars
+              items={reviewScores}
+              layoutClassName={
+                reviewScores.length <= 3
+                  ? 'flex flex-wrap gap-x-5 gap-y-3'
+                  : 'grid gap-x-5 gap-y-3 sm:grid-cols-2'
+              }
+              itemClassName={reviewScores.length <= 3 ? 'min-w-[9rem] flex-1' : ''}
+            />
+          </div>
+        )}
+
+        {(hotel.checkIn || hotel.checkOut || visibleLanguages.length > 0 || policies.length > 0 || paymentMethods.length > 0) && (
+          <div className={showPolicySkeleton && !hotel.checkIn && !hotel.checkOut && !visibleLanguages.length && !paymentMethods.length ? 'hidden' : undefined}>
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+            <BookingSectionHeader icon={Info} title="住宿规定与实用信息" />
+            <div className="divide-y divide-[var(--mist)] text-sm">
+              {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">入住与退房</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
+              {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">服务语言</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
+              {paymentMethods.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">付款方式</span><span className="text-[var(--ink)]/80">{paymentMethods.join('、')}</span></div>}
+              {policies.length > 0 && (
+                <div className={showPolicySkeleton ? 'hidden' : 'py-3'}>
+                  <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
+                    <span className="font-medium">重要须知</span>
+                    <HotelExpandablePolicyList
+                      policies={policies}
+                      expanded={policiesExpanded}
+                      showShimmer={false}
+                      onPendingChange={(pending) => setPoliciesRevealed(!pending)}
+                    />
+                  </div>
+                  {policies.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setPoliciesExpanded((current) => !current)}
+                      className="mt-2 text-xs font-medium text-[var(--sage)] hover:underline"
+                    >
+                      {policiesExpanded ? '收起须知' : `展开全部 ${policies.length} 条须知`}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          </div>
+        )}
+
+        <p className="text-[11px] leading-relaxed text-[var(--stone)]">
+          房型、实时价格、早餐与取消政策会随日期变化，请前往 Booking.com 确认当前可订状态。
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function BookingReviewsPanel({
+  hotel,
+  loading,
+  error,
+  onRetry,
+}: {
+  hotel: HotelCandidate
+  loading: boolean
+  error: string | null
+  onRetry: () => void
+}) {
+  const [reviewsRevealed, setReviewsRevealed] = useState(false)
+  const reviews = (hotel.reviews || []).map((review) => ({
+    text: review.negativeText
+      ? `${review.text}\n\n不足：${review.negativeText}`
+      : review.text,
+    rating: review.rating,
+    author: review.author,
+    relativeTime: review.relativeTime,
+  }))
+  const reviewsNeedTranslate =
+    reviews.some((review) => !looksChinese(review.text)) && isLlmConfigured()
+  const showReviewShimmer = loading || (reviewsNeedTranslate && !reviewsRevealed)
+  const reviewsKey = reviews.map((review) => review.text).join('\n---\n')
+
+  useLayoutEffect(() => {
+    setReviewsRevealed(!reviewsNeedTranslate)
+  }, [hotel.id, reviewsKey, reviewsNeedTranslate])
+
+  return (
+    <section className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+      <BookingSectionHeader
+        icon={MessageSquareQuote}
+        title="住客精选评论"
+      />
+      {showReviewShimmer && (
+        <div className="space-y-3" aria-busy>
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="rounded-xl bg-white/70 px-3 py-2">
+              <ShimmerLines lines={1} className="mb-2 max-w-[10rem]" />
+              <ShimmerLines lines={3} />
+            </div>
+          ))}
+        </div>
+      )}
+      {error && !loading && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="font-medium underline underline-offset-2"
+          >
+            重试
+          </button>
+        </div>
+      )}
+      {reviews.length > 0 && (
+        <div className={showReviewShimmer ? 'hidden' : undefined}>
+          <GoogleReviewsList
+            reviews={reviews}
+            sourceLabel="Booking.com 精选评论"
+            showHeader={false}
+            showShimmer={false}
+            onPendingChange={(pending) => setReviewsRevealed(!pending)}
+          />
+        </div>
+      )}
+      {!loading && !error && hotel.bookingReviewsLoaded && !reviews.length && (
+        <p className="text-sm text-[var(--stone)]">暂无可展示的精选住客评论。</p>
+      )}
+    </section>
   )
 }
 
@@ -165,16 +909,28 @@ export function HotelPicker({
   onCandidatesChange,
   readOnly = false,
   onDetailChange,
+  openSelectedDetailToken = 0,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [customQuery, setCustomQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [popupHotelId, setPopupHotelId] = useState<string | null>(null)
+  const [identityLoadingId, setIdentityLoadingId] = useState<string | null>(null)
+  const [identityError, setIdentityError] = useState<string | null>(null)
+  const [identityRetryToken, setIdentityRetryToken] = useState(0)
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [detailsRetryToken, setDetailsRetryToken] = useState(0)
+  const [photosLoadingId, setPhotosLoadingId] = useState<string | null>(null)
+  const [photosError, setPhotosError] = useState<string | null>(null)
+  const [reviewsLoadingId, setReviewsLoadingId] = useState<string | null>(null)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
   /** Custom hotel awaiting stay / consider / cancel decision. */
   const [pendingCustom, setPendingCustom] = useState<HotelCandidate | null>(null)
   const [storyLoadingId, setStoryLoadingId] = useState<string | null>(null)
+  const [streamingAdvisorReason, setStreamingAdvisorReason] = useState('')
+  const [cardBlurbStream, setCardBlurbStream] = useState<Record<string, string>>({})
   const [hotelStoryRegenToken, setHotelStoryRegenToken] = useState(0)
   /** null = closed; choose = pick mode; prefer = type preferences */
   const [refreshPanel, setRefreshPanel] = useState<'choose' | 'prefer' | null>(null)
@@ -187,6 +943,7 @@ export function HotelPicker({
   const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
   const [dropping, setDropping] = useState(false)
   const bootstrappedRef = useRef(false)
+  const lastOpenSelectedDetailTokenRef = useRef(openSelectedDetailToken)
   const candidatesRef = useRef(candidates)
   const daysRef = useRef(days)
   const selectedRef = useRef(selected)
@@ -194,6 +951,7 @@ export function HotelPicker({
   const currentSlotRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<HotelDragSession | null>(null)
   const floatRef = useRef({ x: 0, y: 0 })
+  const floatElRef = useRef<HTMLDivElement | null>(null)
   const pointerRef = useRef({ x: 0, y: 0 })
   const rafRef = useRef<number | null>(null)
   const suppressClickRef = useRef(false)
@@ -205,6 +963,8 @@ export function HotelPicker({
     cardEl: HTMLElement
     pointerId: number
   } | null>(null)
+  const cardBlurbInflightRef = useRef(new Set<string>())
+  const cardBlurbFailedRef = useRef(new Set<string>())
   candidatesRef.current = candidates
   daysRef.current = days
   selectedRef.current = selected
@@ -216,9 +976,267 @@ export function HotelPicker({
     return candidates.find((h) => h.id === popupHotelId) || null
   }, [candidates, popupHotelId, pendingCustom])
 
+  const popupCandidateRef = useRef(popupCandidate)
+  popupCandidateRef.current = popupCandidate
+
+  const bookingDetailsOverride = useMemo(() => {
+    if (!popupCandidate) return null
+    return {
+      name: popupCandidate.name,
+      nameOriginal: popupCandidate.name,
+      address: popupCandidate.address,
+      rating: popupCandidate.rating,
+      userRatingCount: popupCandidate.reviewCount,
+      photos: popupCandidate.photos?.length
+        ? popupCandidate.photos.map(bookingPhotoUrl)
+        : popupCandidate.image
+          ? [bookingPhotoUrl(popupCandidate.image)]
+          : [],
+      reviews: (popupCandidate.reviews || []).map((review) => ({
+        text: review.negativeText
+          ? `${review.text}\n\n不足：${review.negativeText}`
+          : review.text,
+        rating: review.rating,
+        author: review.author,
+        relativeTime: review.relativeTime,
+      })),
+      summary: popupCandidate.description,
+      location: { lat: popupCandidate.lat, lng: popupCandidate.lng },
+      query: popupCandidate.name,
+    }
+  }, [popupCandidate])
+
+  const popupId = popupCandidate?.id ?? null
+
+  useEffect(() => {
+    if (!popupId) {
+      setIdentityLoadingId(null)
+      setIdentityError(null)
+      return
+    }
+    const card =
+      pendingCustomRef.current?.id === popupId
+        ? pendingCustomRef.current
+        : candidatesRef.current.find((hotel) => hotel.id === popupId)
+    if (
+      !card ||
+      hasValidParisBookingIdentity(card) ||
+      !isBookingApiEnabled()
+    ) {
+      setIdentityLoadingId(null)
+      setIdentityError(null)
+      return
+    }
+    let cancelled = false
+    setIdentityLoadingId(card.id)
+    setIdentityError(null)
+    void resolveBookingHotelIdentity(card.name)
+      .then((identity) => {
+        if (cancelled) return
+        if (!identity) {
+          setIdentityError('没有找到对应的 Booking.com 酒店，请使用其原文名称重试。')
+          return
+        }
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                bookingHotelId: identity.id,
+                name: identity.name,
+                address: identity.address || hotel.address,
+                lat: identity.location.lat,
+                lng: identity.location.lng,
+                image: identity.image || hotel.image,
+                photos: identity.photos.length ? identity.photos : hotel.photos,
+                area: hotel.area || identity.area || '巴黎',
+                facilities: [],
+                reviews: [],
+                checkIn: undefined,
+                checkOut: undefined,
+                bookingUrl: undefined,
+                bookingDetailsLoaded: false,
+                bookingPhotosLoaded: false,
+                bookingReviewsLoaded: false,
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        const resolved = next.find((hotel) => hotel.id === card.id)
+        const nextSelected =
+          resolved && selectedRef.current.id === card.id
+            ? candidateToSelected(resolved)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch((cause) => {
+        if (cancelled) return
+        setIdentityError(
+          cause instanceof Error ? cause.message : 'Booking.com 酒店身份匹配失败。',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIdentityLoadingId((id) => (id === card.id ? null : id))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [popupId, identityRetryToken, onCandidatesChange, onSelect])
+
+  useEffect(() => {
+    if (!popupId) {
+      setDetailsLoadingId(null)
+      setDetailsError(null)
+      return
+    }
+    const card =
+      pendingCustomRef.current?.id === popupId
+        ? pendingCustomRef.current
+        : candidatesRef.current.find((hotel) => hotel.id === popupId)
+    if (
+      !card?.bookingHotelId ||
+      !hasValidParisBookingIdentity(card) ||
+      !isBookingApiEnabled()
+    ) {
+      setDetailsLoadingId(null)
+      setDetailsError(null)
+      return
+    }
+    if (card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= BOOKING_DETAILS_VERSION) {
+      setDetailsLoadingId(null)
+      setDetailsError(null)
+      return
+    }
+    const dates = loadTripDates()
+    if (!dates) return
+    let cancelled = false
+    setDetailsLoadingId(card.id)
+    setDetailsError(null)
+    void fetchBookingHotelDetails({
+      id: card.bookingHotelId,
+      startDate: dates.startDate,
+      endDate: dates.endDate,
+    })
+      .then((details) => {
+        if (cancelled) return
+        if (!details) {
+          setDetailsError('酒店资料暂时无法解析，请稍后重试。')
+          return
+        }
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                name: details.name,
+                address: details.address,
+                lat: details.location.lat,
+                lng: details.location.lng,
+                image: details.image || hotel.image,
+                photos:
+                  details.photos.length > (hotel.photos?.length || 0)
+                    ? details.photos
+                    : hotel.photos,
+                rating: details.rating ?? hotel.rating,
+                reviewCount: details.reviewCount ?? hotel.reviewCount,
+                starRating: details.stars ?? hotel.starRating,
+                facilities: details.facilities,
+                propertyType: details.propertyType || hotel.propertyType,
+                reviewScores: details.reviewScores?.length
+                  ? details.reviewScores
+                  : hotel.reviewScores,
+                languages: details.languages?.length ? details.languages : hotel.languages,
+                policies: details.policies?.length ? details.policies : hotel.policies,
+                paymentMethods: details.paymentMethods?.length
+                  ? details.paymentMethods
+                  : hotel.paymentMethods,
+                sustainability: details.sustainability || hotel.sustainability,
+                description: details.description || hotel.description,
+                districtLabel: details.districtLabel || hotel.districtLabel,
+                distanceToCityCenterKm:
+                  details.distanceToCityCenterKm ?? hotel.distanceToCityCenterKm,
+                locationDescription:
+                  details.locationDescription || hotel.locationDescription,
+                checkIn: details.checkIn || hotel.checkIn,
+                checkOut: details.checkOut || hotel.checkOut,
+                bookingUrl: details.sourceUrl || hotel.bookingUrl,
+                bookingDetailsLoaded: true,
+                bookingDetailsVersion: BOOKING_DETAILS_VERSION,
+                bookingPhotosLoaded: hotel.bookingPhotosLoaded,
+                bookingReviewsLoaded:
+                  details.reviews.length > 0 ? true : hotel.bookingReviewsLoaded,
+                reviews: details.reviews.length
+                  ? details.reviews.map((review) => ({
+                      text: review.text,
+                      negativeText: review.negativeText,
+                      rating: review.rating,
+                      author: review.author,
+                      relativeTime: review.completedAt
+                        ? new Date(review.completedAt * 1_000).toLocaleDateString('zh-CN')
+                        : undefined,
+                    }))
+                  : hotel.reviews,
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        const resolved = next.find((hotel) => hotel.id === card.id)
+        const nextSelected =
+          resolved && selectedRef.current.id === card.id
+            ? candidateToSelected(resolved)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch((cause) => {
+        if (cancelled) return
+        setDetailsError(
+          cause instanceof Error ? cause.message : '酒店资料加载失败，请稍后重试。',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDetailsLoadingId((id) => (id === card.id ? null : id))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [popupId, onCandidatesChange, onSelect, detailsRetryToken])
+
+  useEffect(() => {
+    if (!popupId) return
+    const card =
+      pendingCustomRef.current?.id === popupId
+        ? pendingCustomRef.current
+        : candidatesRef.current.find((hotel) => hotel.id === popupId)
+    if (!card) return
+    loadFeaturedReviews(card)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popupId])
+
   useEffect(() => {
     onDetailChange?.(popupCandidate)
   }, [popupCandidate, onDetailChange])
+
+  useEffect(() => {
+    if (!openSelectedDetailToken) return
+    if (openSelectedDetailToken === lastOpenSelectedDetailTokenRef.current) return
+    lastOpenSelectedDetailTokenRef.current = openSelectedDetailToken
+    const card = candidatesRef.current.find((h) => h.id === selectedRef.current.id)
+    if (!card) return
+    setPendingCustom(null)
+    setPopupHotelId(card.id)
+  }, [openSelectedDetailToken])
 
   const decidingCustom = Boolean(pendingCustom)
 
@@ -237,7 +1255,6 @@ export function HotelPicker({
 
   useEffect(() => {
     if (bootstrappedRef.current) return
-    if (!isLoaded) return
     bootstrappedRef.current = true
 
     const cached = loadHotelCache()
@@ -255,7 +1272,7 @@ export function HotelPicker({
     if (readOnly) return
     void bootstrapRecommendations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, readOnly])
+  }, [readOnly])
 
   function selectHotel(
     card: HotelCandidate,
@@ -288,11 +1305,51 @@ export function HotelPicker({
     if (!popupCandidate) return
     const card = popupCandidate
     const bypass = hotelStoryRegenToken > 0
-    // Already enriched on the candidate — do not call the model again.
-    if ((!bypass && card.tripFit?.trim()) || !isLlmConfigured()) return
+
+    if (!bypass && card.tripFit?.trim() && card.hotelAdvisorVersion === 2) {
+      rememberHotelAdvisorCopy(card, card.tripFit)
+      return
+    }
+
+    if (!bypass) {
+      const hydrated = hydrateHotelAdvisorFromCache(card)
+      if (hydrated.tripFit?.trim() && hydrated.hotelAdvisorVersion === 2) {
+        if (hydrated.tripFit !== card.tripFit) {
+          const enrich = (h: HotelCandidate): HotelCandidate =>
+            h.id === card.id ? hydrated : h
+          if (pendingCustomRef.current?.id === card.id) {
+            setPendingCustom((prev) => (prev && prev.id === card.id ? enrich(prev) : prev))
+          } else if (candidatesRef.current.some((h) => h.id === card.id)) {
+            const next = candidatesRef.current.map(enrich)
+            onCandidatesChange(next)
+            const stillSelected = next.find((h) => h.id === selectedRef.current.id)
+            persistHotelState(
+              next,
+              stillSelected ? candidateToSelected(stillSelected) : selectedRef.current,
+            )
+          }
+        }
+        return
+      }
+    }
+
+    if (!isLlmConfigured()) return
+
+    const needsBookingDetails =
+      Boolean(card.bookingHotelId) &&
+      hasValidParisBookingIdentity(card) &&
+      isBookingApiEnabled()
+    if (
+      needsBookingDetails &&
+      (!(card.bookingDetailsLoaded && (card.bookingDetailsVersion || 0) >= BOOKING_DETAILS_VERSION) ||
+        detailsLoadingId === card.id)
+    ) {
+      return
+    }
 
     let cancelled = false
     setStoryLoadingId(card.id)
+    setStreamingAdvisorReason('')
 
     const prefs = loadHotelCache()?.lastPreferences
     const tripDays = daysRef.current.map((d) => ({
@@ -301,67 +1358,185 @@ export function HotelPicker({
       pace: d.pace,
       theme: d.theme,
     }))
-    const artifactKey = `hotel-detail:${card.id}`
+    const runStory = async () => {
+      const latest =
+        pendingCustomRef.current?.id === card.id
+          ? pendingCustomRef.current
+          : candidatesRef.current.find((hotel) => hotel.id === card.id) || card
+      const featuredReviews = (latest.reviews || []).map((review) => ({
+        text: review.text,
+        negativeText: review.negativeText,
+        rating: review.rating,
+        author: review.author,
+      }))
 
-    void memoizeLlmCall(
-      artifactKey,
-      () =>
-        generateHotelDetailCopy({
-          name: card.name,
-          area: card.area,
-          address: card.address,
-          nearestMetro: card.nearestMetro,
-          ratingHint: card.priceHint,
-          existingDescription: card.description,
-          existingReason: card.reason,
-          isBest: card.isBest,
-          userPreferences: prefs,
-          tripDays,
-        }),
-      { durable: true, bypass },
-    )
-      .then((copy) => {
-        if (cancelled || !copy) return
+      const copy = await memoizeHotelAdvisorCopy(
+        latest,
+        () =>
+          generateHotelDetailCopy({
+            name: latest.name,
+            area: latest.area,
+            address: latest.address,
+            nearestMetro: latest.nearestMetro,
+            rating: latest.rating,
+            reviewCount: latest.reviewCount,
+            starRating: latest.starRating,
+            propertyType: latest.propertyType,
+            facilities: latest.facilities,
+            reviewScores: latest.reviewScores,
+            locationDescription: latest.locationDescription,
+            districtLabel: latest.districtLabel,
+            distanceToCityCenterKm: latest.distanceToCityCenterKm,
+            featuredReviews,
+            existingReason: latest.reason,
+            isBest: latest.isBest,
+            userPreferences: prefs,
+            tripDays,
+            onPartial: (partial) => {
+              if (cancelled || !partial.reason) return
+              setStreamingAdvisorReason(partial.reason)
+            },
+          }),
+        { bypass },
+      )
 
-        const enrich = (h: HotelCandidate): HotelCandidate =>
-          h.id === card.id
-            ? {
-                ...h,
-                description: copy.intro || h.description,
-                reason: copy.reason || h.reason,
-                tripFit: copy.tripFit || h.tripFit,
-              }
-            : h
+      if (cancelled || !copy?.reason) return
 
-        if (pendingCustomRef.current?.id === card.id) {
-          setPendingCustom((prev) => (prev && prev.id === card.id ? enrich(prev) : prev))
-          return
-        }
+      const enrich = (h: HotelCandidate): HotelCandidate =>
+        h.id === card.id
+          ? {
+              ...h,
+              tripFit: copy.reason || h.tripFit,
+              hotelAdvisorVersion: 2,
+            }
+          : h
 
-        const current = candidatesRef.current.find((h) => h.id === card.id)
-        if (!bypass && current?.tripFit?.trim()) return
+      if (pendingCustomRef.current?.id === card.id) {
+        setPendingCustom((prev) => (prev && prev.id === card.id ? enrich(prev) : prev))
+        return
+      }
 
-        const next = candidatesRef.current.map(enrich)
-        onCandidatesChange(next)
-        const stillSelected = next.find((h) => h.id === selectedRef.current.id)
-        persistHotelState(
-          next,
-          stillSelected ? candidateToSelected(stillSelected) : selectedRef.current,
-        )
+      const current = candidatesRef.current.find((h) => h.id === card.id)
+      if (!bypass && current?.tripFit?.trim() && current.hotelAdvisorVersion === 2) return
+
+      const next = candidatesRef.current.map(enrich)
+      onCandidatesChange(next)
+      const stillSelected = next.find((h) => h.id === selectedRef.current.id)
+      persistHotelState(
+        next,
+        stillSelected ? candidateToSelected(stillSelected) : selectedRef.current,
+      )
+    }
+
+    void runStory()
+      .catch(() => {
+        // Silent failure — advisor copy is optional.
       })
       .finally(() => {
-        if (!cancelled) setStoryLoadingId((id) => (id === card.id ? null : id))
+        if (!cancelled) {
+          setStoryLoadingId((id) => (id === card.id ? null : id))
+          setStreamingAdvisorReason('')
+        }
       })
 
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [popupCandidate?.id, hotelStoryRegenToken])
+  }, [
+    popupCandidate?.id,
+    popupCandidate?.bookingHotelId,
+    popupCandidate?.name,
+    popupCandidate?.bookingDetailsLoaded,
+    popupCandidate?.bookingDetailsVersion,
+    detailsLoadingId,
+    hotelStoryRegenToken,
+  ])
 
   useEffect(() => {
     setHotelStoryRegenToken(0)
+    setStreamingAdvisorReason('')
   }, [popupCandidate?.id])
+
+  useEffect(() => {
+    if (readOnly || !isLlmConfigured()) return
+
+    const hotels = [pendingCustom, ...candidates].filter(
+      (hotel): hotel is HotelCandidate => Boolean(hotel),
+    )
+
+    for (const hotel of hotels) {
+      if (!needsCustomCardBlurb(hotel)) continue
+      if (cardBlurbInflightRef.current.has(hotel.id)) continue
+      if (cardBlurbFailedRef.current.has(hotel.id)) continue
+      if (identityLoadingId === hotel.id || detailsLoadingId === hotel.id) continue
+      const waitingForDetails =
+        Boolean(hotel.bookingHotelId) &&
+        hasValidParisBookingIdentity(hotel) &&
+        isBookingApiEnabled() &&
+        !hotel.bookingDetailsLoaded
+      if (waitingForDetails) continue
+
+      cardBlurbInflightRef.current.add(hotel.id)
+      const artifactKey = `hotel-card-blurb:v1:${hotel.bookingHotelId || hotel.name}`
+      void memoizeLlmCall(
+        artifactKey,
+        () =>
+          generateHotelCardBlurb({
+            name: hotel.name,
+            area: hotel.area,
+            address: hotel.address,
+            description: hotel.description,
+            locationDescription: hotel.locationDescription,
+            starRating: hotel.starRating,
+            propertyType: hotel.propertyType,
+            rating: hotel.rating,
+            facilities: hotel.facilities,
+            onPartial: (blurb) => {
+              setCardBlurbStream((current) =>
+                current[hotel.id] === blurb ? current : { ...current, [hotel.id]: blurb },
+              )
+            },
+          }),
+        { durable: true },
+      )
+        .then((blurb) => {
+          if (!blurb) {
+            cardBlurbFailedRef.current.add(hotel.id)
+            return
+          }
+          const enrich = (item: HotelCandidate): HotelCandidate =>
+            item.id === hotel.id ? { ...item, reason: blurb } : item
+          if (pendingCustomRef.current?.id === hotel.id) {
+            setPendingCustom((current) => (current ? enrich(current) : current))
+          }
+          if (candidatesRef.current.some((item) => item.id === hotel.id)) {
+            const next = candidatesRef.current.map(enrich)
+            onCandidatesChange(next)
+            persistHotelState(next, selectedRef.current)
+          }
+          setCardBlurbStream((current) => {
+            if (!(hotel.id in current)) return current
+            const next = { ...current }
+            delete next[hotel.id]
+            return next
+          })
+        })
+        .catch(() => {
+          cardBlurbFailedRef.current.add(hotel.id)
+        })
+        .finally(() => {
+          cardBlurbInflightRef.current.delete(hotel.id)
+        })
+    }
+  }, [
+    candidates,
+    pendingCustom,
+    identityLoadingId,
+    detailsLoadingId,
+    readOnly,
+    onCandidatesChange,
+  ])
 
   async function bootstrapRecommendations() {
     if (!isLlmConfigured()) {
@@ -445,7 +1620,7 @@ export function HotelPicker({
       })
       setCustomQuery('')
       setPopupHotelId(null)
-      setPendingCustom(card)
+      setPendingCustom(hydrateHotelAdvisorFromCache(card))
     } catch (e) {
       setError(e instanceof Error ? e.message : '解析失败')
     } finally {
@@ -458,12 +1633,123 @@ export function HotelPicker({
   }
 
   function closeHotelPopup() {
+    setPhotosError(null)
     if (pendingCustom) {
       dismissPendingCustom()
       return
     }
     setPopupHotelId(null)
   }
+
+  function loadFeaturedReviews(card: HotelCandidate) {
+    if (
+      card.bookingReviewsLoaded ||
+      card.reviews?.length ||
+      reviewsLoadingId === card.id
+    ) {
+      return
+    }
+    if (
+      !card.bookingHotelId ||
+      !hasValidParisBookingIdentity(card) ||
+      !isBookingApiEnabled()
+    ) {
+      setReviewsError('该酒店暂时无法获取 Booking.com 精选评论。')
+      return
+    }
+    setReviewsLoadingId(card.id)
+    setReviewsError(null)
+    void fetchBookingHotelFeaturedReviews({ id: card.bookingHotelId })
+      .then((result) => {
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                bookingReviewsLoaded: true,
+                reviews: result.reviews.map((review) => ({
+                  text: review.text,
+                  negativeText: review.negativeText,
+                  rating: review.rating,
+                  author: review.author,
+                  relativeTime: review.completedAt
+                    ? new Date(review.completedAt * 1_000).toLocaleDateString('zh-CN')
+                    : undefined,
+                })),
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        persistHotelState(next, selectedRef.current)
+      })
+      .catch((cause) => {
+        setReviewsError(
+          cause instanceof Error ? cause.message : '精选评论加载失败，请稍后重试。',
+        )
+      })
+      .finally(() => {
+        setReviewsLoadingId((id) => (id === card.id ? null : id))
+      })
+  }
+
+  function loadHotelPhotos(card: HotelCandidate) {
+    if (card.bookingPhotosLoaded || photosLoadingId === card.id) return
+    if (!card.bookingHotelId || !isBookingApiEnabled()) {
+      setPhotosError('该酒店暂时无法加载完整图集。')
+      return
+    }
+    setPhotosLoadingId(card.id)
+    setPhotosError(null)
+    void fetchBookingHotelPhotos({ id: card.bookingHotelId })
+      .then((photos) => {
+        if (!photos.length) {
+          setPhotosError('图片接口本次未返回可用照片，请稍后重试。')
+          return
+        }
+        const enrich = (hotel: HotelCandidate): HotelCandidate =>
+          hotel.id !== card.id
+            ? hotel
+            : {
+                ...hotel,
+                bookingPhotosLoaded: true,
+                photos,
+                image: photos[0] || hotel.image,
+              }
+        if (pendingCustomRef.current?.id === card.id) {
+          setPendingCustom((current) => (current ? enrich(current) : current))
+          return
+        }
+        const next = candidatesRef.current.map(enrich)
+        onCandidatesChange(next)
+        const resolved = next.find((hotel) => hotel.id === card.id)
+        const nextSelected =
+          resolved && selectedRef.current.id === card.id
+            ? candidateToSelected(resolved)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch((cause) => {
+        setPhotosError(
+          cause instanceof Error ? cause.message : '酒店图集加载失败，请稍后重试。',
+        )
+      })
+      .finally(() => {
+        setPhotosLoadingId((id) => (id === card.id ? null : id))
+      })
+  }
+
+  const loadHotelPhotosRef = useRef(loadHotelPhotos)
+  loadHotelPhotosRef.current = loadHotelPhotos
+  const handleBookingGalleryAdvance = useCallback(() => {
+    const card = popupCandidateRef.current
+    if (card && hasValidParisBookingIdentity(card)) {
+      loadHotelPhotosRef.current(card)
+    }
+  }, [])
 
   /** 就住这儿了：选中，并收起其他酒店卡片（可再展开） */
   function decideStayHere() {
@@ -519,6 +1805,15 @@ export function HotelPicker({
     }
   }
 
+  const applyFloatPos = (x: number, y: number) => {
+    floatRef.current = { x, y }
+    const el = floatElRef.current
+    if (el) {
+      el.style.left = `${x}px`
+      el.style.top = `${y}px`
+    }
+  }
+
   const isOverCurrentSlot = (x: number, y: number) => {
     const el = currentSlotRef.current
     if (!el) return false
@@ -533,16 +1828,16 @@ export function HotelPicker({
     }
     const targetX = pointerRef.current.x - session.grabX
     const targetY = pointerRef.current.y - session.grabY
-    floatRef.current = {
-      x: floatRef.current.x + (targetX - floatRef.current.x) * HOTEL_FLOAT_EASE,
-      y: floatRef.current.y + (targetY - floatRef.current.y) * HOTEL_FLOAT_EASE,
-    }
-    setFloatPos({ ...floatRef.current })
+    applyFloatPos(
+      floatRef.current.x + (targetX - floatRef.current.x) * HOTEL_FLOAT_EASE,
+      floatRef.current.y + (targetY - floatRef.current.y) * HOTEL_FLOAT_EASE,
+    )
 
     const overSlot = isOverCurrentSlot(pointerRef.current.x, pointerRef.current.y)
     if (overSlot !== session.overSlot) {
       const next = { ...session, overSlot }
       dragRef.current = next
+      setFloatPos({ ...floatRef.current })
       setDrag(next)
     }
 
@@ -609,8 +1904,8 @@ export function HotelPicker({
       overSlot: isOverCurrentSlot(e.clientX, e.clientY),
     }
     pointerRef.current = { x: e.clientX, y: e.clientY }
-    floatRef.current = { x: rect.left, y: rect.top }
     dragRef.current = session
+    applyFloatPos(rect.left, rect.top)
     setFloatPos({ x: rect.left, y: rect.top })
     setDrag(session)
     setDropping(false)
@@ -638,11 +1933,6 @@ export function HotelPicker({
       startY: e.clientY,
       cardEl: e.currentTarget,
       pointerId: e.pointerId,
-    }
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {
-      /* ignore */
     }
   }
 
@@ -681,7 +1971,13 @@ export function HotelPicker({
         endDrag(true)
         return
       }
+      const pending = pendingPointerRef.current
       pendingPointerRef.current = null
+      if (!pending || suppressClickRef.current) return
+      const hotel =
+        candidatesRef.current.find((item) => item.id === pending.hotelId) ||
+        candidates.find((item) => item.id === pending.hotelId)
+      if (hotel) openHotelCard(hotel)
     }
     const onCancel = () => {
       if (settlingRef.current) {
@@ -707,6 +2003,12 @@ export function HotelPicker({
   }, [readOnly])
 
   useEffect(() => () => stopRaf(), [])
+
+  const dragHotelIdForLayout = drag?.hotelId ?? null
+  useLayoutEffect(() => {
+    if (dragHotelIdForLayout === null || dropping) return
+    applyFloatPos(floatRef.current.x, floatRef.current.y)
+  }, [dragHotelIdForLayout, dropping])
 
   const currentSlotHighlight = Boolean(drag)
   const currentSlotDropReady = Boolean(drag?.overSlot)
@@ -936,7 +2238,13 @@ export function HotelPicker({
                   onClick={() => openHotelCard(selectedCandidate)}
                   className="w-full text-left"
                 >
-                  <HotelCardFace hotel={selectedCandidate} />
+                  <HotelCardFace
+                    hotel={selectedCandidate}
+                    blurb={cardBlurbStream[selectedCandidate.id]}
+                    blurbLoading={
+                      needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
+                    }
+                  />
                 </button>
               </div>
             ) : (
@@ -982,7 +2290,7 @@ export function HotelPicker({
                 />
                 <button
                   type="button"
-                  disabled={loading || !customQuery.trim() || !isLoaded || decidingCustom}
+                  disabled={loading || !customQuery.trim() || decidingCustom}
                   onClick={() => void applyCustom()}
                   aria-busy={loading || undefined}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2 text-sm text-[var(--paper)] disabled:opacity-50"
@@ -1037,7 +2345,7 @@ export function HotelPicker({
                     <div
                       key={hotel.id}
                       onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
-                      className={`group relative cursor-grab overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] active:cursor-grabbing ${
+                      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                         dragHotelId === hotel.id
                           ? 'pointer-events-none border-transparent opacity-0'
                           : 'border-white/60 hover:border-[var(--gold)]'
@@ -1058,16 +2366,11 @@ export function HotelPicker({
                           <TrashIcon />
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (suppressClickRef.current || dragging) return
-                          openHotelCard(hotel)
-                        }}
-                        className="w-full cursor-grab text-left active:cursor-grabbing"
-                      >
-                        <HotelCardFace hotel={hotel} />
-                      </button>
+                      <HotelCardFace
+                        hotel={hotel}
+                        blurb={cardBlurbStream[hotel.id]}
+                        blurbLoading={needsCustomCardBlurb(hotel) && isLlmConfigured()}
+                      />
                     </div>
                   ))}
                 </div>
@@ -1084,12 +2387,13 @@ export function HotelPicker({
 
       {drag && (
         <div
+          ref={floatElRef}
           className={`timeline-drag-float pointer-events-none fixed z-[80] ${
             dropping ? 'timeline-drag-float-settle' : 'timeline-drag-float-lifted'
           }`}
           style={{
-            left: floatPos.x,
-            top: floatPos.y,
+            left: dropping ? floatPos.x : undefined,
+            top: dropping ? floatPos.y : undefined,
             width: drag.width,
           }}
         >
@@ -1100,7 +2404,13 @@ export function HotelPicker({
                   candidates.find((h) => h.id === drag.hotelId) ||
                   candidatesRef.current.find((h) => h.id === drag.hotelId)
                 if (!hotel) return null
-                return <HotelCardFace hotel={hotel} />
+                return (
+                  <HotelCardFace
+                    hotel={hotel}
+                    blurb={cardBlurbStream[hotel.id]}
+                    blurbLoading={needsCustomCardBlurb(hotel) && isLlmConfigured()}
+                  />
+                )
               })()}
             </div>
           </div>
@@ -1117,20 +2427,59 @@ export function HotelPicker({
         }
         fallbackImage={popupCandidate?.image}
         showMap={false}
+        galleryVariant="booking"
+        onBookingGalleryAdvance={
+          popupCandidate && hasValidParisBookingIdentity(popupCandidate)
+            ? handleBookingGalleryAdvance
+            : undefined
+        }
+        bookingGalleryPhotosLoading={
+          popupCandidate ? photosLoadingId === popupCandidate.id : false
+        }
+        bookingGalleryPhotosError={photosError}
+        bookingPhotosFullyLoaded={Boolean(popupCandidate?.bookingPhotosLoaded)}
+        providerOwnsSummary
+        detailsOverride={bookingDetailsOverride}
+        skipProviderLookup
+        providerDetails={
+          popupCandidate ? (
+            <BookingHotelFacts
+              hotel={popupCandidate}
+              identityLoading={identityLoadingId === popupCandidate.id}
+              identityError={identityError}
+              loading={detailsLoadingId === popupCandidate.id}
+              error={detailsError}
+              onIdentityRetry={() => setIdentityRetryToken((token) => token + 1)}
+              onRetry={() => setDetailsRetryToken((token) => token + 1)}
+            />
+          ) : undefined
+        }
+        reviewsSection={
+          popupCandidate ? (
+            <BookingReviewsPanel
+              hotel={popupCandidate}
+              loading={reviewsLoadingId === popupCandidate.id}
+              error={reviewsError}
+              onRetry={() => {
+                setReviewsError(null)
+                loadFeaturedReviews(popupCandidate)
+              }}
+            />
+          ) : undefined
+        }
         llmNarrative={
           popupCandidate
             ? {
-                intro: popupCandidate.description,
-                reason: popupCandidate.reason,
-                tripFit: popupCandidate.tripFit,
+                variant: 'single',
+                reason:
+                  storyLoadingId === popupCandidate.id
+                    ? streamingAdvisorReason ||
+                      (hotelStoryRegenToken > 0 ? undefined : popupCandidate.tripFit)
+                    : popupCandidate.tripFit,
                 loading: storyLoadingId === popupCandidate.id,
                 labels: {
                   title: '行程顾问点评',
-                  intro: '酒店简介',
-                  reason: '为什么推荐',
-                  tripFit: '与行程 / 要求的关系',
-                  loadingText: '正在生成酒店简介与推荐理由…',
-                  loadingMoreText: '正在补充与行程的匹配说明…',
+                  loadingText: '正在结合酒店资料与住客评论生成推荐理由…',
                 },
                 onRegenerate: isLlmConfigured()
                   ? () => setHotelStoryRegenToken((n) => n + 1)
@@ -1141,7 +2490,10 @@ export function HotelPicker({
             : null
         }
         footer={
-          popupCandidate ? (
+          popupCandidate &&
+          (decidingCustom ||
+            !isHotelSelected(selected) ||
+            popupCandidate.id !== selected.id) ? (
             <div className="space-y-2">
               <p className="text-sm text-[var(--stone)]">
                 {decidingCustom ? '要把这家酒店加入候选项吗？' : '如何处理这家酒店？'}

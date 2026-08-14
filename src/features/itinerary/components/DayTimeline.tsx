@@ -17,6 +17,13 @@ import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { HouseIcon, PlaneIcon } from '../../map/components/markerIcons'
 import { PlaceName } from '../../place/components/PlaceName'
+import {
+  googleMapsDirectionsUrl,
+  googleMapsTravelModeLabel,
+  inferGoogleMapsTravelMode,
+  type GoogleMapsTravelMode,
+} from '../../map/services/googleMapsDirectionsUrl'
+import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from 'lucide-react'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -82,89 +89,32 @@ const typeLabel: Record<string, string> = {
 }
 
 function TrashIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  )
+  return <Trash2 size={16} strokeWidth={1.8} aria-hidden />
 }
 
 function PinIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {/* Classic thumbtack / pushpin */}
-      <path d="M12 17v5" />
-      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-    </svg>
-  )
+  return <Pin size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function RestoreDayIcon({ busy = false }: { busy?: boolean }) {
   return (
-    <svg
+    <History
       className={busy ? 'animate-spin' : undefined}
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      size={17}
+      strokeWidth={1.8}
       aria-hidden
-    >
-      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l3 2" />
-    </svg>
+    />
   )
 }
 
 function RegenerateDayIcon({ busy = false }: { busy?: boolean }) {
   return (
-    <svg
+    <Sparkles
       className={busy ? 'animate-pulse' : undefined}
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      size={17}
+      strokeWidth={1.8}
       aria-hidden
-    >
-      <path d="m14.5 4.5 5 5L8 21H3v-5L14.5 4.5Z" />
-      <path d="m11.5 7.5 5 5" />
-      <path d="M5 3v4" />
-      <path d="M3 5h4" />
-      <path d="M19 16v4" />
-      <path d="M17 18h4" />
-    </svg>
+    />
   )
 }
 
@@ -204,6 +154,8 @@ function LegConnector({
   leg,
   fallbackLabel,
   calculating,
+  routeUrl,
+  routeMode,
   /** Freeze displayed height — used while cards enter/exit/swap so leg morph can't push the list. */
   lockHeight = false,
   /** Optional cue for origin→first (e.g. 「从酒店」) — rendered as a prefix chip. */
@@ -212,16 +164,20 @@ function LegConnector({
   leg: ResolvedDayLeg | null | undefined
   fallbackLabel?: string
   calculating?: boolean
+  routeUrl?: string
+  routeMode?: GoogleMapsTravelMode
   lockHeight?: boolean
   originCue?: string
 }) {
   const mode = leg?.displayMode
   const tone =
-    mode === 'TRANSIT'
+    mode === 'TRANSIT' || routeMode === 'transit'
       ? 'border-sky-300/60 bg-sky-50 text-sky-900'
       : mode === 'DRIVING'
         ? 'border-[var(--copper)]/40 bg-[var(--copper)]/10 text-[var(--copper)]'
-        : 'border-[var(--stone)]/25 bg-[var(--mist)]/70 text-[var(--stone)]'
+        : routeMode === 'walking'
+          ? 'border-emerald-300/70 bg-emerald-50 text-emerald-900'
+          : 'border-[var(--stone)]/25 bg-[var(--mist)]/70 text-[var(--stone)]'
 
   const lines = leg?.transitLines || []
   const isCalculating = Boolean(calculating && !leg)
@@ -229,7 +185,7 @@ function LegConnector({
     ? 'calc'
     : lines.length > 0
       ? `transit:${originCue || ''}:${lines.length}`
-      : `simple:${originCue || ''}:${leg?.label || fallbackLabel || ''}`
+      : `simple:${originCue || ''}:${leg?.label || fallbackLabel || ''}:${routeMode || ''}`
 
   const measureRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -363,7 +319,7 @@ function LegConnector({
 
   return (
     <div
-      className="timeline-leg-connector flex items-start gap-3 px-2 py-1.5"
+      className="timeline-leg-connector flex items-center gap-3 px-2 py-1.5"
       aria-busy={isCalculating || undefined}
     >
       <div className="timeline-leg-rail" aria-hidden />
@@ -412,9 +368,29 @@ function LegConnector({
               )
             ) : (
               chipRow(
-                <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
-                  {leg?.label || fallbackLabel || '查看地图导航'}
-                </span>,
+                routeUrl ? (
+                  <a
+                    className={`timeline-route-link timeline-route-link--${routeMode || 'transit'} inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs`}
+                    href={routeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}，在 Google Maps 查看路线`}
+                  >
+                    <span className="timeline-route-link-label">
+                      {fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}
+                    </span>
+                    <ExternalLink
+                      className="timeline-route-link-arrow"
+                      size={12}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  </a>
+                ) : (
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
+                    {leg?.label || fallbackLabel || '查看地图导航'}
+                  </span>
+                ),
               )
             )}
           </div>
@@ -430,7 +406,6 @@ interface Props {
   customPlaces: Record<string, Place>
   selectedPlaceId: string | null
   navPlan: DayNavPlan
-  navLoading: boolean
   copyRefreshing?: boolean
   /** True while this day's stops are being regenerated via LLM. */
   dayRegenerating?: boolean
@@ -487,13 +462,47 @@ type DragSession = {
   startTop: number
 }
 
+const STOP_SKELETON_TITLE_WIDTHS = ['w-[62%]', 'w-[70%]', 'w-[56%]'] as const
+
+/** Matches the live stop card chrome while a day's places are still generating. */
+function TimelineStopCardSkeleton({ index }: { index: number }) {
+  const titleWidth =
+    STOP_SKELETON_TITLE_WIDTHS[index % STOP_SKELETON_TITLE_WIDTHS.length]
+  return (
+    <div
+      className="flex items-start gap-2 rounded-2xl border border-white/70 bg-[var(--card)] p-2.5 sm:gap-3 sm:p-3"
+      aria-hidden
+    >
+      <span className="mt-1 inline-flex h-7 w-7 shrink-0 rounded-md day-tab-shimmer" />
+      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 rounded-full day-tab-shimmer" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="h-5 w-[4.5rem] rounded-full day-tab-shimmer" />
+          <span className="h-3 w-8 rounded-full day-tab-shimmer" />
+        </div>
+        <span className={`mt-2 block h-4 rounded-full day-tab-shimmer ${titleWidth}`} />
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span className="h-3.5 w-[38%] rounded-full day-tab-shimmer" />
+          <span className="h-4 w-4 shrink-0 rounded-full day-tab-shimmer" />
+        </div>
+        <span className="mt-2 block h-3.5 w-[78%] rounded-full day-tab-shimmer" />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span className="h-6 w-14 rounded-full day-tab-shimmer" />
+          <span className="h-6 w-16 rounded-full day-tab-shimmer" />
+        </div>
+      </div>
+      <span className="hidden h-16 w-16 shrink-0 rounded-xl day-tab-shimmer sm:block" />
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 rounded-full day-tab-shimmer" />
+    </div>
+  )
+}
+
 export function DayTimeline({
   day,
   hotel,
   customPlaces,
   selectedPlaceId,
   navPlan,
-  navLoading,
   copyRefreshing,
   dayRegenerating = false,
   dayRegenError = null,
@@ -537,6 +546,7 @@ export function DayTimeline({
   const dragRef = useRef<DragSession | null>(null)
   const pointerRef = useRef({ x: 0, y: 0 })
   const floatRef = useRef({ x: 0, y: 0 })
+  const floatElRef = useRef<HTMLDivElement | null>(null)
   const velocityRef = useRef({ y: 0, lastY: 0, lastT: 0 })
   const rafRef = useRef<number | null>(null)
   const itemRefs = useRef<(HTMLLIElement | null)[]>([])
@@ -1038,20 +1048,47 @@ export function DayTimeline({
   }, [day.stops, day.day, exitGhosts])
 
   const dayOrigin = getDayOrigin(day.day, hotel)
-  // Origin cue chip shows 「从酒店」/「从机场」 — keep fallback free of that prefix.
-  const metroHint =
-    day.metroHintFromArea[hotel.areaKey] ||
-    day.metroHintFromArea.custom ||
-    '请根据地图出发。'
-
-  const stopPlaces = day.stops.map((stop) => {
+  const routePlaces = day.stops.map((stop): Place | null => {
     try {
       return getPlace(stop.placeId, customPlaces)
     } catch {
-      return { id: stop.placeId, type: 'attraction' as const, name: stop.placeId }
+      return null
     }
   })
+  const stopPlaces = routePlaces.map((place, index) =>
+    place || {
+      id: day.stops[index]?.placeId || `missing-${index}`,
+      type: 'attraction' as const,
+      name: day.stops[index]?.placeId || '未知地点',
+    },
+  )
   const stopNumbers = numberedStopIndexes(stopPlaces)
+  const routeCity = 'Paris, France'
+  const originRoutePoint = {
+    lat: dayOrigin.lat,
+    lng: dayOrigin.lng,
+    query:
+      dayOrigin.kind === 'airport' ? 'Charles de Gaulle Airport' : hotel.name,
+    city: routeCity,
+    placeId: dayOrigin.kind === 'hotel' ? hotel.googlePlaceId : undefined,
+  }
+  const firstRoutePlace = routePlaces[0]
+  const firstRouteMode = inferGoogleMapsTravelMode(
+    day.stops[0]?.transport,
+    day.stops[0]?.walkLevel,
+  )
+  const firstRouteUrl = firstRoutePlace
+    ? googleMapsDirectionsUrl({
+        origin: originRoutePoint,
+        destination: {
+          ...firstRoutePlace.location,
+          query: firstRoutePlace.name,
+          city: routeCity,
+          placeId: firstRoutePlace.googlePlaceId,
+        },
+        travelMode: firstRouteMode,
+      })
+    : undefined
 
   const isFixedAt = (index: number) => {
     const place = stopPlaces[index]
@@ -1062,7 +1099,11 @@ export function DayTimeline({
       !isLastDay &&
       index === day.stops.length - 1 &&
       place.id === SELECTED_HOTEL_PLACE_ID
-    return isCheckIn || isOvernight
+    const isReturnAirport =
+      isLastDay &&
+      index === day.stops.length - 1 &&
+      isAirportPlace(place)
+    return isCheckIn || isOvernight || isReturnAirport
   }
 
   const requestDelete = (stopKey: string, index: number) => {
@@ -1168,6 +1209,15 @@ export function DayTimeline({
     }
   }
 
+  const applyFloatPos = (x: number, y: number) => {
+    floatRef.current = { x, y }
+    const el = floatElRef.current
+    if (el) {
+      el.style.left = `${x}px`
+      el.style.top = `${y}px`
+    }
+  }
+
   const tickFloat = () => {
     const session = dragRef.current
     if (!session) {
@@ -1178,11 +1228,10 @@ export function DayTimeline({
     const targetY = pointerRef.current.y - session.grabY
     // Viscous follow — lags behind the finger for sticky inertia.
     const ease = 0.22
-    floatRef.current = {
-      x: floatRef.current.x + (targetX - floatRef.current.x) * ease,
-      y: floatRef.current.y + (targetY - floatRef.current.y) * ease,
-    }
-    setFloatPos({ ...floatRef.current })
+    applyFloatPos(
+      floatRef.current.x + (targetX - floatRef.current.x) * ease,
+      floatRef.current.y + (targetY - floatRef.current.y) * ease,
+    )
 
     const hover = pickHoverIndex(
       pointerRef.current.y,
@@ -1193,6 +1242,7 @@ export function DayTimeline({
     if (hover !== session.hover) {
       const next = { ...session, hover }
       dragRef.current = next
+      setFloatPos({ ...floatRef.current })
       setDrag(next)
     }
 
@@ -1280,6 +1330,12 @@ export function DayTimeline({
 
   useEffect(() => () => stopRaf(), [])
 
+  const dragFrom = drag?.from ?? null
+  useLayoutEffect(() => {
+    if (dragFrom === null || dropping) return
+    applyFloatPos(floatRef.current.x, floatRef.current.y)
+  }, [dragFrom, dropping])
+
   const beginDrag = (
     index: number,
     e: ReactPointerEvent,
@@ -1315,9 +1371,9 @@ export function DayTimeline({
       startTop: rect.top,
     }
     pointerRef.current = { x: e.clientX, y: e.clientY }
-    floatRef.current = { x: rect.left, y: rect.top }
     velocityRef.current = { y: 0, lastY: e.clientY, lastT: performance.now() }
     dragRef.current = session
+    applyFloatPos(rect.left, rect.top)
     setFloatPos({ x: rect.left, y: rect.top })
     setDrag(session)
     setDropping(false)
@@ -1361,27 +1417,6 @@ export function DayTimeline({
       .filter(Boolean)
       .join(' ')
 
-  if (dayPending) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
-          <LoadingIndicator
-            variant="block"
-            mode="thinking"
-            task="itineraryDayGenerate"
-            thinkingLabel={`正在生成第 ${day.day} 天行程…`}
-            generatingLabel={`正在生成第 ${day.day} 天行程…`}
-            showDots
-            size="md"
-          />
-          <p className="mt-2 text-center text-xs text-[var(--stone)]">
-            其他天可先查看，这一天生成好后会自动更新。
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       <div className="animate-fade-up rounded-2xl border border-white/70 bg-[var(--card)] p-4">
@@ -1392,7 +1427,7 @@ export function DayTimeline({
             </span>
             <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-xs text-[var(--sage)]">
               {dayPending ? (
-                <span className="inline-block h-3 w-16 animate-pulse rounded-full bg-white/20" />
+                <span className="inline-block h-3 w-16 rounded-full day-tab-shimmer" />
               ) : (
                 day.pace
               )}
@@ -1454,21 +1489,21 @@ export function DayTimeline({
         </div>
         <h3 className="font-display mt-2 text-2xl sm:text-3xl">
           {dayPending ? (
-            <span className="inline-block h-8 w-2/3 animate-pulse rounded bg-white/20" />
+            <span className="mt-1 inline-block h-8 w-2/3 rounded-full day-tab-shimmer" />
           ) : (
             day.title
           )}
         </h3>
         <p className="text-sm text-[var(--copper)]">
           {dayPending ? (
-            <span className="inline-block h-4 w-1/2 animate-pulse rounded bg-white/20" />
+            <span className="inline-block h-4 w-1/2 rounded-full day-tab-shimmer" />
           ) : (
             day.theme
           )}
         </p>
         <p className="mt-2 text-sm text-[var(--stone)]">
           {dayPending ? (
-            <span className="inline-block h-4 w-full animate-pulse rounded bg-white/20" />
+            <span className="mt-1 inline-block h-4 w-full rounded-full day-tab-shimmer" />
           ) : (
             day.summary
           )}
@@ -1478,32 +1513,36 @@ export function DayTimeline({
             {dayRegenError}
           </p>
         )}
-        {dayRegenerating && (
+        {(dayPending || dayRegenerating) && (
           <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-[var(--mist)]/40 px-3 py-3">
             <LoadingIndicator
               variant="inline"
-              thinkingLabel="正在仔细规划今天的行程…"
-              generatingLabel="正在重新生成今天的行程…"
+              thinkingLabel={
+                dayPending
+                  ? `正在生成第 ${day.day} 天行程…`
+                  : '正在仔细规划今天的行程…'
+              }
+              generatingLabel={
+                dayPending
+                  ? `正在生成第 ${day.day} 天行程…`
+                  : '正在重新生成今天的行程…'
+              }
               size="sm"
               showDots
               mode="thinking"
               task="itineraryDayGenerate"
             />
+            {dayPending ? (
+              <p className="mt-1.5 text-xs text-[var(--stone)]">
+                其他天可先查看，这一天生成好后会自动更新。
+              </p>
+            ) : null}
           </div>
         )}
         <div className="mt-3">
-          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm" aria-busy={navLoading || undefined}>
-            <span className="font-medium">今日步行：</span>
-            {navLoading ? (
-              <LoadingIndicator
-                className="ml-1 align-middle"
-                label="正在计算步行路线…"
-                size="sm"
-                showDots
-              />
-            ) : (
-              navPlan.walkSummaryText
-            )}
+          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm">
+            <span className="font-medium">路线导航：</span>
+            点击每段交通，在 Google Maps 查看实时路线
           </p>
         </div>
       </div>
@@ -1535,36 +1574,27 @@ export function DayTimeline({
           <div className="timeline-leg-slot-inner">
             <LegConnector
               leg={navPlan.hotelToFirst}
-              calculating={navLoading && !navPlan.hotelToFirst}
               lockHeight={lockLegHeight}
+              routeUrl={firstRouteUrl}
+              routeMode={firstRouteMode}
               originCue={
                 dayOrigin.kind === 'airport' ? '从机场' : '从酒店'
               }
-              fallbackLabel={
-                navLoading
-                  ? '计算出发方式…'
-                  : navPlan.hotelToFirstText || metroHint
-              }
+              fallbackLabel={`${googleMapsTravelModeLabel(firstRouteMode)} · Google Maps`}
             />
           </div>
         </div>
       )}
 
       {dayPending ? (
-        <div className="space-y-1">
+        <div
+          className="space-y-1"
+          role="status"
+          aria-busy="true"
+          aria-label={`正在加载第 ${day.day} 天行程地点`}
+        >
           {Array.from({ length: 3 }, (_, i) => (
-            <div
-              // eslint-disable-next-line react/no-array-index-key
-              key={i}
-              className="rounded-2xl border border-white/10 bg-[var(--mist)]/25 p-3 animate-pulse"
-            >
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-10 rounded-full bg-white/20" />
-                <div className="h-4 w-24 rounded bg-white/20" />
-              </div>
-              <div className="mt-3 h-4 w-3/4 rounded bg-white/20" />
-              <div className="mt-2 h-3 w-full rounded bg-white/20" />
-            </div>
+            <TimelineStopCardSkeleton key={i} index={i} />
           ))}
         </div>
       ) : (
@@ -1603,6 +1633,11 @@ export function DayTimeline({
           const isHotelStop = isHotelPlace(place)
           const isAirportStop = isAirportPlace(place)
           const isGhost = liveIndex == null
+          const isReturnAirport =
+            !isGhost &&
+            isLastDay &&
+            liveIndex === day.stops.length - 1 &&
+            isAirportStop
           const isFixedHotel =
             !isGhost && liveIndex != null ? isFixedAt(liveIndex) : false
           const pinTitle =
@@ -1611,6 +1646,12 @@ export function DayTimeline({
               : '回酒店过夜固定为末站'
           const legToNext =
             liveIndex != null ? navPlan.betweenStops[liveIndex] : undefined
+          const nextStop =
+            liveIndex != null ? day.stops[liveIndex + 1] : undefined
+          const nextRouteMode = inferGoogleMapsTravelMode(
+            nextStop?.transport,
+            nextStop?.walkLevel,
+          )
           const legInbound =
             liveIndex == null
               ? null
@@ -1665,7 +1706,21 @@ export function DayTimeline({
             }
           }
 
-          const cardInner = (
+          const cardInner = isReturnAirport ? (
+            <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+              <span
+                className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                title="机场"
+                aria-label="机场"
+              >
+                <PlaneIcon />
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="text-xs text-[var(--stone)]">今日终点</span>
+                <p className="mt-1 font-medium">{place.name}</p>
+              </div>
+            </div>
+          ) : (
             <div
               className={`flex items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 ${
                 active
@@ -1696,7 +1751,7 @@ export function DayTimeline({
                     if (card) beginDrag(liveIndex, e, card)
                   }}
                 >
-                  ⋮⋮
+                  <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                 </span>
               )}
               {isHotelStop ? (
@@ -1761,7 +1816,10 @@ export function DayTimeline({
                 <GooglePlacePhoto
                   name={place.name}
                   nameLocal={place.nameLocal}
+                  googlePlaceId={place.googlePlaceId}
+                  tripadvisorContentId={place.tripadvisorContentId}
                   location={place.location}
+                  type={place.type}
                   fallback={place.image}
                   alt={place.name}
                   className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
@@ -1927,7 +1985,10 @@ export function DayTimeline({
                           <GooglePlacePhoto
                             name={oldSwapPlace.name}
                             nameLocal={oldSwapPlace.nameLocal}
+                            googlePlaceId={oldSwapPlace.googlePlaceId}
+                            tripadvisorContentId={oldSwapPlace.tripadvisorContentId}
                             location={oldSwapPlace.location}
+                            type={oldSwapPlace.type}
                             fallback={oldSwapPlace.image}
                             alt={oldSwapPlace.name}
                             className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
@@ -1969,12 +2030,30 @@ export function DayTimeline({
                   <div className="timeline-leg-slot-inner">
                     <LegConnector
                       leg={legToNext}
-                      calculating={navLoading && !legToNext}
                       lockHeight={lockLegHeight}
+                      routeMode={nextRouteMode}
+                      routeUrl={
+                        place.location && routePlaces[liveIndex + 1]
+                          ? googleMapsDirectionsUrl({
+                              origin: {
+                                ...place.location,
+                                query: place.name,
+                                city: routeCity,
+                                placeId: place.googlePlaceId,
+                              },
+                              destination: {
+                                ...routePlaces[liveIndex + 1]!.location,
+                                query: routePlaces[liveIndex + 1]!.name,
+                                city: routeCity,
+                                placeId:
+                                  routePlaces[liveIndex + 1]!.googlePlaceId,
+                              },
+                              travelMode: nextRouteMode,
+                            })
+                          : undefined
+                      }
                       fallbackLabel={
-                        navLoading
-                          ? '计算前往方式…'
-                          : stop.transport || '查看地图导航'
+                        `${googleMapsTravelModeLabel(nextRouteMode)} · Google Maps`
                       }
                     />
                   </div>
@@ -1988,12 +2067,13 @@ export function DayTimeline({
 
       {drag && (
         <div
+          ref={floatElRef}
           className={`timeline-drag-float pointer-events-none fixed z-[80] ${
             dropping ? 'timeline-drag-float-settle' : 'timeline-drag-float-lifted'
           }`}
           style={{
-            left: floatPos.x,
-            top: floatPos.y,
+            left: dropping ? floatPos.x : undefined,
+            top: dropping ? floatPos.y : undefined,
             width: drag.width,
           }}
         >
@@ -2015,7 +2095,7 @@ export function DayTimeline({
               return (
                 <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
                   <span className="mt-1 inline-flex h-7 cursor-grabbing items-center justify-center rounded-md bg-[var(--mist)] px-2 text-xs text-[var(--stone)]">
-                    ⋮⋮
+                    <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                   </span>
                   {isHotelStop ? (
                     <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white">
@@ -2065,7 +2145,10 @@ export function DayTimeline({
                   <GooglePlacePhoto
                     name={place.name}
                     nameLocal={place.nameLocal}
+                    googlePlaceId={place.googlePlaceId}
+                    tripadvisorContentId={place.tripadvisorContentId}
                     location={place.location}
+                    type={place.type}
                     fallback={place.image}
                     alt={place.name}
                     className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
@@ -2091,9 +2174,10 @@ export function DayTimeline({
             type="button"
             onClick={() => setAddOpen(true)}
             disabled={dayRestoring}
-            className="w-full rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
           >
-            + 添加地点
+            <Plus size={15} strokeWidth={2} aria-hidden />
+            添加地点
           </button>
 
           <AddPlaceDialog

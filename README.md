@@ -14,7 +14,7 @@ Invite-only Paris trip planner with per-account cloud save and realtime sync. Sh
 - **AI itinerary generation**: Multi-day plans from flights, hotels, and preferences; single-day reshuffle supported
 - **TripChat**: Natural-language itinerary edits (add/swap places, change hotels, switch days, etc.)
 - **Place add**: LLM recommendations or Google search; place details, photos, and reviews
-- **Map & navigation**: Google Maps for the day’s route; Directions; flight lookup via TimeTable Lookup first
+- **Map & navigation**: MapLibre + OpenStreetMap for the day map; openrouteservice road geometry; key-free Google Maps navigation links
 - **Hotels / flights**: Hotel area recommendations and selection; flight templates and live schedule lookup
 
 ## Stack
@@ -22,7 +22,7 @@ Invite-only Paris trip planner with per-account cloud save and realtime sync. Sh
 | Layer | Tech |
 |-------|------|
 | Frontend | Vite · React 19 · TypeScript · Tailwind CSS v4 |
-| Maps | Google Maps (`@react-google-maps/api`); Leaflet fallback |
+| Maps | MapLibre GL JS + OpenStreetMap; openrouteservice road geometry |
 | Backend / data | Supabase (Auth · Postgres · Realtime · RLS) |
 | API proxy | Vercel Serverless (`/api/*`): OpenAI, Gemini, RapidAPI, share email |
 | Email | Resend (optional; without it you can copy invite links) |
@@ -57,6 +57,7 @@ See [`.env.example`](.env.example). **Never commit secrets.**
 # --- Server (no VITE_ prefix) ---
 RAPIDAPI_KEY=              # Flights: TimeTable Lookup / AeroDataBox
 DEEPSEEK_API_KEY=          # Preferred default LLM (itinerary, chat, recommendations)
+OPENROUTESERVICE_API_KEY=  # Road geometry for the itinerary map (server-only)
 # DEEPSEEK_BASE_URL=       # Optional; default https://api.deepseek.com/v1
 OPENAI_API_KEY=            # Optional OpenAI models in the picker
 # OPENAI_BASE_URL=         # Optional; default https://api.openai.com/v1
@@ -70,19 +71,19 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- Browser (VITE_) ---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_MAPS_API_KEY=
+VITE_GOOGLE_MAPS_API_KEY=  # Google Places photos/embed only; not used to load the itinerary map
 # VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # Default DeepSeek model (or deepseek-v4-pro)
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # Override default to an OpenAI model
 # VITE_LLM_ENABLED=true              # false hides LLM features
 ```
 
-On Google Cloud, enable **Maps JavaScript API**, **Places API (New)**, and **Directions API**. Add these HTTP referrers:
+The itinerary map does not use Maps JavaScript API or Directions API. The browser Google key is retained only for Google Places photos/embed; enable the matching Places API and add these HTTP referrers:
 
 - `http://127.0.0.1:5173/*`
 - `http://localhost:5173/*`
 - `https://paristour.vercel.app/*`
 
-A local `RefererNotAllowedMapError` usually means one of the above is missing.
+A local Google Places referrer error usually means one of the above is missing. Create an openrouteservice key at [HeiGIT](https://account.heigit.org/) and store it only as the server-side `OPENROUTESERVICE_API_KEY`.
 
 On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + allowlist. Without `RESEND_API_KEY`, sharing still works—the UI prompts you to copy the invite link manually.
 

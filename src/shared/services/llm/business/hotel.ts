@@ -11,6 +11,8 @@ import { LlmRequestError } from '../errors'
 import { extractJsonObject } from '../json'
 import type { HotelDetailCopy, HotelRecommendation } from '../types'
 import { generateText, isLlmConfigured } from './_service'
+import { callOpenAIMessagesStream } from '../transport'
+import { extractPartialJsonStringField } from '../stream'
 
 export type { HotelDetailCopy, HotelRecommendation }
 
@@ -18,33 +20,50 @@ function toExcludeSet(names: string[]): Set<string> {
   return new Set(names.map((n) => n.toLowerCase().trim()).filter(Boolean))
 }
 
-/** Rich hotel narrative for the detail popup: intro, why recommended, trip fit. */
+/** Rich hotel narrative for the detail popup: one concise recommendation reason. */
 export async function generateHotelDetailCopy(input: {
   name: string
   area: string
   address: string
   nearestMetro?: string
-  ratingHint?: string
-  existingDescription?: string
+  rating?: number
+  reviewCount?: number
+  starRating?: number
+  propertyType?: string
+  facilities?: string[]
+  reviewScores?: Array<{ label: string; score: number }>
+  locationDescription?: string
+  districtLabel?: string
+  distanceToCityCenterKm?: number
+  featuredReviews?: Array<{
+    text: string
+    negativeText?: string
+    rating?: number
+    author?: string
+  }>
   existingReason?: string
   isBest?: boolean
   userPreferences?: string
   tripDays?: Array<{ day: number; title: string; pace: string; theme: string }>
+  /** Progressive `reason` while JSON streams (omit on cache hits). */
+  onPartial?: (partial: { reason?: string }) => void
+  signal?: AbortSignal
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
   const system = buildPrompt(
-    '旅行住宿顾问。为酒店详情页写简洁中文点评。',
+    '旅行住宿顾问。为酒店详情页写一段简洁的中文推荐理由。',
     null,
     `<hard_rules>
-- intro：2–3 句酒店简介（氛围、区位、适合谁），可吸收 existingDescription 但要更完整。
-- reason：1–2 句说明为何出现在推荐列表 / 为何值得考虑。
-- tripFit：2–3 句说明它与本次行程（地铁出行、迪士尼日、自驾日、抵达日倒时差等）以及 userPreferences 的匹配关系；若无偏好则按行程常识写。
-- 不要编造具体房价数字；不要把卢浮宫/凡尔赛周边当唯一卖点。
+- 只输出 reason 一个字段，3–5 句连贯中文，不要分标题或小标题。
+- 综合 hotel 资料与 featuredReviews：区位、评分细项、设施亮点、住客好评/差评要点。
+- 可轻点与 trip / userPreferences 的匹配，但不要写成单独的「行程关系」段落。
+- 不要复述 Booking 英文原文；不要编造房价；不要把卢浮宫/凡尔赛周边当唯一卖点。
+- 若无精选评论，仅依据酒店资料写推荐理由。
 </hard_rules>`,
     jsonContract(
-      '{ intro: "string", reason: "string", tripFit: "string" }',
-      '{ "intro": "16区特罗卡德罗一带的现代精品酒店，紧邻地铁 9 号线。", "reason": "评分 4.6 且步行可上特罗卡德罗平台看铁塔。", "tripFit": "与本次行程的迪士尼日、自驾日衔接顺畅，地铁直达右岸经典。" }',
+      '{ reason: "string" }',
+      '{ "reason": "玛黑区步行可达蓬皮杜与孚日广场，Booking 住客普遍称赞位置与员工服务；地铁 3、4 号线方便衔接本次右岸经典日与迪士尼安排，适合追求在地体验的旅客。" }',
     ),
   )
   const user = JSON.stringify({
@@ -53,41 +72,147 @@ export async function generateHotelDetailCopy(input: {
       area: input.area,
       address: input.address,
       nearestMetro: input.nearestMetro || '',
-      ratingHint: input.ratingHint || '',
-      existingDescription: input.existingDescription || '',
+      rating: input.rating ?? null,
+      reviewCount: input.reviewCount ?? null,
+      starRating: input.starRating ?? null,
+      propertyType: input.propertyType || '',
+      facilities: (input.facilities || []).slice(0, 12),
+      reviewScores: input.reviewScores || [],
+      locationDescription: input.locationDescription || '',
+      districtLabel: input.districtLabel || '',
+      distanceToCityCenterKm: input.distanceToCityCenterKm ?? null,
       existingReason: input.existingReason || '',
       isBest: Boolean(input.isBest),
     },
+    featuredReviews: (input.featuredReviews || []).slice(0, 6).map((review) => ({
+      text: review.text,
+      negativeText: review.negativeText || '',
+      rating: review.rating ?? null,
+      author: review.author || '',
+    })),
     userPreferences: input.userPreferences || null,
     trip: input.tripDays || [],
   })
 
-  const text = await generateText(system, user, {
-    task: 'hotelDetail',
-    json: true,
-    userText: input.userPreferences || input.name,
-  })
+  const text = await (async () => {
+    let lastReason = ''
+    try {
+      return await callOpenAIMessagesStream(
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        {
+          task: 'hotelDetail',
+          userText: input.userPreferences || input.name,
+          signal: input.signal,
+          onDelta: (_delta, fullText) => {
+            if (!input.onPartial) return
+            const reason = extractPartialJsonStringField(fullText, 'reason')
+            if (reason == null || reason === lastReason) return
+            lastReason = reason
+            input.onPartial({ reason })
+          },
+        },
+      )
+    } catch {
+      return ''
+    }
+  })()
   if (!text) return null
   const parsed = extractJsonObject(text)
   if (!parsed) return null
 
-  const intro = String(parsed.intro || parsed.description || '').trim()
-  const reason = String(parsed.reason || '').trim()
-  const tripFit = String(parsed.tripFit || parsed.fit || '').trim()
-  if (!intro && !reason && !tripFit) return null
+  const reason = String(parsed.reason || parsed.recommendation || '').trim()
+  if (!reason) return null
+
+  if (input.onPartial) input.onPartial({ reason })
 
   return {
-    intro: intro || input.existingDescription || `${input.name}，位于${input.area}。`,
-    reason: reason || input.existingReason || '适合作为巴黎行程的住宿起点。',
-    tripFit:
-      tripFit ||
-      '地铁便利，便于连接本行程中的右岸经典、左岸轻松日与迪士尼/自驾安排。',
+    intro: '',
+    reason,
+    tripFit: '',
   }
+}
+
+/** One-line Chinese blurb for a custom hotel picker card. */
+export async function generateHotelCardBlurb(input: {
+  name: string
+  area?: string
+  address?: string
+  description?: string
+  locationDescription?: string
+  starRating?: number
+  propertyType?: string
+  rating?: number
+  facilities?: string[]
+  onPartial?: (blurb: string) => void
+  signal?: AbortSignal
+}): Promise<string | null> {
+  if (!isLlmConfigured()) return null
+
+  const system = buildPrompt(
+    '旅行住宿顾问。为酒店候选项卡片写一句中文简介。',
+    null,
+    `<hard_rules>
+- 只输出 blurb 一个字段：恰好 1 句中文，约 18–40 字，不要句号堆砌，不要分点。
+- 抓住最有辨识度的 1–2 个点：区位/星级/一两个设施或交通，不要翻译或压缩 Booking 英文长简介。
+- 不要编造房价、评分或距离；资料没有的信息不要写。
+- 不要出现「自定义」「推荐理由」等元叙述。
+</hard_rules>`,
+    jsonContract(
+      '{ blurb: "string" }',
+      '{ "blurb": "特罗卡德罗四星酒店，步行可到埃菲尔铁塔，住客评分很高。" }',
+    ),
+  )
+  const user = JSON.stringify({
+    name: input.name,
+    area: input.area || '',
+    address: input.address || '',
+    starRating: input.starRating ?? null,
+    propertyType: input.propertyType || '',
+    rating: input.rating ?? null,
+    facilities: (input.facilities || []).slice(0, 8),
+    description: (input.description || '').slice(0, 500),
+    locationDescription: (input.locationDescription || '').slice(0, 400),
+  })
+
+  let lastBlurb = ''
+  const text = await (async () => {
+    try {
+      return await callOpenAIMessagesStream(
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        {
+          task: 'hotelDetail',
+          userText: input.name,
+          signal: input.signal,
+          onDelta: (_delta, fullText) => {
+            if (!input.onPartial) return
+            const blurb = extractPartialJsonStringField(fullText, 'blurb')
+            if (blurb == null || blurb === lastBlurb) return
+            lastBlurb = blurb
+            input.onPartial(blurb)
+          },
+        },
+      )
+    } catch {
+      return ''
+    }
+  })()
+  if (!text) return null
+  const parsed = extractJsonObject(text)
+  const blurb = String(parsed?.blurb || parsed?.reason || lastBlurb || '').trim()
+  if (!blurb) return null
+  if (input.onPartial && blurb !== lastBlurb) input.onPartial(blurb)
+  return blurb
 }
 
 /**
  * Recommend Paris stay options via LLM (no local hotel catalog).
- * Caller should resolve names with Google Places afterwards.
+ * Caller should resolve names with Booking afterwards.
  */
 export async function recommendHotelsForTrip(input?: {
   batch?: number
@@ -127,8 +252,8 @@ export async function recommendHotelsForTrip(input?: {
 - area 统一写成「N区 (Français / 中文)」格式，例如「4区 (Marais / 玛黑)」「9区 (Opéra / 歌剧院)」「16区 (Trocadéro / 特罗卡德罗)」。
 - 优先 3–4区玛黑 / 2区大林荫道 / 9区歌剧院 / 6区圣日耳曼 / 5区拉丁区 等地铁便利区。
 - 若提供 userPreferences，必须优先满足（区位、预算、风格、安静/便利等）。
-- name 用 Google Maps 可搜到的正式店名；尽量附带含邮编的 address（如 75004 Paris）。
-- 只能从 verifiedCandidates 中选择；name、googlePlaceId 与 address 必须原样复制，不得编造酒店或评分。
+- name 使用 Booking 返回的正式店名；尽量附带含邮编的 address（如 75004 Paris）。
+- 只能从 verifiedCandidates 中选择；name、bookingHotelId 与 address 必须原样复制，不得编造酒店或评分。
 - ${
     count === 1
       ? '仅 1 家时 isBest 必须为 true。'
@@ -138,8 +263,8 @@ export async function recommendHotelsForTrip(input?: {
 - description：2 句中文；reason：一句话为何适合本次行程/用户偏好。
 </hard_rules>`,
     jsonContract(
-      '{ hotels: [{ name, googlePlaceId?, area: "N区 (Français / 中文)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }',
-      '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "googlePlaceId": "...", "area": "4区 (Marais / 玛黑)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "nearestMetro": "Saint-Sébastien – Froissart (8号线)", "priceHint": "€€€", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。", "isBest": true }] }',
+      '{ hotels: [{ name, bookingHotelId?, area: "N区 (Français / 中文)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }',
+      '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "bookingHotelId": "...", "area": "4区 (Marais / 玛黑)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "nearestMetro": "Saint-Sébastien – Froissart (8号线)", "priceHint": "€€€", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。", "isBest": true }] }',
     ),
   )
   const user = JSON.stringify({
@@ -194,7 +319,7 @@ export async function recommendHotelsForTrip(input?: {
     if (!item || typeof item !== 'object') continue
     const row = item as Record<string, unknown>
     const proposedName = String(row.name || '').trim()
-    const proposedId = String(row.googlePlaceId || '').trim()
+    const proposedId = String(row.bookingHotelId || '').trim()
     const verified =
       (proposedId ? verifiedById.get(proposedId) : undefined) ||
       verifiedByName.get(proposedName.toLowerCase())
@@ -203,7 +328,7 @@ export async function recommendHotelsForTrip(input?: {
     const key = name.toLowerCase()
     if (exclude.has(key) || seen.has(key)) continue
     out.push({
-      googlePlaceId: verified.id,
+      bookingHotelId: verified.id,
       name,
       area: String(row.area || '巴黎市区').trim() || '巴黎市区',
       address: verified.address || String(row.address || '').trim() || undefined,

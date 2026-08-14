@@ -1,0 +1,99 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { setLlmArtifact, resetLlmArtifactStoreForTests } from '../shared/services/llm/llmArtifactStore'
+import {
+  invalidatePlaceWebsitePhotosCache,
+  peekCachedPlaceWebsitePhotos,
+  resetPlaceWebsitePhotosForTests,
+  websiteCacheKeys,
+} from '../features/place/services/placeWebsitePhotos'
+
+describe('place website photo cache', () => {
+  beforeEach(() => {
+    resetLlmArtifactStoreForTests()
+    resetPlaceWebsitePhotosForTests()
+  })
+
+  it('treats www and trailing-slash website URLs as the same cache', () => {
+    setLlmArtifact(
+      websiteCacheKeys('https://www.rest-maxan.com/')[0],
+      { photos: ['https://cdn.example/maxan.jpg'] },
+      { silent: true },
+    )
+
+    expect(
+      peekCachedPlaceWebsitePhotos({ website: 'https://rest-maxan.com' }).photos,
+    ).toEqual(['https://cdn.example/maxan.jpg'])
+  })
+
+  it('finds official-site photos from a cached official URL even when Google has none', () => {
+    setLlmArtifact(
+      'place-official-website:v1:Parallel Coffee|平行咖啡|',
+      { website: 'https://parallelcoffee.fr/' },
+      { silent: true },
+    )
+    setLlmArtifact(
+      websiteCacheKeys('https://parallelcoffee.fr/')[0],
+      { photos: ['https://cdn.example/parallel.jpg'] },
+      { silent: true },
+    )
+
+    expect(
+      peekCachedPlaceWebsitePhotos({
+        name: 'Parallel Coffee',
+        nameLocal: '平行咖啡',
+      }).photos,
+    ).toEqual(['https://cdn.example/parallel.jpg'])
+  })
+
+  it('remembers a failed website scrape so the next open skips it', () => {
+    setLlmArtifact(
+      websiteCacheKeys('https://www.sognoparis.com/')[0],
+      { photos: [], miss: true },
+      { silent: true },
+    )
+
+    expect(
+      peekCachedPlaceWebsitePhotos({
+        website: 'https://sognoparis.com',
+        name: 'Sogno',
+      }),
+    ).toEqual({ photos: [], miss: true })
+  })
+
+  it('treats a cached null official website as a miss', () => {
+    setLlmArtifact(
+      'place-official-website:v1:Sogno||',
+      { website: null },
+      { silent: true },
+    )
+
+    expect(peekCachedPlaceWebsitePhotos({ name: 'Sogno' })).toEqual({
+      photos: [],
+      miss: true,
+    })
+  })
+
+  it('clears a persisted place miss so an explicit refresh can retry', () => {
+    setLlmArtifact(
+      'place-official-website:v1:All Good + Sucré|好事甜咖啡曲奇店|233 Bd Pereire, 75017 Paris',
+      { website: null },
+      { silent: true },
+    )
+    setLlmArtifact(
+      'place-website-photos-by-place:v1:all good + sucré',
+      { photos: [], miss: true },
+      { silent: true },
+    )
+
+    const input = {
+      name: 'All Good + Sucré',
+      nameLocal: '好事甜咖啡曲奇店',
+      address: '233 Bd Pereire, 75017 Paris',
+    }
+    expect(peekCachedPlaceWebsitePhotos(input)).toEqual({ photos: [], miss: true })
+
+    invalidatePlaceWebsitePhotosCache(input)
+
+    expect(peekCachedPlaceWebsitePhotos(input)).toEqual({ photos: [] })
+  })
+})

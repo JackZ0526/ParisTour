@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
+import { fetchPlaceWebsitePhotosWithFallback } from '../../place/services/placeWebsitePhotos'
+import { fetchTripadvisorAttractionInfo } from '../../place/services/tripadvisorPlacePhotos'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -17,6 +19,12 @@ import {
   peekPlaceDetailCopy,
   placeDetailKeysFromPlace,
 } from '../../place/services/placeDetailMemo'
+import {
+  nearbyStopsForAdvisor,
+  placeAdvisorCopyFields,
+  placeAdvisorFactsSignature,
+  type PlaceAdvisorFacts,
+} from '../../place/services/placeAdvisorFacts'
 import {
   persistHotelState,
   refreshHotelCandidates,
@@ -53,7 +61,6 @@ import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
 import {
@@ -100,8 +107,6 @@ export interface TripChatHandlers {
 import { ChatBubbleIcon } from './ChatBubbleIcon'
 import {
   CHAT_WORK_STEP_LABELS,
-  ChatWorkStepsPanel,
-  StoredChatWorkStepsPanel,
   actionsNeedPlaceLookup,
   activateChatWorkStep,
   finishChatWorkSteps,
@@ -110,6 +115,10 @@ import {
   searchStepLabel,
   type ChatWorkStep,
 } from './ChatWorkStepList'
+import {
+  ChatWorkStepsPanel,
+  StoredChatWorkStepsPanel,
+} from './ChatWorkStepPanels'
 import {
   ChatReasoningDisclosure,
   StoredChatReasoningDisclosure,
@@ -159,7 +168,6 @@ export function TripChatPanel({
   viewing = null,
   handlers,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -175,6 +183,8 @@ export function TripChatPanel({
   const [pendingStory, setPendingStory] = useState<HotelDetailCopy | null>(null)
   const [pendingStoryLoading, setPendingStoryLoading] = useState(false)
   const [pendingStoryRegenToken, setPendingStoryRegenToken] = useState(0)
+  const [advisorFacts, setAdvisorFacts] = useState<PlaceAdvisorFacts | null>(null)
+  const [advisorFactsPendingId, setAdvisorFactsPendingId] = useState<string | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [busyUserText, setBusyUserText] = useState('')
   const [workSteps, setWorkSteps] = useState<ChatWorkStep[]>([])
@@ -196,8 +206,8 @@ export function TripChatPanel({
     thinkingEnabled: requestThinkingEnabled,
   })
   // Snapshot day/hotel context so itinerary edits don't re-fire LLM mid-confirm.
-  const pendingCtxRef = useRef({ hotel, days })
-  pendingCtxRef.current = { hotel, days }
+  const pendingCtxRef = useRef({ hotel, days, customPlaces })
+  pendingCtxRef.current = { hotel, days, customPlaces }
   workStepsRef.current = workSteps
   reasoningTextRef.current = reasoningText
 
@@ -250,6 +260,7 @@ export function TripChatPanel({
   }
 
   const activePending = pendingPlaces[0] ?? null
+  const activePendingId = activePending?.id
 
   // If pending exists but the portaled detail page never painted, force remount.
   useEffect(() => {
@@ -268,6 +279,10 @@ export function TripChatPanel({
       window.clearTimeout(timer)
     }
   }, [pendingPlaces, confirmEpoch])
+
+  const factsForPending =
+    advisorFactsPendingId === activePending?.id ? advisorFacts : null
+  const factsSig = placeAdvisorFactsSignature(factsForPending)
 
   // Generate intro + 推荐理由 when pending confirm opens (same memo as PlacePanel).
   useEffect(() => {
@@ -306,12 +321,22 @@ export function TripChatPanel({
       return
     }
 
+    if (!factsSig) {
+      setPendingStory({ intro: '', reason: '', tripFit: '' })
+      setPendingStoryLoading(true)
+      return
+    }
+
     let cancelled = false
     setPendingStory({ intro: '', reason: '', tripFit: '' })
     setPendingStoryLoading(true)
 
     const ctx = pendingCtxRef.current
     const day = ctx.days.find((d) => d.day === pending.dayNum)
+    const facts = placeAdvisorCopyFields(factsForPending)
+    const nearbyStops = day
+      ? nearbyStopsForAdvisor(day.stops, undefined, ctx.customPlaces)
+      : []
 
     void memoizePlaceDetailCopy(
       detailKeys,
@@ -320,8 +345,16 @@ export function TripChatPanel({
           name: place.name,
           nameLocal: place.nameLocal,
           type: place.type,
+          address: facts.address,
           existingDescription: place.description,
+          listingDescription: facts.listingDescription,
           stopNote,
+          rating: facts.rating,
+          reviewCount: facts.reviewCount,
+          priceLevel: facts.priceLevel,
+          cuisine: facts.cuisine,
+          featuredReviews: facts.featuredReviews,
+          nearbyStops,
           day: pending.dayNum,
           dayTitle: day?.title,
           dayTheme: day?.theme,
@@ -366,11 +399,24 @@ export function TripChatPanel({
     }
     // Only re-run when the pending confirm target changes or user regenerates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePending?.id, pendingStoryRegenToken])
+  }, [activePending?.id, pendingStoryRegenToken, factsSig])
 
   useEffect(() => {
     setPendingStoryRegenToken(0)
   }, [activePending?.id])
+
+  useEffect(() => {
+    if (!activePendingId || !isLlmConfigured()) return
+    if (factsSig) return
+    const pendingId = activePendingId
+    const timer = window.setTimeout(() => {
+      setAdvisorFactsPendingId(pendingId)
+      setAdvisorFacts((prev) =>
+        prev?.settled ? prev : { reviews: prev?.reviews || [], settled: true },
+      )
+    }, 12_000)
+    return () => window.clearTimeout(timer)
+  }, [activePendingId, factsSig])
 
   // Keep the panel mounted through the close animation so exit can play.
   useEffect(() => {
@@ -455,9 +501,36 @@ export function TripChatPanel({
     note?: string
     dayNum: number
   }): Promise<Place> {
-    if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加地点。')
-
     const placeType: PlaceType = input.placeType || 'attraction'
+    if (placeType === 'attraction') {
+      const ta = await fetchTripadvisorAttractionInfo({
+        name: input.placeName,
+      })
+      if (!ta?.location) {
+        throw new Error(`找不到景点「${input.placeName}」，请换个更完整的名称。`)
+      }
+      const travelerNote = !isOperationalStopNote(input.note) ? input.note?.trim() : undefined
+      const hasUsefulNote = Boolean(travelerNote && travelerNote.length >= 12)
+      return {
+        id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        tripadvisorContentId: ta.contentId,
+        name: ta.name || input.placeName,
+        type: 'attraction',
+        description:
+          (hasUsefulNote ? travelerNote : undefined) ||
+          ta.description ||
+          `${ta.name}，适合安排进第 ${input.dayNum} 天行程。`,
+        ratingHint:
+          ta.rating != null ? `Tripadvisor ★ ${ta.rating.toFixed(1)}` : 'Tripadvisor 景点',
+        image: ta.photos[0] || FALLBACK_IMAGE,
+        location: ta.location,
+        googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          `${ta.name} Paris`,
+        )}`,
+        durationHint: '90 分钟',
+      }
+    }
+
     const hotelLocation =
       Number.isFinite(hotel.lat) &&
       Number.isFinite(hotel.lng) &&
@@ -505,13 +578,26 @@ export function TripChatPanel({
       if (blurb) description = blurb
     }
 
+    const websitePhotos = (
+      await fetchPlaceWebsitePhotosWithFallback({
+        website: details.website,
+        name: details.name,
+        nameLocal: details.nameOriginal,
+        address: details.address,
+      }).catch(() => ({ photos: [] }))
+    ).photos
+    const websitePhoto = websitePhotos[0] || null
+
     return {
       id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: details.name,
       type: placeType,
       description,
+      googleRating: details.rating,
+      googleUserRatingCount: details.userRatingCount,
+      googleAddress: details.address,
       ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
-      image: details.photos[0] || FALLBACK_IMAGE,
+      image: websitePhoto || FALLBACK_IMAGE,
       location: details.location,
       googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
       durationHint: placeType === 'cafe' ? '45 分钟' : '90 分钟',
@@ -523,8 +609,6 @@ export function TripChatPanel({
     workingCandidates: HotelCandidate[],
     workingHotel: SelectedHotel,
   ): Promise<{ note: string; candidates: HotelCandidate[]; hotel: SelectedHotel }> {
-    if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加酒店。')
-
     const existing = matchHotelCandidate(workingCandidates, action.hotelName)
     if (existing) {
       const selectedHotel = candidateToSelected(existing)
@@ -1380,7 +1464,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'refresh_hotels') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试推荐酒店。')
           const result = await refreshHotelCandidates({
             current: workingCandidates,
             preferences: action.preferences,
@@ -1399,7 +1482,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_hotel') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试替换酒店。')
           const from = matchHotelCandidate(workingCandidates, action.fromHotelName)
           if (!from) {
             notes.push(`候选项里没有「${action.fromHotelName}」`)
@@ -1422,7 +1504,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_hotels') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试替换酒店。')
           const fromHotels: HotelCandidate[] = []
           for (const name of action.fromHotelNames) {
             const hit = matchHotelCandidate(workingCandidates, name)
@@ -1904,12 +1985,21 @@ export function TripChatPanel({
         name={activePending?.place.name || ''}
         nameLocal={activePending?.place.nameLocal}
         googlePlaceId={activePending?.place.googlePlaceId}
+        googleRating={activePending?.place.googleRating}
+        googleRatingCount={activePending?.place.googleUserRatingCount}
+        googleAddress={activePending?.place.googleAddress}
+        googleRatingHint={activePending?.place.ratingHint}
         location={activePending?.place.location}
+        placeType={activePending?.place.type}
         fallbackImage={activePending?.place.image}
         showMap={false}
         overlayClassName="z-[2300]"
         overlayZIndex={2500}
         closeOnBackdrop={activePending?.status !== 'rerecommending'}
+        onAdvisorFacts={(next) => {
+          setAdvisorFactsPendingId(activePending?.id || null)
+          setAdvisorFacts(next)
+        }}
         llmNarrative={
           activePending
             ? {
@@ -1984,4 +2074,3 @@ export function TripChatPanel({
     </>
   )
 }
-

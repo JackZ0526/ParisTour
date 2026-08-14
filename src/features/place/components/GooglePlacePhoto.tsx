@@ -1,12 +1,34 @@
 import { useEffect, useState } from 'react'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
-import { fetchGooglePlacePhoto, placePhotoQuery } from '../../map/services/googlePlacePhotos'
-import type { Coordinates } from '../../../types'
+import { Image } from 'lucide-react'
+import {
+  fetchRapidApiGooglePhotoFallbackById,
+  peekGooglePlaceDetails,
+  peekGooglePlacePhotoMedia,
+  peekRapidApiGooglePhotoFallback,
+} from '../../map/services/googlePlaceDetails'
+import {
+  fetchTripadvisorPlaceGallery,
+  peekTripadvisorPlacePhotos,
+} from '../services/tripadvisorPlacePhotos'
+import {
+  fetchPlaceWebsitePhotosWithFallback,
+  peekCachedPlaceWebsitePhotos,
+} from '../services/placeWebsitePhotos'
+import { withGoogleMapsPhotoKey } from '../../map/services/googleMapsKey'
+import {
+  fetchWikimediaPlacePhoto,
+  peekWikimediaPlacePhoto,
+  type WikimediaPlacePhoto,
+} from '../../map/services/wikimediaPlacePhotos'
+import type { Coordinates, PlaceType } from '../../../types'
 
 interface Props {
   name: string
   nameLocal?: string
+  googlePlaceId?: string
+  tripadvisorContentId?: string
   location?: Coordinates
+  type?: PlaceType
   /** Static fallback (Unsplash etc.) while loading or if Places fails */
   fallback: string
   alt: string
@@ -25,93 +47,343 @@ function withCacheBust(url: string): string {
   }
 }
 
+function isUnsplashFallback(url: string): boolean {
+  return /images\.unsplash\.com/i.test(url)
+}
+
+/** Google Place Photo URLs 403 without a live photo fetch; never put them on <img>. */
+function isDisplayablePhotoUrl(url: string): boolean {
+  if (!/^https?:\/\//i.test(url)) return false
+  if (url.includes('places.googleapis.com')) return false
+  if (url.includes('maps.googleapis.com/maps/api/place/photo')) return false
+  return true
+}
+
+function isPlaceholderFallback(url: string): boolean {
+  return !isDisplayablePhotoUrl(url) || isUnsplashFallback(url)
+}
+
+function displayableSrc(url: string): string {
+  return isDisplayablePhotoUrl(url) ? url : ''
+}
+
+function PhotoPlaceholder() {
+  return (
+    <span
+      className="absolute inset-0 flex items-center justify-center bg-[var(--mist)]"
+      aria-hidden
+    >
+      <Image className="h-6 w-6 text-[var(--stone)]/40" strokeWidth={1.6} />
+    </span>
+  )
+}
+
 export function GooglePlacePhoto({
   name,
   nameLocal,
+  googlePlaceId,
+  tripadvisorContentId,
   location,
+  type,
   fallback,
   alt,
   className = '',
   asBackground = false,
   showBadge = true,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
-  const [src, setSrc] = useState(fallback)
+  const fallbackSrc = withGoogleMapsPhotoKey(fallback) || fallback
+  const [src, setSrc] = useState(() => (isPlaceholderFallback(fallbackSrc) ? '' : fallbackSrc))
+  const [loading, setLoading] = useState(() => isPlaceholderFallback(fallbackSrc))
   const [attribution, setAttribution] = useState<string | undefined>()
   const [fromGoogle, setFromGoogle] = useState(false)
+  const [wikimedia, setWikimedia] = useState<WikimediaPlacePhoto | null>(null)
   const [retried, setRetried] = useState(false)
   const locationLat = location?.lat
   const locationLng = location?.lng
 
   useEffect(() => {
-    if (!isLoaded) return
     let cancelled = false
-    setSrc(fallback)
+    const genericFallback = isPlaceholderFallback(fallbackSrc)
+    setSrc(genericFallback ? '' : fallbackSrc)
+    setLoading(genericFallback)
     setFromGoogle(false)
+    setWikimedia(null)
     setAttribution(undefined)
     setRetried(false)
-    const query = placePhotoQuery(name, nameLocal)
     const queryLocation =
       locationLat != null && locationLng != null
         ? { lat: locationLat, lng: locationLng }
         : undefined
 
-    void fetchGooglePlacePhoto(query, queryLocation).then((result) => {
-      if (cancelled || !result?.url) return
-      setSrc(result.url)
-      setAttribution(result.attribution)
-      setFromGoogle(true)
+    if (type === 'hotel' || type === 'transport' || asBackground) {
+      setSrc(displayableSrc(fallbackSrc))
+      setLoading(false)
+      return
+    }
+
+    if (type === 'attraction') {
+      const tripadvisorPhoto = peekTripadvisorPlacePhotos(
+        name,
+        nameLocal,
+        type,
+        tripadvisorContentId,
+      )[0]
+      if (tripadvisorPhoto) {
+        setSrc(tripadvisorPhoto)
+        setLoading(false)
+        return
+      }
+      const originalName = name.trim() || nameLocal?.trim() || ''
+      void (async () => {
+        const gallery = await fetchTripadvisorPlaceGallery({
+          name,
+          nameLocal,
+          type,
+          contentId: tripadvisorContentId,
+        }).catch(() => null)
+        if (cancelled) return
+        if (gallery?.photos[0]) {
+          setSrc(gallery.photos[0])
+          setLoading(false)
+          return
+        }
+        if (queryLocation && originalName) {
+          const cachedWiki = peekWikimediaPlacePhoto(originalName, queryLocation)
+          if (cachedWiki?.url) {
+            setSrc(cachedWiki.url)
+            setWikimedia(cachedWiki)
+            setLoading(false)
+            return
+          }
+          const wiki = await fetchWikimediaPlacePhoto(originalName, queryLocation)
+          if (cancelled) return
+          if (wiki?.url) {
+            setSrc(wiki.url)
+            setWikimedia(wiki)
+            setLoading(false)
+            return
+          }
+        }
+        if (googlePlaceId) {
+          const cachedRapid = peekRapidApiGooglePhotoFallback(googlePlaceId)
+          if (cachedRapid && isDisplayablePhotoUrl(cachedRapid)) {
+            setSrc(cachedRapid)
+            setLoading(false)
+            return
+          }
+          const rapid = await fetchRapidApiGooglePhotoFallbackById(googlePlaceId).catch(
+            () => null,
+          )
+          if (cancelled) return
+          if (rapid && isDisplayablePhotoUrl(rapid)) {
+            setSrc(rapid)
+            setLoading(false)
+            return
+          }
+        }
+        if (!cancelled) {
+          setSrc(displayableSrc(fallbackSrc))
+          setLoading(false)
+        }
+      })()
+      return
+    }
+
+    const cachedDetails = peekGooglePlaceDetails(
+      name,
+      nameLocal,
+      queryLocation,
+      googlePlaceId,
+    )
+    const websiteCache = peekCachedPlaceWebsitePhotos({
+      website: cachedDetails?.website,
+      name: cachedDetails?.name || name,
+      nameLocal: cachedDetails?.nameOriginal || nameLocal,
+      address: cachedDetails?.address,
     })
+    if (websiteCache.photos[0]) {
+      setSrc(websiteCache.photos[0])
+      setLoading(false)
+      return
+    }
+    const tripadvisorPhoto = peekTripadvisorPlacePhotos(name, nameLocal, type, tripadvisorContentId)[0]
+    if (tripadvisorPhoto) {
+      setSrc(tripadvisorPhoto)
+      setLoading(false)
+      return
+    }
+    const googlePhoto = cachedDetails?.photos?.[0]
+    const cachedUri = googlePhoto
+      ? peekGooglePlacePhotoMedia(googlePhoto, cachedDetails?.id)
+      : null
+    const keyedGoogleUri = cachedUri ? withGoogleMapsPhotoKey(cachedUri) || cachedUri : ''
+    if (keyedGoogleUri && isDisplayablePhotoUrl(keyedGoogleUri)) {
+      setSrc(keyedGoogleUri)
+      setFromGoogle(true)
+      setLoading(false)
+      return
+    }
+
+    const originalName = name.trim() || nameLocal?.trim() || ''
+
+    void (async () => {
+      if (originalName && !websiteCache.miss) {
+        const website = await fetchPlaceWebsitePhotosWithFallback({
+          website: cachedDetails?.website,
+          name: cachedDetails?.name || name,
+          nameLocal: cachedDetails?.nameOriginal || nameLocal,
+          address: cachedDetails?.address,
+        }).catch(() => ({ photos: [] as string[] }))
+        if (cancelled) return
+        if (website.photos[0]) {
+          setSrc(website.photos[0])
+          setLoading(false)
+          return
+        }
+      }
+
+      if (
+        (type === 'restaurant' || type === 'cafe') &&
+        cachedDetails &&
+        !peekCachedPlaceWebsitePhotos({
+          website: cachedDetails.website,
+          name: cachedDetails.name || name,
+          nameLocal: cachedDetails.nameOriginal || nameLocal,
+          address: cachedDetails.address,
+        }).photos.length
+      ) {
+        const gallery = await fetchTripadvisorPlaceGallery({
+          name,
+          nameLocal,
+          type,
+          contentId: tripadvisorContentId,
+        }).catch(() => null)
+        if (cancelled) return
+        if (gallery?.photos[0]) {
+          setSrc(gallery.photos[0])
+          setLoading(false)
+          return
+        }
+      }
+
+      if (googlePlaceId) {
+        const cachedRapid = peekRapidApiGooglePhotoFallback(googlePlaceId)
+        if (cachedRapid && isDisplayablePhotoUrl(cachedRapid)) {
+          setSrc(cachedRapid)
+          setLoading(false)
+          return
+        }
+        const rapid = await fetchRapidApiGooglePhotoFallbackById(googlePlaceId).catch(
+          () => null,
+        )
+        if (cancelled) return
+        if (rapid && isDisplayablePhotoUrl(rapid)) {
+          setSrc(rapid)
+          setLoading(false)
+          return
+        }
+      }
+
+      if (!cancelled) {
+        setSrc(displayableSrc(fallbackSrc))
+        setLoading(false)
+      }
+    })()
 
     return () => {
       cancelled = true
     }
-  }, [isLoaded, name, nameLocal, locationLat, locationLng, fallback])
+  }, [
+    name,
+    nameLocal,
+    googlePlaceId,
+    tripadvisorContentId,
+    locationLat,
+    locationLng,
+    fallbackSrc,
+    type,
+    asBackground,
+  ])
 
   function handleImgError() {
-    if (fromGoogle && !retried && src !== fallback) {
-      // Bust stale 403/error cache from earlier referrer failures.
+    if (fromGoogle && !retried && src !== fallbackSrc) {
       setRetried(true)
       setSrc(withCacheBust(src))
       return
     }
-    if (src !== fallback) {
-      setSrc(fallback)
-      setFromGoogle(false)
-      setAttribution(undefined)
-    }
+    const next =
+      src !== fallbackSrc && isDisplayablePhotoUrl(fallbackSrc) ? fallbackSrc : ''
+    setSrc(next)
+    setFromGoogle(false)
+    setWikimedia(null)
+    setAttribution(undefined)
+    setLoading(false)
   }
+
+  const showShimmer = loading
+  const showPlaceholder = !loading && !src
 
   if (asBackground) {
     return (
       <div
-        className={className}
+        className={`relative overflow-hidden ${className}`}
         style={{ backgroundImage: src ? `url(${src})` : undefined }}
         role="img"
         aria-label={alt}
-        title={fromGoogle ? `Google Maps 照片${attribution ? ` · ${attribution}` : ''}` : alt}
-      />
+        aria-busy={showShimmer || undefined}
+        title={
+          wikimedia
+            ? `Wikimedia Commons${wikimedia.attribution ? ` · ${wikimedia.attribution}` : ''}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`
+            : fromGoogle
+              ? `地图照片${attribution ? ` · ${attribution}` : ''}`
+              : alt
+        }
+      >
+        {showShimmer ? (
+          <span className="absolute inset-0 place-hero-shimmer" aria-hidden />
+        ) : null}
+        {showPlaceholder ? <PhotoPlaceholder /> : null}
+      </div>
     )
   }
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div
+      className={`relative overflow-hidden ${className}`}
+      aria-busy={showShimmer || undefined}
+    >
+      {showShimmer ? (
+        <span className="absolute inset-0 place-hero-shimmer" aria-hidden />
+      ) : null}
+      {showPlaceholder ? <PhotoPlaceholder /> : null}
       {src ? (
         <img
           src={src}
           alt={alt}
-          className="h-full w-full object-cover"
+          className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-300 ${
+            loading ? 'opacity-0' : 'opacity-100'
+          }`}
           loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoading(false)}
           onError={handleImgError}
         />
-      ) : (
-        <span className="block h-full w-full bg-[var(--mist)]" aria-hidden />
-      )}
-      {fromGoogle && showBadge && src !== fallback && (
+      ) : null}
+      {fromGoogle && showBadge && src && src !== fallbackSrc && !loading && (
         <span className="absolute bottom-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-          Google{attribution ? ` · ${attribution}` : ''}
+          地图{attribution ? ` · ${attribution}` : ''}
         </span>
+      )}
+      {wikimedia && showBadge && src && src !== fallbackSrc && !loading && (
+        <a
+          href={wikimedia.sourcePage}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm"
+          title={`${wikimedia.attribution || 'Wikimedia Commons'}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`}
+        >
+          Wikimedia Commons{wikimedia.license ? ` · ${wikimedia.license}` : ''}
+        </a>
       )}
     </div>
   )

@@ -4,6 +4,7 @@ import { purgeNonApiFlightCache } from '../services/flightCache'
 import {
   loadFlightSelection,
   saveFlightSelection,
+  type FlightSelection,
   type PersistedFlightSelection,
 } from '../services/flightSelection'
 import type { TripDateRange } from '../../itinerary/services/tripDates'
@@ -119,18 +120,6 @@ function FlightCard({
         <p className="mt-2 text-sm text-[var(--stone)]">状态 {status}</p>
       )}
     </article>
-  )
-}
-
-export type FlightSelection = {
-  outbound: FlightInfo | null
-  returnFlight: FlightInfo | null
-}
-
-/** Both legs looked up successfully (non-null FlightInfo with a flight number). */
-export function areFlightsComplete(flights: FlightSelection | null | undefined): boolean {
-  return Boolean(
-    flights?.outbound?.flightNumber?.trim() && flights?.returnFlight?.flightNumber?.trim(),
   )
 }
 

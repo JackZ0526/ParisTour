@@ -10,8 +10,15 @@ import {
   peekPlaceDetailCopy,
   placeDetailKeysFromPlace,
 } from '../services/placeDetailMemo'
+import {
+  nearbyStopsForAdvisor,
+  placeAdvisorCopyFields,
+  placeAdvisorFactsSignature,
+  type PlaceAdvisorFacts,
+} from '../services/placeAdvisorFacts'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from './GooglePlacePage'
+import { SELECTED_HOTEL_PLACE_ID } from '../../itinerary/utils/dayOrigin'
 
 interface Props {
   placeId: string | null
@@ -23,6 +30,7 @@ interface Props {
     placeId: string,
     googlePlaceId: string,
     nameOriginal?: string,
+    googleAddress?: string,
   ) => void
   onClose: () => void
 }
@@ -46,9 +54,11 @@ export function PlacePanel({
   const [story, setStory] = useState<HotelDetailCopy | null>(null)
   const [storyLoading, setStoryLoading] = useState(false)
   const [regenToken, setRegenToken] = useState(0)
+  const [advisorFacts, setAdvisorFacts] = useState<PlaceAdvisorFacts | null>(null)
+  const [advisorFactsPlaceId, setAdvisorFactsPlaceId] = useState<string | null>(null)
 
   const place = useMemo(() => {
-    if (!placeId) return null
+    if (!placeId || placeId === SELECTED_HOTEL_PLACE_ID) return null
     try {
       return getPlace(placeId, customPlaces)
     } catch {
@@ -62,8 +72,14 @@ export function PlacePanel({
   }, [day.stops, placeId])
 
   // Snapshot context in refs so itinerary title/theme updates don't re-fire LLM.
-  const ctxRef = useRef({ place, stopNote, day, hotel, days })
-  ctxRef.current = { place, stopNote, day, hotel, days }
+  const ctxRef = useRef({ place, stopNote, day, hotel, days, customPlaces })
+  ctxRef.current = { place, stopNote, day, hotel, days, customPlaces }
+  const factsForPlace = advisorFactsPlaceId === placeId ? advisorFacts : null
+  const factsSig = placeAdvisorFactsSignature(factsForPlace)
+
+  useEffect(() => {
+    setRegenToken(0)
+  }, [placeId])
 
   useEffect(() => {
     if (!placeId || !place) {
@@ -93,6 +109,12 @@ export function PlacePanel({
       return
     }
 
+    if (!factsSig) {
+      setStory({ intro: '', reason: '', tripFit: '' })
+      setStoryLoading(true)
+      return
+    }
+
     let cancelled = false
     setStory({ intro: '', reason: '', tripFit: '' })
     setStoryLoading(true)
@@ -100,6 +122,8 @@ export function PlacePanel({
     const ctx = ctxRef.current
     const p = ctx.place
     if (!p) return
+    const facts = placeAdvisorCopyFields(factsForPlace)
+    const nearbyStops = nearbyStopsForAdvisor(ctx.day.stops, p.id, ctx.customPlaces)
 
     void memoizePlaceDetailCopy(
       detailKeys,
@@ -108,8 +132,16 @@ export function PlacePanel({
           name: p.name,
           nameLocal: p.nameLocal,
           type: p.type,
+          address: facts.address,
           existingDescription: p.description,
+          listingDescription: facts.listingDescription,
           stopNote: ctx.stopNote,
+          rating: facts.rating,
+          reviewCount: facts.reviewCount,
+          priceLevel: facts.priceLevel,
+          cuisine: facts.cuisine,
+          featuredReviews: facts.featuredReviews,
+          nearbyStops,
           day: ctx.day.day,
           dayTitle: ctx.day.title,
           dayTheme: ctx.day.theme,
@@ -146,13 +178,21 @@ export function PlacePanel({
     return () => {
       cancelled = true
     }
-    // Only re-run when the selected place changes or the user asks to regenerate.
+    // Wait for listing facts (reviews / cuisine / price) before the first write.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeId, regenToken])
+  }, [placeId, regenToken, factsSig])
 
   useEffect(() => {
-    setRegenToken(0)
-  }, [placeId])
+    if (!placeId || !place || !isLlmConfigured()) return
+    if (factsSig) return
+    const timer = window.setTimeout(() => {
+      setAdvisorFactsPlaceId(placeId)
+      setAdvisorFacts((prev) =>
+        prev?.settled ? prev : { reviews: prev?.reviews || [], settled: true },
+      )
+    }, 12_000)
+    return () => window.clearTimeout(timer)
+  }, [placeId, place, factsSig])
 
   return (
     <GooglePlacePage
@@ -160,7 +200,13 @@ export function PlacePanel({
       name={place?.name || ''}
       nameLocal={place?.nameLocal}
       googlePlaceId={place?.googlePlaceId}
+      googleRating={place?.googleRating}
+      googleRatingCount={place?.googleUserRatingCount}
+      googleAddress={place?.googleAddress}
+      googleRatingHint={place?.ratingHint}
+      tripadvisorContentId={place?.tripadvisorContentId}
       location={place?.location}
+      placeType={place?.type}
       fallbackImage={place?.image}
       showMap={false}
       llmNarrative={
@@ -181,12 +227,17 @@ export function PlacePanel({
             }
           : null
       }
+      onAdvisorFacts={(next) => {
+        setAdvisorFactsPlaceId(placeId)
+        setAdvisorFacts(next)
+      }}
       onDetailsResolved={(resolved) => {
         if (!placeId || !resolved.id) return
         onGoogleIdentityResolved?.(
           placeId,
           resolved.id,
           resolved.nameOriginal,
+          resolved.address,
         )
       }}
       onClose={onClose}

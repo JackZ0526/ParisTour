@@ -9,12 +9,19 @@ import type {
   WalkLevel,
 } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
+import { fetchWikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
 } from '../../map/services/googlePlaceDetails'
+import { fetchPlaceWebsitePhotos } from '../../place/services/placeWebsitePhotos'
+import {
+  fetchTripadvisorAttractionInfo,
+  listSeededTripadvisorAttractions,
+  tripadvisorContentIdFromCandidate,
+} from '../../place/services/tripadvisorPlacePhotos'
 import {
   generateFullItinerary,
   generateSingleDayItinerary,
@@ -60,6 +67,12 @@ function normalizeWalk(raw: unknown): WalkLevel | undefined {
   return WALK_SET.has(v) ? v : undefined
 }
 
+function normalizeTransportChoice(raw: unknown): '公共交通' | '步行' | undefined {
+  const text = String(raw || '').trim()
+  if (!text) return undefined
+  return /walk|walking|步行|走路|步走/i.test(text) ? '步行' : '公共交通'
+}
+
 function normalizeType(raw: unknown): PlaceType {
   const v = String(raw || '').toLowerCase()
   if (v.includes('cafe') || v.includes('coffee') || v === '咖啡馆') return 'cafe'
@@ -72,6 +85,33 @@ function normalizeType(raw: unknown): PlaceType {
 
 function mapsUrl(query: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+}
+
+function haversineMeters(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const R = 6371000
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+function attractionCandidatesFromTripadvisor(
+  hotel: SelectedHotel,
+): VerifiedPlaceCandidate[] {
+  return listSeededTripadvisorAttractions().map((item) => ({
+    id: `ta-${item.contentId}`,
+    name: item.name,
+    type: 'attraction' as const,
+    distanceMeters: item.location
+      ? Math.round(haversineMeters({ lat: hotel.lat, lng: hotel.lng }, item.location))
+      : undefined,
+  }))
 }
 
 function resolveSpecialPlaceId(key: string, name: string, type: PlaceType): string | null {
@@ -116,6 +156,78 @@ function resolveSpecialPlaceId(key: string, name: string, type: PlaceType): stri
   return null
 }
 
+async function resolveAttractionPlace(
+  draft: FullItineraryPlaceDraft,
+  hotel: SelectedHotel,
+  specialId?: string,
+): Promise<{ id: string; place?: Place }> {
+  const catalog = specialId ? catalogPlaces[specialId] : undefined
+  const lookupName = draft.name || catalog?.name || ''
+  const lookupLocal = draft.nameLocal || catalog?.nameLocal
+  const googleQuery = placeDetailsQuery(lookupName, lookupLocal)
+  const [ta, google] = await Promise.all([
+    fetchTripadvisorAttractionInfo({
+      name: lookupName,
+      nameLocal: lookupLocal,
+      contentId: tripadvisorContentIdFromCandidate(draft.googlePlaceId),
+    }).catch(() => null),
+    googleQuery
+      ? fetchGooglePlaceDetails(googleQuery, catalog?.location, {
+          placeId: /^ChI/i.test(draft.googlePlaceId || '')
+            ? draft.googlePlaceId
+            : undefined,
+          recoverPhotos: false,
+        }).catch(() => null)
+      : Promise.resolve(null),
+  ])
+  const loc =
+    ta?.location ||
+    google?.location ||
+    catalog?.location || {
+      lat: hotel.lat + (Math.random() - 0.5) * 0.01,
+      lng: hotel.lng + (Math.random() - 0.5) * 0.01,
+    }
+  const wikimediaPhoto =
+    !ta?.photos[0] && loc
+      ? await fetchWikimediaPlacePhoto(ta?.name || draft.name, loc)
+      : null
+  const id =
+    specialId ||
+    `gen-${slugKey(draft.key || draft.name) || 'place'}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}`
+  const displayName = /[\u3400-\u9fff]/.test(draft.name)
+    ? draft.name
+    : catalog?.name || ta?.name || draft.name
+  const place: Place = {
+    ...(catalog ? { ...catalog } : {}),
+    id,
+    tripadvisorContentId: ta?.contentId || catalog?.tripadvisorContentId,
+    googlePlaceId: google?.id,
+    name: displayName,
+    nameLocal: catalog?.nameLocal || draft.nameLocal || ta?.name,
+    type: 'attraction',
+    description:
+      ta?.description ||
+      draft.description ||
+      catalog?.description ||
+      `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
+    googleRating: google?.rating,
+    googleUserRatingCount: google?.userRatingCount,
+    googleAddress: google?.address || draft.googleAddress,
+    ratingHint:
+      ta?.rating != null
+        ? `Tripadvisor ★ ${ta.rating.toFixed(1)}`
+        : catalog?.ratingHint?.replace(/Google/i, 'Tripadvisor') ||
+          'Tripadvisor 景点',
+    image: ta?.photos[0] || wikimediaPhoto?.url || catalog?.image || FALLBACK_IMAGE,
+    location: loc,
+    googleMapsUrl: mapsUrl(ta?.name || catalog?.nameLocal || `${draft.name} Paris`),
+    durationHint: draft.durationHint || catalog?.durationHint || '60 分钟',
+  }
+  return { id, place }
+}
+
 async function resolveDraftPlace(
   draft: FullItineraryPlaceDraft,
   hotel: SelectedHotel,
@@ -124,12 +236,7 @@ async function resolveDraftPlace(
   if (special === SELECTED_HOTEL_PLACE_ID) {
     return { id: SELECTED_HOTEL_PLACE_ID }
   }
-  if (
-    special === CDG_PLACE_ID ||
-    special === DISNEY_PLACE_ID ||
-    special === CHAMPS_PLACE_ID ||
-    special === ARC_PLACE_ID
-  ) {
+  if (special === CDG_PLACE_ID || special === DISNEY_PLACE_ID) {
     const catalog = catalogPlaces[special]
     return { id: special, place: catalog ? { ...catalog } : undefined }
   }
@@ -147,14 +254,44 @@ async function resolveDraftPlace(
     }
   }
 
+  if (
+    draft.type === 'attraction' ||
+    special === CHAMPS_PLACE_ID ||
+    special === ARC_PLACE_ID
+  ) {
+    const resolved = await resolveAttractionPlace(
+      draft,
+      hotel,
+      special === CHAMPS_PLACE_ID || special === ARC_PLACE_ID
+        ? special
+        : undefined,
+    )
+    placeResolveCache.set(cacheKey, resolved)
+    if (resolved.place?.tripadvisorContentId) {
+      placeResolveCache.set(`ta-${resolved.place.tripadvisorContentId}`, resolved)
+    }
+    return resolved
+  }
+
   const query = placeDetailsQuery(
     draft.area ? `${draft.name} ${draft.area}` : draft.name,
     draft.nameLocal,
   )
   const details = await fetchGooglePlaceDetails(query, undefined, {
     placeId: draft.googlePlaceId,
+    recoverPhotos: false,
   }).catch(() => null)
   const loc = details?.location
+  const websitePhoto = details?.website
+    ? (
+        await fetchPlaceWebsitePhotos(details.website, {
+          name: details.name || draft.name,
+          nameLocal: details.nameOriginal || draft.nameLocal,
+        }).catch(() => ({
+          photos: [] as string[],
+        }))
+      ).photos[0] || null
+    : null
   const id = `gen-${slugKey(draft.key || draft.name) || 'place'}-${Math.random()
     .toString(36)
     .slice(2, 7)}`
@@ -162,7 +299,9 @@ async function resolveDraftPlace(
   const place: Place = {
     id,
     googlePlaceId: details?.id || draft.googlePlaceId,
-    name: details?.name || draft.name,
+    name: /[\u3400-\u9fff]/.test(draft.name)
+      ? draft.name
+      : details?.name || draft.name,
     // Persist Google's local/original title so itinerary cards are bilingual
     // immediately, even when the LLM only returned a Chinese place name.
     nameLocal: details?.nameOriginal || draft.nameLocal,
@@ -171,12 +310,15 @@ async function resolveDraftPlace(
       draft.description ||
       details?.summary ||
       `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
+    googleRating: details?.rating,
+    googleUserRatingCount: details?.userRatingCount,
+    googleAddress: details?.address || draft.googleAddress,
     ratingHint:
       details?.rating != null
         ? `Google ★ ${details.rating.toFixed(1)}`
         : draft.ratingHint || 'Google 地点',
     priceHint: details?.priceLevel,
-    image: details?.photos?.[0] || FALLBACK_IMAGE,
+    image: websitePhoto || FALLBACK_IMAGE,
     location: loc || {
       // Soft fallback near hotel so the map still works if Places misses.
       lat: hotel.lat + (Math.random() - 0.5) * 0.01,
@@ -212,13 +354,12 @@ async function loadItineraryCandidates(
 ): Promise<VerifiedPlaceCandidate[]> {
   const excluded = new Set(occupiedNames.map(normalizePlaceName))
   const specs: Array<{
-    type: VerifiedPlaceCandidate['type']
+    type: Exclude<VerifiedPlaceCandidate['type'], 'attraction'>
     query: string
     radius: number
   }> = [
     { type: 'cafe', query: 'specialty coffee bakery brunch Paris', radius: 12_000 },
     { type: 'restaurant', query: 'restaurant Paris', radius: 12_000 },
-    { type: 'attraction', query: 'tourist attraction museum Paris', radius: 20_000 },
   ]
   const batches = await Promise.all(
     specs.map(async (spec) => {
@@ -234,12 +375,14 @@ async function loadItineraryCandidates(
     }),
   )
   const seen = new Set<string>()
-  return batches.flat().filter((row) => {
-    const key = row.id || `${row.type}:${normalizePlaceName(row.name)}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+  return [...batches.flat(), ...attractionCandidatesFromTripadvisor(hotel)].filter(
+    (row) => {
+      const key = row.id || `${row.type}:${normalizePlaceName(row.name)}`
+      if (seen.has(key) || excluded.has(normalizePlaceName(row.name))) return false
+      seen.add(key)
+      return true
+    },
+  )
 }
 
 /** One Google candidate pull per hotel/session; filter occupied names per day. */
@@ -801,7 +944,7 @@ export async function buildGeneratedSingleDay(
       time: String(s.time || '10:00').trim() || '10:00',
       placeId,
       note: String(s.note || '').trim() || '按当天节奏灵活调整。',
-      transport: s.transport ? String(s.transport).trim() : undefined,
+      transport: normalizeTransportChoice(s.transport),
       walkLevel: normalizeWalk(s.walkLevel) || '短步行',
       duration: s.duration ? String(s.duration).trim() : undefined,
     }
@@ -933,7 +1076,7 @@ export async function buildGeneratedItinerary(
         time: String(s.time || '10:00').trim() || '10:00',
         placeId,
         note: String(s.note || '').trim() || '按当天节奏灵活调整。',
-        transport: s.transport ? String(s.transport).trim() : undefined,
+        transport: normalizeTransportChoice(s.transport),
         walkLevel: normalizeWalk(s.walkLevel) || '短步行',
         duration: s.duration ? String(s.duration).trim() : undefined,
       }

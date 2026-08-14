@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   DEEPSEEK_MODEL_OPTIONS,
   getActiveLlmLabel,
@@ -90,20 +91,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
       >
         <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
         <span className="hidden min-w-0 truncate tracking-tight sm:inline">{chip}</span>
-        <svg
-          aria-hidden
-          viewBox="0 0 12 12"
-          className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
-            open ? 'rotate-180' : ''
-          }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M3 4.5 6 7.5 9 4.5" />
-        </svg>
+        <ChevronDown aria-hidden strokeWidth={1.75} className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -351,17 +339,7 @@ function SecondaryCheckbox({
           checked ? '' : 'border-[var(--ink)]/22 bg-[var(--card)]'
         }`}
       >
-        <svg
-          viewBox="0 0 12 12"
-          className={`h-2.5 w-2.5 transition-opacity duration-100 ${
-            checked ? 'opacity-100' : 'opacity-0'
-          }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.25"
-        >
-          <path d="M2.5 6.2 4.8 8.5 9.5 3.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Check strokeWidth={2.25} className={`h-2.5 w-2.5 transition-opacity duration-100 ${checked ? 'opacity-100' : 'opacity-0'}`} />
       </span>
     </span>
   )
@@ -691,9 +669,7 @@ function ModelOption({
           }`}
         >
           {selected && (
-            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M2.5 6.2 4.8 8.5 9.5 3.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Check className="h-2.5 w-2.5" strokeWidth={2} />
           )}
         </span>
         {icon && <span className="shrink-0 opacity-80">{icon}</span>}
@@ -733,18 +709,7 @@ function SettingsRow({
       {value ? (
         <span className="max-w-[7rem] truncate text-[var(--stone)]">{value}</span>
       ) : null}
-      <svg
-        aria-hidden
-        viewBox="0 0 12 12"
-        className="h-3 w-3 shrink-0 text-[var(--stone)]"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M4.5 2.5 8 6 4.5 9.5" />
-      </svg>
+      <ChevronRight aria-hidden className="h-3 w-3 shrink-0 text-[var(--stone)]" strokeWidth={1.75} />
     </button>
   )
 }
@@ -767,18 +732,7 @@ function SubPanel({
           aria-label="返回"
           className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink)] transition hover:bg-[var(--mist)]/60"
         >
-          <svg
-            aria-hidden
-            viewBox="0 0 12 12"
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M7.5 2.5 4 6l3.5 3.5" />
-          </svg>
+          <ChevronLeft aria-hidden className="h-3.5 w-3.5" strokeWidth={1.75} />
         </button>
         <p className="text-sm font-medium text-[var(--ink)]">{title}</p>
       </div>

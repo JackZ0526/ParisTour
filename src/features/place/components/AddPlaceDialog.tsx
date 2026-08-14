@@ -1,11 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
+import { fetchPlaceWebsitePhotosWithFallback } from '../services/placeWebsitePhotos'
+import { fetchTripadvisorPlaceGallery } from '../services/tripadvisorPlacePhotos'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -22,6 +25,11 @@ import {
   placeDetailKeysFromGoogle,
 } from '../services/placeDetailMemo'
 import {
+  placeAdvisorCopyFields,
+  placeAdvisorFactsSignature,
+  type PlaceAdvisorFacts,
+} from '../services/placeAdvisorFacts'
+import {
   getDayRecommendCache,
   setDayRecommendCache,
 } from '../services/recommendCache'
@@ -30,9 +38,12 @@ import type { RecommendationPreferences } from '../services/recommendationPrefer
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
+import {
+  fetchWikimediaPlacePhoto,
+  type WikimediaPlacePhoto,
+} from '../../map/services/wikimediaPlacePhotos'
 
 interface Props {
   open: boolean
@@ -87,7 +98,6 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -99,6 +109,8 @@ export function AddPlaceDialog({
   const [googleStory, setGoogleStory] = useState<HotelDetailCopy | null>(null)
   const [googleStoryLoading, setGoogleStoryLoading] = useState(false)
   const [googleStoryRegenToken, setGoogleStoryRegenToken] = useState(0)
+  const [advisorFacts, setAdvisorFacts] = useState<PlaceAdvisorFacts | null>(null)
+  const [advisorFactsKey, setAdvisorFactsKey] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [addingName, setAddingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -113,6 +125,9 @@ export function AddPlaceDialog({
   >({})
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
+  const [wikimediaByKey, setWikimediaByKey] = useState<
+    Record<string, WikimediaPlacePhoto>
+  >({})
   const [loadingDetailsKey, setLoadingDetailsKey] = useState<string | null>(null)
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
   const chromeRef = useRef<HTMLDivElement>(null)
@@ -209,6 +224,7 @@ export function AddPlaceDialog({
     setError(null)
     setExpandedKey(null)
     setDetailsByKey({})
+    setWikimediaByKey({})
     setPhotoIndexByKey({})
   }
 
@@ -275,6 +291,7 @@ export function AddPlaceDialog({
     if (options.resetDetails) {
       setExpandedKey(null)
       setDetailsByKey({})
+      setWikimediaByKey({})
       setPhotoIndexByKey({})
     }
 
@@ -547,10 +564,6 @@ export function AddPlaceDialog({
   async function ensureDetails(item: PlaceRecommendation) {
     const key = itemKey(item)
     if (detailsByKey[key] !== undefined) return detailsByKey[key]
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return null
-    }
 
     setLoadingDetailsKey(key)
     setError(null)
@@ -564,9 +577,46 @@ export function AddPlaceDialog({
       const details = await fetchGooglePlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
       })
-      setDetailsByKey((prev) => ({ ...prev, [key]: details }))
+      const websitePhotos = (
+        await fetchPlaceWebsitePhotosWithFallback({
+          website: details?.website,
+          name: details?.name || item.name,
+          nameLocal: details?.nameOriginal || item.nameLocal,
+          address: details?.address,
+        }).catch(() => ({ photos: [] }))
+      ).photos
+      const tripadvisorPhotos =
+        !websitePhotos.length && (item.type === 'restaurant' || item.type === 'cafe')
+          ? (
+              await fetchTripadvisorPlaceGallery({
+                name: details?.name || item.name,
+                nameLocal: details?.nameOriginal || item.nameLocal,
+                type: item.type,
+              }).catch(() => null)
+            )?.photos || []
+          : []
+      const displayPhotos = websitePhotos.length ? websitePhotos : tripadvisorPhotos
+      const detailsWithPhotos = details
+        ? { ...details, photos: displayPhotos }
+        : details
+      const hasDisplayPhotos = Boolean(detailsWithPhotos?.photos?.length)
+      const wikimedia =
+        !hasDisplayPhotos && item.type === 'attraction' && detailsWithPhotos?.location
+          ? await fetchWikimediaPlacePhoto(
+              detailsWithPhotos.name || item.name,
+              detailsWithPhotos.location,
+            )
+          : null
+      const resolved =
+        detailsWithPhotos && wikimedia && !hasDisplayPhotos
+          ? { ...detailsWithPhotos, photos: [wikimedia.url] }
+          : detailsWithPhotos
+      setDetailsByKey((prev) => ({ ...prev, [key]: resolved }))
+      if (wikimedia) {
+        setWikimediaByKey((prev) => ({ ...prev, [key]: wikimedia }))
+      }
       setPhotoIndexByKey((prev) => ({ ...prev, [key]: 0 }))
-      return details
+      return resolved
     } catch {
       setDetailsByKey((prev) => ({ ...prev, [key]: null }))
       setError('加载 Google 地点详情失败。')
@@ -595,10 +645,6 @@ export function AddPlaceDialog({
     intro?: string,
     cached?: GooglePlaceDetails | null,
   ) {
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return
-    }
     setAddingName(`${name}:${mode}`)
     setSearching(true)
     setError(null)
@@ -609,7 +655,7 @@ export function AddPlaceDialog({
       }
       const details = cached?.location
         ? cached
-        : await fetchGooglePlaceDetails(query)
+        : await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -628,19 +674,46 @@ export function AddPlaceDialog({
         if (blurb) description = blurb
       }
 
+      const websitePhotos = (
+        await fetchPlaceWebsitePhotosWithFallback({
+          website: details.website,
+          name: details.name,
+          nameLocal: details.nameOriginal,
+          address: details.address,
+        }).catch(() => ({ photos: [] }))
+      ).photos
+      const tripadvisorPhotos =
+        !websitePhotos.length && (type === 'restaurant' || type === 'cafe')
+          ? (
+              await fetchTripadvisorPlaceGallery({
+                name: details.name,
+                nameLocal: details.nameOriginal,
+                type,
+              }).catch(() => null)
+            )?.photos || []
+          : []
+      const websitePhoto = websitePhotos[0] || tripadvisorPhotos[0] || null
+      const wikimediaPhoto =
+        type === 'attraction' && !websitePhoto
+          ? await fetchWikimediaPlacePhoto(details.name, details.location)
+          : null
+
       const place: Place = {
         id: `custom-${Date.now()}`,
         googlePlaceId: details.id,
-        name: details.name,
+        name: /[\u3400-\u9fff]/.test(name) ? name : details.name,
         nameLocal: details.nameOriginal,
         type,
         description,
+        googleRating: details.rating,
+        googleUserRatingCount: details.userRatingCount,
+        googleAddress: details.address,
         ratingHint:
           details.rating != null
             ? `Google ★ ${details.rating.toFixed(1)}`
             : 'AI 推荐 / Google 地点',
         priceHint: details.priceLevel,
-        image: details.photos[0] || FALLBACK_IMAGE,
+        image: websitePhoto || wikimediaPhoto?.url || FALLBACK_IMAGE,
         location: details.location,
         googleMapsUrl: details.id
           ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -667,10 +740,6 @@ export function AddPlaceDialog({
   async function searchGooglePlace() {
     const q = googleQuery.trim()
     if (!q || searching) return
-    if (!isLoaded) {
-      setError('Google Maps 尚未加载完成，请稍后再试。')
-      return
-    }
     setSearching(true)
     setError(null)
     try {
@@ -678,7 +747,7 @@ export function AddPlaceDialog({
       if (!query) {
         throw new Error('请使用地点的原文名称搜索。')
       }
-      const details = await fetchGooglePlaceDetails(query)
+      const details = await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
         throw new Error('未找到该地点或缺少坐标，请换个关键词。')
       }
@@ -694,8 +763,16 @@ export function AddPlaceDialog({
     setGoogleDetail(null)
     setGoogleStory(null)
     setGoogleStoryLoading(false)
+    setAdvisorFacts(null)
+    setAdvisorFactsKey(null)
     setError(null)
   }
+
+  const googleDetailKey = googleDetail
+    ? `${googleDetail.details.id || googleDetail.details.name}:${googleDetail.type}`
+    : null
+  const factsForDetail = advisorFactsKey === googleDetailKey ? advisorFacts : null
+  const factsSig = placeAdvisorFactsSignature(factsForDetail)
 
   // Generate intro + 推荐理由 when Google detail opens (same memo as PlacePanel).
   useEffect(() => {
@@ -727,17 +804,34 @@ export function AddPlaceDialog({
       return
     }
 
+    if (!factsSig) {
+      setGoogleStory({ intro: '', reason: '', tripFit: '' })
+      setGoogleStoryLoading(true)
+      return
+    }
+
     let cancelled = false
     setGoogleStory({ intro: '', reason: '', tripFit: '' })
     setGoogleStoryLoading(true)
+    const facts = placeAdvisorCopyFields(factsForDetail)
     void memoizePlaceDetailCopy(
       detailKeys,
       () =>
         generatePlaceDetailCopy({
           name: details.name,
-          type: typeLabel[type] || type,
-          address: details.address,
+          nameLocal: details.nameOriginal,
+          type,
+          address: facts.address || details.address,
           existingDescription: details.summary,
+          listingDescription: facts.listingDescription,
+          rating: facts.rating ?? details.rating,
+          reviewCount: facts.reviewCount ?? details.userRatingCount,
+          priceLevel: facts.priceLevel || details.priceLevel,
+          cuisine: facts.cuisine,
+          featuredReviews: facts.featuredReviews?.length
+            ? facts.featuredReviews
+            : details.reviews.slice(0, 6),
+          nearbyStops: currentPlaceNames.slice(0, 8).map((name) => ({ name, type: '' })),
           day: dayNumber,
           dayTitle,
           dayTheme,
@@ -776,11 +870,23 @@ export function AddPlaceDialog({
     }
     // Snapshot day context on open; remount / same place should hit memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleDetail, googleStoryRegenToken])
+  }, [googleDetail, googleStoryRegenToken, factsSig])
 
   useEffect(() => {
     setGoogleStoryRegenToken(0)
   }, [googleDetail])
+
+  useEffect(() => {
+    if (!googleDetail || !isLlmConfigured()) return
+    if (factsSig) return
+    const timer = window.setTimeout(() => {
+      setAdvisorFactsKey(googleDetailKey)
+      setAdvisorFacts((prev) =>
+        prev?.settled ? prev : { reviews: prev?.reviews || [], settled: true },
+      )
+    }, 12_000)
+    return () => window.clearTimeout(timer)
+  }, [googleDetail, googleDetailKey, factsSig])
 
   if (!open || typeof document === 'undefined') return null
 
@@ -897,6 +1003,7 @@ export function AddPlaceDialog({
                     const key = itemKey(item)
                     const expanded = expandedKey === key
                     const details = detailsByKey[key]
+                    const wikimedia = wikimediaByKey[key]
                     const loadingDetails = loadingDetailsKey === key
                     const busyBest = addingName === `${item.name}:best`
                     const busyEnd = addingName === `${item.name}:end`
@@ -976,6 +1083,18 @@ export function AddPlaceDialog({
                                           referrerPolicy="no-referrer-when-downgrade"
                                           draggable={false}
                                         />
+                                        {wikimedia && activePhoto === wikimedia.url && (
+                                          <a
+                                            href={wikimedia.sourcePage}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
+                                            title={`${wikimedia.attribution || 'Wikimedia Commons'}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`}
+                                          >
+                                            图片：{wikimedia.attribution || 'Wikimedia Commons'}
+                                            {wikimedia.license ? ` · ${wikimedia.license}` : ''}
+                                          </a>
+                                        )}
                                         {photos.length > 1 && (
                                           <>
                                             <button
@@ -984,19 +1103,7 @@ export function AddPlaceDialog({
                                               onClick={() => stepPhoto(key, photos.length, -1)}
                                               className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
                                             >
-                                              <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2.2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden
-                                              >
-                                                <path d="M15 18l-6-6 6-6" />
-                                              </svg>
+                                              <ChevronLeft size={14} strokeWidth={2.2} aria-hidden />
                                             </button>
                                             <button
                                               type="button"
@@ -1004,19 +1111,7 @@ export function AddPlaceDialog({
                                               onClick={() => stepPhoto(key, photos.length, 1)}
                                               className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
                                             >
-                                              <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2.2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden
-                                              >
-                                                <path d="M9 18l6-6-6-6" />
-                                              </svg>
+                                              <ChevronRight size={14} strokeWidth={2.2} aria-hidden />
                                             </button>
                                             <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
                                               {photoIndex + 1} / {photos.length}
@@ -1221,9 +1316,18 @@ export function AddPlaceDialog({
         nameLocal={googleDetail?.details.nameOriginal}
         googlePlaceId={googleDetail?.details.id}
         location={googleDetail?.details.location}
+        placeType={googleDetail?.type}
+        googleRating={googleDetail?.details.rating}
+        googleRatingCount={googleDetail?.details.userRatingCount}
+        googleAddress={googleDetail?.details.address}
         fallbackImage={googleDetail?.details.photos?.[0] || FALLBACK_IMAGE}
         showMap={false}
+        detailsOverride={googleDetail?.details}
         overlayClassName="z-[2200]"
+        onAdvisorFacts={(next) => {
+          setAdvisorFactsKey(googleDetailKey)
+          setAdvisorFacts(next)
+        }}
         llmNarrative={
           googleDetail
             ? {

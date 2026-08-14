@@ -1,448 +1,466 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DirectionsRenderer, GoogleMap, Marker } from '@react-google-maps/api'
-import { getPlace } from '../../place/constants/places'
-import type { DayNavPlan, ResolvedDayLeg } from '../services/googleNav'
-import type { DayPlan, Place, SelectedHotel } from '../../../types'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  getDayOriginFromHotelFields,
+  FullscreenControl,
+  LngLatBounds,
+  Map as MapLibreMap,
+  Marker as MapLibreMarker,
+  NavigationControl,
+  type StyleSpecification,
+} from 'maplibre-gl'
+import type { DayPlan, Place, SelectedHotel } from '../../../types'
+import { getPlace } from '../../place/constants/places'
+import {
   isAirportPlace,
   isHotelPlace,
   numberedStopIndexes,
 } from '../../itinerary/utils/dayOrigin'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
-import { googleMapsLoadErrorHelp } from '../services/googleMapsErrors'
-import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import {
   airportIconUrl,
   homeIconUrl,
   numberIconUrl,
-} from './markerIcons'
+  SPECIAL_MARKER_SIZE,
+} from '../services/markerIconUrls'
 import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
 import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
+import {
+  getCachedMapRouteSegment,
+  type MapRouteSegmentEntry,
+} from '../services/mapRouteCache'
+import {
+  dayRouteSegmentsToRequests,
+  buildDayMapRouteSegments,
+} from '../services/mapDayRoute'
+import {
+  getOrFetchMapRouteSegments,
+  type MapRouteSegmentsResult,
+} from '../services/openRouteService'
 
-const mapContainerStyle = { width: '100%', height: '100%' }
-
-/** Google Maps blue — native look, not black */
-const GOOGLE_ROUTE_BLUE = '#1a73e8'
-
-const mapOptions: google.maps.MapOptions = {
-  disableDefaultUI: false,
-  zoomControl: true,
-  mapTypeControl: false,
-  streetViewControl: false,
-  fullscreenControl: true,
-  clickableIcons: true,
-  gestureHandling: 'cooperative',
+const OPEN_STREET_MAP_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    'openstreetmap-raster': {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: 'openstreetmap-raster',
+      type: 'raster',
+      source: 'openstreetmap-raster',
+    },
+  ],
 }
-
-function collectNavLegs(navPlan: DayNavPlan): ResolvedDayLeg[] {
-  const legs: ResolvedDayLeg[] = []
-  if (navPlan.hotelToFirst) legs.push(navPlan.hotelToFirst)
-  for (const leg of navPlan.betweenStops) {
-    if (leg) legs.push(leg)
-  }
-  if (navPlan.lastToDestination) legs.push(navPlan.lastToDestination)
-  return legs
-}
-
-/** All coordinates that should stay inside the map viewport (markers + route geometry). */
-function collectViewportPoints(
-  origin: { lat: number; lng: number },
-  stops: Place[],
-  navPlan: DayNavPlan,
-): google.maps.LatLngLiteral[] {
-  const points: google.maps.LatLngLiteral[] = [
-    { lat: origin.lat, lng: origin.lng },
-    ...stops.map((s) => s.location),
-  ]
-
-  const pushPath = (path: google.maps.LatLngLiteral[] | undefined | null) => {
-    if (!path?.length) return
-    for (const p of path) {
-      if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) points.push(p)
-    }
-  }
-
-  pushPath(navPlan.hotelLinkPath)
-  pushPath(navPlan.routePath)
-  for (const leg of collectNavLegs(navPlan)) {
-    pushPath(leg.path)
-    const overview = leg.directionsResult?.routes?.[0]?.overview_path
-    if (overview?.length) {
-      for (const ll of overview) {
-        const lat = typeof ll.lat === 'function' ? ll.lat() : Number(ll.lat)
-        const lng = typeof ll.lng === 'function' ? ll.lng() : Number(ll.lng)
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-          points.push({ lat, lng })
-        }
-      }
-    }
-  }
-
-  return points
-}
-
 interface Props {
   hotel: SelectedHotel
   day: DayPlan
   customPlaces?: Record<string, Place>
-  navPlan: DayNavPlan
-  navLoading: boolean
   selectedPlaceId: string | null
   onSelectPlace: (id: string) => void
+  onRouteCacheChanged?: () => void
+}
+
+function markerElement(
+  imageUrl: string,
+  size: number,
+  title: string,
+  options?: { faded?: boolean; onClick?: () => void },
+): HTMLElement {
+  const element = document.createElement(options?.onClick ? 'button' : 'div')
+  element.title = title
+  element.setAttribute('aria-label', title)
+  element.style.width = `${size}px`
+  element.style.height = `${size}px`
+  element.style.padding = '0'
+  element.style.border = '0'
+  element.style.background = 'transparent'
+  element.style.opacity = options?.faded ? '0.55' : '1'
+  element.style.cursor = options?.onClick ? 'pointer' : 'default'
+  element.style.zIndex = '2'
+
+  const image = document.createElement('img')
+  image.src = imageUrl
+  image.alt = ''
+  image.draggable = false
+  image.style.display = 'block'
+  image.style.width = '100%'
+  image.style.height = '100%'
+  element.appendChild(image)
+  if (options?.onClick) element.addEventListener('click', options.onClick)
+  return element
+}
+
+interface SegmentPathHandles {
+  casing: SVGPathElement | null
+  line: SVGPathElement | null
+}
+
+function pathDFromGeometry(
+  map: MapLibreMap,
+  geometry: MapRouteSegmentEntry['geometry'],
+): string {
+  return geometry.coordinates
+    .map((coordinate, index) => {
+      const point = map.project(coordinate)
+      return `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`
+    })
+    .join(' ')
 }
 
 export function TripMap({
   hotel,
   day,
   customPlaces = {},
-  navPlan,
-  navLoading,
   selectedPlaceId,
   onSelectPlace,
+  onRouteCacheChanged,
 }: Props) {
-  const { isLoaded, loadError } = useGoogleMapsReady()
-  // Depend on hotel primitives so other-day edits (new hotel object, same coords) do not churn.
-  const dayOrigin = useMemo(
-    () =>
-      getDayOriginFromHotelFields(
-        day.day,
-        hotel.id,
-        hotel.name,
-        hotel.lat,
-        hotel.lng,
-      ),
-    [day.day, hotel.id, hotel.lat, hotel.lng, hotel.name],
-  )
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const fullscreenContainerRef = useRef<HTMLDivElement | null>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+  const routeSvgRef = useRef<SVGSVGElement | null>(null)
+  const pathHandlesRef = useRef<Map<string, SegmentPathHandles>>(new Map())
+  const seenSegmentCacheKeysRef = useRef<Map<string, string>>(new Map())
+  const [mapReady, setMapReady] = useState(false)
+  const [segmentEntries, setSegmentEntries] = useState<
+    Array<MapRouteSegmentEntry | null>
+  >([])
+  const [routeError, setRouteError] = useState<string | null>(null)
 
-  /** Stable center for GoogleMap — new object identity would pan the map on every parent render. */
-  const mapCenter = useMemo(
-    () => ({ lat: dayOrigin.lat, lng: dayOrigin.lng }),
-    [dayOrigin.lat, dayOrigin.lng],
-  )
-
-  /** Place id + coords for this day only — ignores unrelated customPlaces churn (e.g. Day 1 edits). */
   const stopsFingerprint = useMemo(
     () =>
       day.stops
-        .map((s) => {
+        .map((stop) => {
           try {
-            const place = getPlace(s.placeId, customPlaces)
-            const { lat, lng } = place.location
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return s.placeId
-            return `${s.placeId}@${lat.toFixed(5)},${lng.toFixed(5)}`
+            const place = getPlace(stop.placeId, customPlaces)
+            return `${stop.placeId}@${place.location.lat.toFixed(5)},${place.location.lng.toFixed(5)}`
           } catch {
-            return s.placeId
+            return stop.placeId
           }
         })
         .join('|'),
     [day.stops, customPlaces],
   )
 
-  const stops = useMemo(() => {
-    const list: Place[] = []
-    for (const s of day.stops) {
-      try {
-        const place = getPlace(s.placeId, customPlaces)
-        if (Number.isFinite(place.location.lat) && Number.isFinite(place.location.lng)) {
-          list.push(place)
-        }
-      } catch {
-        /* skip */
-      }
-    }
-    return list
-    // Fingerprint captures id/order/coords; omit day/customPlaces identity.
+  const routeRequest = useMemo(
+    () => buildDayMapRouteSegments(day, hotel, customPlaces),
+    // The fingerprint captures the only custom-place fields used by the map.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopsFingerprint])
-
+    [
+      day.day,
+      hotel.id,
+      hotel.name,
+      hotel.lat,
+      hotel.lng,
+      stopsFingerprint,
+    ],
+  )
+  const { origin: dayOrigin, stops, markerStops, segments } = routeRequest
   const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
 
-  const directionsLegs = useMemo(
-    () => collectNavLegs(navPlan).filter((leg) => Boolean(leg.directionsResult)),
-    [navPlan],
-  )
-  const cachedPathLegs = useMemo(
-    () =>
-      collectNavLegs(navPlan).filter(
-        (leg) => !leg.directionsResult && leg.path.length >= 2,
-      ),
-    [navPlan],
-  )
-  const resolvedLegCount = directionsLegs.length + cachedPathLegs.length
-
-  const [map, setMap] = useState<google.maps.Map | null>(null)
-  const onLoad = useCallback((m: google.maps.Map) => setMap(m), [])
-  const onUnmount = useCallback(() => setMap(null), [])
-
-  // The wrapper's <Polyline> calls setPath on a stale Google instance when a
-  // realtime snapshot replaces the route array. Manage cached paths directly
-  // on the persistent map so sync updates cannot escape React as a commit error.
   useEffect(() => {
-    if (!map || !isLoaded || !cachedPathLegs.length) return
+    if (!containerRef.current || mapRef.current) return
+    const map = new MapLibreMap({
+      container: containerRef.current,
+      style: OPEN_STREET_MAP_STYLE,
+      center: [dayOrigin.lng, dayOrigin.lat],
+      zoom: 13,
+      attributionControl: { compact: true },
+      cooperativeGestures: true,
+    })
+    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
+    map.addControl(
+      new FullscreenControl({
+        container: fullscreenContainerRef.current || containerRef.current,
+      }),
+      'top-right',
+    )
+    map.once('load', () => setMapReady(true))
+    mapRef.current = map
 
-    const polylines: google.maps.Polyline[] = []
-    for (const leg of cachedPathLegs) {
-      try {
-        polylines.push(
-          new google.maps.Polyline({
-            map,
-            path: leg.path,
-            strokeColor: GOOGLE_ROUTE_BLUE,
-            strokeOpacity: 0.9,
-            strokeWeight: 6,
-          }),
-        )
-      } catch (error) {
-        console.warn('[TripMap] cached route overlay could not be drawn', error)
-      }
-    }
-
+    const observer = new ResizeObserver(() => map.resize())
+    observer.observe(containerRef.current)
     return () => {
-      for (const polyline of polylines) {
-        try {
-          polyline.setMap(null)
-        } catch {
-          /* Google may already have disposed the overlay with the map. */
-        }
-      }
+      observer.disconnect()
+      map.remove()
+      mapRef.current = null
+      setMapReady(false)
     }
-  }, [map, isLoaded, cachedPathLegs])
+    // The map instance is deliberately retained while days change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  /** Only refit when this day's route/places change — not when other days' data updates. */
-  const viewportKey = useMemo(
-    () => `${day.day}|${dayOrigin.id}|${stopsFingerprint}|${navPlan.stopsKey || ''}`,
-    [day.day, dayOrigin.id, stopsFingerprint, navPlan.stopsKey],
-  )
-  const lastFittedKeyRef = useRef('')
+  // Track the segment list we're currently rendering so the loader effect
+  // can detect when the underlying day changes underneath an in-flight request.
+  const segmentsKeyRef = useRef(routeRequest.fingerprint)
+  segmentsKeyRef.current = routeRequest.fingerprint
 
   useEffect(() => {
-    if (!map || !isLoaded) return
-    // Wait until nav settles so route geometry is included (cached days are instant).
-    if (navLoading) return
-    // Same day viewport — skip. Avoids one-shot pan when parent re-renders after other-day edits.
-    if (lastFittedKeyRef.current === viewportKey) return
-
-    const points = collectViewportPoints(dayOrigin, stops, navPlan)
-    if (!points.length) return
-
-    const padding = { top: 72, right: 72, bottom: 72, left: 72 }
-
-    if (points.length === 1) {
-      map.setCenter(points[0])
-      map.setZoom(14)
-      lastFittedKeyRef.current = viewportKey
+    if (segments.length === 0) {
+      setSegmentEntries([])
+      setRouteError(null)
       return
     }
+    setRouteError(null)
 
-    const bounds = new google.maps.LatLngBounds()
-    for (const p of points) bounds.extend(p)
-    if (bounds.isEmpty()) return
+    // Prime from cache so the first paint shows already-resolved legs while
+    // we wait for the network response for the rest.
+    const primed: Array<MapRouteSegmentEntry | null> = segments.map(
+      (segment) => getCachedMapRouteSegment(segment.cacheKey),
+    )
+    setSegmentEntries(primed)
 
     let cancelled = false
-    const applyFit = () => {
-      if (cancelled) return
-      map.fitBounds(bounds, padding)
-      lastFittedKeyRef.current = viewportKey
-      // Avoid over-zooming on short hops; never zoom in past this (keeps path padding).
-      google.maps.event.addListenerOnce(map, 'idle', () => {
+    let retryTimer: number | undefined
+    const loadRoute = async (attempt: number) => {
+      try {
+        const requests = dayRouteSegmentsToRequests(segments)
+        const result: MapRouteSegmentsResult = await getOrFetchMapRouteSegments(
+          routeRequest.profile,
+          requests,
+        )
+        if (cancelled || segmentsKeyRef.current !== routeRequest.fingerprint) {
+          return
+        }
+        setSegmentEntries(result.segments)
+        setRouteError(null)
+        if (result.fetchedFromNetwork) onRouteCacheChanged?.()
+      } catch (error: unknown) {
         if (cancelled) return
-        const zoom = map.getZoom()
-        if (zoom != null && zoom > 15) map.setZoom(15)
-      })
+        if (attempt === 0) {
+          retryTimer = window.setTimeout(() => void loadRoute(1), 900)
+          return
+        }
+        setRouteError(
+          error instanceof Error ? error.message : '道路路线暂不可用。',
+        )
+      }
     }
-
-    const raf = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(applyFit)
-    })
-
+    void loadRoute(0)
     return () => {
       cancelled = true
-      window.cancelAnimationFrame(raf)
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, isLoaded, navLoading, viewportKey])
+  }, [
+    onRouteCacheChanged,
+    routeRequest.fingerprint,
+    routeRequest.profile,
+    segments,
+  ])
 
-  // Switching days must allow a fresh fit even if a previous day shared a key shape.
   useEffect(() => {
-    lastFittedKeyRef.current = ''
-  }, [day.day])
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const svg = routeSvgRef.current
+    if (!svg) return
 
-  if (loadError) {
-    const help = googleMapsLoadErrorHelp(loadError)
-    return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        <p className="font-medium">{help.title}</p>
-        <p className="mt-2">{help.detail}</p>
-        {help.refererHint && (
-          <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-[var(--ink)]">
-            需要添加：<strong>{help.refererHint}</strong>
-            <br />
-            建议同时添加：
-            <code className="ml-1">http://127.0.0.1:5173/*</code>、
-            <code className="ml-1">http://localhost:5173/*</code>、
-            <code className="ml-1">https://paristour.vercel.app/*</code>
-          </p>
-        )}
-        <p className="mt-2">
-          另请确认已启用{' '}
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Maps JavaScript API
-          </a>
-          、
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/places.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Places API (New)
-          </a>
-          、
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/directions-backend.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Directions API
-          </a>
-          。
-        </p>
-      </div>
-    )
-  }
+    const sync = () => {
+      const width = map.getContainer().clientWidth
+      const height = map.getContainer().clientHeight
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+      const handles = pathHandlesRef.current
+      for (let i = 0; i < segments.length; i += 1) {
+        const segment = segments[i]
+        const handle = handles.get(segment.reactKey)
+        const entry = segmentEntries[i]
+        if (!handle) continue
+        if (!entry) {
+          handle.casing?.setAttribute('d', '')
+          handle.line?.setAttribute('d', '')
+          continue
+        }
+        const d = pathDFromGeometry(map, entry.geometry)
+        handle.casing?.setAttribute('d', d)
+        handle.line?.setAttribute('d', d)
+      }
+    }
+    sync()
+    map.on('move', sync)
+    map.on('resize', sync)
+    return () => {
+      map.off('move', sync)
+      map.off('resize', sync)
+    }
+  }, [mapReady, segmentEntries, segments])
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-[min(52vh,360px)] items-center justify-center rounded-2xl border border-white/70 bg-[var(--card)] md:h-[560px]">
-        <LoadingIndicator variant="block" label="正在加载 Google Maps…" showDots size="md" />
-      </div>
+  useEffect(() => {
+    const seen = seenSegmentCacheKeysRef.current
+    const next = new Map<string, string>()
+    for (let i = 0; i < segments.length; i += 1) {
+      const segment = segments[i]
+      const entry = segmentEntries[i]
+      if (!entry) continue
+      const previous = seen.get(segment.reactKey)
+      const handle = pathHandlesRef.current.get(segment.reactKey)
+      if (handle && previous !== entry.key) {
+        for (const path of [handle.casing, handle.line]) {
+          path?.classList.remove('trip-map-route-enter')
+        }
+        // Force reflow so re-adding the class restarts the animation.
+        void handle.line?.getBoundingClientRect()
+        for (const path of [handle.casing, handle.line]) {
+          path?.classList.add('trip-map-route-enter')
+        }
+      }
+      next.set(segment.reactKey, entry.key)
+    }
+    seenSegmentCacheKeysRef.current = next
+  }, [segmentEntries, segments])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const bounds = new LngLatBounds()
+    for (const segment of segments) {
+      bounds.extend([segment.from.lng, segment.from.lat])
+      bounds.extend([segment.to.lng, segment.to.lat])
+    }
+    if (segments.length === 1) {
+      map.jumpTo({
+        center: [segments[0].from.lng, segments[0].from.lat],
+        zoom: 14,
+      })
+    } else if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: 72, maxZoom: 15, duration: 0 })
+    }
+    // Only re-fit on initial load and on day change. Editing a stop on the
+    // same day must not snap the viewport back to the default — that wipes
+    // the user's zoom/pan. We deliberately ignore `routeRequest.fingerprint`
+    // and `segments` here; place changes are handled by the per-segment
+    // route overlay, not by a global re-fit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, day.day])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const markers: MapLibreMarker[] = []
+    markers.push(
+      new MapLibreMarker({
+        element: markerElement(
+          dayOrigin.kind === 'airport' ? airportIconUrl() : homeIconUrl(),
+          SPECIAL_MARKER_SIZE,
+          dayOrigin.label,
+        ),
+        anchor: 'center',
+      })
+        .setLngLat([dayOrigin.lng, dayOrigin.lat])
+        .addTo(map),
     )
-  }
+
+    for (const { place, index } of markerStops) {
+      const number = stopNumbers[index]
+      const active = selectedPlaceId === place.id
+      const isHotelStop = isHotelPlace(place)
+      const isAirportStop = isAirportPlace(place)
+      const cached = peekGooglePlaceDetails(place.name, place.nameLocal, place.location)
+      const label = placeOriginalLabel(
+        place.name,
+        place.nameLocal,
+        cached?.name,
+        cached?.nameOriginal,
+      )
+      const title =
+        isHotelStop || isAirportStop || number == null
+          ? label
+          : `${number}. ${label}`
+      const icon = isHotelStop
+        ? homeIconUrl()
+        : isAirportStop
+          ? airportIconUrl()
+          : numberIconUrl(number ?? index + 1, active)
+      const size = isHotelStop || isAirportStop ? SPECIAL_MARKER_SIZE : 30
+      markers.push(
+        new MapLibreMarker({
+          element: markerElement(icon, size, title, {
+            faded:
+              Boolean(selectedPlaceId) &&
+              !active &&
+              !isHotelStop &&
+              !isAirportStop,
+            onClick: () => onSelectPlace(place.id),
+          }),
+          anchor: 'center',
+        })
+          .setLngLat([place.location.lng, place.location.lat])
+          .addTo(map),
+      )
+    }
+
+    return () => {
+      for (const marker of markers) marker.remove()
+    }
+  }, [
+    dayOrigin,
+    mapReady,
+    markerStops,
+    onSelectPlace,
+    selectedPlaceId,
+    stopNumbers,
+  ])
+
+  const setPathRef =
+    (reactKey: string, kind: 'casing' | 'line') =>
+    (element: SVGPathElement | null) => {
+      let handle = pathHandlesRef.current.get(reactKey)
+      if (!handle) {
+        handle = { casing: null, line: null }
+        pathHandlesRef.current.set(reactKey, handle)
+      }
+      handle[kind] = element
+    }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
-        <span>Google Maps · 当日路线</span>
-        {navLoading ? (
-          <LoadingIndicator label="正在获取实时导航…" size="sm" showDots />
-        ) : (
-          <span>
-            {resolvedLegCount
-              ? `${cachedPathLegs.length ? '已保存路线' : '实时路线'} · ${resolvedLegCount} 段`
-              : '等待路线数据'}
-          </span>
-        )}
+        <span>MapLibre · OpenStreetMap</span>
+        <span title={routeError || undefined}>
+          {routeError ? '道路路线暂不可用' : '按实际道路连接地点'}
+        </span>
       </div>
-
-      {navPlan.error && (
-        <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          {navPlan.error} 请稍后刷新页面重试。
-        </div>
-      )}
-
-      <div className="h-[min(52vh,360px)] w-full md:h-[560px]">
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={mapCenter}
-          zoom={13}
-          options={mapOptions}
-          onLoad={onLoad}
-          onUnmount={onUnmount}
+      <div
+        ref={fullscreenContainerRef}
+        className="relative h-[min(52vh,360px)] w-full bg-[var(--mist)] md:h-[560px]"
+      >
+        <div
+          ref={containerRef}
+          className="h-full w-full bg-[var(--mist)]/35"
+          style={{ position: 'absolute', inset: 0 }}
+          aria-label={`第 ${day.day} 天地图`}
+        />
+        <svg
+          ref={routeSvgRef}
+          className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+          preserveAspectRatio="none"
+          aria-hidden="true"
         >
-          {directionsLegs.map((leg, i) => (
-            <DirectionsRenderer
-              key={`${navPlan.stopsKey || 'nav'}-gdir-${i}-${leg.displayMode}-${leg.durationSeconds}-${leg.distanceMeters}`}
-              directions={leg.directionsResult}
-              options={{
-                suppressMarkers: true,
-                preserveViewport: true,
-                polylineOptions: {
-                  strokeColor: GOOGLE_ROUTE_BLUE,
-                  strokeOpacity: 0.9,
-                  strokeWeight: 6,
-                },
-              }}
-            />
-          ))}
-          <Marker
-            position={{ lat: dayOrigin.lat, lng: dayOrigin.lng }}
-            title={dayOrigin.label}
-            icon={{
-              url: dayOrigin.kind === 'airport' ? airportIconUrl() : homeIconUrl(),
-              scaledSize: new google.maps.Size(40, 40),
-              anchor: new google.maps.Point(20, 20),
-            }}
-            zIndex={1000}
-          />
-          {stops.map((place, index) => {
-            const n = stopNumbers[index]
-            const active = selectedPlaceId === place.id
-            // Day 1: hotel is a stop (origin is CDG). Mid-trip + last day: hotel is
-            // origin only (house marker above); airport stop uses plane icon.
-            // Hotel/airport markers do not consume sequence numbers.
-            const isHotelStop = isHotelPlace(place)
-            const isAirportStop = isAirportPlace(place)
-            const cached = peekGooglePlaceDetails(
-              place.name,
-              place.nameLocal,
-              place.location,
-            )
-            const label = placeOriginalLabel(
-              place.name,
-              place.nameLocal,
-              cached?.name,
-              cached?.nameOriginal,
-            )
-            const title =
-              isHotelStop || isAirportStop || n == null
-                ? label
-                : `${n}. ${label}`
-            return (
-              <Marker
-                key={`${day.day}-${place.id}-${index}`}
-                position={place.location}
-                title={title}
-                onClick={() => onSelectPlace(place.id)}
-                icon={
-                  isHotelStop
-                    ? {
-                        url: homeIconUrl(),
-                        scaledSize: new google.maps.Size(40, 40),
-                        anchor: new google.maps.Point(20, 20),
-                      }
-                    : isAirportStop
-                      ? {
-                          url: airportIconUrl(),
-                          scaledSize: new google.maps.Size(40, 40),
-                          anchor: new google.maps.Point(20, 20),
-                        }
-                      : {
-                          url: numberIconUrl(n ?? index + 1, active),
-                          scaledSize: new google.maps.Size(30, 30),
-                          anchor: new google.maps.Point(15, 15),
-                        }
-                }
-                zIndex={
-                  isHotelStop || isAirportStop
-                    ? 1000
-                    : active
-                      ? 900
-                      : (n ?? index + 1) * 10
-                }
-                opacity={
-                  !selectedPlaceId || active || isHotelStop || isAirportStop ? 1 : 0.55
-                }
+          {segments.map((segment) => (
+            <Fragment key={segment.reactKey}>
+              <path
+                ref={setPathRef(segment.reactKey, 'casing')}
+                pathLength="1"
+                fill="none"
+                stroke="#fffaf2"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.9"
               />
-            )
-          })}
-        </GoogleMap>
+              <path
+                ref={setPathRef(segment.reactKey, 'line')}
+                pathLength="1"
+                fill="none"
+                stroke="#b9572f"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Fragment>
+          ))}
+        </svg>
       </div>
     </div>
   )

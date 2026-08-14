@@ -39,47 +39,89 @@
   }
 }
 
-@keyframes day-tab-shimmer {
-  0% {
-    background-position: 180% 50%;
-  }
+@keyframes day-tab-shimmer-slide {
   100% {
-    background-position: -100% 50%;
+    transform: translateX(100%);
   }
 }
 
-/* Block skeleton shimmer for pending day tabs (not text-clip). */
+/* Block skeleton: transform on a child layer so it can keep moving if JS is busy. */
+.day-tab-shimmer,
+.day-tab-shimmer-on-ink {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
 .day-tab-shimmer {
-  background-image: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--mist) 55%, transparent) 12%,
-    color-mix(in srgb, var(--stone) 22%, var(--mist)) 40%,
-    color-mix(in srgb, white 78%, var(--mist)) 50%,
-    color-mix(in srgb, var(--stone) 22%, var(--mist)) 60%,
-    color-mix(in srgb, var(--mist) 55%, transparent) 88%
-  );
-  background-size: 220% 100%;
-  animation: day-tab-shimmer 1.6s linear infinite;
-  will-change: background-position;
+  background-color: color-mix(in srgb, var(--mist) 70%, transparent);
 }
 
 .day-tab-shimmer-on-ink {
-  background-image: linear-gradient(
+  background-color: color-mix(in srgb, white 14%, transparent);
+}
+
+.day-tab-shimmer::after,
+.day-tab-shimmer-on-ink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  animation: day-tab-shimmer-slide 1.6s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.day-tab-shimmer::after {
+  background: linear-gradient(
     100deg,
-    color-mix(in srgb, white 12%, transparent) 12%,
-    color-mix(in srgb, white 28%, transparent) 40%,
-    color-mix(in srgb, white 55%, transparent) 50%,
-    color-mix(in srgb, white 28%, transparent) 60%,
-    color-mix(in srgb, white 12%, transparent) 88%
+    transparent 15%,
+    color-mix(in srgb, white 78%, var(--mist)) 50%,
+    transparent 85%
   );
-  background-size: 220% 100%;
-  animation: day-tab-shimmer 1.6s linear infinite;
-  will-change: background-position;
+}
+
+/* Large photo skeleton: higher contrast so the sweep reads on a mist block.
+   Do not set position here — the hero overlay must stay `absolute`. */
+.place-hero-shimmer {
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--stone) 18%, var(--mist));
+}
+
+.place-hero-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    100deg,
+    transparent 8%,
+    color-mix(in srgb, white 88%, var(--paper)) 50%,
+    transparent 92%
+  );
+  animation: day-tab-shimmer-slide 1.35s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .day-tab-shimmer,
-  .day-tab-shimmer-on-ink {
+  .place-hero-shimmer::after {
+    animation: none;
+  }
+}
+
+.day-tab-shimmer-on-ink::after {
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    color-mix(in srgb, white 55%, transparent) 50%,
+    transparent 85%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-tab-shimmer::after,
+  .day-tab-shimmer-on-ink::after {
     animation: none;
   }
 }
@@ -93,11 +135,19 @@
     color 200ms ease;
 }
 
+.llm-narrative-body {
+  transition: height 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .day-tab-button {
     transition:
       background-color 200ms ease,
       color 200ms ease;
+  }
+
+  .llm-narrative-body {
+    transition: none;
   }
 }
 
@@ -302,11 +352,6 @@ select {
   animation-delay: 0.36s;
 }
 
-.cloud-save-toast-bars {
-  margin-left: auto;
-  color: var(--gold);
-}
-
 /* Game-style autosave toast ? fixed bottom-left HUD */
 @keyframes cloud-save-slide {
   from {
@@ -373,7 +418,7 @@ select {
   /* Sit above the chat FAB on narrow screens to avoid overlap. */
   bottom: max(4.75rem, calc(env(safe-area-inset-bottom) + 3.75rem));
   z-index: 1900;
-  min-width: 11.5rem;
+  width: fit-content;
   max-width: min(18rem, calc(100vw - 2rem));
   pointer-events: none;
   animation: cloud-save-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1);
@@ -382,6 +427,163 @@ select {
 @media (min-width: 640px) {
   .cloud-save-toast {
     bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+.api-meter {
+  --api-meter-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --api-meter-ease-in: cubic-bezier(0.4, 0.05, 0.2, 1);
+  --api-meter-rail: 1.85rem;
+  position: fixed;
+  z-index: 1900;
+  left: 0;
+  top: max(6.75rem, calc(env(safe-area-inset-top) + 5.5rem));
+}
+
+@media (min-width: 1024px) {
+  .api-meter {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
+.api-meter-shell {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  width: max-content;
+  margin-left: max(0.45rem, env(safe-area-inset-left));
+}
+
+.api-meter-rail,
+.api-meter-details-panel {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.api-meter-rail {
+  display: flex;
+  width: var(--api-meter-rail);
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  padding: 0.6rem 0.08rem 0.65rem;
+  border-radius: 0.95rem;
+}
+
+.api-meter-rail-label,
+.api-meter-rail-value,
+.api-meter-rail-group-value {
+  margin: 0;
+  text-align: center;
+}
+
+.api-meter-rail-label {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: var(--stone);
+}
+
+.api-meter-rail-value {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.api-meter-rail-groups {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.42rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.api-meter-rail-groups > li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.api-meter-rail-group-value {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--stone) 65%, transparent);
+}
+
+.api-meter-rail-group-value.is-active {
+  color: var(--sage);
+}
+
+.api-meter-details {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 22.5rem;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition:
+    max-width 520ms var(--api-meter-ease-out),
+    opacity 280ms var(--api-meter-ease-out),
+    transform 520ms var(--api-meter-ease-out);
+}
+
+.api-meter:not(.is-details-open) .api-meter-details {
+  transition-duration: 360ms, 220ms, 360ms;
+  transition-timing-function: var(--api-meter-ease-in);
+}
+
+.api-meter.is-details-open .api-meter-details {
+  max-width: 22.5rem;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.api-meter-details-panel {
+  width: 21.5rem;
+  margin-left: 0.45rem;
+  overflow: visible;
+  border-radius: 1rem;
+  padding: 0.65rem 0.7rem 0.7rem;
+}
+
+.api-meter-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.4rem;
+}
+
+.api-meter-details-grid > li {
+  border-radius: 0.55rem;
+  padding: 0.38rem 0.45rem 0.42rem;
+  background: color-mix(in srgb, var(--mist) 32%, white 68%);
+}
+
+.api-meter-details-grid > li:nth-child(even) {
+  background: color-mix(in srgb, var(--sage) 8%, white 92%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-meter-details {
+    transition: none;
   }
 }
 
@@ -410,7 +612,7 @@ select {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.65rem 0.85rem 0.65rem 0.7rem;
+  padding: 0.65rem 0.7rem;
   border: 1px solid rgba(232, 235, 228, 0.18);
   border-radius: 12px;
   background:
@@ -863,8 +1065,17 @@ select {
 
 .cloud-save-check-badge {
   position: absolute;
-  right: -5px;
-  bottom: -4px;
+  right: -7px;
+  bottom: -6px;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 2px solid #24302a;
+  border-radius: 999px;
+  background: #9bb59f;
+  color: #f6faf7;
+  box-shadow: 0 2px 7px rgba(12, 19, 15, 0.38);
   animation: cloud-save-badge-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1178,13 +1389,139 @@ body.timeline-dragging {
   animation: timeline-leg-content-in 180ms ease both;
 }
 
+/* Route links: distinct travel-mode colors with a tactile, non-linear response. */
+.timeline-route-link {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  text-decoration: none;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center;
+  will-change: transform;
+  backdrop-filter: blur(12px) saturate(125%);
+  -webkit-backdrop-filter: blur(12px) saturate(125%);
+  transition:
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 320ms ease,
+    background-color 320ms ease,
+    box-shadow 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 240ms ease;
+}
+
+.timeline-route-link--transit {
+  color: #174f67;
+  border-color: rgba(69, 137, 166, 0.28);
+  background: linear-gradient(180deg, rgba(244, 251, 253, 0.86), rgba(223, 241, 247, 0.78));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 1px 2px rgba(28, 36, 32, 0.08);
+}
+
+.timeline-route-link--walking {
+  color: #315f4a;
+  border-color: rgba(70, 126, 94, 0.3);
+  background: linear-gradient(180deg, rgba(246, 251, 247, 0.88), rgba(225, 239, 229, 0.8));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.74),
+    0 1px 2px rgba(28, 36, 32, 0.08);
+}
+
+.timeline-route-link::before {
+  position: absolute;
+  z-index: -1;
+  inset: -1px;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.12) 38%,
+    rgba(255, 255, 255, 0.78) 50%,
+    rgba(255, 255, 255, 0.12) 62%,
+    transparent 80%
+  );
+  transform: translate3d(-125%, 0, 0) skewX(-16deg);
+  transition: transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.timeline-route-link-label,
+.timeline-route-link-arrow {
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-route-link-arrow {
+  opacity: 0.72;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms ease;
+}
+
+@media (hover: hover) {
+  .timeline-route-link:hover {
+    transform: translate3d(0, -1px, 0) scale(1.008);
+  }
+
+  .timeline-route-link--transit:hover {
+    color: #123f55;
+    border-color: rgba(55, 125, 155, 0.42);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.78),
+      0 2px 5px rgba(28, 36, 32, 0.11);
+  }
+
+  .timeline-route-link--walking:hover {
+    color: #244f3b;
+    border-color: rgba(62, 116, 84, 0.44);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 2px 5px rgba(28, 36, 32, 0.11);
+  }
+
+  .timeline-route-link:hover::before {
+    transform: translate3d(125%, 0, 0) skewX(-16deg);
+  }
+
+  .timeline-route-link:hover .timeline-route-link-arrow {
+    opacity: 1;
+    transform: translate3d(2px, -2px, 0);
+  }
+}
+
+.timeline-route-link:active {
+  transform: translate3d(0, 0, 0) scale(0.98);
+  box-shadow:
+    inset 0 1px 2px rgba(28, 36, 32, 0.08),
+    0 1px 1px rgba(28, 36, 32, 0.04);
+  transition-duration: 90ms;
+}
+
+.timeline-route-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, currentColor 65%, white);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-route-link,
+  .timeline-route-link::before,
+  .timeline-route-link-arrow {
+    transition-duration: 0.01ms !important;
+  }
+
+  .timeline-route-link:hover,
+  .timeline-route-link:active,
+  .timeline-route-link:hover .timeline-route-link-arrow {
+    transform: none;
+  }
+}
+
 /* Soft vertical rail between stops — stone→sage fade, rounded ends. */
 .timeline-leg-rail {
   flex-shrink: 0;
   width: 2px;
   height: 2.125rem;
   margin-left: 0.8125rem;
-  margin-top: 0.2rem;
   border-radius: 999px;
   background: linear-gradient(
     180deg,
@@ -1248,4 +1585,26 @@ body.timeline-dragging {
   transition:
     opacity 220ms ease 140ms,
     transform 240ms ease 140ms;
+}
+@keyframes trip-map-route-draw {
+  from {
+    opacity: 0;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  to {
+    opacity: 1;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+.trip-map-route-enter {
+  animation: trip-map-route-draw 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-map-route-enter {
+    animation: none;
+  }
 }

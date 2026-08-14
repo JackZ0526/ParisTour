@@ -58,7 +58,7 @@ import {
   itineraryMissingLabels,
   syncDaysCopyToHotelArea,
 } from '../appHelpers'
-import { isRemoteQuietPeriodActive } from '../features/cloud-sync/services/tripCloud'
+import { isRemoteQuietPeriodActive, holdTripCloudSaves, releaseTripCloudSaves } from '../features/cloud-sync/services/tripCloud'
 import {
   clampIsoDate,
   itineraryDayCount,
@@ -93,7 +93,7 @@ import {
 import { LlmRequestError } from '../shared/services/llm/errors'
 import { getOpenAIModel } from '../shared/services/llm/model-state'
 import type { DayPlan, Place, SelectedHotel } from '../types'
-import type { FlightSelection } from '../features/flight/components/FlightPanel'
+import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
 import type { RecommendationPreferences } from '../features/place/services/recommendationPreferences'
 
@@ -537,6 +537,7 @@ export function useItineraryGeneration(
       }
 
       try {
+        holdTripCloudSaves()
         const areaLabel =
           AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || hotel.areaKey
 
@@ -807,6 +808,7 @@ export function useItineraryGeneration(
           formatItineraryFailure(err, '行程生成失败，请再试一次。'),
         )
       } finally {
+        releaseTripCloudSaves()
         if (fullGenAbortRef.current === abortController) {
           fullGenAbortRef.current = null
         }
@@ -925,6 +927,7 @@ export function useItineraryGeneration(
         )
 
       try {
+        holdTripCloudSaves()
         const areaLabel =
           AREA_KEY_CN[hotel.areaKey] || hotelAreaShort(hotel) || hotel.areaKey
         const calendarDate =
@@ -965,6 +968,7 @@ export function useItineraryGeneration(
         if (requestId !== dayRegenRequestIdRef.current) return
         setDayRegenError(formatItineraryFailure(err, '当天行程重新生成失败，请再试一次。'))
       } finally {
+        releaseTripCloudSaves()
         if (dayGenTimeoutRef.current === timeoutId) {
           window.clearTimeout(timeoutId)
           dayGenTimeoutRef.current = null

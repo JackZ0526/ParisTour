@@ -1,9 +1,9 @@
 import type { Coordinates } from '../../../types'
 import {
   withGoogleMapsPhotoKey,
-  withoutGoogleMapsPhotoKey,
 } from './googleMapsKey'
-import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
+import { getLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
+import { appendCityToQuery, tripCityFromDestination } from '../../destination/services/tripCity'
 
 export interface PlacePhotoResult {
   url: string
@@ -13,7 +13,6 @@ export interface PlacePhotoResult {
 }
 
 const cache = new Map<string, PlacePhotoResult>()
-const inflight = new Map<string, Promise<PlacePhotoResult | null>>()
 const PHOTO_ARTIFACT_PREFIX = 'google-place-photo:'
 
 function cacheKey(query: string, location?: Coordinates) {
@@ -39,88 +38,35 @@ function getStoredPhoto(key: string): PlacePhotoResult | null {
   return { ...stored, url: withGoogleMapsPhotoKey(stored.url) }
 }
 
+/** Sync cache read used by cards without starting a paid lookup. */
+export function peekGooglePlacePhoto(
+  query: string,
+  location?: Coordinates,
+): PlacePhotoResult | null {
+  const key = cacheKey(query, location)
+  const memory = cache.get(key)
+  if (memory) return memory
+  const stored = getStoredPhoto(key)
+  if (stored) cache.set(key, stored)
+  return stored
+}
+
 /**
- * Fetch a real Google Maps / Places photo for a venue via Places JS library.
- * Requires Maps JavaScript API + Places API (New) enabled.
+ * Photo media is a separate RapidAPI endpoint request. Keep this function as a
+ * cache-only compatibility layer so one complete place lookup remains one call.
  */
 export async function fetchGooglePlacePhoto(
   query: string,
   location?: Coordinates,
 ): Promise<PlacePhotoResult | null> {
-  const key = cacheKey(query, location)
-  const hit = cache.get(key)
-  if (hit) return hit
-
-  const stored = getStoredPhoto(key)
-  if (stored) {
-    cache.set(key, stored)
-    return stored
-  }
-
-  const pending = inflight.get(key)
-  if (pending) return pending
-
-  const task = (async () => {
-    if (!window.google?.maps) return null
-
-    const lib = (await google.maps.importLibrary('places')) as unknown as {
-      Place: {
-        searchByText: (req: Record<string, unknown>) => Promise<{
-          places?: Array<{
-            photos?: Array<{
-              getURI: (opts?: { maxHeight?: number; maxWidth?: number }) => string
-              authorAttributions?: Array<{ displayName?: string }>
-            }>
-            rating?: number
-            displayName?: string | { text?: string }
-          }>
-        }>
-      }
-    }
-
-    const request: Record<string, unknown> = {
-      textQuery: query,
-      fields: ['displayName', 'photos', 'rating', 'location'],
-      language: 'zh-CN',
-      region: 'fr',
-      maxResultCount: 1,
-    }
-
-    if (location) {
-      request.locationBias = location
-    }
-
-    const { places } = await lib.Place.searchByText(request)
-    const place = places?.[0]
-    const photo = place?.photos?.[0]
-    if (!photo) return null
-
-    const url = withGoogleMapsPhotoKey(photo.getURI({ maxHeight: 1000, maxWidth: 1400 }))
-    const attribution = photo.authorAttributions?.[0]?.displayName
-    const result: PlacePhotoResult = {
-      url,
-      attribution,
-      rating: place.rating,
-      query,
-    }
-    cache.set(key, result)
-    setLlmArtifact(artifactKey(key), {
-      ...result,
-      url: withoutGoogleMapsPhotoKey(result.url),
-    })
-    return result
-  })()
-
-  inflight.set(key, task)
-  try {
-    return await task
-  } finally {
-    inflight.delete(key)
-  }
+  return peekGooglePlacePhoto(query, location)
 }
 
 export function placePhotoQuery(name: string, nameLocal?: string): string {
   const label = nameLocal || name
-  if (/paris|france|迪士尼|枫丹白露|cdg|airport/i.test(label)) return label
-  return `${label} Paris`
+  const city = tripCityFromDestination().nameEn
+  if (new RegExp(`\\b${city}\\b`, 'i').test(label) || /france|迪士尼|枫丹白露|cdg|airport/i.test(label)) {
+    return label
+  }
+  return appendCityToQuery(label, city)
 }

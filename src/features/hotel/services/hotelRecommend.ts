@@ -1,6 +1,5 @@
 import { getOpenAIModel, recommendHotelsForTrip } from '../../../shared/services/llm/llm'
 import { clearLlmMemo } from '../../../shared/services/llm/llmMemo'
-import { removeLlmArtifactsByPrefix } from '../../../shared/services/llm/llmArtifactStore'
 import { loadHotelCache, saveHotelCache } from './hotelCache'
 import {
   candidateToSelected,
@@ -8,7 +7,8 @@ import {
   resolveHotelCandidates,
 } from './hotelResolve'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
-import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlaceDetails'
+import { searchBookingHotelCandidates } from './bookingHotels'
+import { loadTripDates } from '../../itinerary/services/tripDates'
 
 export function persistHotelState(
   candidates: HotelCandidate[],
@@ -38,7 +38,7 @@ function markBest(candidates: HotelCandidate[], bestId: string): HotelCandidate[
   return candidates.map((h) => ({ ...h, isBest: h.id === bestId }))
 }
 
-/** Fresh LLM batch → Google-resolved candidates. */
+/** Fresh LLM batch selected only from Booking-verified Paris hotels. */
 export async function fetchResolvedHotelRecommendations(input?: {
   count?: number
   batch?: number
@@ -51,14 +51,27 @@ export async function fetchResolvedHotelRecommendations(input?: {
   const excluded = new Set(
     (input?.excludeNames || []).map((name) => name.trim().toLowerCase()),
   )
-  const verifiedCandidates = (await searchNearbyGooglePlaceCandidates({
-    textQuery: 'hotel Paris',
-    location: { lat: 48.8566, lng: 2.3522 },
-    maxDistanceMeters: 25_000,
-    limit: 20,
-  })).filter((candidate) => !excluded.has(candidate.name.trim().toLowerCase()))
+  const dates = loadTripDates()
+  if (!dates?.startDate || !dates.endDate) {
+    throw new Error('请先选择行程日期，再获取 Booking 酒店推荐。')
+  }
+  const verifiedCandidates = (
+    await searchBookingHotelCandidates({
+      startDate: dates.startDate,
+      endDate: dates.endDate,
+      limit: 20,
+    })
+  )
+    .filter((candidate) => !excluded.has(candidate.name.trim().toLowerCase()))
+    .map((candidate) => ({
+      id: candidate.id,
+      name: candidate.name,
+      address: candidate.address,
+      rating: candidate.rating,
+      userRatingCount: candidate.reviewCount,
+    }))
   if (!verifiedCandidates.length) {
-    throw new Error('Google 暂时没有返回可验证的酒店候选。')
+    throw new Error('Booking 暂时没有返回可验证的巴黎酒店候选。')
   }
   const raw = await recommendHotelsForTrip({
     count,
@@ -100,9 +113,9 @@ export async function refreshHotelCandidates(input: {
     ...customs.filter((c) => !llmCards.some((l) => l.name === c.name)),
   ]
   const selected = candidateToSelected(best)
-  // New batch → allow detail enrichment for new hotel ids; clear only hotel-detail memos.
+  // New batch uses new candidate ids; drop in-memory memos only.
+  // Keep durable hotel-detail artifacts so a deleted custom hotel can reuse its advisor copy.
   clearLlmMemo('hotel-detail:')
-  removeLlmArtifactsByPrefix('hotel-detail:')
   persistHotelState(candidates, selected, {
     lastPreferences: input.preferences?.trim() || null,
   })

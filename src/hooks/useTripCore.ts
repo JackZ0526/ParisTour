@@ -23,7 +23,7 @@ import { useCallback, useState } from 'react'
 import {
   areFlightsComplete,
   type FlightSelection,
-} from '../features/flight/components/FlightPanel'
+} from '../features/flight/services/flightSelection'
 import { loadTripDates, type TripDateRange } from '../features/itinerary/services/tripDates'
 import {
   hasTripDates,

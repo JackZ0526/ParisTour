@@ -57,6 +57,8 @@ export interface ItineraryStartResult {
 export interface FullItineraryPlaceDraft {
   key: string
   googlePlaceId?: string
+  /** Google formatted address copied from the verified candidate, never authored by the model. */
+  googleAddress?: string
   name: string
   nameLocal?: string
   type: PlaceTypeForItinerary
@@ -77,9 +79,17 @@ export interface FullItineraryStopDraft {
   time: string
   placeKey: string
   note: string
-  transport?: string
+  transport?: '公共交通' | '步行'
   walkLevel?: '很少走' | '短步行' | '中等步行'
   duration?: string
+}
+
+function normalizeTransportChoice(
+  value: unknown,
+): FullItineraryStopDraft['transport'] {
+  const text = String(value || '').trim()
+  if (!text) return undefined
+  return /walk|walking|步行|走路|步走/i.test(text) ? '步行' : '公共交通'
 }
 
 export interface FullItineraryDayDraft {
@@ -330,7 +340,7 @@ export async function generateFullItinerary(
         ? '软偏好：同日地点尽量同片区聚类，优先少步行、少换乘。'
         : '在路线合理的前提下可接受适量步行以丰富行程。'
     }
-- 文案一致（硬规则）：note 只写本站在做什么（氛围/吃什么/看点），不要写「乘X号线回酒店」「地铁去下一站」等离开本站的具体交通；回酒店/去下一站由时间线站点之间的 Google 导航展示。walkLevel 表示到达本站这一段的步行强度，须与 transport 一致：若 transport 含地铁/公交则 walkLevel 不要写短步行/很少走。
+- 交通分类（硬规则）：transport 只能输出「公共交通」或「步行」，不要猜测或输出具体线路、车次、站名、出租车等；具体路线以 Google Maps 为准。note 只写本站在做什么，不写离开本站的交通。walkLevel 表示到达本站这一段的步行强度，并与 transport 保持一致。
 - ${
       prefs.avoidLouvreAndVersailles
         ? '软偏好：默认不主动安排卢浮宫或凡尔赛；用户明确要求时优先服从。'
@@ -343,8 +353,8 @@ export async function generateFullItinerary(
 - time 用 HH:MM；最后一天去机场可用「按航班倒推」。
 </hard_rules>`,
     jsonContract(
-      '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], days: [{ day, title, theme, pace: "轻松|适中|乐园日|自驾日", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?, walkLevel: "很少走|短步行|中等步行", duration? }] }] }',
-      '{ "places": [{ "key": "cafe-day2", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "area": "1区", "description": "1区皇家宫殿内的精品咖啡小店，可坐位。" }], "days": [{ "day": 1, "title": "抵达巴黎", "theme": "落地 · 安顿", "pace": "轻松", "summary": "抵达 CDG 后直奔酒店办理入住，下午就近闲逛。", "metroHintFromArea": { "custom": "16区特罗卡德罗周边 9 号线可换乘多条线路。" }, "stops": [{ "time": "15:30", "placeKey": "hotel-selected", "note": "办理入住，稍作休息。", "transport": "出租车", "walkLevel": "很少走" }] }] }',
+      '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], days: [{ day, title, theme, pace: "轻松|适中|乐园日|自驾日", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?: "公共交通|步行", walkLevel: "很少走|短步行|中等步行", duration? }] }] }',
+      '{ "places": [{ "key": "cafe-day2", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "area": "1区", "description": "1区皇家宫殿内的精品咖啡小店，可坐位。" }], "days": [{ "day": 1, "title": "抵达巴黎", "theme": "落地 · 安顿", "pace": "轻松", "summary": "抵达 CDG 后直奔酒店办理入住，下午就近闲逛。", "metroHintFromArea": { "custom": "按实时地图选择合适路线。" }, "stops": [{ "time": "15:30", "placeKey": "hotel-selected", "note": "办理入住，稍作休息。", "transport": "公共交通", "walkLevel": "很少走" }] }] }',
     ),
   )
 
@@ -439,6 +449,9 @@ export async function generateFullItinerary(
     places.push({
       key,
       googlePlaceId: verified.id,
+      googleAddress: /^ChI/i.test(verified.id)
+        ? verified.address
+        : undefined,
       name: verified.name,
       nameLocal: String(row.nameLocal || '').trim() || undefined,
       type,
@@ -474,7 +487,7 @@ export async function generateFullItinerary(
         time: String(stop.time || '10:00').trim() || '10:00',
         placeKey,
         note: String(stop.note || '').trim() || '按当天节奏灵活调整。',
-        transport: String(stop.transport || '').trim() || undefined,
+        transport: normalizeTransportChoice(stop.transport),
         walkLevel:
           walk === '很少走' || walk === '短步行' || walk === '中等步行'
             ? walk
@@ -547,6 +560,9 @@ function parseItineraryPlaces(
     places.push({
       key,
       googlePlaceId: verified.id,
+      googleAddress: /^ChI/i.test(verified.id)
+        ? verified.address
+        : undefined,
       name: verified.name,
       nameLocal: String(row.nameLocal || '').trim() || undefined,
       type,
@@ -576,7 +592,7 @@ function parseItineraryDay(
       time: String(stop.time || '10:00').trim() || '10:00',
       placeKey,
       note: String(stop.note || '').trim() || '按当天节奏灵活调整。',
-      transport: String(stop.transport || '').trim() || undefined,
+      transport: normalizeTransportChoice(stop.transport),
       walkLevel:
         walk === '很少走' || walk === '短步行' || walk === '中等步行'
           ? walk
@@ -752,7 +768,7 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
         ? '软偏好：同日地点尽量同片区聚类，优先少步行、少换乘。'
         : '可接受适量步行以换取更丰富的行程。'
     }
-- 文案一致（硬规则）：note 只写本站在做什么（氛围/吃什么/看点），不要写「乘X号线回酒店」「地铁去下一站」等离开本站的具体交通；回酒店/去下一站由时间线站点之间的 Google 导航展示。walkLevel 表示到达本站这一段的步行强度，须与 transport 一致：若 transport 含地铁/公交则 walkLevel 不要写短步行/很少走。
+- 交通分类（硬规则）：transport 只能输出「公共交通」或「步行」，不要猜测或输出具体线路、车次、站名、出租车等；具体路线以 Google Maps 为准。note 只写本站在做什么，不写离开本站的交通。walkLevel 表示到达本站这一段的步行强度，并与 transport 保持一致。
 - ${
       prefs.avoidLouvreAndVersailles
         ? '软偏好：默认不主动安排卢浮宫或凡尔赛；用户明确要求时优先服从。'
@@ -765,8 +781,8 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
 - time 用 HH:MM；最后一天去机场可用「按航班倒推」。
 </hard_rules>`,
     jsonContract(
-      '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], day: { day, title, theme, pace: "轻松|适中|乐园日|自驾日", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?, walkLevel: "很少走|短步行|中等步行", duration? }] } }',
-      '{ "places": [{ "key": "cafe-day3", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "description": "1区精品咖啡小店。" }], "day": { "day": 3, "title": "右岸经典", "theme": "卢浮宫与杜伊勒里", "pace": "适中", "summary": "上午卢浮宫，下午杜伊勒里花园散步，傍晚塞纳河游船。", "metroHintFromArea": { "custom": "1/7/8 号线 Palais Royal – Musée du Louvre 站直达。" }, "stops": [{ "time": "09:30", "placeKey": "attr-louvre", "note": "早场入馆，先看镇馆三宝。", "transport": "地铁 1/7 号线", "walkLevel": "很少走" }] } }',
+      '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], day: { day, title, theme, pace: "轻松|适中|乐园日|自驾日", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?: "公共交通|步行", walkLevel: "很少走|短步行|中等步行", duration? }] } }',
+      '{ "places": [{ "key": "cafe-day3", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "description": "1区精品咖啡小店。" }], "day": { "day": 3, "title": "右岸经典", "theme": "卢浮宫与杜伊勒里", "pace": "适中", "summary": "上午卢浮宫，下午杜伊勒里花园散步，傍晚塞纳河游船。", "metroHintFromArea": { "custom": "按实时地图选择合适路线。" }, "stops": [{ "time": "09:30", "placeKey": "attr-louvre", "note": "早场入馆，先看镇馆三宝。", "transport": "公共交通", "walkLevel": "很少走" }] } }',
     ),
   )
 
