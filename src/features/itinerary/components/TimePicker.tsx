@@ -111,7 +111,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           ref={panelRef}
           role="dialog"
           aria-label={label ? `${label}选择器` : '选择时间'}
-          className="fixed z-[2700] max-h-[calc(100vh-1.5rem)] origin-top animate-fade-up overflow-y-auto rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
+          className="fixed z-[2700] max-h-[min(calc(100dvh-1.5rem),calc(100vh-1.5rem))] origin-top animate-fade-up overflow-y-auto rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
           style={{
             top: panelPosition.top,
             left: panelPosition.left,

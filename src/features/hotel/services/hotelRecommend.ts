@@ -9,6 +9,7 @@ import {
 import type { HotelCandidate, SelectedHotel } from '../../../types'
 import { searchBookingHotelCandidates } from './bookingHotels'
 import { loadTripDates } from '../../itinerary/services/tripDates'
+import { isHotelSelected } from '../constants/hotels'
 
 export function persistHotelState(
   candidates: HotelCandidate[],
@@ -20,6 +21,16 @@ export function persistHotelState(
     options?.lastPreferences === null
       ? undefined
       : options?.lastPreferences?.trim() || prev?.lastPreferences
+  // When a real hotel is selected, "其他候选项" must default to collapsed so
+  // the picker surface stays compact. Callers can still force the list open
+  // by passing options.othersCollapsed = false (e.g. after clearing selection).
+  const hasRealSelection = isHotelSelected(selected)
+  const othersCollapsed =
+    options?.othersCollapsed !== undefined
+      ? options.othersCollapsed
+      : hasRealSelection
+        ? true
+        : Boolean(prev?.othersCollapsed)
   saveHotelCache({
     candidates,
     selected,
@@ -27,10 +38,7 @@ export function persistHotelState(
     batch: 1,
     fetchedAt: Date.now(),
     lastPreferences,
-    othersCollapsed:
-      options?.othersCollapsed !== undefined
-        ? options.othersCollapsed
-        : Boolean(prev?.othersCollapsed),
+    othersCollapsed,
   })
 }
 

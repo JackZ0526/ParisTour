@@ -1,0 +1,17 @@
+{
+  "name": "Paris Tour",
+  "short_name": "ParisTour",
+  "description": "行程规划与协作工具",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffaf2",
+  "theme_color": "#1c2420",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

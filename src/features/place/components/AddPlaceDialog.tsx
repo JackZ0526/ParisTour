@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -98,6 +99,7 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
+  useBodyScrollLock(open)
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -907,7 +909,7 @@ export function AddPlaceDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+        className="relative z-10 flex max-h-[min(88dvh,88vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
         <div ref={chromeRef} className="shrink-0">
           <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
@@ -961,7 +963,7 @@ export function AddPlaceDialog({
                 根据今天「{dayTitle}」给出推荐。点「换一批」可刷新列表；已加入行程的地点会暂时隐藏。
               </p>
 
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x]">
                 {recommendTabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -1080,6 +1082,8 @@ export function AddPlaceDialog({
                                           src={activePhoto}
                                           alt={item.name}
                                           className="h-44 w-full object-cover"
+                                          loading="lazy"
+                                          decoding="async"
                                           referrerPolicy="no-referrer-when-downgrade"
                                           draggable={false}
                                         />
@@ -1120,7 +1124,7 @@ export function AddPlaceDialog({
                                         )}
                                       </div>
                                       {photos.length > 1 && (
-                                        <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                        <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                           {photos.slice(0, 8).map((url, i) => (
                                             <button
                                               key={url + i}
@@ -1147,6 +1151,8 @@ export function AddPlaceDialog({
                                                 src={url}
                                                 alt=""
                                                 className="h-full w-full object-cover"
+                                                loading="lazy"
+                                                decoding="async"
                                                 referrerPolicy="no-referrer-when-downgrade"
                                               />
                                             </button>
@@ -1267,10 +1273,14 @@ export function AddPlaceDialog({
           ) : (
             <div className="space-y-3">
               <input
+                type="search"
+                inputMode="search"
+                autoComplete="off"
+                enterKeyHint="search"
                 value={googleQuery}
                 onChange={(e) => setGoogleQuery(e.target.value)}
                 placeholder="例如：Musée Rodin Paris"
-                className="w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-sm outline-none focus:border-[var(--sage)]"
+                className="w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -1283,7 +1293,7 @@ export function AddPlaceDialog({
                 <select
                   value={googleType}
                   onChange={(e) => setGoogleType(e.target.value as PlaceType)}
-                  className="mt-1 w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-base"
                 >
                   <option value="attraction">景点</option>
                   <option value="cafe">咖啡馆</option>

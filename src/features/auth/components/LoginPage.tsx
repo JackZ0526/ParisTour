@@ -126,6 +126,7 @@ export function LoginPage() {
               type="text"
               inputMode="email"
               autoComplete="email"
+              enterKeyHint="send"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

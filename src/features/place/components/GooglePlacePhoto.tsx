@@ -364,6 +364,7 @@ export function GooglePlacePhoto({
             loading ? 'opacity-0' : 'opacity-100'
           }`}
           loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           onLoad={() => setLoading(false)}
           onError={handleImgError}

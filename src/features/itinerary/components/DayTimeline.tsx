@@ -1740,7 +1740,7 @@ export function DayTimeline({
                 <span className="mt-1 inline-flex h-7 w-7" aria-hidden />
               ) : (
                 <span
-                  className="timeline-drag-handle mt-1 inline-flex h-7 cursor-grab select-none items-center justify-center rounded-md bg-[var(--mist)] px-2 text-xs text-[var(--stone)] touch-none active:cursor-grabbing"
+                  className="timeline-drag-handle mt-1 inline-flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-md bg-[var(--mist)] text-xs text-[var(--stone)] touch-none active:cursor-grabbing"
                   title="按住拖动排序"
                   aria-label="按住拖动排序"
                   onPointerDown={(e) => {

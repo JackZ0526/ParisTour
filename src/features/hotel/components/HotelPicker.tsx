@@ -1265,7 +1265,9 @@ export function HotelPicker({
       } else {
         onSelect(PENDING_HOTEL)
       }
-      setOthersCollapsed(Boolean(cached.othersCollapsed && isHotelSelected(cached.selected)))
+      setOthersCollapsed(
+        isHotelSelected(cached.selected) ? true : Boolean(cached.othersCollapsed),
+      )
       return
     }
 
@@ -2141,7 +2143,7 @@ export function HotelPicker({
                 onChange={(e) => setPreferText(e.target.value)}
                 rows={3}
                 placeholder="写下你对住宿的想法…"
-                className="mt-3 w-full resize-none rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-sm outline-none focus:border-[var(--sage)]"
+                className="mt-3 w-full resize-none rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <button
@@ -2280,7 +2282,7 @@ export function HotelPicker({
                   value={customQuery}
                   onChange={(e) => setCustomQuery(e.target.value)}
                   placeholder="例如：25 Rue du Temple, 75004 Paris"
-                  className="w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-sm outline-none focus:border-[var(--sage)]"
+                  className="w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && customQuery.trim() && !loading) {
                       e.preventDefault()

@@ -7,6 +7,7 @@ import {
   NavigationControl,
   type StyleSpecification,
 } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getPlace } from '../../place/constants/places'
 import {
@@ -72,9 +73,13 @@ function markerElement(
   const element = document.createElement(options?.onClick ? 'button' : 'div')
   element.title = title
   element.setAttribute('aria-label', title)
-  element.style.width = `${size}px`
-  element.style.height = `${size}px`
-  element.style.padding = '0'
+  // Expand hit area on phones so dense markers are easier to tap. Desktop
+  // keeps the tight bounding box so overlapping markers stay readable.
+  const hitPad = typeof window !== 'undefined' && window.innerWidth < 640 ? 6 : 0
+  const outer = size + hitPad * 2
+  element.style.width = `${outer}px`
+  element.style.height = `${outer}px`
+  element.style.padding = `${hitPad}px`
   element.style.border = '0'
   element.style.background = 'transparent'
   element.style.opacity = options?.faded ? '0.55' : '1'
@@ -86,8 +91,8 @@ function markerElement(
   image.alt = ''
   image.draggable = false
   image.style.display = 'block'
-  image.style.width = '100%'
-  image.style.height = '100%'
+  image.style.width = `${size}px`
+  image.style.height = `${size}px`
   element.appendChild(image)
   if (options?.onClick) element.addEventListener('click', options.onClick)
   return element
@@ -171,12 +176,12 @@ export function TripMap({
       attributionControl: { compact: true },
       cooperativeGestures: true,
     })
-    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
+    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-left')
     map.addControl(
       new FullscreenControl({
         container: fullscreenContainerRef.current || containerRef.current,
       }),
-      'top-right',
+      'top-left',
     )
     map.once('load', () => setMapReady(true))
     mapRef.current = map
@@ -416,14 +421,15 @@ export function TripMap({
   return (
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
-        <span>MapLibre · OpenStreetMap</span>
+        <span className="hidden sm:inline">MapLibre · OpenStreetMap</span>
+        <span className="sm:hidden">地图</span>
         <span title={routeError || undefined}>
           {routeError ? '道路路线暂不可用' : '按实际道路连接地点'}
         </span>
       </div>
       <div
         ref={fullscreenContainerRef}
-        className="relative h-[min(52vh,360px)] w-full bg-[var(--mist)] md:h-[560px]"
+        className="relative h-[min(60vh,440px)] w-full bg-[var(--mist)] md:h-[560px]"
       >
         <div
           ref={containerRef}
@@ -431,6 +437,9 @@ export function TripMap({
           style={{ position: 'absolute', inset: 0 }}
           aria-label={`第 ${day.day} 天地图`}
         />
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[2] -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-xs text-white sm:hidden">
+          用两根手指拖动地图
+        </div>
         <svg
           ref={routeSvgRef}
           className="pointer-events-none absolute inset-0 z-[1] h-full w-full"

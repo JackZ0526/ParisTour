@@ -60,7 +60,7 @@ export function DayTabButton({
       aria-busy={pending || undefined}
       aria-label={pending ? `第 ${dayNumber} 天，正在生成` : undefined}
       style={box ? { width: box.w, height: box.h } : undefined}
-      className={`day-tab-button shrink-0 overflow-hidden rounded-full px-3 py-2 text-sm sm:px-4 ${
+      className={`day-tab-button snap-start shrink-0 overflow-hidden rounded-full px-3 py-2 text-sm sm:px-4 ${
         active
           ? 'bg-[var(--ink)] text-[var(--paper)]'
           : 'bg-white/70 text-[var(--ink)] hover:bg-white'

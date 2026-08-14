@@ -4,9 +4,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type HTMLAttributeReferrerPolicy,
   type ReactNode,
 } from 'react'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import {
   ChevronLeft,
   ChevronRight,
@@ -446,6 +448,7 @@ export function GooglePlacePage({
   onAdvisorFacts,
   onClose,
 }: Props) {
+  useBodyScrollLock(open)
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLookupReady, setGoogleLookupReady] = useState(false)
@@ -474,6 +477,28 @@ export function GooglePlacePage({
   /** idle = not finished; loading = in flight; done = success or gave up */
   const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
   const swipeStartX = useRef<number | null>(null)
+  const swipeStartY = useRef<number | null>(null)
+  const swipeStartTime = useRef(0)
+  const swipeAxis = useRef<'h' | 'v' | null>(null)
+  const heroRef = useRef<HTMLDivElement | null>(null)
+  const [swipeOffsetX, setSwipeOffsetX] = useState(0)
+  const [isDraggingHero, setIsDraggingHero] = useState(false)
+  const sheetDragStartY = useRef<number | null>(null)
+  const sheetDragStartX = useRef<number | null>(null)
+  const sheetDragStartTime = useRef(0)
+  const sheetDragAxis = useRef<'v' | 'h' | null>(null)
+  const sheetDragStartScrollTop = useRef(0)
+  const contentScrollRef = useRef<HTMLDivElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const backdropRef = useRef<HTMLButtonElement | null>(null)
+  const [isDraggingSheet, setIsDraggingSheet] = useState(false)
+  const [isMobileSheet, setIsMobileSheet] = useState(false)
+  const [sheetAnim, setSheetAnim] = useState<
+    | { phase: 'idle' }
+    | { phase: 'snap'; fromY: number }
+    | { phase: 'flyoff'; fromY: number; duration: number }
+  >({ phase: 'idle' })
+  const sheetAnimTimer = useRef<number | null>(null)
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
   const thumbScrollReadyRef = useRef(false)
   const onDetailsResolvedRef = useRef(onDetailsResolved)
@@ -484,7 +509,7 @@ export function GooglePlacePage({
   const query = placeDetailsQuery(name, nameLocal)
   const apiKey = getGoogleMapsApiKey()
   const embedSrc = googleMapsEmbedApiUrl(query, apiKey)
-  const nameTranslateKey = `${open ? 1 : 0}|${name}|${nameLocal || ''}`
+  const nameTranslateKey = `${name}|${nameLocal || ''}`
   const placeResetKey = `${nameTranslateKey}|${tripadvisorContentId || ''}|${googlePlaceId || ''}`
   const nameTranslateKeyRef = useRef(nameTranslateKey)
   const placeResetKeyRef = useRef(placeResetKey)
@@ -724,6 +749,149 @@ export function GooglePlacePage({
 
     if (galleryLength < 2) return
     setPhotoIndex((i) => (i + 1) % galleryLength)
+  }
+
+  function resetHeroDrag() {
+    swipeStartX.current = null
+    swipeStartY.current = null
+    swipeAxis.current = null
+    setIsDraggingHero(false)
+    setSwipeOffsetX(0)
+  }
+
+  function endHeroDrag(clientX: number, clientY: number, timeStamp: number) {
+    const startX = swipeStartX.current
+    const startY = swipeStartY.current
+    const axis = swipeAxis.current
+    swipeStartX.current = null
+    swipeStartY.current = null
+    swipeAxis.current = null
+    setIsDraggingHero(false)
+    setSwipeOffsetX(0)
+    if (
+      startX == null ||
+      startY == null ||
+      axis !== 'h' ||
+      !showGalleryNav ||
+      galleryLength < 2
+    ) {
+      return
+    }
+    const dx = clientX - startX
+    const dy = clientY - startY
+    const dt = Math.max(1, timeStamp - swipeStartTime.current)
+    const velocity = dx / dt // px / ms
+    const width = heroRef.current?.getBoundingClientRect().width || 1
+    const threshold = Math.max(24, width * 0.12)
+    const shouldAdvance =
+      Math.abs(dx) > threshold || Math.abs(velocity) > 0.25
+    if (!shouldAdvance) return
+    // Suppress unused-var warning while keeping diagnostics meaningful
+    void dy
+    stepPhoto(dx < 0 ? 1 : -1)
+  }
+
+  function applySheetDrag(visualOffset: number) {
+    const dlg = dialogRef.current
+    const bd = backdropRef.current
+    if (dlg) {
+      dlg.style.setProperty('--sheet-y', `${visualOffset}px`)
+      dlg.style.transform = `translate3d(0, var(--sheet-y, 0), 0)`
+    }
+    if (bd) {
+      const viewport = typeof window !== 'undefined' ? window.innerHeight : 1
+      const t = Math.max(0, Math.min(1, visualOffset / viewport))
+      bd.style.opacity = String(1 - t)
+    }
+  }
+
+  function clearSheetDragStyles() {
+    const dlg = dialogRef.current
+    const bd = backdropRef.current
+    if (dlg) {
+      dlg.style.removeProperty('--sheet-y')
+      dlg.style.transform = ''
+    }
+    if (bd) {
+      bd.style.opacity = ''
+    }
+  }
+
+  function resetSheetDrag() {
+    sheetDragStartY.current = null
+    sheetDragStartX.current = null
+    sheetDragAxis.current = null
+    sheetDragStartScrollTop.current = 0
+    setIsDraggingSheet(false)
+    clearSheetDragStyles()
+  }
+
+  function endSheetDrag(clientY: number, timeStamp: number) {
+    const startY = sheetDragStartY.current
+    const axis = sheetDragAxis.current
+    const startScrollTop = sheetDragStartScrollTop.current
+    sheetDragStartY.current = null
+    sheetDragStartX.current = null
+    sheetDragAxis.current = null
+    sheetDragStartScrollTop.current = 0
+    if (startY == null || axis !== 'v') {
+      setIsDraggingSheet(false)
+      clearSheetDragStyles()
+      return
+    }
+    const rawDy = clientY - startY
+    const dt = Math.max(1, timeStamp - sheetDragStartTime.current)
+    const velocity = rawDy / dt
+    const height =
+      heroRef.current?.parentElement?.getBoundingClientRect().height || 1
+    // Only dismiss if the inner scroll is at the top by the time the user releases.
+    // A fast swipe on mid-scroll content should scroll content, not dismiss.
+    const visualOffset = Math.max(0, rawDy)
+    const dismissThreshold = Math.max(160, height * 0.3)
+    const atTop = startScrollTop <= 0
+    const shouldDismiss =
+      atTop && (visualOffset > dismissThreshold || velocity > 0.8)
+    setIsDraggingSheet(false)
+    if (!shouldDismiss) {
+      // Snap back with spring-like overshoot.
+      clearSheetDragStyles()
+      const bd = backdropRef.current
+      if (bd) {
+        bd.style.transition = `opacity 220ms ease-out`
+        bd.style.opacity = '1'
+      }
+      setSheetAnim({ phase: 'snap', fromY: visualOffset })
+      if (sheetAnimTimer.current != null) {
+        window.clearTimeout(sheetAnimTimer.current)
+      }
+      sheetAnimTimer.current = window.setTimeout(() => {
+        setSheetAnim({ phase: 'idle' })
+        if (backdropRef.current) backdropRef.current.style.transition = ''
+        sheetAnimTimer.current = null
+      }, 380)
+      return
+    }
+    // Fly off with momentum. Velocity dictates duration.
+    const viewport = typeof window !== 'undefined' ? window.innerHeight : height
+    const targetY = viewport + 80
+    const remaining = Math.max(0, targetY - visualOffset)
+    const v = Math.max(velocity, 0.4) // px/ms
+    const duration = Math.max(180, Math.min(520, remaining / v))
+    clearSheetDragStyles()
+    const bd2 = backdropRef.current
+    if (bd2) {
+      bd2.style.transition = `opacity ${duration}ms cubic-bezier(0.32, 0.72, 0, 1)`
+      bd2.style.opacity = '0'
+    }
+    setSheetAnim({ phase: 'flyoff', fromY: visualOffset, duration })
+    if (sheetAnimTimer.current != null) {
+      window.clearTimeout(sheetAnimTimer.current)
+    }
+    sheetAnimTimer.current = window.setTimeout(() => {
+      sheetAnimTimer.current = null
+      setSheetAnim({ phase: 'idle' })
+      onClose()
+    }, duration + 30)
   }
 
   const showGalleryNav =
@@ -1011,6 +1179,38 @@ export function GooglePlacePage({
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose, closeOnBackdrop, photos.length])
+
+  useEffect(() => {
+    if (open) return
+    swipeStartX.current = null
+    swipeStartY.current = null
+    swipeAxis.current = null
+    setIsDraggingHero(false)
+    setSwipeOffsetX(0)
+    sheetDragStartY.current = null
+    sheetDragStartX.current = null
+    sheetDragAxis.current = null
+    sheetDragStartScrollTop.current = 0
+    setIsDraggingSheet(false)
+    if (sheetAnimTimer.current != null) {
+      window.clearTimeout(sheetAnimTimer.current)
+      sheetAnimTimer.current = null
+    }
+    setSheetAnim({ phase: 'idle' })
+  }, [open])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(max-width: 639.98px)')
+    const update = () => setIsMobileSheet(mq.matches)
+    update()
+    if (mq.addEventListener) mq.addEventListener('change', update)
+    else mq.addListener(update)
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', update)
+      else mq.removeListener(update)
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -1557,6 +1757,7 @@ export function GooglePlacePage({
       style={{ zIndex: overlayZIndex ?? 2000 }}
     >
       <button
+        ref={backdropRef}
         type="button"
         className="absolute inset-0 cursor-default"
         aria-label="关闭"
@@ -1565,10 +1766,86 @@ export function GooglePlacePage({
         }}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
-        className="relative z-10 flex max-h-[min(92vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+        className={`relative z-10 flex max-h-[min(92vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl ${
+          isMobileSheet ? 'touch-none' : ''
+        } ${
+          sheetAnim.phase === 'idle'
+            ? isDraggingSheet
+              ? 'sheet-dragging'
+              : 'motion-safe:transition-transform motion-safe:duration-200'
+            : ''
+        } ${
+          sheetAnim.phase === 'snap'
+            ? 'sheet-snap-back'
+            : sheetAnim.phase === 'flyoff'
+              ? 'sheet-fly-off'
+              : ''
+        }`}
+        style={
+          sheetAnim.phase === 'snap'
+            ? ({ ['--from-y' as string]: `${sheetAnim.fromY}px` } as CSSProperties)
+            : sheetAnim.phase === 'flyoff'
+              ? ({
+                  ['--from-y' as string]: `${sheetAnim.fromY}px`,
+                  ['--fly-duration' as string]: `${sheetAnim.duration}ms`,
+                } as CSSProperties)
+              : { transform: 'translate3d(0, var(--sheet-y, 0), 0)' }
+        }
+        onPointerDown={(e) => {
+          if (!isMobileSheet) return
+          if (e.pointerType === 'mouse' && e.button !== 0) return
+          if (isDraggingHero) return
+          sheetDragStartY.current = e.clientY
+          sheetDragStartX.current = e.clientX
+          sheetDragStartTime.current = e.timeStamp
+          sheetDragAxis.current = null
+          sheetDragStartScrollTop.current = contentScrollRef.current?.scrollTop || 0
+        }}
+        onPointerMove={(e) => {
+          if (!isMobileSheet) return
+          if (sheetDragStartY.current == null) return
+          const dy = e.clientY - (sheetDragStartY.current ?? e.clientY)
+          const dx = e.clientX - (sheetDragStartX.current ?? e.clientX)
+          if (sheetDragAxis.current == null) {
+            if (Math.abs(dy) < 6 && Math.abs(dx) < 6) return
+            sheetDragAxis.current = Math.abs(dy) >= Math.abs(dx) ? 'v' : 'h'
+            if (sheetDragAxis.current !== 'v') {
+              sheetDragStartY.current = null
+              sheetDragStartX.current = null
+              return
+            }
+            if (!isDraggingSheet) setIsDraggingSheet(true)
+          }
+          const scroller = contentScrollRef.current
+          if (!scroller) return
+          if (dy < 0) {
+            // Upward swipe: scroll content up (scrollTop grows).
+            scroller.scrollTop = sheetDragStartScrollTop.current - dy
+            applySheetDrag(0)
+            return
+          }
+          // Downward swipe: if content still has room above, scroll it up first;
+          // only when it has hit the top does the remaining travel engage the sheet.
+          const desiredScrollTop = sheetDragStartScrollTop.current - dy
+          if (desiredScrollTop > 0) {
+            scroller.scrollTop = desiredScrollTop
+            applySheetDrag(0)
+            return
+          }
+          scroller.scrollTop = 0
+          applySheetDrag(-desiredScrollTop)
+        }}
+        onPointerUp={(e) => {
+          if (!isMobileSheet) return
+          endSheetDrag(e.clientY, e.timeStamp)
+        }}
+        onPointerCancel={() => {
+          resetSheetDrag()
+        }}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
           <div className="min-w-0 pr-3">
@@ -1613,7 +1890,10 @@ export function GooglePlacePage({
         </div>
 
         <div
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
+          ref={contentScrollRef}
+          className={`min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-none p-4 ${
+            isMobileSheet ? 'touch-none' : ''
+          }`}
           aria-busy={
             loading ||
             rapidApiFallbackLoading ||
@@ -1632,21 +1912,46 @@ export function GooglePlacePage({
               <div className="grid grid-rows-[1fr] opacity-100">
               <div className="min-h-0 overflow-hidden">
               <div
-                className="relative h-56 overflow-hidden rounded-2xl bg-[var(--mist)] select-none sm:h-72"
+                ref={heroRef}
+                className="relative h-[min(56vw,14rem)] overflow-hidden rounded-2xl bg-[var(--mist)] select-none [touch-action:pan-y] sm:h-72"
                 aria-busy={showPhotoShimmer || undefined}
                 onPointerDown={(e) => {
                   if (!showGalleryNav) return
+                  if (e.pointerType === 'mouse' && e.button !== 0) return
                   swipeStartX.current = e.clientX
+                  swipeStartY.current = e.clientY
+                  swipeStartTime.current = e.timeStamp
+                  swipeAxis.current = null
+                  try {
+                    e.currentTarget.setPointerCapture(e.pointerId)
+                  } catch {
+                    /* not capturable */
+                  }
+                }}
+                onPointerMove={(e) => {
+                  if (swipeStartX.current == null || swipeStartY.current == null) return
+                  if (!showGalleryNav) return
+                  const dx = e.clientX - swipeStartX.current
+                  const dy = e.clientY - swipeStartY.current
+                  if (swipeAxis.current == null) {
+                    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+                    swipeAxis.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+                    if (swipeAxis.current !== 'h') {
+                      // Vertical intent — let ancestor scroll handle it.
+                      swipeStartX.current = null
+                      swipeStartY.current = null
+                      return
+                    }
+                    setIsDraggingHero(true)
+                  }
+                  if (swipeAxis.current !== 'h') return
+                  setSwipeOffsetX(dx)
                 }}
                 onPointerUp={(e) => {
-                  if (swipeStartX.current == null || !showGalleryNav) return
-                  const dx = e.clientX - swipeStartX.current
-                  swipeStartX.current = null
-                  if (Math.abs(dx) < 40) return
-                  stepPhoto(dx < 0 ? 1 : -1)
+                  endHeroDrag(e.clientX, e.clientY, e.timeStamp)
                 }}
                 onPointerCancel={() => {
-                  swipeStartX.current = null
+                  resetHeroDrag()
                 }}
               >
                 <span
@@ -1664,8 +1969,11 @@ export function GooglePlacePage({
                       className={`pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-2xl motion-safe:transition-opacity motion-safe:duration-300 ${
                         heroReady ? 'opacity-80' : 'opacity-0'
                       }`}
+                      style={{ transform: `translate3d(${swipeOffsetX}px, 0, 0)` }}
                       referrerPolicy={photoReferrerPolicy(displayPhoto)}
                       draggable={false}
+                      fetchPriority="low"
+                      decoding="async"
                     />
                     <span
                       className={`pointer-events-none absolute inset-0 bg-white/25 motion-safe:transition-opacity motion-safe:duration-300 ${
@@ -1677,11 +1985,18 @@ export function GooglePlacePage({
                       ref={heroImgRef}
                       src={displayPhoto}
                       alt={details?.name || name}
-                      className={`relative z-[1] h-full w-full object-contain motion-safe:transition-opacity motion-safe:duration-300 ${
+                      className={`relative z-[1] h-full w-full object-contain ${
+                        isDraggingHero
+                          ? ''
+                          : 'motion-safe:transition-transform motion-safe:duration-200'
+                      } motion-safe:transition-opacity motion-safe:duration-300 ${
                         heroReady ? 'opacity-100' : 'opacity-0'
                       }`}
+                      style={{ transform: `translate3d(${swipeOffsetX}px, 0, 0)` }}
                       referrerPolicy={photoReferrerPolicy(displayPhoto)}
                       draggable={false}
+                      fetchPriority="high"
+                      decoding="async"
                       onLoad={() => setHeroReady(true)}
                       onError={() =>
                         setFailedPhotos((current) =>

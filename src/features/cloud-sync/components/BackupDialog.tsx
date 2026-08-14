@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
 import {
   listTripSnapshotBackups,
@@ -49,6 +50,7 @@ function formatBackupTime(value: string): string {
 }
 
 export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
+  useBodyScrollLock(open)
   const [backups, setBackups] = useState<TripSnapshotBackup[]>([])
   const [loading, setLoading] = useState(false)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -76,6 +78,15 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     }
   }, [open, tripId])
 
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   if (!open) return null
 
   async function restore(backup: TripSnapshotBackup) {
@@ -102,7 +113,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
         className="absolute inset-0"
         onClick={onClose}
       />
-      <section className="relative z-10 max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7">
+      <section className="relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>

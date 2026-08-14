@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
 import {
   listTripShares,
@@ -64,6 +65,7 @@ function RoleToggle({
 }
 
 export function ShareDialog({ tripId, open, onClose }: Props) {
+  useBodyScrollLock(open)
   const titleId = useId()
   const [shares, setShares] = useState<TripShareRow[]>([])
   const [email, setEmail] = useState('')
@@ -208,12 +210,14 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
               <span className="font-medium text-[var(--ink)]">邀请邮箱</span>
               <input
                 type="email"
+                inputMode="email"
+                enterKeyHint="send"
                 required
                 autoComplete="email"
                 placeholder="friend@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full border-0 border-b border-[var(--stone)]/35 bg-transparent px-0 py-2 text-sm outline-none transition placeholder:text-[var(--stone)]/50 focus:border-[var(--sage)]"
+                className="mt-1.5 w-full border-0 border-b border-[var(--stone)]/35 bg-transparent px-0 py-2 outline-none transition placeholder:text-[var(--stone)]/50 focus:border-[var(--sage)]"
               />
             </label>
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
@@ -169,6 +170,7 @@ export function TripChatPanel({
   handlers,
 }: Props) {
   const [open, setOpen] = useState(false)
+  useBodyScrollLock(open)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [streamingReply, setStreamingReply] = useState(false)
@@ -1947,7 +1949,9 @@ export function TripChatPanel({
               disabled={busy || !open}
               tabIndex={open ? undefined : -1}
               aria-busy={busy || undefined}
-              className="min-w-0 flex-1 rounded-full border border-[var(--ink)]/10 bg-white/80 px-3 py-2 text-sm outline-none focus:border-[var(--sage)]"
+              enterKeyHint="send"
+              autoComplete="off"
+              className="min-w-0 flex-1 rounded-full border border-[var(--ink)]/10 bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
             />
             <button
               type="submit"

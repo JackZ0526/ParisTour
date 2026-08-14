@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
@@ -21,10 +21,12 @@ import {
 } from './features/place/components/RecommendationPreferencesDialog'
 import { PlacePanel } from './features/place/components/PlacePanel'
 import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
-import { TripChatPanel } from './features/chat/components/TripChatPanel'
+import { TripChatPanelLazy as TripChatPanel } from './features/chat/components/TripChatPanel.lazy'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
-import { TripMap } from './features/map/components/TripMap'
+const TripMap = React.lazy(() =>
+  import('./features/map/components/TripMap').then((m) => ({ default: m.TripMap })),
+)
 import {
   buildDayMapRouteSegments,
   dayRouteSegmentsToRequests,
@@ -521,7 +523,7 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+    <div className="mx-auto min-h-[100svh] max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
       <ApiRequestMeter />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
@@ -558,53 +560,110 @@ export default function App() {
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
-          {activeTrip && (
-            <button
-              type="button"
-              onClick={() => setBackupOpen(true)}
-              aria-label="存档"
-              title="存档"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+          {/* Mobile (< sm): collapse into a "⋯" overflow menu. */}
+          <details className="relative sm:hidden">
+            <summary
+              className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] [&::-webkit-details-marker]:hidden"
+              aria-label="更多操作"
             >
-              <Archive size={17} strokeWidth={1.8} aria-hidden />
-            </button>
-          )}
-          {role === 'owner' && activeTrip && (
+              <span aria-hidden>⋯</span>
+            </summary>
+            <div className="absolute right-0 top-12 z-30 flex min-w-[10rem] flex-col gap-1 rounded-2xl border border-white/70 bg-[var(--paper)] p-2 shadow-[var(--shadow)]">
+              {activeTrip && (
+                <button
+                  type="button"
+                  onClick={() => setBackupOpen(true)}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                >
+                  <Archive size={16} strokeWidth={1.8} aria-hidden />
+                  存档
+                </button>
+              )}
+              {role === 'owner' && activeTrip && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShareOpen(true)
+                    void refreshTrips().catch(() => undefined)
+                  }}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                >
+                  <Share2 size={16} strokeWidth={1.8} aria-hidden />
+                  分享
+                </button>
+              )}
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={handleClearAllTripState}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                >
+                  <Trash2 size={16} strokeWidth={1.8} aria-hidden />
+                  清空全部
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  void signOut()
+                }}
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+              >
+                <LogOut size={16} strokeWidth={1.8} aria-hidden />
+                退出
+              </button>
+            </div>
+          </details>
+          {/* Desktop (≥ sm): inline action buttons as before. */}
+          <div className="hidden items-center gap-1.5 sm:flex sm:gap-2">
+            {activeTrip && (
+              <button
+                type="button"
+                onClick={() => setBackupOpen(true)}
+                aria-label="存档"
+                title="存档"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
+              >
+                <Archive size={17} strokeWidth={1.8} aria-hidden />
+              </button>
+            )}
+            {role === 'owner' && activeTrip && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShareOpen(true)
+                  void refreshTrips().catch(() => undefined)
+                }}
+                aria-label="分享"
+                title="分享"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
+              >
+                <Share2 size={17} strokeWidth={1.8} aria-hidden />
+              </button>
+            )}
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={handleClearAllTripState}
+                aria-label="清空全部"
+                title="清空全部"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
+              >
+                <Trash2 size={17} strokeWidth={1.8} aria-hidden />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
-                setShareOpen(true)
-                void refreshTrips().catch(() => undefined)
+                void signOut()
               }}
-              aria-label="分享"
-              title="分享"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+              aria-label="退出"
+              title="退出"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
             >
-              <Share2 size={17} strokeWidth={1.8} aria-hidden />
+              <LogOut size={17} strokeWidth={1.8} aria-hidden />
             </button>
-          )}
-          {!readOnly && (
-            <button
-              type="button"
-              onClick={handleClearAllTripState}
-              aria-label="清空全部"
-              title="清空全部"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
-            >
-              <Trash2 size={17} strokeWidth={1.8} aria-hidden />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              void signOut()
-            }}
-            aria-label="退出"
-            title="退出"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
-          >
-            <LogOut size={17} strokeWidth={1.8} aria-hidden />
-          </button>
+          </div>
         </div>
       </div>
 
@@ -863,8 +922,8 @@ export default function App() {
 
                 {showItineraryContent && (
                   <>
-                    <div className="sticky top-0 z-20 -mx-3 space-y-2 bg-[color-mix(in_srgb,var(--paper)_92%,transparent)] px-3 py-2 backdrop-blur-md sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
-                      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-20 -mx-3 space-y-2 bg-[color-mix(in_srgb,var(--paper)_92%,transparent)] px-3 py-2 backdrop-blur-md sm:static sm:top-0 sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+                      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {days.map((d, i) => {
                           const cal = dateForTripDay(itineraryStartDate, d.day)
                           return (
@@ -966,14 +1025,16 @@ export default function App() {
                         }`}
                       >
                         <MapErrorBoundary>
-                          <TripMap
-                            hotel={hotel}
-                            day={day}
-                            customPlaces={placesWithHotel}
-                            selectedPlaceId={selectedPlaceId}
-                            onSelectPlace={handleSelectPlace}
-                            onRouteCacheChanged={handleRouteCacheChanged}
-                          />
+                          <React.Suspense fallback={<div className="flex h-[min(60vh,440px)] w-full items-center justify-center bg-[var(--mist)] text-sm text-[var(--stone)] md:h-[560px]">地图加载中…</div>}>
+                            <TripMap
+                              hotel={hotel}
+                              day={day}
+                              customPlaces={placesWithHotel}
+                              selectedPlaceId={selectedPlaceId}
+                              onSelectPlace={handleSelectPlace}
+                              onRouteCacheChanged={handleRouteCacheChanged}
+                            />
+                          </React.Suspense>
                         </MapErrorBoundary>
                         <PlacePanel
                           key={`place-panel-${day.day}-${hotel.id}`}

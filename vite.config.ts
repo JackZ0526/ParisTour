@@ -369,9 +369,10 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       // Windows often resolves localhost → 127.0.0.1; default Node may bind [::1] only
-      host: '127.0.0.1',
+      // host: true → listen on 0.0.0.0 so phones on the same LAN can reach the dev server
+      host: true,
       port: 5173,
-      strictPort: true,
+      strictPort: false,
       proxy: {
         // Booking COM hotel endpoints. Client-side code has an additional
         // disabled-by-default switch, so development consumes no quota until

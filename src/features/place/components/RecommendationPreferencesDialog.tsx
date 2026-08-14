@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import {
@@ -80,6 +81,7 @@ export function RecommendationPreferencesDialog({
   onSave,
   onClose,
 }: Props) {
+  useBodyScrollLock(open)
   const [draft, setDraft] = useState(value)
 
   useEffect(() => {
@@ -98,10 +100,10 @@ export function RecommendationPreferencesDialog({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[2600] flex items-center justify-center bg-black/35 p-4" onMouseDown={(event) => {
+    <div className="fixed inset-0 z-[2600] flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={(event) => {
       if (event.target === event.currentTarget) onClose()
     }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="recommendation-preferences-title" className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/70 bg-[var(--paper)] shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="recommendation-preferences-title" className="w-full max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl">
         <div className="flex items-start justify-between border-b border-[var(--mist)] px-5 py-4">
           <div>
             <h2 id="recommendation-preferences-title" className="font-serif text-2xl text-[var(--ink)]">推荐偏好</h2>
@@ -110,7 +112,7 @@ export function RecommendationPreferencesDialog({
           <CloseIconButton onClick={onClose} />
         </div>
 
-        <div className="max-h-[68vh] space-y-5 overflow-y-auto px-5 py-4">
+        <div className="max-h-[min(68dvh,68vh)] space-y-5 overflow-y-auto px-5 py-4">
           <TimePicker
             label="通常开始时间"
             value={draft.dayStartTime}

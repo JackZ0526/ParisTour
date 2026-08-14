@@ -391,7 +391,7 @@ export async function consumeResponsesStream(
         // Surface every streaming event in the console so we can see the
         // real payload shape — the `action.query` field has moved
         // between OpenAI versions and we want to be empirical.
-        if (typeof console !== 'undefined') console.debug('[responses:event]', event.type, event)
+        if (import.meta.env.DEV && typeof console !== 'undefined') console.debug('[responses:event]', event.type, event)
 
         if (
           event.type === 'response.output_text.delta' ||

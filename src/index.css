@@ -1,5 +1,42 @@
 @import 'tailwindcss';
 
+@keyframes sheet-snap-back {
+  0% {
+    transform: translate3d(0, var(--from-y, 0), 0);
+  }
+  60% {
+    transform: translate3d(0, calc(var(--from-y, 0) * -0.08), 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sheet-fly-off {
+  0% {
+    transform: translate3d(0, var(--from-y, 0), 0);
+  }
+  100% {
+    transform: translate3d(0, 110vh, 0);
+  }
+}
+
+.sheet-snap-back {
+  animation: sheet-snap-back 360ms cubic-bezier(0.34, 1.4, 0.5, 1) forwards;
+  will-change: transform;
+}
+
+.sheet-fly-off {
+  animation: sheet-fly-off var(--fly-duration, 320ms)
+    cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform;
+}
+
+.sheet-dragging {
+  transition: none !important;
+  will-change: transform;
+}
+
 @keyframes chat-step-shimmer {
   0% {
     background-position: 180% 50%;
@@ -1663,5 +1700,15 @@ body.timeline-dragging {
 @media (prefers-reduced-motion: reduce) {
   .trip-map-route-enter {
     animation: none;
+  }
+}
+
+/* Mobile-only baselines (<640px). Desktop ≥ sm is untouched. */
+@media (max-width: 639.98px) {
+  /* Prevent iOS Safari from auto-zooming focused form fields. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
