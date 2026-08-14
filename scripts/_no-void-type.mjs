@@ -10,7 +10,7 @@ const SRC_DIRS = ['src', 'api', 'scripts']
 // We intentionally *exclude* `)` so normal `void <expression>` statements
 // (e.g. `) void foo()`) don't get flagged.
 const VOID_TYPE_REGEX =
-  /(?:[:<,|&\[\{])\s*void\s+[A-Za-z_][A-Za-z0-9_]*/m
+  /(?:[:<,|&[{])\s*void\s+[A-Za-z_][A-Za-z0-9_]*/m
 
 function walk(dir) {
   /** @type {string[]} */

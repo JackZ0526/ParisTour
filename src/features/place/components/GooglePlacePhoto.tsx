@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Image } from 'lucide-react'
-import { peekGooglePlaceDetails, peekGooglePlacePhotoMedia } from '../../map/services/googlePlaceDetails'
+import {
+  fetchRapidApiGooglePhotoFallbackById,
+  peekGooglePlaceDetails,
+  peekGooglePlacePhotoMedia,
+  peekRapidApiGooglePhotoFallback,
+} from '../../map/services/googlePlaceDetails'
 import {
   fetchTripadvisorPlaceGallery,
   peekTripadvisorPlacePhotos,
@@ -159,6 +164,23 @@ export function GooglePlacePhoto({
             return
           }
         }
+        if (googlePlaceId) {
+          const cachedRapid = peekRapidApiGooglePhotoFallback(googlePlaceId)
+          if (cachedRapid && isDisplayablePhotoUrl(cachedRapid)) {
+            setSrc(cachedRapid)
+            setLoading(false)
+            return
+          }
+          const rapid = await fetchRapidApiGooglePhotoFallbackById(googlePlaceId).catch(
+            () => null,
+          )
+          if (cancelled) return
+          if (rapid && isDisplayablePhotoUrl(rapid)) {
+            setSrc(rapid)
+            setLoading(false)
+            return
+          }
+        }
         if (!cancelled) {
           setSrc(displayableSrc(fallbackSrc))
           setLoading(false)
@@ -239,6 +261,24 @@ export function GooglePlacePhoto({
         if (cancelled) return
         if (gallery?.photos[0]) {
           setSrc(gallery.photos[0])
+          setLoading(false)
+          return
+        }
+      }
+
+      if (googlePlaceId) {
+        const cachedRapid = peekRapidApiGooglePhotoFallback(googlePlaceId)
+        if (cachedRapid && isDisplayablePhotoUrl(cachedRapid)) {
+          setSrc(cachedRapid)
+          setLoading(false)
+          return
+        }
+        const rapid = await fetchRapidApiGooglePhotoFallbackById(googlePlaceId).catch(
+          () => null,
+        )
+        if (cancelled) return
+        if (rapid && isDisplayablePhotoUrl(rapid)) {
+          setSrc(rapid)
           setLoading(false)
           return
         }

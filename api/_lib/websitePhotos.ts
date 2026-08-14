@@ -143,7 +143,6 @@ function absUrl(value: string, base: string): string | null {
     if (url.protocol === 'http:') url.protocol = 'https:'
     if (url.protocol !== 'https:') return null
     if (url.pathname.endsWith('.svg') || url.pathname.endsWith('.js')) return null
-    if (url.protocol === 'data:') return null
     return url.toString()
   } catch {
     return null

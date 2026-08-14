@@ -26,7 +26,15 @@ for (const file of await collectTsxFiles(sourceRoot)) {
     const isNumberedMapMarker =
       file.endsWith(path.join('map', 'components', 'markerIcons.tsx')) &&
       lines[index].includes('const svg = `<svg')
-    if (lines[index].includes('<svg') && !isNumberedMapMarker) {
+    // The route overlay is geospatial data visualization, not a UI icon.
+    const isMapRouteOverlay =
+      file.endsWith(path.join('map', 'components', 'TripMap.tsx')) &&
+      lines[index].includes('<svg')
+    if (
+      lines[index].includes('<svg') &&
+      !isNumberedMapMarker &&
+      !isMapRouteOverlay
+    ) {
       violations.push(`${path.relative(process.cwd(), file)}:${index + 1}`)
     }
     if (iconGlyphPattern.test(lines[index])) {

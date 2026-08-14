@@ -1,6 +1,7 @@
 import { authFetch } from '../../auth/services/authFetch'
 import {
   getLlmArtifact,
+  removeLlmArtifact,
   setLlmArtifact,
 } from '../../../shared/services/llm/llmArtifactStore'
 import { isLlmConfigured, resolveOfficialWebsite } from '../../../shared/services/llm/llm'
@@ -128,8 +129,6 @@ function remember(
   if (!keys.length) return
   setLlmArtifact(keys[0], stored, {
     aliases: keys.slice(1),
-    // Persist confirmed misses to the trip snapshot so refreshes do not retry.
-    silent: !stored.miss,
   })
 }
 
@@ -165,6 +164,43 @@ export function peekCachedPlaceWebsitePhotos(input: {
     miss = true
   }
   return miss ? { photos: [], miss: true } : { photos: [] }
+}
+
+/** Clear one place's successful or failed official-site photo lookup. */
+export function invalidatePlaceWebsitePhotosCache(input: {
+  website?: string
+  name?: string
+  nameLocal?: string
+  address?: string
+}): void {
+  const official = peekOfficialWebsiteLookup(
+    input.name,
+    input.nameLocal,
+    input.address,
+  )
+  const artifactKeys = new Set<string>([
+    ...placeIndexKeys(input.name, input.nameLocal),
+    ...(input.website?.trim() ? websiteCacheKeys(input.website) : []),
+    ...(official.website ? websiteCacheKeys(official.website) : []),
+  ])
+  const names = [...new Set([input.name?.trim() || ''].filter(Boolean))]
+  const locals = [...new Set([input.nameLocal?.trim() || '', ''])]
+  const addresses = [...new Set([input.address?.trim() || '', ''])]
+  for (const name of names) {
+    for (const nameLocal of locals) {
+      for (const address of addresses) {
+        artifactKeys.add(
+          `place-official-website:v1:${name}|${nameLocal}|${address}`,
+        )
+      }
+    }
+  }
+
+  for (const key of artifactKeys) {
+    memory.delete(key)
+    inflight.delete(key)
+    removeLlmArtifact(key, { silent: true })
+  }
 }
 
 export async function fetchPlaceWebsitePhotos(

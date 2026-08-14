@@ -13,6 +13,20 @@ const SUMMARY_GROUPS = API_REQUEST_GROUPS.filter((group) =>
   (API_REQUEST_SUMMARY_GROUP_IDS as readonly string[]).includes(group.id),
 )
 
+const DETAILS_GROUP_ORDER = [
+  'google-places',
+  'booking',
+  'tripadvisor',
+  'llm',
+  'flights',
+  'other',
+]
+
+const DETAILS_GROUPS = [...API_REQUEST_GROUPS].sort(
+  (first, second) =>
+    DETAILS_GROUP_ORDER.indexOf(first.id) - DETAILS_GROUP_ORDER.indexOf(second.id),
+)
+
 const RAIL_LABELS: Record<string, string> = {
   'google-places': 'G',
   tripadvisor: 'TA',
@@ -105,7 +119,7 @@ export function ApiRequestMeter() {
         <div className="api-meter-details">
           <div className="api-meter-details-panel">
             <ul className="api-meter-details-grid">
-              {API_REQUEST_GROUPS.map((group) => {
+              {DETAILS_GROUPS.map((group) => {
                 const total = groupCount(snapshot, group)
                 return (
                   <li key={group.id}>

@@ -1,13 +1,10 @@
 /**
- * Client-side guardrail for paid Google Maps/Places requests.
+ * Client-side counter for paid Google Maps/Places requests.
  *
- * The project intentionally stops controlled API work at 90 requests per
- * local calendar day. The remaining ten requests are a safety margin for the
- * Maps JavaScript bootstrap and page reloads, which do not pass through these
- * service functions.
+ * The meter is observational only: every controlled call increments the daily
+ * count and the per-kind breakdown so we can see API spend in the dashboard.
+ * It never blocks the actual request — RapidAPI's own quota handles that.
  */
-
-export const GOOGLE_CONTROLLED_DAILY_LIMIT = 90
 
 export type GoogleRequestKind =
   | 'place-search'
@@ -17,8 +14,6 @@ export type GoogleRequestKind =
 export interface GoogleRequestBudgetSnapshot {
   date: string
   used: number
-  remaining: number
-  limit: number
   byKind: Partial<Record<GoogleRequestKind, number>>
 }
 
@@ -80,31 +75,24 @@ function writeBudget(budget: StoredBudget) {
   try {
     localStorage.setItem(storageFor(budget.date), JSON.stringify(budget))
   } catch {
-    /* the in-memory guard still protects this tab */
+    /* the in-memory counter still protects this tab */
   }
 }
 
 export function getGoogleRequestBudgetSnapshot(
   now = new Date(),
 ): GoogleRequestBudgetSnapshot {
-  const budget = readBudget(now)
-  return {
-    ...budget,
-    limit: GOOGLE_CONTROLLED_DAILY_LIMIT,
-    remaining: Math.max(0, GOOGLE_CONTROLLED_DAILY_LIMIT - budget.used),
-  }
+  return readBudget(now)
 }
 
-/** Reserve one request immediately before starting a real network call. */
-export function tryConsumeGoogleRequest(
+/** Increment the daily counter for a controlled request and return the new count. */
+export function recordGoogleRequest(
   kind: GoogleRequestKind,
   amount = 1,
   now = new Date(),
-): boolean {
+): number {
   const cost = Math.max(1, Math.floor(amount))
   const current = readBudget(now)
-  if (current.used + cost > GOOGLE_CONTROLLED_DAILY_LIMIT) return false
-
   const next: StoredBudget = {
     date: current.date,
     used: current.used + cost,
@@ -114,10 +102,23 @@ export function tryConsumeGoogleRequest(
     },
   }
   writeBudget(next)
+  return next.used
+}
+
+/**
+ * @deprecated Retained for call-site compatibility. Always returns `true` —
+ * the meter is observational only and never blocks real network calls.
+ */
+export function tryConsumeGoogleRequest(
+  kind: GoogleRequestKind,
+  amount = 1,
+  now = new Date(),
+): boolean {
+  recordGoogleRequest(kind, amount, now)
   return true
 }
 
-/** Test helper; production UI never resets the daily guardrail. */
+/** Test helper; production UI never resets the daily counter. */
 export function resetGoogleRequestBudgetForTests() {
   memoryBudget = null
 }

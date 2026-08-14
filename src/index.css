@@ -352,11 +352,6 @@ select {
   animation-delay: 0.36s;
 }
 
-.cloud-save-toast-bars {
-  margin-left: auto;
-  color: var(--gold);
-}
-
 /* Game-style autosave toast ? fixed bottom-left HUD */
 @keyframes cloud-save-slide {
   from {
@@ -423,7 +418,7 @@ select {
   /* Sit above the chat FAB on narrow screens to avoid overlap. */
   bottom: max(4.75rem, calc(env(safe-area-inset-bottom) + 3.75rem));
   z-index: 1900;
-  min-width: 11.5rem;
+  width: fit-content;
   max-width: min(18rem, calc(100vw - 2rem));
   pointer-events: none;
   animation: cloud-save-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1);
@@ -617,7 +612,7 @@ select {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.65rem 0.85rem 0.65rem 0.7rem;
+  padding: 0.65rem 0.7rem;
   border: 1px solid rgba(232, 235, 228, 0.18);
   border-radius: 12px;
   background:
@@ -1070,8 +1065,17 @@ select {
 
 .cloud-save-check-badge {
   position: absolute;
-  right: -5px;
-  bottom: -4px;
+  right: -7px;
+  bottom: -6px;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 2px solid #24302a;
+  border-radius: 999px;
+  background: #9bb59f;
+  color: #f6faf7;
+  box-shadow: 0 2px 7px rgba(12, 19, 15, 0.38);
   animation: cloud-save-badge-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1581,4 +1585,26 @@ body.timeline-dragging {
   transition:
     opacity 220ms ease 140ms,
     transform 240ms ease 140ms;
+}
+@keyframes trip-map-route-draw {
+  from {
+    opacity: 0;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  to {
+    opacity: 1;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+.trip-map-route-enter {
+  animation: trip-map-route-draw 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-map-route-enter {
+    animation: none;
+  }
 }

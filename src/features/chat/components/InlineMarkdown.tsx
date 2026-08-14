@@ -208,7 +208,7 @@ function renderBlock(block: string): string {
   return `<p>${withBreaks}</p>`
 }
 
-export function formatInlineMarkdown(text: string): string {
+function formatInlineMarkdown(text: string): string {
   if (!text) return ''
   // Normalize CRLF.
   const normalized = text.replace(/\r\n?/g, '\n')

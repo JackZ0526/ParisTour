@@ -93,7 +93,7 @@ import {
 import { LlmRequestError } from '../shared/services/llm/errors'
 import { getOpenAIModel } from '../shared/services/llm/model-state'
 import type { DayPlan, Place, SelectedHotel } from '../types'
-import type { FlightSelection } from '../features/flight/components/FlightPanel'
+import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
 import type { RecommendationPreferences } from '../features/place/services/recommendationPreferences'
 

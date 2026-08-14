@@ -7,16 +7,6 @@ import path from 'node:path'
 
 const root = path.resolve('src')
 
-// Map `'./llm'` / `'./llmMemo'` / `'./llmArtifactStore'` / `'./llm/prompts'` (relative inside services/)
-// to the new shared path. Only meaningful in files that used to be in src/services/.
-const subs = [
-  // From `src/services/anything.ts` (now moved into features/) that referenced ./llm*:
-  // `./llm` -> `../../shared/services/llm/llm` (one level up to features/<x>/, then up to src/, down to shared/...)
-  // We are conservative: only rewrite from files under features/* that previously
-  // imported from services/llm, llmMemo, llmArtifactStore. The source file
-  // location drives the depth.
-]
-
 // Simple strategy: walk every file under features/* and shared/*; for every
 // import string that ends in a moved module name, rewrite the relative path
 // using the file's actual location.

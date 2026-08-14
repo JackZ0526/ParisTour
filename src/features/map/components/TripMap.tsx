@@ -1,53 +1,113 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { GoogleMap, Marker } from '@react-google-maps/api'
-import { getPlace } from '../../place/constants/places'
-import type { DayPlan, Place, SelectedHotel } from '../../../types'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  getDayOriginFromHotelFields,
+  FullscreenControl,
+  LngLatBounds,
+  Map as MapLibreMap,
+  Marker as MapLibreMarker,
+  NavigationControl,
+  type StyleSpecification,
+} from 'maplibre-gl'
+import type { DayPlan, Place, SelectedHotel } from '../../../types'
+import { getPlace } from '../../place/constants/places'
+import {
   isAirportPlace,
   isHotelPlace,
   numberedStopIndexes,
 } from '../../itinerary/utils/dayOrigin'
-import { useGoogleMapsReady } from './GoogleMapsProvider'
-import { googleMapsLoadErrorHelp } from '../services/googleMapsErrors'
-import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import {
   airportIconUrl,
   homeIconUrl,
   numberIconUrl,
-} from './markerIcons'
+  SPECIAL_MARKER_SIZE,
+} from '../services/markerIconUrls'
 import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
 import { peekGooglePlaceDetails } from '../services/googlePlaceDetails'
+import {
+  getCachedMapRoute,
+  type MapRouteCacheEntry,
+} from '../services/mapRouteCache'
+import { getOrFetchMapRoute } from '../services/openRouteService'
+import { buildDayMapRouteRequest } from '../services/mapDayRoute'
 
-const mapContainerStyle = { width: '100%', height: '100%' }
-
-const mapOptions: google.maps.MapOptions = {
-  disableDefaultUI: false,
-  zoomControl: true,
-  mapTypeControl: false,
-  streetViewControl: false,
-  fullscreenControl: true,
-  clickableIcons: true,
-  gestureHandling: 'cooperative',
+const OPEN_STREET_MAP_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    'openstreetmap-raster': {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: 'openstreetmap-raster',
+      type: 'raster',
+      source: 'openstreetmap-raster',
+    },
+  ],
 }
-
-/** All origin and stop coordinates that should stay inside the map viewport. */
-function collectViewportPoints(
-  origin: { lat: number; lng: number },
-  stops: Place[],
-): google.maps.LatLngLiteral[] {
-  return [
-    { lat: origin.lat, lng: origin.lng },
-    ...stops.map((s) => s.location),
-  ]
-}
-
 interface Props {
   hotel: SelectedHotel
   day: DayPlan
   customPlaces?: Record<string, Place>
   selectedPlaceId: string | null
   onSelectPlace: (id: string) => void
+  onRouteCacheChanged?: () => void
+}
+
+function markerElement(
+  imageUrl: string,
+  size: number,
+  title: string,
+  options?: { faded?: boolean; onClick?: () => void },
+): HTMLElement {
+  const element = document.createElement(options?.onClick ? 'button' : 'div')
+  element.title = title
+  element.setAttribute('aria-label', title)
+  element.style.width = `${size}px`
+  element.style.height = `${size}px`
+  element.style.padding = '0'
+  element.style.border = '0'
+  element.style.background = 'transparent'
+  element.style.opacity = options?.faded ? '0.55' : '1'
+  element.style.cursor = options?.onClick ? 'pointer' : 'default'
+  element.style.zIndex = '2'
+
+  const image = document.createElement('img')
+  image.src = imageUrl
+  image.alt = ''
+  image.draggable = false
+  image.style.display = 'block'
+  image.style.width = '100%'
+  image.style.height = '100%'
+  element.appendChild(image)
+  if (options?.onClick) element.addEventListener('click', options.onClick)
+  return element
+}
+
+function syncRouteOverlay(
+  map: MapLibreMap,
+  route: MapRouteCacheEntry | null,
+  svg: SVGSVGElement | null,
+  paths: readonly (SVGPathElement | null)[],
+): void {
+  if (!svg) return
+  const width = map.getContainer().clientWidth
+  const height = map.getContainer().clientHeight
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+  if (!route) {
+    for (const path of paths) path?.setAttribute('d', '')
+    return
+  }
+  const d = route.geometry.coordinates
+    .map((coordinate, index) => {
+      const point = map.project(coordinate)
+      return `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`
+    })
+    .join(' ')
+  for (const path of paths) path?.setAttribute('d', d)
 }
 
 export function TripMap({
@@ -56,253 +116,271 @@ export function TripMap({
   customPlaces = {},
   selectedPlaceId,
   onSelectPlace,
+  onRouteCacheChanged,
 }: Props) {
-  const { isLoaded, loadError } = useGoogleMapsReady()
-  // Depend on hotel primitives so other-day edits (new hotel object, same coords) do not churn.
-  const dayOrigin = useMemo(
-    () =>
-      getDayOriginFromHotelFields(
-        day.day,
-        hotel.id,
-        hotel.name,
-        hotel.lat,
-        hotel.lng,
-      ),
-    [day.day, hotel.id, hotel.lat, hotel.lng, hotel.name],
-  )
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const fullscreenContainerRef = useRef<HTMLDivElement | null>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+  const routeSvgRef = useRef<SVGSVGElement | null>(null)
+  const routeCasingRef = useRef<SVGPathElement | null>(null)
+  const routeLineRef = useRef<SVGPathElement | null>(null)
+  const lastAnimatedRouteKeyRef = useRef('')
+  const [mapReady, setMapReady] = useState(false)
+  const [route, setRoute] = useState<MapRouteCacheEntry | null>(null)
+  const [routeError, setRouteError] = useState<string | null>(null)
 
-  /** Stable center for GoogleMap — new object identity would pan the map on every parent render. */
-  const mapCenter = useMemo(
-    () => ({ lat: dayOrigin.lat, lng: dayOrigin.lng }),
-    [dayOrigin.lat, dayOrigin.lng],
-  )
-
-  /** Place id + coords for this day only — ignores unrelated customPlaces churn (e.g. Day 1 edits). */
   const stopsFingerprint = useMemo(
     () =>
       day.stops
-        .map((s) => {
+        .map((stop) => {
           try {
-            const place = getPlace(s.placeId, customPlaces)
-            const { lat, lng } = place.location
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return s.placeId
-            return `${s.placeId}@${lat.toFixed(5)},${lng.toFixed(5)}`
+            const place = getPlace(stop.placeId, customPlaces)
+            return `${stop.placeId}@${place.location.lat.toFixed(5)},${place.location.lng.toFixed(5)}`
           } catch {
-            return s.placeId
+            return stop.placeId
           }
         })
         .join('|'),
     [day.stops, customPlaces],
   )
 
-  const stops = useMemo(() => {
-    const list: Place[] = []
-    for (const s of day.stops) {
-      try {
-        const place = getPlace(s.placeId, customPlaces)
-        if (Number.isFinite(place.location.lat) && Number.isFinite(place.location.lng)) {
-          list.push(place)
-        }
-      } catch {
-        /* skip */
-      }
-    }
-    return list
-    // Fingerprint captures id/order/coords; omit day/customPlaces identity.
+  const routeRequest = useMemo(
+    () => buildDayMapRouteRequest(day, hotel, customPlaces),
+    // The fingerprint captures the only custom-place fields used by the map.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopsFingerprint])
-
-  const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
-
-  const [map, setMap] = useState<google.maps.Map | null>(null)
-  const onLoad = useCallback((m: google.maps.Map) => setMap(m), [])
-  const onUnmount = useCallback(() => setMap(null), [])
-
-  /** Only refit when this day's route/places change — not when other days' data updates. */
-  const viewportKey = useMemo(
-    () => `${day.day}|${dayOrigin.id}|${stopsFingerprint}`,
-    [day.day, dayOrigin.id, stopsFingerprint],
+    [
+      day.day,
+      hotel.id,
+      hotel.name,
+      hotel.lat,
+      hotel.lng,
+      stopsFingerprint,
+    ],
   )
-  const lastFittedKeyRef = useRef('')
+  const { origin: dayOrigin, stops, markerStops } = routeRequest
+  const stopNumbers = useMemo(() => numberedStopIndexes(stops), [stops])
+  const routePoints = routeRequest.points
+  const routeProfile = routeRequest.profile
+  const routeKey = routeRequest.key
 
   useEffect(() => {
-    if (!map || !isLoaded) return
-    // Same day viewport — skip. Avoids one-shot pan when parent re-renders after other-day edits.
-    if (lastFittedKeyRef.current === viewportKey) return
+    if (!containerRef.current || mapRef.current) return
+    const map = new MapLibreMap({
+      container: containerRef.current,
+      style: OPEN_STREET_MAP_STYLE,
+      center: [dayOrigin.lng, dayOrigin.lat],
+      zoom: 13,
+      attributionControl: { compact: true },
+      cooperativeGestures: true,
+    })
+    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
+    map.addControl(
+      new FullscreenControl({
+        container: fullscreenContainerRef.current || containerRef.current,
+      }),
+      'top-right',
+    )
+    map.once('load', () => setMapReady(true))
+    mapRef.current = map
 
-    const points = collectViewportPoints(dayOrigin, stops)
-    if (!points.length) return
+    const observer = new ResizeObserver(() => map.resize())
+    observer.observe(containerRef.current)
+    return () => {
+      observer.disconnect()
+      map.remove()
+      mapRef.current = null
+      setMapReady(false)
+    }
+    // The map instance is deliberately retained while days change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-    const padding = { top: 72, right: 72, bottom: 72, left: 72 }
-
-    if (points.length === 1) {
-      map.setCenter(points[0])
-      map.setZoom(14)
-      lastFittedKeyRef.current = viewportKey
+  useEffect(() => {
+    if (routePoints.length < 2) {
+      setRoute(null)
+      setRouteError(null)
       return
     }
-
-    const bounds = new google.maps.LatLngBounds()
-    for (const p of points) bounds.extend(p)
-    if (bounds.isEmpty()) return
+    setRouteError(null)
+    const cached = getCachedMapRoute(routeKey)
+    if (cached) setRoute(cached)
+    else setRoute(null)
 
     let cancelled = false
-    const applyFit = () => {
-      if (cancelled) return
-      map.fitBounds(bounds, padding)
-      lastFittedKeyRef.current = viewportKey
-      // Avoid over-zooming on short hops; never zoom in past this (keeps path padding).
-      google.maps.event.addListenerOnce(map, 'idle', () => {
+    let retryTimer: number | undefined
+    const loadRoute = async (attempt: number) => {
+      try {
+        const { route: resolved, fromCache } = await getOrFetchMapRoute(
+          routePoints,
+          routeProfile,
+        )
         if (cancelled) return
-        const zoom = map.getZoom()
-        if (zoom != null && zoom > 15) map.setZoom(15)
-      })
+        setRoute(resolved)
+        setRouteError(null)
+        if (!fromCache) onRouteCacheChanged?.()
+      } catch (error: unknown) {
+        if (cancelled) return
+        if (attempt === 0) {
+          retryTimer = window.setTimeout(() => void loadRoute(1), 900)
+          return
+        }
+        setRouteError(
+          error instanceof Error ? error.message : '道路路线暂不可用。',
+        )
+      }
     }
-
-    const raf = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(applyFit)
-    })
-
+    void loadRoute(0)
     return () => {
       cancelled = true
-      window.cancelAnimationFrame(raf)
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, isLoaded, viewportKey])
+  }, [onRouteCacheChanged, routeKey, routePoints, routeProfile])
 
-  // Switching days must allow a fresh fit even if a previous day shared a key shape.
   useEffect(() => {
-    lastFittedKeyRef.current = ''
-  }, [day.day])
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const paths = [routeCasingRef.current, routeLineRef.current]
+    const sync = () =>
+      syncRouteOverlay(map, route, routeSvgRef.current, paths)
+    sync()
+    if (route && lastAnimatedRouteKeyRef.current !== route.key) {
+      lastAnimatedRouteKeyRef.current = route.key
+      for (const path of paths) path?.classList.remove('trip-map-route-enter')
+      void routeLineRef.current?.getBoundingClientRect()
+      for (const path of paths) path?.classList.add('trip-map-route-enter')
+    }
+    map.on('move', sync)
+    map.on('resize', sync)
+    return () => {
+      map.off('move', sync)
+      map.off('resize', sync)
+    }
+  }, [mapReady, route])
 
-  if (loadError) {
-    const help = googleMapsLoadErrorHelp(loadError)
-    return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        <p className="font-medium">{help.title}</p>
-        <p className="mt-2">{help.detail}</p>
-        {help.refererHint && (
-          <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-[var(--ink)]">
-            需要添加：<strong>{help.refererHint}</strong>
-            <br />
-            建议同时添加：
-            <code className="ml-1">http://127.0.0.1:5173/*</code>、
-            <code className="ml-1">http://localhost:5173/*</code>、
-            <code className="ml-1">https://paristour.vercel.app/*</code>
-          </p>
-        )}
-        <p className="mt-2">
-          另请确认已启用{' '}
-          <a
-            className="underline"
-            href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Maps JavaScript API
-          </a>
-          。
-        </p>
-      </div>
-    )
-  }
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const bounds = new LngLatBounds()
+    for (const point of routePoints) bounds.extend([point.lng, point.lat])
+    if (routePoints.length === 1) {
+      map.jumpTo({ center: [routePoints[0].lng, routePoints[0].lat], zoom: 14 })
+    } else if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: 72, maxZoom: 15, duration: 0 })
+    }
+  }, [mapReady, routeKey, routePoints])
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-[min(52vh,360px)] items-center justify-center rounded-2xl border border-white/70 bg-[var(--card)] md:h-[560px]">
-        <LoadingIndicator variant="block" label="正在加载 Google Maps…" showDots size="md" />
-      </div>
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const markers: MapLibreMarker[] = []
+    markers.push(
+      new MapLibreMarker({
+        element: markerElement(
+          dayOrigin.kind === 'airport' ? airportIconUrl() : homeIconUrl(),
+          SPECIAL_MARKER_SIZE,
+          dayOrigin.label,
+        ),
+        anchor: 'center',
+      })
+        .setLngLat([dayOrigin.lng, dayOrigin.lat])
+        .addTo(map),
     )
-  }
+
+    for (const { place, index } of markerStops) {
+      const number = stopNumbers[index]
+      const active = selectedPlaceId === place.id
+      const isHotelStop = isHotelPlace(place)
+      const isAirportStop = isAirportPlace(place)
+      const cached = peekGooglePlaceDetails(place.name, place.nameLocal, place.location)
+      const label = placeOriginalLabel(
+        place.name,
+        place.nameLocal,
+        cached?.name,
+        cached?.nameOriginal,
+      )
+      const title =
+        isHotelStop || isAirportStop || number == null
+          ? label
+          : `${number}. ${label}`
+      const icon = isHotelStop
+        ? homeIconUrl()
+        : isAirportStop
+          ? airportIconUrl()
+          : numberIconUrl(number ?? index + 1, active)
+      const size = isHotelStop || isAirportStop ? SPECIAL_MARKER_SIZE : 30
+      markers.push(
+        new MapLibreMarker({
+          element: markerElement(icon, size, title, {
+            faded:
+              Boolean(selectedPlaceId) &&
+              !active &&
+              !isHotelStop &&
+              !isAirportStop,
+            onClick: () => onSelectPlace(place.id),
+          }),
+          anchor: 'center',
+        })
+          .setLngLat([place.location.lng, place.location.lat])
+          .addTo(map),
+      )
+    }
+
+    return () => {
+      for (const marker of markers) marker.remove()
+    }
+  }, [
+    dayOrigin,
+    mapReady,
+    markerStops,
+    onSelectPlace,
+    selectedPlaceId,
+    stopNumbers,
+  ])
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/70 shadow-[var(--shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/50 bg-[var(--card)] px-3 py-2 text-xs text-[var(--stone)]">
-        <span>Google Maps · 当日地点</span>
-        <span>路线请点击时间线中的交通链接</span>
+        <span>MapLibre · OpenStreetMap</span>
+        <span title={routeError || undefined}>
+          {routeError ? '道路路线暂不可用' : '按实际道路连接地点'}
+        </span>
       </div>
-
-      <div className="h-[min(52vh,360px)] w-full md:h-[560px]">
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={mapCenter}
-          zoom={13}
-          options={mapOptions}
-          onLoad={onLoad}
-          onUnmount={onUnmount}
+      <div
+        ref={fullscreenContainerRef}
+        className="relative h-[min(52vh,360px)] w-full bg-[var(--mist)] md:h-[560px]"
+      >
+        <div
+          ref={containerRef}
+          className="h-full w-full bg-[var(--mist)]/35"
+          style={{ position: 'absolute', inset: 0 }}
+          aria-label={`第 ${day.day} 天地图`}
+        />
+        <svg
+          ref={routeSvgRef}
+          className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+          preserveAspectRatio="none"
+          aria-hidden="true"
         >
-          <Marker
-            position={{ lat: dayOrigin.lat, lng: dayOrigin.lng }}
-            title={dayOrigin.label}
-            icon={{
-              url: dayOrigin.kind === 'airport' ? airportIconUrl() : homeIconUrl(),
-              scaledSize: new google.maps.Size(40, 40),
-              anchor: new google.maps.Point(20, 20),
-            }}
-            zIndex={1000}
+          <path
+            ref={routeCasingRef}
+            pathLength="1"
+            fill="none"
+            stroke="#fffaf2"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.9"
           />
-          {stops.map((place, index) => {
-            const n = stopNumbers[index]
-            const active = selectedPlaceId === place.id
-            // Day 1: hotel is a stop (origin is CDG). Mid-trip + last day: hotel is
-            // origin only (house marker above); airport stop uses plane icon.
-            // Hotel/airport markers do not consume sequence numbers.
-            const isHotelStop = isHotelPlace(place)
-            const isAirportStop = isAirportPlace(place)
-            const cached = peekGooglePlaceDetails(
-              place.name,
-              place.nameLocal,
-              place.location,
-            )
-            const label = placeOriginalLabel(
-              place.name,
-              place.nameLocal,
-              cached?.name,
-              cached?.nameOriginal,
-            )
-            const title =
-              isHotelStop || isAirportStop || n == null
-                ? label
-                : `${n}. ${label}`
-            return (
-              <Marker
-                key={`${day.day}-${place.id}-${index}`}
-                position={place.location}
-                title={title}
-                onClick={() => onSelectPlace(place.id)}
-                icon={
-                  isHotelStop
-                    ? {
-                        url: homeIconUrl(),
-                        scaledSize: new google.maps.Size(40, 40),
-                        anchor: new google.maps.Point(20, 20),
-                      }
-                    : isAirportStop
-                      ? {
-                          url: airportIconUrl(),
-                          scaledSize: new google.maps.Size(40, 40),
-                          anchor: new google.maps.Point(20, 20),
-                        }
-                      : {
-                          url: numberIconUrl(n ?? index + 1, active),
-                          scaledSize: new google.maps.Size(30, 30),
-                          anchor: new google.maps.Point(15, 15),
-                        }
-                }
-                zIndex={
-                  isHotelStop || isAirportStop
-                    ? 1000
-                    : active
-                      ? 900
-                      : (n ?? index + 1) * 10
-                }
-                opacity={
-                  !selectedPlaceId || active || isHotelStop || isAirportStop ? 1 : 0.55
-                }
-              />
-            )
-          })}
-        </GoogleMap>
+          <path
+            ref={routeLineRef}
+            pathLength="1"
+            fill="none"
+            stroke="#b9572f"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
     </div>
   )

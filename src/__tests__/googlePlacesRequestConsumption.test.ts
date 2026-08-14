@@ -7,6 +7,7 @@ vi.mock('../features/auth/services/authFetch', () => ({ authFetch }))
 import {
   fetchGooglePlaceDetails,
   fetchGooglePlacePhotoMedia,
+  fetchRapidApiGooglePhotoFallbackById,
   fetchRapidApiGooglePlaceDetailsById,
   refreshGooglePlaceCoreDetailsById,
   resetGooglePlaceDetailsCacheForTests,
@@ -129,6 +130,7 @@ describe('current Places request consumption', () => {
 
     expect(full?.reviews[0]?.text).toBe('Bon.')
     expect(full?.fullDetails).toBe(true)
+    expect(full?.userRatingCount).toBe(100)
     expect(authFetch).toHaveBeenCalledTimes(2)
     expect(authFetch.mock.calls[1][0]).toContain('detailsMode=full')
     expect(getGoogleRequestBudgetSnapshot().byKind).toEqual({
@@ -221,5 +223,43 @@ describe('current Places request consumption', () => {
     await fetchGooglePlacePhotoMedia('places/ChIJ-test/photos/photo-1')
     expect(authFetch).not.toHaveBeenCalled()
     expect(getGoogleRequestBudgetSnapshot().used).toBe(0)
+  })
+
+  it('counts 1 Place Details + 1 Place Photo for the RapidAPI Google photo fallback', async () => {
+    authFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'ChIJ-photo-fallback',
+            displayName: { text: 'Parallel Coffee', languageCode: 'fr' },
+            photos: [
+              {
+                name: 'places/ChIJ-photo-fallback/photos/hi-res',
+                widthPx: 1600,
+                heightPx: 1067,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            photoUri: 'https://lh3.googleusercontent.com/parallel-coffee-hires',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+
+    const url = await fetchRapidApiGooglePhotoFallbackById('ChIJ-photo-fallback')
+    expect(url).toBe('https://lh3.googleusercontent.com/parallel-coffee-hires')
+
+    const snapshot = getGoogleRequestBudgetSnapshot()
+    expect(snapshot.used).toBe(2)
+    expect(snapshot.byKind).toEqual({
+      'place-details': 1,
+      'place-photo': 1,
+    })
   })
 })

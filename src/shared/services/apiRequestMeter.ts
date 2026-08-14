@@ -1,10 +1,10 @@
 export type ApiRequestKind =
-  | 'google-place-search'
-  | 'google-place-details'
   | 'google-official-search'
   | 'google-official-details'
+  | 'google-official-photo'
   | 'google-rapidapi-search'
   | 'google-rapidapi-details'
+  | 'google-rapidapi-photo'
   | 'tripadvisor-search'
   | 'tripadvisor-gallery'
   | 'tripadvisor-details'
@@ -23,6 +23,7 @@ export type ApiRequestKind =
   | 'flight-aerodatabox'
   | 'place-website'
   | 'share-invite'
+  | 'openrouteservice-directions'
   | 'other'
 
 export interface ApiRequestGroup {
@@ -35,15 +36,15 @@ export interface ApiRequestGroup {
 export const API_REQUEST_GROUPS: ApiRequestGroup[] = [
   {
     id: 'google-places',
-    label: 'Google Places',
+    label: 'Google',
     shortLabel: 'Google',
     kinds: [
       { kind: 'google-official-search', label: '官方 · 搜索' },
       { kind: 'google-official-details', label: '官方 · 详情' },
+      { kind: 'google-official-photo', label: '官方 · 照片' },
       { kind: 'google-rapidapi-search', label: 'RapidAPI · 搜索' },
       { kind: 'google-rapidapi-details', label: 'RapidAPI · 详情' },
-      { kind: 'google-place-search', label: '旧记录 · 搜索', legacy: true },
-      { kind: 'google-place-details', label: '旧记录 · 详情', legacy: true },
+      { kind: 'google-rapidapi-photo', label: 'RapidAPI · 照片' },
     ],
   },
   {
@@ -97,6 +98,7 @@ export const API_REQUEST_GROUPS: ApiRequestGroup[] = [
     kinds: [
       { kind: 'place-website', label: '官网图片' },
       { kind: 'share-invite', label: '分享邀请' },
+      { kind: 'openrouteservice-directions', label: '道路路线' },
       { kind: 'other', label: '未分类' },
     ],
   },
@@ -189,20 +191,27 @@ export function classifyApiRequest(
   const rest = url.searchParams.get('rest') || ''
 
   if (path === '/api/google-places' || path.startsWith('/api/google-places/')) {
-    const operation = /^v1\/places\//.test(rest) ? 'details' : 'search'
+    const isPhoto = /\/photos\/[A-Za-z0-9_-]+\/media$/.test(rest)
+    const operation = isPhoto
+      ? 'photo'
+      : /^v1\/places\//.test(rest)
+        ? 'details'
+        : 'search'
     if (googlePlacesProvider === 'official') {
-      return operation === 'details'
-        ? 'google-official-details'
-        : 'google-official-search'
+      return operation === 'photo'
+        ? 'google-official-photo'
+        : operation === 'details'
+          ? 'google-official-details'
+          : 'google-official-search'
     }
     if (googlePlacesProvider === 'rapidapi') {
-      return operation === 'details'
-        ? 'google-rapidapi-details'
-        : 'google-rapidapi-search'
+      return operation === 'photo'
+        ? 'google-rapidapi-photo'
+        : operation === 'details'
+          ? 'google-rapidapi-details'
+          : 'google-rapidapi-search'
     }
-    return operation === 'details'
-      ? 'google-place-details'
-      : 'google-place-search'
+    return null
   }
   if (path === '/api/tripadvisor' || path.startsWith('/api/tripadvisor/')) {
     if (rest.includes('media-gallery')) return 'tripadvisor-gallery'
@@ -228,6 +237,7 @@ export function classifyApiRequest(
   if (path.startsWith('/api/aerodatabox')) return 'flight-aerodatabox'
   if (path.startsWith('/api/place-website')) return 'place-website'
   if (path.startsWith('/api/share-invite')) return 'share-invite'
+  if (path.startsWith('/api/openrouteservice')) return 'openrouteservice-directions'
   if (path.startsWith('/api/')) return 'other'
   return null
 }

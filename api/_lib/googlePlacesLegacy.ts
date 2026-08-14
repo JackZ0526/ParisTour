@@ -69,6 +69,7 @@ export function mapLegacyPlaceToNew(place: unknown): Json | null {
   const lat = num(loc?.lat) ?? num(loc?.latitude)
   const lng = num(loc?.lng) ?? num(loc?.longitude)
   const editorial = asRecord(row.editorial_summary)
+  const editorialOverview = text(editorial?.overview)
   const hours = asRecord(row.opening_hours)
   const weekday = Array.isArray(hours?.weekday_text)
     ? hours.weekday_text.filter((item): item is string => typeof item === 'string')
@@ -106,9 +107,7 @@ export function mapLegacyPlaceToNew(place: unknown): Json | null {
     websiteUri: text(row.website) || text(row.websiteUri) || undefined,
     regularOpeningHours: weekday?.length ? { weekdayDescriptions: weekday } : undefined,
     priceLevel: mapLegacyPriceLevel(row.price_level),
-    editorialSummary: text(editorial?.overview)
-      ? { text: text(editorial.overview) }
-      : undefined,
+    editorialSummary: editorialOverview ? { text: editorialOverview } : undefined,
     reviews,
     photos: [],
   }

@@ -1,10 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+type AttractionCanonicalMockResult = {
+  nameEn: string
+  nameFr?: string
+  aliases: string[]
+} | null
+
+type TripadvisorRestaurantListingMockResult = {
+  url?: string
+  contentId?: string
+  name?: string
+} | null
+
 const { authFetch, resolveAttractionCanonicalName, resolveTripadvisorRestaurantListing } =
   vi.hoisted(() => ({
     authFetch: vi.fn(),
-    resolveAttractionCanonicalName: vi.fn(async () => null),
-    resolveTripadvisorRestaurantListing: vi.fn(async () => null),
+    resolveAttractionCanonicalName: vi.fn(
+      async (): Promise<AttractionCanonicalMockResult> => null,
+    ),
+    resolveTripadvisorRestaurantListing: vi.fn(
+      async (): Promise<TripadvisorRestaurantListingMockResult> => null,
+    ),
   }))
 
 vi.mock('../features/auth/services/authFetch', () => ({ authFetch }))
@@ -1667,7 +1683,7 @@ describe('Tripadvisor place photos', () => {
     expect(info?.rating).toBeUndefined()
   })
 
-  it('still requests restaurant details when only the seeded cover is cached', async () => {
+  it('persists a sparse restaurant details response instead of requesting it again', async () => {
     authFetch.mockReset()
     resetTripadvisorRequestBudgetForTests()
     resetLlmArtifactStoreForTests()
@@ -1716,15 +1732,16 @@ describe('Tripadvisor place photos', () => {
     expect(hasSettledTripadvisorRestaurantDetails(first)).toBe(false)
     expect(detailCalls).toBe(1)
 
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockClear()
     const second = await fetchTripadvisorRestaurantInfo({
       name: '斯菲尔',
       nameLocal: 'Sphère',
     })
-    expect(detailCalls).toBe(2)
-    expectRestaurantDetailsQuery(String(authFetch.mock.calls[0]?.[0] || ''), SPHERE_LISTING_URL)
-    expect(second?.rating).toBe(3.7)
-    expect(second?.cuisine).toBe('French')
-    expect(second?.photos.length).toBeGreaterThan(1)
+    expect(detailCalls).toBe(1)
+    expect(authFetch).not.toHaveBeenCalled()
+    expect(second?.photos).toEqual([sphereCover])
+    expect(second?.rating).toBeUndefined()
   })
 
   it('reuses a cafe gallery when the Chinese/English labels are swapped', async () => {
@@ -1774,7 +1791,7 @@ describe('Tripadvisor place photos', () => {
         ]),
       )
       .mockResolvedValueOnce(
-        restaurantMediaGalleryResponse('https://media-cdn.tripadvisor.com/wrong-hotel.jpg'),
+        restaurantMediaGalleryResponse('https://media-cdn.tripadvisor.com/stale-cafe.jpg'),
       )
       .mockResolvedValueOnce(
         tripadvisor34AutocompleteResponse([
@@ -1792,7 +1809,7 @@ describe('Tripadvisor place photos', () => {
     }
     const first = await fetchTripadvisorPlaceGallery(input)
     expect(first?.photos).toEqual([
-      'https://media-cdn.tripadvisor.com/wrong-hotel.jpg',
+      'https://media-cdn.tripadvisor.com/stale-cafe.jpg',
     ])
 
     invalidateTripadvisorPlaceCache(input)
@@ -2106,6 +2123,39 @@ describe('Tripadvisor place photos', () => {
     expect(gallery.photos.join(' ')).not.toContain('33/c9/52/3c')
     expect(gallery.photos.join(' ')).not.toContain('30/0f/25/01')
     expect(gallery.photos.join(' ')).not.toContain('2e/ca/54/84')
+  })
+
+  it('does not treat nearby hotel thumbs as a cafe album', () => {
+    const info = normalizeTripadvisorAttractionDetails(
+      {
+        success: true,
+        id: '33063008',
+        name: 'Parallel Coffee',
+        category: 'RESTAURANT',
+        images: [
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/30/0f/25/01/caption.jpg?w=2400&h=-1&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2e/ca/54/84/caption.jpg?w=2400&h=-1&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/33/c9/52/3c/caption.jpg?w=2400&h=-1&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/34/15/ff/ac/executive-room-with-balcony.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/34/2b/94/5c/facade.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/06/53/f7/78/le-belmont-hotel.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/07/9c/cf/e6/ratn.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/04/c2/9a/88/le-maxan.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2e/ea/40/79/l-orangerie.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/07/92/e0/a8/le-confidentiel.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2c/a0/15/7a/caption.jpg?w=400&h=400&' },
+          { url: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0e/6f/20/d6/photo1jpg.jpg?w=400&h=400&' },
+        ],
+        rating: 5,
+        reviewCount: 1,
+      },
+      '33063008',
+    )
+    expect(info.name).toBe('Parallel Coffee')
+    expect(info.photos.join(' ')).not.toContain('executive-room-with-balcony')
+    expect(info.photos.join(' ')).not.toContain('le-belmont-hotel')
+    expect(info.photos.join(' ')).not.toContain('30/0f/25/01')
+    expect(info.photos).toEqual([])
   })
 
   it('keeps the listing album when nearby thumbs come before the photos', () => {
@@ -2449,7 +2499,7 @@ describe('Tripadvisor place photos', () => {
     expect(resolveTripadvisorRestaurantListing).not.toHaveBeenCalled()
   })
 
-  it('does not cache a cover-only gallery when restaurant details fail', async () => {
+  it('persists a provider-confirmed missing details result', async () => {
     authFetch.mockReset()
     resetTripadvisorRequestBudgetForTests()
     resetLlmArtifactStoreForTests()
@@ -2475,16 +2525,16 @@ describe('Tripadvisor place photos', () => {
     )
     expect(authFetch).toHaveBeenCalledTimes(1)
 
+    resetTripadvisorPlacePhotosForTests()
+    authFetch.mockClear()
     const second = await fetchTripadvisorPlaceGallery({
       name: 'Sogno',
       type: 'restaurant',
     })
     expect(second?.photos).toEqual([
       'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/24/67/76/e3/penne-all-arrabbiata.jpg?w=1200&h=900&s=1',
-      'https://media-cdn.tripadvisor.com/sogno-1.jpg',
-      'https://media-cdn.tripadvisor.com/sogno-2.jpg',
     ])
-    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(authFetch).not.toHaveBeenCalled()
   })
 
   it('loads restaurant address, website, reviews and photos from Tripadvisor', async () => {

@@ -30,7 +30,6 @@ import { HotelExpandablePolicyList, HotelTranslatedText } from './hotelTranslati
 import { ShimmerLines } from '../../../shared/components/ShimmerLines'
 import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { GoogleReviewsList } from '../../place/components/GoogleReviewsList'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import {
   fetchBookingHotelFeaturedReviews,
@@ -462,11 +461,11 @@ function ReviewScoreBars({
   const [highlightTop, setHighlightTop] = useState(false)
   const itemsKey = items.map((item) => `${item.label}:${item.score}`).join('|')
 
-  const topLabel = useMemo(() => {
+  const topLabel = (() => {
     if (items.length === 0) return null
     const maxScore = Math.max(...items.map((item) => item.score))
     return items.find((item) => item.score === maxScore)?.label ?? null
-  }, [itemsKey])
+  })()
 
   useEffect(() => {
     const el = containerRef.current
@@ -850,10 +849,11 @@ function BookingReviewsPanel({
   const reviewsNeedTranslate =
     reviews.some((review) => !looksChinese(review.text)) && isLlmConfigured()
   const showReviewShimmer = loading || (reviewsNeedTranslate && !reviewsRevealed)
+  const reviewsKey = reviews.map((review) => review.text).join('\n---\n')
 
   useLayoutEffect(() => {
     setReviewsRevealed(!reviewsNeedTranslate)
-  }, [hotel.id, reviewsNeedTranslate, reviews.map((review) => review.text).join('\n---\n')])
+  }, [hotel.id, reviewsKey, reviewsNeedTranslate])
 
   return (
     <section className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
@@ -911,7 +911,6 @@ export function HotelPicker({
   onDetailChange,
   openSelectedDetailToken = 0,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [customQuery, setCustomQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -1256,7 +1255,6 @@ export function HotelPicker({
 
   useEffect(() => {
     if (bootstrappedRef.current) return
-    if (!isLoaded) return
     bootstrappedRef.current = true
 
     const cached = loadHotelCache()
@@ -1274,7 +1272,7 @@ export function HotelPicker({
     if (readOnly) return
     void bootstrapRecommendations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, readOnly])
+  }, [readOnly])
 
   function selectHotel(
     card: HotelCandidate,
@@ -1744,10 +1742,12 @@ export function HotelPicker({
       })
   }
 
+  const loadHotelPhotosRef = useRef(loadHotelPhotos)
+  loadHotelPhotosRef.current = loadHotelPhotos
   const handleBookingGalleryAdvance = useCallback(() => {
     const card = popupCandidateRef.current
     if (card && hasValidParisBookingIdentity(card)) {
-      loadHotelPhotos(card)
+      loadHotelPhotosRef.current(card)
     }
   }, [])
 
@@ -2004,10 +2004,11 @@ export function HotelPicker({
 
   useEffect(() => () => stopRaf(), [])
 
+  const dragHotelIdForLayout = drag?.hotelId ?? null
   useLayoutEffect(() => {
-    if (!drag || dropping) return
+    if (dragHotelIdForLayout === null || dropping) return
     applyFloatPos(floatRef.current.x, floatRef.current.y)
-  }, [drag?.hotelId, dropping])
+  }, [dragHotelIdForLayout, dropping])
 
   const currentSlotHighlight = Boolean(drag)
   const currentSlotDropReady = Boolean(drag?.overSlot)
@@ -2289,7 +2290,7 @@ export function HotelPicker({
                 />
                 <button
                   type="button"
-                  disabled={loading || !customQuery.trim() || !isLoaded || decidingCustom}
+                  disabled={loading || !customQuery.trim() || decidingCustom}
                   onClick={() => void applyCustom()}
                   aria-busy={loading || undefined}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2 text-sm text-[var(--paper)] disabled:opacity-50"

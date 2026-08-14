@@ -61,8 +61,6 @@ import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
-import { fetchWikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
-import { useGoogleMapsReady } from '../../map/components/GoogleMapsProvider'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
 import {
@@ -109,8 +107,6 @@ export interface TripChatHandlers {
 import { ChatBubbleIcon } from './ChatBubbleIcon'
 import {
   CHAT_WORK_STEP_LABELS,
-  ChatWorkStepsPanel,
-  StoredChatWorkStepsPanel,
   actionsNeedPlaceLookup,
   activateChatWorkStep,
   finishChatWorkSteps,
@@ -119,6 +115,10 @@ import {
   searchStepLabel,
   type ChatWorkStep,
 } from './ChatWorkStepList'
+import {
+  ChatWorkStepsPanel,
+  StoredChatWorkStepsPanel,
+} from './ChatWorkStepPanels'
 import {
   ChatReasoningDisclosure,
   StoredChatReasoningDisclosure,
@@ -168,7 +168,6 @@ export function TripChatPanel({
   viewing = null,
   handlers,
 }: Props) {
-  const { isLoaded } = useGoogleMapsReady()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -261,6 +260,7 @@ export function TripChatPanel({
   }
 
   const activePending = pendingPlaces[0] ?? null
+  const activePendingId = activePending?.id
 
   // If pending exists but the portaled detail page never painted, force remount.
   useEffect(() => {
@@ -406,9 +406,9 @@ export function TripChatPanel({
   }, [activePending?.id])
 
   useEffect(() => {
-    if (!activePending || !isLlmConfigured()) return
+    if (!activePendingId || !isLlmConfigured()) return
     if (factsSig) return
-    const pendingId = activePending.id
+    const pendingId = activePendingId
     const timer = window.setTimeout(() => {
       setAdvisorFactsPendingId(pendingId)
       setAdvisorFacts((prev) =>
@@ -416,7 +416,7 @@ export function TripChatPanel({
       )
     }, 12_000)
     return () => window.clearTimeout(timer)
-  }, [activePending?.id, factsSig])
+  }, [activePendingId, factsSig])
 
   // Keep the panel mounted through the close animation so exit can play.
   useEffect(() => {
@@ -501,8 +501,6 @@ export function TripChatPanel({
     note?: string
     dayNum: number
   }): Promise<Place> {
-    if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加地点。')
-
     const placeType: PlaceType = input.placeType || 'attraction'
     if (placeType === 'attraction') {
       const ta = await fetchTripadvisorAttractionInfo({
@@ -589,10 +587,6 @@ export function TripChatPanel({
       }).catch(() => ({ photos: [] }))
     ).photos
     const websitePhoto = websitePhotos[0] || null
-    const wikimediaPhoto =
-      placeType === 'attraction' && !websitePhoto
-        ? await fetchWikimediaPlacePhoto(details.name, details.location)
-        : null
 
     return {
       id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -603,10 +597,7 @@ export function TripChatPanel({
       googleUserRatingCount: details.userRatingCount,
       googleAddress: details.address,
       ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
-      image:
-        websitePhoto ||
-        wikimediaPhoto?.url ||
-        FALLBACK_IMAGE,
+      image: websitePhoto || FALLBACK_IMAGE,
       location: details.location,
       googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
       durationHint: placeType === 'cafe' ? '45 分钟' : '90 分钟',
@@ -618,8 +609,6 @@ export function TripChatPanel({
     workingCandidates: HotelCandidate[],
     workingHotel: SelectedHotel,
   ): Promise<{ note: string; candidates: HotelCandidate[]; hotel: SelectedHotel }> {
-    if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试添加酒店。')
-
     const existing = matchHotelCandidate(workingCandidates, action.hotelName)
     if (existing) {
       const selectedHotel = candidateToSelected(existing)
@@ -1475,7 +1464,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'refresh_hotels') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试推荐酒店。')
           const result = await refreshHotelCandidates({
             current: workingCandidates,
             preferences: action.preferences,
@@ -1494,7 +1482,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_hotel') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试替换酒店。')
           const from = matchHotelCandidate(workingCandidates, action.fromHotelName)
           if (!from) {
             notes.push(`候选项里没有「${action.fromHotelName}」`)
@@ -1517,7 +1504,6 @@ export function TripChatPanel({
         }
 
         if (action.type === 'replace_hotels') {
-          if (!isLoaded) throw new Error('地图尚未就绪，请稍后再试替换酒店。')
           const fromHotels: HotelCandidate[] = []
           for (const name of action.fromHotelNames) {
             const hit = matchHotelCandidate(workingCandidates, name)

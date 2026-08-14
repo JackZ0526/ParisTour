@@ -1,5 +1,5 @@
 /** Public API of the flight feature. */
-export { FlightPanel, areFlightsComplete } from './components/FlightPanel'
+export { FlightPanel } from './components/FlightPanel'
 export {
   lookupFlight,
   meaningfulFlightStatus,
@@ -9,8 +9,10 @@ export {
 } from './services/flightLookup'
 export {
   clearFlightSelection,
+  areFlightsComplete,
   loadFlightSelection,
   saveFlightSelection,
+  type FlightSelection,
   type PersistedFlightSelection,
 } from './services/flightSelection'
 export {

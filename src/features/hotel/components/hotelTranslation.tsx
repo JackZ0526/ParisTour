@@ -16,11 +16,13 @@ function useBatchTranslation(
   texts: string[],
   translateFn: TranslateFn = translateTextsToChinese,
 ) {
-  const originals = useMemo(
-    () => [...new Set(texts.map((text) => text.trim()).filter(Boolean))],
-    [texts],
+  const sourceKey = JSON.stringify([
+    ...new Set(texts.map((text) => text.trim()).filter(Boolean)),
+  ])
+  const originals = useMemo<string[]>(
+    () => JSON.parse(sourceKey) as string[],
+    [sourceKey],
   )
-  const sourceKey = originals.join('\n---\n')
   const needsTranslate = originals.some((text) => !looksChinese(text)) && isLlmConfigured()
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [translating, setTranslating] = useState(needsTranslate)
@@ -67,7 +69,7 @@ function useBatchTranslation(
     return () => {
       cancelled = true
     }
-  }, [sourceKey, retryCount, translateFn])
+  }, [originals, retryCount, translateFn])
 
   const hasTranslation = originals.some((text) => translations[text])
   const pending = Boolean(needsTranslate && translating && !hasTranslation && !translationFailed)

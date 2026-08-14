@@ -39,6 +39,12 @@ export const GOOGLE_PLACES_DETAILS_REVIEWS_FIELD_MASK = [
   'reviews',
 ].join(',')
 
+/** Minimal first request for the two-step Place Photo fallback. */
+export const GOOGLE_PLACES_DETAILS_PHOTOS_FIELD_MASK = [
+  'id',
+  'photos',
+].join(',')
+
 export function normalizeGooglePlaceId(placeId: string): string {
   let value = placeId.trim()
   try {
@@ -52,7 +58,11 @@ export function normalizeGooglePlaceId(placeId: string): string {
 /** RapidAPI Place Details is GET with no body. Sending JSON Content-Type makes the gateway return 400. */
 export function googlePlacesUpstreamHeaders(
   method: string,
-  options?: { fullDetails?: boolean; reviewDetails?: boolean },
+  options?: {
+    fullDetails?: boolean
+    reviewDetails?: boolean
+    photoDetails?: boolean
+  },
 ): Record<string, string> {
   const isPost = method.toUpperCase() === 'POST'
   const headers: Record<string, string> = {
@@ -61,6 +71,8 @@ export function googlePlacesUpstreamHeaders(
       ? GOOGLE_PLACES_SEARCH_FIELD_MASK
       : options?.reviewDetails
         ? GOOGLE_PLACES_DETAILS_REVIEWS_FIELD_MASK
+      : options?.photoDetails
+        ? GOOGLE_PLACES_DETAILS_PHOTOS_FIELD_MASK
       : options?.fullDetails
         ? GOOGLE_PLACES_DETAILS_FIELD_MASK
         : GOOGLE_PLACES_DETAILS_CORE_FIELD_MASK,

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  GOOGLE_CONTROLLED_DAILY_LIMIT,
   getGoogleRequestBudgetSnapshot,
   resetGoogleRequestBudgetForTests,
   tryConsumeGoogleRequest,
@@ -11,18 +10,21 @@ describe('Google request budget', () => {
     resetGoogleRequestBudgetForTests()
   })
 
-  it('never allows controlled calls beyond the daily limit', () => {
+  it('counts every controlled request without capping', () => {
     const now = new Date(2026, 7, 11, 12)
-    for (let index = 0; index < GOOGLE_CONTROLLED_DAILY_LIMIT; index += 1) {
+    for (let index = 0; index < 200; index += 1) {
       expect(tryConsumeGoogleRequest('place-search', 1, now)).toBe(true)
     }
+    expect(tryConsumeGoogleRequest('place-details', 1, now)).toBe(true)
 
-    expect(tryConsumeGoogleRequest('place-details', 1, now)).toBe(false)
-    expect(getGoogleRequestBudgetSnapshot(now)).toMatchObject({
-      used: GOOGLE_CONTROLLED_DAILY_LIMIT,
-      remaining: 0,
-      byKind: { 'place-search': GOOGLE_CONTROLLED_DAILY_LIMIT },
+    const snapshot = getGoogleRequestBudgetSnapshot(now)
+    expect(snapshot.used).toBe(201)
+    expect(snapshot.byKind).toEqual({
+      'place-search': 200,
+      'place-details': 1,
     })
+    expect('limit' in snapshot).toBe(false)
+    expect('remaining' in snapshot).toBe(false)
   })
 
   it('starts a fresh budget on the next local calendar day', () => {
@@ -31,6 +33,6 @@ describe('Google request budget', () => {
     ).toBe(true)
     expect(
       getGoogleRequestBudgetSnapshot(new Date(2026, 7, 12, 1)),
-    ).toMatchObject({ used: 0, remaining: GOOGLE_CONTROLLED_DAILY_LIMIT })
+    ).toMatchObject({ used: 0, byKind: {} })
   })
 })

@@ -1,5 +1,9 @@
 import type { Coordinates } from '../../../types'
-import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
+import {
+  getLlmArtifact,
+  removeLlmArtifact,
+  setLlmArtifact,
+} from '../../../shared/services/llm/llmArtifactStore'
 import {
   placeIdentitySimilarity,
   PLACE_NAME_MATCH_MIN,
@@ -126,11 +130,14 @@ interface RapidSearchResponse {
   places?: RapidPlace[]
 }
 
+type RapidPhoto = NonNullable<RapidPlace['photos']>[number]
+
 const DETAILS_PREFIX = 'rapid-google-place:v4:'
 const CANDIDATES_PREFIX = 'rapid-google-candidates:v3:'
 const PHOTO_URI_PREFIX = 'rapid-google-photo-uri:v1:'
 const WEBSITE_RECOVERY_PREFIX = 'rapid-google-website-recovery:v1:'
 const RAPID_DETAILS_FALLBACK_PREFIX = 'rapid-google-details-fallback:v1:'
+const RAPID_PHOTO_FALLBACK_PREFIX = 'rapid-google-photo-fallback:v1:'
 const MAX_PLACE_PHOTOS = 8
 const PLACE_PHOTO_MAX_PX = 900
 const detailMemory = new Map<string, GooglePlaceDetails>()
@@ -140,6 +147,10 @@ const photoUriMemory = new Map<string, string>()
 const photoInflight = new Map<string, Promise<string | null>>()
 const websiteRecoveryMemory = new Set<string>()
 const rapidDetailsFallbackMemory = new Set<string>()
+// `null` is a confirmed provider miss. Persist both hits and misses so opening
+// the same place on another device does not spend the two-call photo fallback
+// again. The explicit no-photo retry clears this entry first.
+const rapidPhotoFallbackCache = new Map<string, string | null>()
 
 function textOf(value: LocalizedText): string {
   if (typeof value === 'string') return value.trim()
@@ -244,6 +255,98 @@ function photoResourceName(photo: {
     (value) => typeof value === 'string' && value.trim(),
   )
   return named?.trim() || null
+}
+
+function photoAspectFromSize(photo: RapidPhoto): {
+  width: number
+  height: number
+} | null {
+  const candidate = photo as {
+    widthPx?: number
+    heightPx?: number
+    maxWidthPx?: number
+    maxHeightPx?: number
+  }
+  const width = Number(candidate.widthPx ?? candidate.maxWidthPx) || 0
+  const height = Number(candidate.heightPx ?? candidate.maxHeightPx) || 0
+  if (width > 0 && height > 0) return { width, height }
+  return null
+}
+
+function scoreGooglePhotoForHero(
+  photo: NonNullable<RapidPlace['photos']>[number],
+): number {
+  const size = photoAspectFromSize(photo)
+  const area = size ? size.width * size.height : 0
+  let score = area
+  if (size) {
+    if (size.width >= 1600) score += 4_000_000
+    else if (size.width >= 1200) score += 2_000_000
+    else if (size.width >= 800) score += 500_000
+    if (size.width >= size.height) score += 200_000
+  }
+  const direct = [
+    photo.photoUri,
+    photo.uri,
+    photo.url,
+    photo.photoUrl,
+    photo.photo_url,
+    photo.imageUrl,
+    photo.image_url,
+    photo.thumbnailUrl,
+    photo.thumbnail_url,
+  ].some((value) => typeof value === 'string' && value.length)
+  if (direct) score += 50_000
+  return score
+}
+
+function pickTopGooglePhoto(photos: RapidPlace['photos'] | undefined): {
+  photo: NonNullable<RapidPlace['photos']>[number]
+  url: string
+} | null {
+  if (!Array.isArray(photos) || !photos.length) return null
+  let best: NonNullable<RapidPlace['photos']>[number] | null = null
+  let bestUrl: string | null = null
+  let bestScore = Number.NEGATIVE_INFINITY
+  for (const photo of photos) {
+    if (!photo) continue
+    const url = extractSingleGooglePhoto(photo)
+    if (!url) continue
+    const score = scoreGooglePhotoForHero(photo)
+    if (score > bestScore) {
+      best = photo
+      bestUrl = url
+      bestScore = score
+    }
+  }
+  return best && bestUrl ? { photo: best, url: bestUrl } : null
+}
+
+function extractSingleGooglePhoto(
+  photo: RapidPhoto,
+): string | null {
+  const id = photo.name?.replace(/^places\//, '').trim()
+  const direct = [
+    photo.photoUri,
+    photo.uri,
+    photo.url,
+    photo.photoUrl,
+    photo.photo_url,
+    photo.imageUrl,
+    photo.image_url,
+    photo.thumbnailUrl,
+    photo.thumbnail_url,
+  ].find(
+    (value): value is string => typeof value === 'string' && isResolvedPhotoUri(value),
+  )
+  if (direct) return withoutGoogleMapsPhotoKey(direct)
+  if (photo.photo_reference || photo.photoReference) {
+    const ref = (photo.photo_reference || photo.photoReference || '').trim()
+    if (ref && id) return `places/${id}/photos/${ref.replace(/\/media$/, '')}`
+  }
+  const name = photoResourceName(photo)
+  if (name && id) return name
+  return null
 }
 
 function extractPlacePhotoUrls(
@@ -405,26 +508,65 @@ function storeDetails(
   details: GooglePlaceDetails,
   query?: string,
   location?: Coordinates,
-  options?: { silent?: boolean },
-) {
-  const stored = forStorage(details)
-  const keys = aliasesFor(stored, query, location)
-  if (!keys.length) return
+): GooglePlaceDetails {
+  const incoming = forStorage(details)
+  const keys = aliasesFor(incoming, query, location)
+  if (!keys.length) return withDisplayPhotos(incoming)
   const existing = readDetails(keys)
-  if (existing?.fullDetails && !stored.fullDetails) {
-    const preserved = forStorage(existing)
-    for (const key of keys) detailMemory.set(key, preserved)
-    setLlmArtifact(keys[0], preserved, {
-      aliases: keys.slice(1),
-      silent: options?.silent,
-    })
-    return
-  }
+  const stored = existing
+    ? forStorage(mergeGooglePlaceDetails(existing, incoming))
+    : incoming
   for (const key of keys) detailMemory.set(key, stored)
   setLlmArtifact(keys[0], stored, {
     aliases: keys.slice(1),
-    silent: options?.silent,
   })
+  return withDisplayPhotos(stored)
+}
+
+function mergeGoogleReviews(current: GoogleReview[], incoming: GoogleReview[]): GoogleReview[] {
+  const seen = new Set<string>()
+  const out: GoogleReview[] = []
+  for (const review of [...incoming, ...current]) {
+    const key = `${review.author || ''}|${review.rating || ''}|${review.text.trim()}`
+    if (!review.text.trim() || seen.has(key)) continue
+    seen.add(key)
+    out.push(review)
+    if (out.length >= 8) break
+  }
+  return out
+}
+
+/** Merge partial Search/Details responses without erasing previously paid fields. */
+function mergeGooglePlaceDetails(
+  current: GooglePlaceDetails,
+  incoming: GooglePlaceDetails,
+): GooglePlaceDetails {
+  return {
+    ...current,
+    ...incoming,
+    id: incoming.id || current.id,
+    name: incoming.name || current.name,
+    nameOriginal: incoming.nameOriginal || current.nameOriginal,
+    address: incoming.address || current.address,
+    rating: incoming.rating ?? current.rating,
+    userRatingCount: incoming.userRatingCount ?? current.userRatingCount,
+    photos: [...new Set([...(incoming.photos || []), ...(current.photos || [])])].slice(
+      0,
+      MAX_PLACE_PHOTOS,
+    ),
+    reviews: mergeGoogleReviews(current.reviews || [], incoming.reviews || []),
+    summary: incoming.summary || current.summary,
+    phone: incoming.phone || current.phone,
+    website: incoming.website || current.website,
+    openingHours: incoming.openingHours?.length
+      ? incoming.openingHours
+      : current.openingHours,
+    priceLevel: incoming.priceLevel || current.priceLevel,
+    location: incoming.location || current.location,
+    query: incoming.query || current.query,
+    fullDetails:
+      incoming.fullDetails || current.fullDetails ? true : undefined,
+  }
 }
 
 function toCoords(place: RapidPlace): Coordinates | undefined {
@@ -512,7 +654,7 @@ function candidateScore(
 }
 
 async function rapidRequest<T>(
-  kind: 'place-search' | 'place-details',
+  kind: 'place-search' | 'place-details' | 'place-photo',
   rest: string,
   init?: RequestInit,
 ): Promise<T | null> {
@@ -527,7 +669,7 @@ async function rapidRequest<T>(
     const budget = getGoogleRequestBudgetSnapshot()
     const provider = response.headers.get('x-paristour-places-provider') || 'unknown'
     console.info(
-      `[places] ${kind} ${path} via ${provider} (${response.status}) used ${budget.used}/${budget.limit}`,
+      `[places] ${kind} ${path} via ${provider} (${response.status}) used ${budget.used} ${kind}`,
     )
   }
   if (!response.ok) {
@@ -571,7 +713,7 @@ async function searchFullPlaces(
     .filter((item): item is GooglePlaceDetails => Boolean(item))
   // One search response often contains several complete places. Save all of
   // them now so clicking any returned candidate later costs zero requests.
-  for (const item of details) storeDetails(item, undefined, undefined, { silent: true })
+  for (const item of details) storeDetails(item)
   return details
 }
 
@@ -592,8 +734,7 @@ async function detailsById(
   // field from the gateway into the website-photo fallback path.
   if (details && rapidApiNewOnly) details.photos = []
   if (details && fullDetails) details.fullDetails = true
-  if (details) storeDetails(details, query)
-  return details ? withDisplayPhotos(details) : null
+  return details ? storeDetails(details, query) : null
 }
 
 function hasAttemptedRapidDetailsFallback(placeId: string): boolean {
@@ -611,12 +752,123 @@ function markRapidDetailsFallbackAttempted(placeId: string) {
   setLlmArtifact(
     `${RAPID_DETAILS_FALLBACK_PREFIX}${placeId}`,
     { done: true },
-    { silent: true },
   )
 }
 
 /**
- * Tripadvisor-miss fallback. Uses the cached Place ID and exactly one request
+ * Final one-shot fallback when Tripadvisor and the official site have no usable
+ * photos and a `place_id` is known. Calls RapidAPI Google Place Details (New V2)
+ * with the `photos` field mask and returns the single best display URL.
+ * Caches the outcome per place so later opens cost zero requests.
+ */
+export async function fetchRapidApiGooglePhotoFallbackById(
+  placeId: string,
+): Promise<string | null> {
+  const id = placeId.replace(/^places\//, '').trim()
+  if (!id) return null
+  if (rapidPhotoFallbackCache.has(id)) {
+    return rapidPhotoFallbackCache.get(id) || null
+  }
+  const stored = getLlmArtifact<{ done?: boolean; url?: string | null }>(
+    `${RAPID_PHOTO_FALLBACK_PREFIX}${id}`,
+  )
+  if (stored?.done || stored?.url) {
+    const cached = stored.url || null
+    rapidPhotoFallbackCache.set(id, cached)
+    return cached
+  }
+  const inflightKey = `rapidapi-new-photo:${id}`
+  const pending = photoInflight.get(inflightKey)
+  if (pending) return pending
+  const task = (async () => {
+    let raw: RapidPlace | null = null
+    try {
+      raw = await rapidRequest<RapidPlace>(
+        'place-details',
+        `v1/places/${encodeURIComponent(id)}?languageCode=fr&regionCode=FR&detailsMode=photos&provider=rapidapi-new`,
+      )
+    } catch {
+      // Tripadvisor and website photos already failed; do not surface this error.
+      raw = null
+    }
+    const top = raw ? pickTopGooglePhoto(raw.photos) : null
+    let url: string | null = null
+    if (top) {
+      const photoUri = top.url
+      // `photoUri` from Places (New) is already a signed GCS URL; nothing to do.
+      if (isResolvedPhotoUri(photoUri)) {
+        url = withoutGoogleMapsPhotoKey(photoUri)
+      } else {
+        // Otherwise it is a `places/{id}/photos/{resource}` reference; fetch the
+        // media URL via the second RapidAPI Place Photo (New) request.
+        const parsed = parseGooglePhotoResource(photoUri, id)
+        if (parsed) {
+          try {
+            const media = await rapidRequest<{ photoUri?: string; name?: string }>(
+              'place-photo',
+              `v1/places/${encodeURIComponent(id)}/photos/${encodeURIComponent(parsed.photoResource)}/media?maxWidthPx=${PLACE_PHOTO_MAX_PX}&maxHeightPx=${PLACE_PHOTO_MAX_PX}&skipHttpRedirect=true`,
+            )
+            const resolved = media?.photoUri || media?.name
+            if (resolved && isResolvedPhotoUri(resolved)) {
+              url = withoutGoogleMapsPhotoKey(resolved)
+            } else if (resolved) {
+              url = resolved
+            }
+          } catch {
+            // Final fallback path stays best-effort.
+          }
+        }
+      }
+    }
+    // A non-null Details response means the provider lookup really ran. Cache
+    // its result even when no usable image exists; a budget-denied null is not
+    // treated as a permanent miss.
+    if (raw) {
+      rapidPhotoFallbackCache.set(id, url)
+      setLlmArtifact(`${RAPID_PHOTO_FALLBACK_PREFIX}${id}`, { done: true, url })
+    }
+    return url
+  })()
+  photoInflight.set(inflightKey, task)
+  try {
+    return await task
+  } finally {
+    photoInflight.delete(inflightKey)
+  }
+}
+
+/** Sync read of the cached URL (positive results only). Returns null when uncached. */
+export function peekRapidApiGooglePhotoFallback(
+  placeId: string,
+): string | null {
+  const id = placeId.replace(/^places\//, '').trim()
+  if (!id) return null
+  const memory = rapidPhotoFallbackCache.get(id)
+  if (memory) return memory
+  try {
+    const stored = getLlmArtifact<{ done?: boolean; url?: string | null }>(
+      `${RAPID_PHOTO_FALLBACK_PREFIX}${id}`,
+    )
+    const url = stored?.url
+    if (url) {
+      rapidPhotoFallbackCache.set(id, url)
+      return url
+    }
+  } catch {
+    /* localStorage unavailable */
+  }
+  return null
+}
+
+/** Allow the explicit no-photo recovery action to bypass a persisted miss. */
+export function invalidateRapidApiGooglePhotoFallback(placeId?: string): void {
+  const id = placeId?.replace(/^places\//, '').trim()
+  if (!id) return
+  rapidPhotoFallbackCache.delete(id)
+  removeLlmArtifact(`${RAPID_PHOTO_FALLBACK_PREFIX}${id}`)
+}
+
+/** Tripadvisor-miss fallback. Uses the cached Place ID and exactly one request
  * to RapidAPI Google Place API (New V2); it never performs Text Search or the
  * legacy-host retry.
  */
@@ -733,7 +985,7 @@ function hasAttemptedWebsiteRecovery(placeId: string): boolean {
 
 function markWebsiteRecoveryAttempted(placeId: string) {
   websiteRecoveryMemory.add(placeId)
-  setLlmArtifact(`${WEBSITE_RECOVERY_PREFIX}${placeId}`, { done: true }, { silent: true })
+  setLlmArtifact(`${WEBSITE_RECOVERY_PREFIX}${placeId}`, { done: true })
 }
 
 /**
@@ -877,4 +1129,5 @@ export function resetGooglePlaceDetailsCacheForTests() {
   photoInflight.clear()
   websiteRecoveryMemory.clear()
   rapidDetailsFallbackMemory.clear()
+  rapidPhotoFallbackCache.clear()
 }

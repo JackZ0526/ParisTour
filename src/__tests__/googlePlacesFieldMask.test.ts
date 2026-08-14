@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   GOOGLE_PLACES_DETAILS_CORE_FIELD_MASK,
   GOOGLE_PLACES_DETAILS_FIELD_MASK,
+  GOOGLE_PLACES_DETAILS_PHOTOS_FIELD_MASK,
   GOOGLE_PLACES_DETAILS_REVIEWS_FIELD_MASK,
   GOOGLE_PLACES_SEARCH_FIELD_MASK,
   googlePlacesUpstreamHeaders,
@@ -28,6 +29,13 @@ describe('Google Places New V2 request shape', () => {
     )
     expect(reviewHeaders['X-Goog-FieldMask']).toContain('reviews')
     expect(reviewHeaders['X-Goog-FieldMask']).not.toContain('photos')
+
+    const photoHeaders = googlePlacesUpstreamHeaders('GET', { photoDetails: true })
+    expect(photoHeaders['X-Goog-FieldMask']).toBe(
+      GOOGLE_PLACES_DETAILS_PHOTOS_FIELD_MASK,
+    )
+    expect(photoHeaders['X-Goog-FieldMask']).toBe('id,photos')
+    expect(photoHeaders['X-Goog-FieldMask']).not.toContain('reviews')
   })
 
   it('sends JSON Content-Type and places.* mask on Text Search POST', () => {

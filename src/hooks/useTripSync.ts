@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { FlightSelection } from '../features/flight/components/FlightPanel'
+import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { HotelCandidate, Place, SelectedHotel } from '../types'
 import type { DayPlan } from '../types'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
@@ -257,6 +257,7 @@ export function useTripSync(
     recommendationPreferences,
     canEdit,
     notifyTripChanged,
+    suppressCloudSaveRef,
   ])
 
   useEffect(() => {

@@ -15,15 +15,15 @@ describe('API request meter', () => {
     vi.unstubAllGlobals()
   })
 
-  it('classifies Google Places search and details separately', () => {
+  it('classifies Google Places search, details, and photo separately', () => {
     expect(
       classifyApiRequest('/api/google-places?rest=v1%2Fplaces%3AsearchText'),
-    ).toBe('google-place-search')
+    ).toBeNull()
     expect(
       classifyApiRequest(
         '/api/google-places?rest=v1%2Fplaces%2FChIJ-id&languageCode=fr',
       ),
-    ).toBe('google-place-details')
+    ).toBeNull()
     expect(
       classifyApiRequest(
         '/api/google-places?rest=v1%2Fplaces%3AsearchText',
@@ -32,10 +32,28 @@ describe('API request meter', () => {
     ).toBe('google-official-search')
     expect(
       classifyApiRequest(
+        '/api/google-places?rest=v1%2Fplaces%2FChIJ-id',
+        'official',
+      ),
+    ).toBe('google-official-details')
+    expect(
+      classifyApiRequest(
+        '/api/google-places?rest=v1%2Fplaces%2FChIJ-id%2Fphotos%2Fphoto-res%2Fmedia&maxWidthPx=900',
+        'official',
+      ),
+    ).toBe('google-official-photo')
+    expect(
+      classifyApiRequest(
         '/api/google-places?rest=v1%2Fplaces%2FChIJ-id&provider=rapidapi-new',
         'rapidapi',
       ),
     ).toBe('google-rapidapi-details')
+    expect(
+      classifyApiRequest(
+        '/api/google-places?rest=v1%2Fplaces%2FChIJ-id%2Fphotos%2Fphoto-res%2Fmedia',
+        'rapidapi',
+      ),
+    ).toBe('google-rapidapi-photo')
   })
 
   it('classifies Tripadvisor, Booking, LLM, and other paid routes', () => {
@@ -64,6 +82,9 @@ describe('API request meter', () => {
     expect(classifyApiRequest('/api/place-website?url=https%3A%2F%2Fx.test')).toBe(
       'place-website',
     )
+    expect(classifyApiRequest('/api/openrouteservice')).toBe(
+      'openrouteservice-directions',
+    )
     expect(classifyApiRequest('https://nominatim.openstreetmap.org/search')).toBe(
       null,
     )
@@ -81,6 +102,19 @@ describe('API request meter', () => {
     expect(snapshot.byKind['tripadvisor-gallery']).toBe(3)
     const google = API_REQUEST_GROUPS.find((group) => group.id === 'google-places')
     expect(google && groupCount(snapshot, google)).toBe(3)
+  })
+
+  it('counts road route requests outside the Google group', () => {
+    const now = new Date(2026, 7, 12, 18)
+    recordApiRequest('openrouteservice-directions', 1, now)
+    recordApiRequest('google-official-details', 2, now)
+    const snapshot = getApiRequestMeterSnapshot(now)
+    const google = API_REQUEST_GROUPS.find((group) => group.id === 'google-places')
+
+    expect(snapshot.used).toBe(3)
+    expect(snapshot.byKind['openrouteservice-directions']).toBe(1)
+    expect(google?.label).toBe('Google')
+    expect(google && groupCount(snapshot, google)).toBe(2)
   })
 
   it('records the Google Places provider returned by the server', async () => {
@@ -104,7 +138,8 @@ describe('API request meter', () => {
     const snapshot = getApiRequestMeterSnapshot()
     expect(snapshot.byKind['google-official-search']).toBe(1)
     expect(snapshot.byKind['google-rapidapi-details']).toBe(1)
-    expect(snapshot.byKind['google-place-search']).toBeUndefined()
-    expect(snapshot.byKind['google-place-details']).toBeUndefined()
+    expect('google-place-search' in snapshot.byKind).toBe(false)
+    expect('google-place-details' in snapshot.byKind).toBe(false)
+    expect('google-place-photo' in snapshot.byKind).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
-import { useAuth } from './features/auth/AuthProvider'
+import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
 import { useItineraryDays, useItineraryDaysEffects } from './hooks/useItineraryDays'
@@ -25,6 +25,8 @@ import { TripChatPanel } from './features/chat/components/TripChatPanel'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { TripMap } from './features/map/components/TripMap'
+import { buildDayMapRouteRequest } from './features/map/services/mapDayRoute'
+import { getOrFetchMapRoute } from './features/map/services/openRouteService'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import { PENDING_HOTEL } from './features/hotel/constants/hotels'
 import { getPlace } from './features/place/constants/places'
@@ -122,6 +124,7 @@ export default function App() {
     handleAddOnDay,
     handleSwitchDay,
     handleReplaceOnDay,
+    completeReorderSaveTransaction,
     day,
   } = useItineraryDays(
     hotel,
@@ -143,6 +146,9 @@ export default function App() {
     },
     [setSelectedPlaceId],
   )
+  const handleRouteCacheChanged = useCallback(() => {
+    notifyTripChanged()
+  }, [notifyTripChanged])
   const {
     itineraryStart,
     setItineraryStart,
@@ -200,6 +206,82 @@ export default function App() {
     { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
   )
   numberOfDaysRef.current = numberOfDays
+  const routePrefetchPlan = useMemo(
+    () =>
+      days
+        .map((plan) => buildDayMapRouteRequest(plan, hotel, placesWithHotel))
+        .filter((request) => request.points.length >= 2),
+    [days, hotel, placesWithHotel],
+  )
+  const routePrefetchFingerprint = useMemo(
+    () => routePrefetchPlan.map((request) => request.key).join('||'),
+    [routePrefetchPlan],
+  )
+  const routePrefetchPlanRef = useRef(routePrefetchPlan)
+  routePrefetchPlanRef.current = routePrefetchPlan
+
+  useEffect(() => {
+    if (
+      !showItineraryContent ||
+      itineraryGenerating ||
+      itineraryIncrementalGenerating ||
+      dayRegenerating ||
+      dayRestoring ||
+      !routePrefetchFingerprint
+    ) {
+      return
+    }
+
+    let active = true
+    void (async () => {
+      const requests = routePrefetchPlanRef.current
+      let nextIndex = 0
+      let fetchedAny = false
+      const worker = async () => {
+        while (active) {
+          const index = nextIndex
+          nextIndex += 1
+          const request = requests[index]
+          if (!request) return
+          for (let attempt = 0; attempt < 2 && active; attempt += 1) {
+            try {
+              const result = await getOrFetchMapRoute(
+                request.points,
+                request.profile,
+              )
+              if (!result.fromCache) fetchedAny = true
+              break
+            } catch {
+              if (attempt === 0) {
+                await new Promise((resolve) => window.setTimeout(resolve, 900))
+              }
+              // Keep prefetch silent; TripMap surfaces the final error if opened.
+            }
+          }
+        }
+      }
+      await Promise.all(
+        Array.from(
+          { length: Math.min(2, requests.length) },
+          () => worker(),
+        ),
+      )
+      if (active && fetchedAny && !readOnly) notifyTripChanged()
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [
+    dayRegenerating,
+    dayRestoring,
+    itineraryGenerating,
+    itineraryIncrementalGenerating,
+    notifyTripChanged,
+    readOnly,
+    routePrefetchFingerprint,
+    showItineraryContent,
+  ])
   const [panelResetKey, setPanelResetKey] = useState(0)
   /**
    * Remount input panels / chat after a remote snapshot is reconciled.
@@ -362,6 +444,7 @@ export default function App() {
       itineraryStartDate,
       numberOfDays,
       setCopyRefreshing,
+      completeReorderSaveTransaction,
     },
     {
       prevStopsKeyRef,
@@ -879,15 +962,14 @@ export default function App() {
                             : 'hidden lg:block'
                         }`}
                       >
-                        <MapErrorBoundary
-                          key={`map-boundary-${day.day}-${hotel.id}`}
-                        >
+                        <MapErrorBoundary>
                           <TripMap
                             hotel={hotel}
                             day={day}
                             customPlaces={placesWithHotel}
                             selectedPlaceId={selectedPlaceId}
                             onSelectPlace={handleSelectPlace}
+                            onRouteCacheChanged={handleRouteCacheChanged}
                           />
                         </MapErrorBoundary>
                         <PlacePanel

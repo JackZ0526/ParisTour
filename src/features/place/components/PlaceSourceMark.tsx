@@ -1,17 +1,7 @@
-export type PlaceInfoSource =
-  | 'google'
-  | 'tripadvisor'
-  | 'booking'
-  | 'website'
-  | 'wikimedia'
-
-const SOURCE_LABEL: Record<PlaceInfoSource, string> = {
-  google: 'Google',
-  tripadvisor: 'Tripadvisor',
-  booking: 'Booking.com',
-  website: '官网',
-  wikimedia: 'Wikimedia',
-}
+import {
+  placeSourceLabel,
+  type PlaceInfoSource,
+} from '../services/placeSource'
 
 function BrandImage({
   src,
@@ -49,10 +39,6 @@ function SourceLogo({ source }: { source: PlaceInfoSource }) {
   return null
 }
 
-export function placeSourceLabel(source: PlaceInfoSource): string {
-  return SOURCE_LABEL[source]
-}
-
 export function PlaceSourceMark({
   source,
   showLabel = true,
@@ -64,7 +50,7 @@ export function PlaceSourceMark({
   onPhoto?: boolean
   className?: string
 }) {
-  const label = SOURCE_LABEL[source]
+  const label = placeSourceLabel(source)
   const showText = showLabel && source !== 'booking'
   const inner = (
     <>

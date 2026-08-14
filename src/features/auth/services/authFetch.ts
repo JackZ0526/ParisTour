@@ -36,10 +36,11 @@ export async function authApiHeaders(
 
 export async function authFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers = await authApiHeaders(init?.headers)
-  const kind = classifyApiRequest(input)
-  const isGooglePlaces =
-    kind === 'google-place-search' || kind === 'google-place-details'
-  if (kind && !isGooglePlaces) recordApiRequest(kind)
+  const isGooglePlaces = isGooglePlacesPath(input)
+  if (!isGooglePlaces) {
+    const kind = classifyApiRequest(input)
+    if (kind) recordApiRequest(kind)
+  }
 
   const response = await fetch(input, { ...init, headers })
   if (isGooglePlaces) {
@@ -52,4 +53,13 @@ export async function authFetch(input: string, init?: RequestInit): Promise<Resp
     if (resolvedKind) recordApiRequest(resolvedKind)
   }
   return response
+}
+
+function isGooglePlacesPath(input: string): boolean {
+  try {
+    const url = new URL(input, 'http://local.invalid')
+    return url.pathname === '/api/google-places' || url.pathname.startsWith('/api/google-places/')
+  } catch {
+    return false
+  }
 }

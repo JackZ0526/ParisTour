@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useAuth } from '../AuthProvider'
+import { useAuth } from '../authContext'
 import { LoginPage } from './LoginPage'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 

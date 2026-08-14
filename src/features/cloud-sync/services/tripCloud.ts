@@ -21,6 +21,7 @@ import {
   type TripSnapshot,
 } from './tripSnapshot'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { sanitizeMapRouteCache } from '../../map/services/mapRouteCache'
 
 export type TripRole = 'owner' | 'viewer' | 'editor'
 
@@ -121,6 +122,7 @@ function asSnapshot(raw: unknown): TripSnapshot {
     itinerary: s.itinerary ?? null,
     baseline: s.baseline ?? null,
     recommendationPreferences: s.recommendationPreferences ?? null,
+    mapRoutes: sanitizeMapRouteCache(s.mapRoutes),
     llmArtifacts,
   }
 }
@@ -190,6 +192,7 @@ function snapshotForBackup(snapshot: TripSnapshot): TripSnapshot {
   const clean = asSnapshot(snapshot)
   return {
     ...clean,
+    mapRoutes: {},
     llmArtifacts: {},
   }
 }
@@ -560,6 +563,7 @@ export async function restoreTripSnapshotBackup(
 /** Debounced cloud writer — only persists when the snapshot actually changed. */
 const SAVE_DEBOUNCE_MS = 2000
 const MIN_SAVE_INTERVAL_MS = 8000
+const MAX_TRANSIENT_SAVE_RETRIES = 1
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveTripId: string | null = null
@@ -567,6 +571,7 @@ let saveInFlight = false
 let queuedSaveMode: 'none' | 'artifacts' | 'full' = 'none'
 let queuedAllowEmptyTrip = false
 let pendingAfterFlight = false
+let transientSaveRetryCount = 0
 /** Last time a cloud write actually started (network). */
 let lastSaveStartedAt = 0
 /** Pause uploads during bursty work (itinerary generation); flush once on release. */
@@ -682,6 +687,15 @@ function describeCloudSaveError(err: unknown): string {
   }
   if (raw && raw !== '保存失败') return raw
   return code ? `云端返回错误 ${code}` : '未知错误，请稍后重试'
+}
+
+function isTransientCloudSaveError(err: unknown): boolean {
+  const rec = asRecord(err)
+  const code = rec && typeof rec.code === 'string' ? rec.code : ''
+  const raw = extractErrorText(err)
+  return /timeout|timed out|57014|failed to fetch|networkerror|network request|load failed|\b50[234]\b/i.test(
+    `${code} ${raw}`,
+  )
 }
 
 function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) {
@@ -1235,10 +1249,23 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
     // Swallow our own realtime echo.
     armSuppressRemote(3000)
+    transientSaveRetryCount = 0
     setCloudSaveStatus('saved')
   } catch (err) {
     console.warn('[tripCloud] save failed', err)
-    setCloudSaveStatus('error', describeCloudSaveError(err))
+    if (
+      isTransientCloudSaveError(err) &&
+      transientSaveRetryCount < MAX_TRANSIENT_SAVE_RETRIES
+    ) {
+      transientSaveRetryCount += 1
+      if (saveMode === 'full' || queuedSaveMode === 'none') queuedSaveMode = saveMode
+      if (allowEmptyTrip) queuedAllowEmptyTrip = true
+      setCloudSaveStatus('pending')
+      armSaveTimer(MIN_SAVE_INTERVAL_MS)
+    } else {
+      transientSaveRetryCount = 0
+      setCloudSaveStatus('error', describeCloudSaveError(err))
+    }
   } finally {
     saveInFlight = false
     if (pendingAfterFlight) {

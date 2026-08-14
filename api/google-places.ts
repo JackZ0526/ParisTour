@@ -50,7 +50,8 @@ function json(status: number, body: unknown): Response {
 function allowedPath(method: string, rest: string): boolean {
   if (method === 'POST') return rest === 'v1/places:searchText'
   if (method === 'GET') {
-    return /^v1\/places\/[A-Za-z0-9_-]+$/.test(rest)
+    if (/^v1\/places\/[A-Za-z0-9_-]+$/.test(rest)) return true
+    if (/^v1\/places\/[A-Za-z0-9_-]+\/photos\/[A-Za-z0-9_-]+\/media$/.test(rest)) return true
   }
   return false
 }
@@ -58,6 +59,13 @@ function allowedPath(method: string, rest: string): boolean {
 function normalizeDetailsRest(rest: string): string {
   const id = normalizeGooglePlaceId(rest.replace(/^v1\/places\//, ''))
   return id ? `v1/places/${id}` : rest
+}
+
+function normalizePhotoRest(rest: string): string {
+  const match = rest.match(/^v1\/places\/([A-Za-z0-9_-]+)\/photos\/([A-Za-z0-9_-]+)\/media$/)
+  if (!match) return rest
+  const placeId = normalizeGooglePlaceId(match[1])
+  return placeId ? `v1/places/${placeId}/photos/${match[2]}/media` : rest
 }
 
 function parseSearchBody(body: ArrayBuffer | null): {
@@ -195,6 +203,7 @@ async function handleOfficialPlaces(
   body: ArrayBuffer | null,
   fullDetails: boolean,
   reviewDetails: boolean,
+  photoDetails: boolean,
 ): Promise<Response> {
   const key = getOfficialGooglePlacesApiKey()
   if (!key) return missingKey('GOOGLE_PLACES_API_KEY')
@@ -209,7 +218,11 @@ async function handleOfficialPlaces(
   try {
     const upstream = await proxyRequest(target, primaryReq, {
       'X-Goog-Api-Key': key,
-      ...googlePlacesUpstreamHeaders(req.method, { fullDetails, reviewDetails }),
+      ...googlePlacesUpstreamHeaders(req.method, {
+        fullDetails,
+        reviewDetails,
+        photoDetails,
+      }),
     })
     logUpstream('official', req.method, rest, upstream.status)
     if (!upstream.ok) {
@@ -234,6 +247,7 @@ async function handleRapidApiPlaces(
   body: ArrayBuffer | null,
   fullDetails: boolean,
   reviewDetails: boolean,
+  photoDetails: boolean,
   allowLegacyFallback = true,
 ): Promise<Response> {
   const key = getRapidApiKey()
@@ -251,10 +265,17 @@ async function handleRapidApiPlaces(
 
   let primary: Response | null = null
   try {
+    const fieldMaskHeaders = /\/photos\/[A-Za-z0-9_-]+\/media$/.test(rest)
+      ? {}
+      : googlePlacesUpstreamHeaders(req.method, {
+          fullDetails,
+          reviewDetails,
+          photoDetails,
+        })
     primary = await proxyRequest(target, primaryReq, {
       'X-RapidAPI-Key': key,
       'X-RapidAPI-Host': host,
-      ...googlePlacesUpstreamHeaders(req.method, { fullDetails, reviewDetails }),
+      ...fieldMaskHeaders,
     })
   } catch (error) {
     console.error('[google-places] primary', error)
@@ -331,11 +352,17 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
   const detailsMode = req.method === 'GET' ? url.searchParams.get('detailsMode') : null
   const fullDetails = detailsMode === 'full'
   const reviewDetails = detailsMode === 'reviews'
+  const photoDetails = detailsMode === 'photos'
   url.searchParams.delete('detailsMode')
   const rapidApiNewOnly =
     req.method === 'GET' && url.searchParams.get('provider') === 'rapidapi-new'
   url.searchParams.delete('provider')
-  if (req.method === 'GET') rest = normalizeDetailsRest(rest)
+  const isPhotoRequest = req.method === 'GET' && /\/photos\/[A-Za-z0-9_-]+\/media$/.test(rest)
+  if (req.method === 'GET' && isPhotoRequest) {
+    rest = normalizePhotoRest(rest)
+  } else if (req.method === 'GET') {
+    rest = normalizeDetailsRest(rest)
+  }
   if (!allowedPath(req.method, rest)) {
     return json(400, { error: 'Unsupported Places path' })
   }
@@ -344,6 +371,18 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
     req.method !== 'GET' && req.method !== 'HEAD'
       ? await req.arrayBuffer()
       : null
+  if (isPhotoRequest) {
+    return handleRapidApiPlaces(
+      req,
+      rest,
+      url.search,
+      body,
+      false,
+      false,
+      false,
+      false,
+    )
+  }
   const provider = rapidApiNewOnly ? 'rapidapi' : getGooglePlacesProvider()
   if (provider === 'official') {
     return handleOfficialPlaces(
@@ -353,6 +392,7 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
       body,
       fullDetails,
       reviewDetails,
+      photoDetails,
     )
   }
   return handleRapidApiPlaces(
@@ -362,6 +402,7 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
     body,
     fullDetails,
     reviewDetails,
+    photoDetails,
     !rapidApiNewOnly,
   )
 }

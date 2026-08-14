@@ -2,11 +2,24 @@ import type { FlightInfo } from '../../../types'
 
 const STORAGE_KEY = 'paris-tour-flights-v1'
 
-export interface PersistedFlightSelection {
+export interface FlightSelection {
   outbound: FlightInfo | null
   returnFlight: FlightInfo | null
+}
+
+export interface PersistedFlightSelection extends FlightSelection {
   outboundInput: string
   returnInput: string
+}
+
+/** Both legs looked up successfully (non-null FlightInfo with a flight number). */
+export function areFlightsComplete(
+  flights: FlightSelection | null | undefined,
+): boolean {
+  return Boolean(
+    flights?.outbound?.flightNumber?.trim() &&
+      flights?.returnFlight?.flightNumber?.trim(),
+  )
 }
 
 function isFlightInfo(value: unknown): value is FlightInfo {

@@ -1330,10 +1330,11 @@ export function DayTimeline({
 
   useEffect(() => () => stopRaf(), [])
 
+  const dragFrom = drag?.from ?? null
   useLayoutEffect(() => {
-    if (!drag || dropping) return
+    if (dragFrom === null || dropping) return
     applyFloatPos(floatRef.current.x, floatRef.current.y)
-  }, [drag?.from, dropping])
+  }, [dragFrom, dropping])
 
   const beginDrag = (
     index: number,

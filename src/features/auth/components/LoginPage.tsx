@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { useAuth } from '../AuthProvider'
+import { useAuth } from '../authContext'
 
 function readAuthDeepLink(): { mode: 'signin' | 'signup'; email: string } {
   try {

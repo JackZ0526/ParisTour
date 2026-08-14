@@ -131,6 +131,7 @@ describe('RapidAPI place cache', () => {
     })
     expect(authFetch).toHaveBeenCalledTimes(2)
     expect(withWebsite?.website).toBe('https://www.rest-maxan.com/')
+    expect(withWebsite?.photos).toEqual(['places/ChIJ-no-website/photos/room-1'])
 
     const again = await fetchGooglePlaceDetails('Le Maxan Paris', undefined, {
       placeId: 'ChIJ-no-website',
@@ -190,5 +191,135 @@ describe('RapidAPI place cache', () => {
     )
     expect(uri).toBeNull()
     expect(authFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns the highest-res photo from the two RapidAPI Google fallback calls', async () => {
+    const { fetchRapidApiGooglePhotoFallbackById, peekRapidApiGooglePhotoFallback } =
+      await import('../features/map/services/googlePlaceDetails')
+    authFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'ChIJ-photo-fallback',
+            displayName: { text: 'Parallel Coffee', languageCode: 'fr' },
+            photos: [
+              {
+                name: 'places/ChIJ-photo-fallback/photos/small',
+                widthPx: 400,
+                heightPx: 400,
+              },
+              {
+                name: 'places/ChIJ-photo-fallback/photos/hi-res',
+                widthPx: 1600,
+                heightPx: 1067,
+              },
+              {
+                name: 'places/ChIJ-photo-fallback/photos/medium',
+                widthPx: 800,
+                heightPx: 533,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            photoUri: 'https://lh3.googleusercontent.com/parallel-coffee-hires',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+    const url = await fetchRapidApiGooglePhotoFallbackById('ChIJ-photo-fallback')
+    expect(url).toBe('https://lh3.googleusercontent.com/parallel-coffee-hires')
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(authFetch.mock.calls[0][0]).toBe(
+      '/api/google-places?rest=v1%2Fplaces%2FChIJ-photo-fallback&languageCode=fr&regionCode=FR&detailsMode=photos&provider=rapidapi-new',
+    )
+    expect(authFetch.mock.calls[1][0]).toBe(
+      '/api/google-places?rest=v1%2Fplaces%2FChIJ-photo-fallback%2Fphotos%2Fhi-res%2Fmedia&maxWidthPx=900&maxHeightPx=900&skipHttpRedirect=true',
+    )
+
+    const second = await fetchRapidApiGooglePhotoFallbackById('ChIJ-photo-fallback')
+    expect(second).toBe(url)
+    expect(authFetch).toHaveBeenCalledTimes(2)
+    expect(peekRapidApiGooglePhotoFallback('ChIJ-photo-fallback')).toBe(url)
+  })
+
+  it('prefers a resolved photoUri over photo resource names', async () => {
+    authFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'ChIJ-photo-uri-fallback',
+          displayName: { text: 'All Good + Sucré', languageCode: 'fr' },
+          photos: [
+            {
+              name: 'places/ChIJ-photo-uri-fallback/photos/small',
+              widthPx: 400,
+              heightPx: 400,
+            },
+            {
+              photoUri: 'https://lh3.googleusercontent.com/example',
+              widthPx: 1200,
+              heightPx: 800,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+    const { fetchRapidApiGooglePhotoFallbackById } = await import(
+      '../features/map/services/googlePlaceDetails'
+    )
+    const url = await fetchRapidApiGooglePhotoFallbackById('ChIJ-photo-uri-fallback')
+    expect(url).toBe('https://lh3.googleusercontent.com/example')
+    expect(authFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists a confirmed no-photo result until an explicit retry', async () => {
+    const {
+      fetchRapidApiGooglePhotoFallbackById,
+      invalidateRapidApiGooglePhotoFallback,
+    } = await import(
+      '../features/map/services/googlePlaceDetails'
+    )
+    authFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'ChIJ-no-photos',
+            displayName: { text: 'Unknown Spot', languageCode: 'fr' },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'ChIJ-no-photos',
+            displayName: { text: 'Unknown Spot', languageCode: 'fr' },
+            photos: [
+              {
+                photoUri: 'https://lh3.googleusercontent.com/late-arrival',
+                widthPx: 1200,
+                heightPx: 800,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+    const url = await fetchRapidApiGooglePhotoFallbackById('ChIJ-no-photos')
+    expect(url).toBeNull()
+    resetGooglePlaceDetailsCacheForTests()
+    const again = await fetchRapidApiGooglePhotoFallbackById('ChIJ-no-photos')
+    expect(again).toBeNull()
+    expect(authFetch).toHaveBeenCalledTimes(1)
+
+    invalidateRapidApiGooglePhotoFallback('ChIJ-no-photos')
+    const retried = await fetchRapidApiGooglePhotoFallbackById('ChIJ-no-photos')
+    expect(retried).toBe('https://lh3.googleusercontent.com/late-arrival')
+    expect(authFetch).toHaveBeenCalledTimes(2)
   })
 })

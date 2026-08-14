@@ -14,6 +14,7 @@ const PAID_API_PREFIXES = [
   '/api/tripadvisor',
   '/api/place-website',
   '/api/google-places',
+  '/api/openrouteservice',
 ]
 
 function readBearer(req: IncomingMessage): string | null {
@@ -218,6 +219,59 @@ function googlePlacesDevPlugin(): Plugin {
   }
 }
 
+/** Local handler for /api/openrouteservice (Vercel serves the same function in prod). */
+function openRouteServiceDevPlugin(): Plugin {
+  return {
+    name: 'paristour-openrouteservice-dev',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const urlPath = (req.url || '').split('?')[0] || ''
+        if (urlPath !== '/api/openrouteservice') {
+          next()
+          return
+        }
+
+        try {
+          const chunks: Buffer[] = []
+          for await (const chunk of req) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+          }
+          const host = req.headers.host || '127.0.0.1:5173'
+          const headers = new Headers()
+          for (const [key, value] of Object.entries(req.headers)) {
+            if (typeof value === 'string') headers.set(key, value)
+            else if (Array.isArray(value)) headers.set(key, value.join(', '))
+          }
+          const request = new Request(`http://${host}${req.url || urlPath}`, {
+            method: req.method || 'POST',
+            headers,
+            body:
+              req.method === 'GET' || req.method === 'HEAD'
+                ? undefined
+                : Buffer.concat(chunks),
+          })
+          const modulePath = path.resolve(server.config.root, 'api/openrouteservice.ts')
+          const mod = (await server.ssrLoadModule(modulePath)) as {
+            handleOpenRouteService: (request: Request) => Promise<Response>
+          }
+          const response = await mod.handleOpenRouteService(request)
+          const body = Buffer.from(await response.arrayBuffer())
+          res.statusCode = response.status
+          response.headers.forEach((value, key) => {
+            if (key.toLowerCase() !== 'transfer-encoding') res.setHeader(key, value)
+          })
+          res.end(body)
+        } catch (error) {
+          console.error('[openrouteservice-dev]', error)
+          json(res, 500, {
+            error: error instanceof Error ? error.message : 'openrouteservice failed',
+          })
+        }
+      })
+    },
+  }
+}
+
 /** Local handler for /api/place-website (Vercel serves api/place-website.ts in prod). */
 function placeWebsiteDevPlugin(): Plugin {
   return {
@@ -311,6 +365,7 @@ export default defineConfig(({ mode }) => {
       shareInviteDevPlugin(),
       placeWebsiteDevPlugin(),
       googlePlacesDevPlugin(),
+      openRouteServiceDevPlugin(),
     ],
     server: {
       // Windows often resolves localhost → 127.0.0.1; default Node may bind [::1] only

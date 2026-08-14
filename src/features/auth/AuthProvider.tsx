@@ -1,14 +1,12 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
+import type { Session } from '@supabase/supabase-js'
 import { normalizeAuthEmail } from './devTestAccount'
 import { getSupabase, isSupabaseConfigured } from '../../shared/lib/supabase'
 import {
@@ -22,46 +20,13 @@ import {
   scheduleTripCloudSave,
   subscribeTripRealtime,
   type AccessibleTrip,
-  type TripRole,
 } from '../cloud-sync/services/tripCloud'
 import { subscribeLlmArtifacts } from '../../shared/services/llm/llmArtifactStore'
-
-type AuthStatus =
-  | 'loading'
-  | 'unconfigured'
-  | 'signed_out'
-  | 'not_allowlisted'
-  | 'ready'
-
-type AuthContextValue = {
-  status: AuthStatus
-  session: Session | null
-  user: User | null
-  email: string
-  allowlisted: boolean
-  trips: AccessibleTrip[]
-  activeTrip: AccessibleTrip | null
-  role: TripRole | null
-  canEdit: boolean
-  tripReady: boolean
-  error: string | null
-  signIn: (email: string, password: string) => Promise<void>
-  /** Resolves with whether the user must confirm email before signing in. */
-  signUp: (email: string, password: string) => Promise<{ needsEmailConfirm: boolean }>
-  signOut: () => Promise<void>
-  switchTrip: (tripId: string) => Promise<void>
-  refreshTrips: () => Promise<void>
-  notifyTripChanged: (opts?: {
-    force?: boolean
-    artifactsOnly?: boolean
-    allowEmptyTrip?: boolean
-  }) => void
-  /**
-   * Increments on live remote apply. App soft-reloads trip data without remounting
-   * (so the user keeps the day / selection they were viewing).
-   */
-  tripSyncEpoch: number
-}
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthStatus,
+} from './authContext'
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
   const msg = (err.message || '').trim()
@@ -94,14 +59,6 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
     return '当前不允许注册，请联系管理员。'
   }
   return msg || '登录失败，请稍后重试。'
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

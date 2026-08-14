@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { setLlmArtifact, resetLlmArtifactStoreForTests } from '../shared/services/llm/llmArtifactStore'
 import {
+  invalidatePlaceWebsitePhotosCache,
   peekCachedPlaceWebsitePhotos,
   resetPlaceWebsitePhotosForTests,
   websiteCacheKeys,
@@ -70,5 +71,29 @@ describe('place website photo cache', () => {
       photos: [],
       miss: true,
     })
+  })
+
+  it('clears a persisted place miss so an explicit refresh can retry', () => {
+    setLlmArtifact(
+      'place-official-website:v1:All Good + Sucré|好事甜咖啡曲奇店|233 Bd Pereire, 75017 Paris',
+      { website: null },
+      { silent: true },
+    )
+    setLlmArtifact(
+      'place-website-photos-by-place:v1:all good + sucré',
+      { photos: [], miss: true },
+      { silent: true },
+    )
+
+    const input = {
+      name: 'All Good + Sucré',
+      nameLocal: '好事甜咖啡曲奇店',
+      address: '233 Bd Pereire, 75017 Paris',
+    }
+    expect(peekCachedPlaceWebsitePhotos(input)).toEqual({ photos: [], miss: true })
+
+    invalidatePlaceWebsitePhotosCache(input)
+
+    expect(peekCachedPlaceWebsitePhotos(input)).toEqual({ photos: [] })
   })
 })

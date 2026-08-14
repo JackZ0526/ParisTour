@@ -9,8 +9,8 @@ import {
   type CloudSaveStatus,
   type CloudSyncStatus,
 } from '../services/tripCloud'
-import { ActivityBars, SyncOrbitIcon } from '../../../shared/components/LoadingIndicator'
-import { CircleAlert, CircleCheck, Save } from 'lucide-react'
+import { SyncOrbitIcon } from '../../../shared/components/LoadingIndicator'
+import { Check, CircleAlert, Save } from 'lucide-react'
 
 type ToastKind = 'save' | 'sync'
 
@@ -106,12 +106,9 @@ export function CloudSaveIndicator() {
           ) : done ? (
             <div className="cloud-save-ok">
               {isSave ? <FloppyIcon /> : <SyncOrbitIcon spinning={false} />}
-              <CircleCheck
-                className="cloud-save-check-badge"
-                size={14}
-                strokeWidth={2.4}
-                aria-hidden
-              />
+              <span className="cloud-save-check-badge" aria-hidden>
+                <Check size={11} strokeWidth={3} />
+              </span>
             </div>
           ) : isSave ? (
             <FloppyIcon spinning={busy} />
@@ -123,7 +120,6 @@ export function CloudSaveIndicator() {
           <span className="cloud-save-kicker">{isSave ? 'AUTO SAVE' : 'LIVE SYNC'}</span>
           <span className="cloud-save-label">{label}</span>
         </div>
-        {busy && <ActivityBars size="md" className="cloud-save-toast-bars" />}
       </div>
     </div>,
     document.body,

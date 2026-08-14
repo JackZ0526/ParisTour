@@ -63,8 +63,9 @@ export interface TripadvisorAttractionInfo {
 }
 
 const CATALOG_PREFIX = 'tripadvisor-catalog:v1:'
-const GALLERY_PREFIX = 'tripadvisor-gallery:v16:'
-const DETAILS_PREFIX = 'tripadvisor-place-details:v13:'
+const GALLERY_PREFIX = 'tripadvisor-gallery:v17:'
+const DETAILS_PREFIX = 'tripadvisor-place-details:v14:'
+const FETCH_STATE_PREFIX = 'tripadvisor-fetch-state:v1:'
 const QUERY_MATCH_PREFIX = 'tripadvisor-query-match:v3:'
 const QUERY_MISS_STORAGE_PREFIX = 'paris-tour-tripadvisor-query-miss-v1:'
 export const MAX_GALLERY_PHOTOS = 15
@@ -179,6 +180,12 @@ const galleryInflight = new Map<string, Promise<TripadvisorPlaceGallery | null>>
 const detailsMemory = new Map<string, TripadvisorAttractionInfo>()
 const infoInflight = new Map<string, Promise<TripadvisorAttractionInfo | null>>()
 const matchLookup = new Map<string, string | 'miss'>()
+const fetchStateMemory = new Map<string, TripadvisorFetchState>()
+
+type TripadvisorFetchState = {
+  details?: true
+  reviews?: true
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -523,6 +530,35 @@ function detailsKey(contentId: string): string {
   return `${DETAILS_PREFIX}${contentId}`
 }
 
+function fetchStateKey(kind: TripadvisorGalleryKind, contentId: string): string {
+  return `${FETCH_STATE_PREFIX}${kind}:${contentId}`
+}
+
+function readFetchState(
+  kind: TripadvisorGalleryKind,
+  contentId: string,
+): TripadvisorFetchState {
+  const key = fetchStateKey(kind, contentId)
+  const memory = fetchStateMemory.get(key)
+  if (memory) return memory
+  const stored = getLlmArtifact<TripadvisorFetchState>(key) || {}
+  fetchStateMemory.set(key, stored)
+  return stored
+}
+
+function markFetchSettled(
+  kind: TripadvisorGalleryKind,
+  contentId: string,
+  slice: keyof TripadvisorFetchState,
+) {
+  const key = fetchStateKey(kind, contentId)
+  const current = readFetchState(kind, contentId)
+  if (current[slice]) return
+  const next = { ...current, [slice]: true as const }
+  fetchStateMemory.set(key, next)
+  setLlmArtifact(key, next)
+}
+
 function uniquePhotos(urls: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []
@@ -778,6 +814,26 @@ function photoHeightFromUrl(url: string): number {
   return height > 0 ? height : 0
 }
 
+/** Nearby hotel/restaurant cards in tripadvisor34 `images[]` are 400×400 squares. */
+function isNearbyCarouselThumb(width: number, height: number): boolean {
+  if (width > 0 && width < MIN_GALLERY_WIDTH) return true
+  return width > 0 && width <= 400 && height === width
+}
+
+function listingLooksLikeRestaurant(listing: Record<string, unknown>): boolean {
+  return /RESTAURANT|EATERY|CAFE|COFFEE/i.test(
+    String(listing.category || listing.type || listing.placeType || ''),
+  )
+}
+
+/** Nearby hotels leaked onto cafe/restaurant `images[]` (rooms, facades, hotel names). */
+function photoFilenameLooksLikeHotel(url: string): boolean {
+  const path = tripadvisorPhotoIdentity(url).toLowerCase()
+  return /(?:^|[-_/])(?:hotel|motel|hostel|auberge)(?:[-_./]|$)|executive[-_]?room|guest[-_]?room|deluxe[-_]?room|hotel[-_]?room|room[-_]with[-_]balcony|suite[-_]with/.test(
+    path,
+  )
+}
+
 function candidateFromPhotoUrl(url: string): TripadvisorGalleryPhotoCandidate | null {
   const resolved = tripadvisorPhotoUrl(url)
   if (!resolved || /\.(mp4|webm|mov)(?:$|\?)/i.test(resolved)) return null
@@ -940,10 +996,21 @@ function isExcludedGalleryPhoto(url: string, excluded: Set<string>): boolean {
   return excluded.has(identity) || RELATED_STORY_PHOTO_IDENTITIES.has(identity)
 }
 
+function keepTripadvisor34Photo(
+  url: string,
+  excluded: Set<string>,
+  restaurant: boolean,
+): boolean {
+  if (isExcludedGalleryPhoto(url, excluded)) return false
+  if (restaurant && photoFilenameLooksLikeHotel(url)) return false
+  return true
+}
+
 function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] {
   const listing = listingRecordWithTopLevelPhotos(payload)
   if (!listing) return []
   const excluded = relatedPhotoIdentities(payload)
+  const restaurant = listingLooksLikeRestaurant(listing)
   const images = Array.isArray(listing.images) ? listing.images : []
   const groups: string[][] = []
   let current: string[] = []
@@ -957,13 +1024,15 @@ function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] 
     if (imageEntryLooksRelated(entry) || imageEntryLooksCommerce(entry)) continue
     const url = photoUrlFromUnknown(entry)
     if (!url) continue
-    const width = photoWidthFromUrl(url)
-    if (width > 0 && width < MIN_GALLERY_WIDTH) {
+    if (isNearbyCarouselThumb(photoWidthFromUrl(url), photoHeightFromUrl(url))) {
       // Nearby / footer thumbs often sit before and after the listing album.
       flushGroup()
       continue
     }
-    if (isExcludedGalleryPhoto(url, excluded)) continue
+    if (!keepTripadvisor34Photo(url, excluded, restaurant)) {
+      flushGroup()
+      continue
+    }
     current.push(url)
   }
   flushGroup()
@@ -973,7 +1042,7 @@ function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] 
   )
   const urls: string[] = []
   const cover = photoUrlFromUnknown(listing.image)
-  if (cover && !isExcludedGalleryPhoto(cover, excluded)) urls.push(cover)
+  if (cover && keepTripadvisor34Photo(cover, excluded, restaurant)) urls.push(cover)
   urls.push(...album)
   const seen = new Set<string>()
   return urls.filter((url) => {
@@ -1718,13 +1787,13 @@ function rememberCatalogItem(
       coverUrl,
     }
     catalogMemory.set(catalogKey(item.kind), next)
-    setLlmArtifact(catalogKey(item.kind), next, { silent: true })
+    setLlmArtifact(catalogKey(item.kind), next)
     return
   }
   const nextItem = extra.length > 0 ? { ...item, aliases: extra } : item
   const next = [...current, nextItem]
   catalogMemory.set(catalogKey(item.kind), next)
-  setLlmArtifact(catalogKey(item.kind), next, { silent: true })
+  setLlmArtifact(catalogKey(item.kind), next)
 }
 
 function matchLookupKey(
@@ -1857,8 +1926,10 @@ export function invalidateTripadvisorPlaceCache(input: {
     galleryMemory.delete(galleryCacheKey)
     galleryInflight.delete(galleryCacheKey)
     detailsMemory.delete(contentId)
+    fetchStateMemory.delete(fetchStateKey(kind, contentId))
     removeLlmArtifact(galleryCacheKey, { silent: true })
     removeLlmArtifact(detailsKey(contentId), { silent: true })
+    removeLlmArtifact(fetchStateKey(kind, contentId), { silent: true })
   }
 
   if (contentIds.size > 0) {
@@ -1884,10 +1955,18 @@ function readGallery(
 }
 
 function storeGallery(gallery: TripadvisorPlaceGallery) {
-  galleryMemory.set(galleryKey(gallery.kind, gallery.contentId), gallery)
-  setLlmArtifact(galleryKey(gallery.kind, gallery.contentId), gallery, {
-    silent: true,
-  })
+  const key = galleryKey(gallery.kind, gallery.contentId)
+  const current = readGallery(gallery.kind, gallery.contentId)
+  const merged: TripadvisorPlaceGallery = current
+    ? {
+        ...current,
+        ...gallery,
+        name: gallery.name || current.name,
+        photos: uniquePhotos([...gallery.photos, ...current.photos]),
+      }
+    : gallery
+  galleryMemory.set(key, merged)
+  setLlmArtifact(key, merged)
 }
 
 function readDetails(contentId: string): TripadvisorAttractionInfo | null {
@@ -1902,8 +1981,50 @@ function readDetails(contentId: string): TripadvisorAttractionInfo | null {
 }
 
 function storeDetails(info: TripadvisorAttractionInfo) {
-  detailsMemory.set(info.contentId, info)
-  setLlmArtifact(detailsKey(info.contentId), info, { silent: true })
+  const current = readDetails(info.contentId)
+  const merged = current ? mergeTripadvisorDetails(current, info) : info
+  detailsMemory.set(info.contentId, merged)
+  setLlmArtifact(detailsKey(info.contentId), merged)
+}
+
+function mergeTripadvisorReviews(
+  current: GoogleReview[],
+  incoming: GoogleReview[],
+): GoogleReview[] {
+  const seen = new Set<string>()
+  const out: GoogleReview[] = []
+  for (const review of [...incoming, ...current]) {
+    const key = `${review.author || ''}|${review.rating || ''}|${review.text.trim()}`
+    if (!review.text.trim() || seen.has(key)) continue
+    seen.add(key)
+    out.push(review)
+    if (out.length >= MAX_REVIEWS) break
+  }
+  return out
+}
+
+/** Merge independently loaded Tripadvisor facts, gallery and reviews. */
+function mergeTripadvisorDetails(
+  current: TripadvisorAttractionInfo,
+  incoming: TripadvisorAttractionInfo,
+): TripadvisorAttractionInfo {
+  return {
+    ...current,
+    ...incoming,
+    contentId: incoming.contentId || current.contentId,
+    name: incoming.name || current.name,
+    description: incoming.description || current.description,
+    rating: incoming.rating ?? current.rating,
+    userRatingCount: incoming.userRatingCount ?? current.userRatingCount,
+    address: incoming.address || current.address,
+    website: incoming.website || current.website,
+    phone: incoming.phone || current.phone,
+    priceLevel: incoming.priceLevel || current.priceLevel,
+    cuisine: incoming.cuisine || current.cuisine,
+    location: incoming.location || current.location,
+    photos: uniquePhotos([...incoming.photos, ...current.photos]),
+    reviews: mergeTripadvisorReviews(current.reviews, incoming.reviews),
+  }
 }
 
 function findCatalogItem(
@@ -2057,6 +2178,7 @@ function galleryLooksCoverOnly(match: TripadvisorCatalogItem): boolean {
 }
 
 function hasFetchedTripadvisorDetails(match: TripadvisorCatalogItem): boolean {
+  if (readFetchState(match.kind, match.contentId).details) return true
   if (hasSettledTripadvisorRestaurantDetails(readDetails(match.contentId))) return true
   const gallery = readGallery(match.kind, match.contentId)
   if (!gallery?.photos.length) return false
@@ -2067,8 +2189,8 @@ async function loadGalleryFor(
   match: TripadvisorCatalogItem,
 ): Promise<TripadvisorPlaceGallery | null> {
   const cached = readGallery(match.kind, match.contentId)
-  if (cached?.photos.length && hasFetchedTripadvisorDetails(match)) {
-    return cached
+  if (hasFetchedTripadvisorDetails(match)) {
+    return cached?.photos.length ? cached : coverOnlyGallery(match)
   }
   const inflightKey = galleryKey(match.kind, match.contentId)
   const pending = galleryInflight.get(inflightKey)
@@ -2090,6 +2212,7 @@ async function loadGalleryFor(
         tripadvisorDetailParams(match.kind, match.contentId, listingUrl),
         45_000,
       )
+      if (payload) markFetchSettled(match.kind, match.contentId, 'details')
       if (!payload || tripadvisorPayloadFailed(payload) || tripadvisorPlaceMissing(payload)) {
         return coverOnlyGallery(match)
       }
@@ -2349,13 +2472,25 @@ async function resolveAttractionMatch(input: {
 }): Promise<TripadvisorCatalogItem | null> {
   const catalog = await loadCatalog('attraction')
   const existing = findCatalogItem(catalog, input)
-  if (existing) return existing
+  if (existing) {
+    rememberMatchLookup('attraction', input, existing.contentId)
+    return existing
+  }
+  const lookup = readMatchLookup('attraction', input)
+  if (lookup === 'miss') return null
+  if (lookup) {
+    const byId = catalog.find((item) => item.contentId === lookup)
+    if (byId) return byId
+  }
   if (input.contentId) {
-    return {
+    const direct: TripadvisorCatalogItem = {
       contentId: input.contentId,
       name: input.nameLocal || input.name,
       kind: 'attraction',
     }
+    rememberCatalogItem(direct, [input.name, input.nameLocal])
+    rememberMatchLookup('attraction', input, direct.contentId)
+    return direct
   }
 
   let hits: TripadvisorCatalogItem[] = []
@@ -2364,7 +2499,8 @@ async function resolveAttractionMatch(input: {
   }
   let match = matchLabels(catalog, hits, [{ name: input.name, nameLocal: input.nameLocal }])
   if (match) {
-    rememberCatalogItem(match)
+    rememberCatalogItem(match, [input.name, input.nameLocal])
+    rememberMatchLookup('attraction', input, match.contentId)
     return match
   }
 
@@ -2372,7 +2508,10 @@ async function resolveAttractionMatch(input: {
     name: input.name,
     nameLocal: input.nameLocal,
   }).catch(() => null)
-  if (!canonical?.nameEn) return null
+  if (!canonical?.nameEn) {
+    rememberMatchLookup('attraction', input, 'miss')
+    return null
+  }
 
   const labels = canonicalLookupLabels(input.name, input.nameLocal, canonical)
   match = matchLabels(catalog, hits, labels)
@@ -2388,8 +2527,12 @@ async function resolveAttractionMatch(input: {
       match = matchLabels(catalog, hits, labels)
     }
   }
-  if (!match) return null
-  rememberCatalogItem(match)
+  if (!match) {
+    rememberMatchLookup('attraction', input, 'miss')
+    return null
+  }
+  rememberCatalogItem(match, [input.name, input.nameLocal])
+  rememberMatchLookup('attraction', input, match.contentId)
   return match
 }
 
@@ -2443,25 +2586,35 @@ async function requestTripadvisorReviewsPayload(
   path: string,
   params: Record<string, string>,
   kind: TripadvisorRequestKind = 'reviews',
-): Promise<GoogleReview[]> {
+): Promise<{ reviews: GoogleReview[]; settled: boolean }> {
   try {
-    return reviewsFromTripadvisorPayload(await requestTripadvisor(kind, path, params))
+    const payload = await requestTripadvisor(kind, path, params)
+    return {
+      reviews: reviewsFromTripadvisorPayload(payload),
+      settled: payload != null,
+    }
   } catch (error) {
-    if (!isTripadvisorRateLimited(error)) return []
+    if (!isTripadvisorRateLimited(error)) return { reviews: [], settled: false }
     await new Promise((resolve) => setTimeout(resolve, 700))
     try {
-      return reviewsFromTripadvisorPayload(await requestTripadvisor(kind, path, params))
+      const payload = await requestTripadvisor(kind, path, params)
+      return {
+        reviews: reviewsFromTripadvisorPayload(payload),
+        settled: payload != null,
+      }
     } catch {
-      return []
+      return { reviews: [], settled: false }
     }
   }
 }
 
 async function fetchTripadvisorReviewList(
   match: TripadvisorCatalogItem,
-): Promise<GoogleReview[]> {
+): Promise<{ reviews: GoogleReview[]; settled: boolean }> {
   const reviewParams = tripadvisorReviewParams(match.kind, match.contentId, match.listingUrl)
-  if (!reviewParams.url && !reviewParams.locationId) return []
+  if (!reviewParams.url && !reviewParams.locationId) {
+    return { reviews: [], settled: true }
+  }
   // things-to-do/reviews returns `{ count: 0 }` for attractions. The same
   // listing's traveler reviews come from restaurants/reviews. Hitting both
   // in a burst also 429s the working endpoint.
@@ -2469,14 +2622,22 @@ async function fetchTripadvisorReviewList(
     TA_RESTAURANT_REVIEWS,
     reviewParams,
   )
-  if (fromReviews.length || match.kind !== 'attraction') return fromReviews
+  if (fromReviews.reviews.length || match.kind !== 'attraction') return fromReviews
   const detailParams = tripadvisorDetailParams(
     'restaurant',
     match.contentId,
     match.listingUrl,
   )
-  if (!detailParams.url) return []
-  return requestTripadvisorReviewsPayload(TA_RESTAURANT_DETAIL, detailParams, 'details')
+  if (!detailParams.url) return fromReviews
+  const fallback = await requestTripadvisorReviewsPayload(
+    TA_RESTAURANT_DETAIL,
+    detailParams,
+    'details',
+  )
+  return {
+    reviews: fallback.reviews,
+    settled: fromReviews.settled && fallback.settled,
+  }
 }
 
 async function loadReviewsIfMissing(
@@ -2484,9 +2645,12 @@ async function loadReviewsIfMissing(
   details: TripadvisorAttractionInfo | null,
 ): Promise<TripadvisorAttractionInfo | null> {
   if (details?.reviews.length) return details
+  if (readFetchState(match.kind, match.contentId).reviews) return details
   if (!details && match.kind !== 'attraction') return details
   try {
-    const reviews = await fetchTripadvisorReviewList(match)
+    const result = await fetchTripadvisorReviewList(match)
+    if (result.settled) markFetchSettled(match.kind, match.contentId, 'reviews')
+    const reviews = result.reviews
     if (!reviews.length) return details
     const next = details
       ? { ...details, reviews }
@@ -2613,4 +2777,5 @@ export function resetTripadvisorPlacePhotosForTests() {
   detailsMemory.clear()
   infoInflight.clear()
   matchLookup.clear()
+  fetchStateMemory.clear()
 }

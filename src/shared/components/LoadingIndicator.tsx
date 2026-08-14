@@ -19,9 +19,6 @@ type Variant = 'inline' | 'block' | 'badge'
  */
 type Mode = 'sync' | 'thinking' | 'generating'
 
-export { llmBusyDefaultLabel, llmBusyLabel, resolveLlmBusyVisual } from '../services/llm/llm'
-export type { LlmBusyVisual } from '../services/llm/llm'
-
 const toneClass: Record<Tone, string> = {
   sage: 'text-[var(--sage)]',
   copper: 'text-[var(--copper)]',

@@ -25,9 +25,14 @@ export const PATH_MODE_COLORS: Record<PathMode, string> = {
   TRANSIT: '#2563a8',
 }
 
+export interface RoutePoint {
+  lat: number
+  lng: number
+}
+
 export interface RouteSegment {
   mode: PathMode
-  path: google.maps.LatLngLiteral[]
+  path: RoutePoint[]
   color: string
   label?: string
   distanceMeters?: number
@@ -43,7 +48,7 @@ export interface TransitLineInfo {
 
 export interface NavLegResult {
   mode: NavMode
-  path: google.maps.LatLngLiteral[]
+  path: RoutePoint[]
   distanceMeters: number
   durationSeconds: number
   distanceText: string
@@ -68,8 +73,8 @@ export interface DayNavPlan {
   hotelToFirstText: string
   lastToDestinationText: string
   segments: RouteSegment[]
-  routePath: google.maps.LatLngLiteral[]
-  hotelLinkPath: google.maps.LatLngLiteral[]
+  routePath: RoutePoint[]
+  hotelLinkPath: RoutePoint[]
   stopsKey?: string
   error?: string
 }
