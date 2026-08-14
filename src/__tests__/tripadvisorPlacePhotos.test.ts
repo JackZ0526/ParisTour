@@ -2208,6 +2208,101 @@ describe('Tripadvisor place photos', () => {
     expect(photos).not.toContain('30/0f/25/01')
   })
 
+  it('uses attraction image-size runs to skip flattened highlights and product tiles', () => {
+    const hero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/arc-hero.jpg?w=2000&h=1200&'
+    const highlightWide =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/highlight-wide.jpg?w=1600&h=900&'
+    const highlightFourThree =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/highlight-four-three.jpg?w=1600&h=1200&'
+    const highlightUnknownHeight =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/highlight-eternal.jpg?w=1200&h=-1&'
+    const product = (index: number) =>
+      `https://dynamic-media-cdn.tripadvisor.com/media/photo-o/product-${index}.jpg?w=800&h=800&`
+    const traveler = (index: number, size: 1100 | 1400) =>
+      `https://dynamic-media-cdn.tripadvisor.com/media/photo-o/traveler-${index}.jpg?w=${size}&h=${size}&`
+    const nearbyThumb =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/nearby.jpg?w=200&h=200&'
+    const payload = {
+      success: true,
+      url: 'https://www.tripadvisor.ca/Attraction_Review-g187147-d188709-Reviews-Arc_de_Triomphe.html',
+      data: {
+        id: '188709',
+        name: 'Arc de Triomphe',
+        category: 'ATTRACTION',
+        image: hero,
+        images: [
+          { url: hero },
+          { url: highlightWide },
+          { url: highlightFourThree },
+          { url: highlightUnknownHeight },
+          { url: highlightFourThree.replace('four-three', 'four-three-two') },
+          ...Array.from({ length: 6 }, (_, index) => ({ url: product(index) })),
+          { url: nearbyThumb },
+          ...Array.from({ length: 6 }, (_, index) => ({
+            url: traveler(index, index % 2 ? 1400 : 1100),
+          })),
+          { url: nearbyThumb },
+        ],
+      },
+    }
+
+    const gallery = normalizeTripadvisorGallery(
+      payload,
+      'attraction',
+      '188709',
+      'Arc de Triomphe',
+      hero,
+    )
+    const photos = gallery.photos.join(' ')
+    expect(gallery.photos[0]).toContain('arc-hero')
+    expect(photos).toContain('traveler-0')
+    expect(photos).toContain('traveler-5')
+    expect(photos).not.toContain('highlight-wide')
+    expect(photos).not.toContain('highlight-four-three')
+    expect(photos).not.toContain('highlight-eternal')
+    expect(photos).not.toContain('product-0')
+    expect(photos).not.toContain('product-5')
+
+    const detailsPhotos = normalizeTripadvisorAttractionDetails(payload, '188709').photos.join(' ')
+    expect(detailsPhotos).toContain('traveler-0')
+    expect(detailsPhotos).not.toContain('highlight-four-three')
+    expect(detailsPhotos).not.toContain('product-0')
+  })
+
+  it('does not apply attraction size-run filtering to restaurants', () => {
+    const hero =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/restaurant-hero.jpg?w=2000&h=1200&'
+    const fourThree =
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/restaurant-dish.jpg?w=1600&h=1200&'
+    const square = (index: number) =>
+      `https://dynamic-media-cdn.tripadvisor.com/media/photo-o/restaurant-square-${index}.jpg?w=800&h=800&`
+    const gallery = normalizeTripadvisorGallery(
+      {
+        success: true,
+        data: {
+          id: '24052281',
+          name: 'Sogno Paris',
+          category: 'RESTAURANT',
+          image: hero,
+          images: [
+            { url: hero },
+            { url: fourThree },
+            ...Array.from({ length: 5 }, (_, index) => ({ url: square(index) })),
+          ],
+        },
+      },
+      'restaurant',
+      '24052281',
+      'Sogno Paris',
+      hero,
+    )
+    const photos = gallery.photos.join(' ')
+    expect(photos).toContain('restaurant-dish')
+    expect(photos).toContain('restaurant-square-0')
+    expect(photos).toContain('restaurant-square-4')
+  })
+
   it('drops Must-see highlights and Historical Tours photos from attraction details', () => {
     const arcHero =
       'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0e/53/47/52/arc-de-triomphe.jpg?w=1200&h=900&s=1'

@@ -41,10 +41,11 @@ import {
   type TripadvisorAttractionInfo,
 } from '../services/tripadvisorPlacePhotos'
 import { tripadvisorPlaceLoadingSlices } from '../services/tripadvisorPlaceLoading'
+import { shouldFetchWebsiteGalleryFallback } from '../services/placeGalleryFallback'
 import {
-  pickRestaurantGalleryPhotos,
-  shouldFetchWebsiteGalleryFallback,
-} from '../services/placeGalleryFallback'
+  nextGalleryPhotoIndex,
+  pickPlaceGalleryPhotos,
+} from '../services/placeGalleryPhotos'
 import {
   fetchPlaceWebsitePhotosWithFallback,
   invalidatePlaceWebsitePhotosCache,
@@ -299,12 +300,16 @@ function GalleryThumb({
   onSelect,
   onError,
   buttonRef,
+  animateIn = false,
+  enterDelayMs = 0,
 }: {
   url?: string
   selected: boolean
   onSelect: () => void
   onError: (url: string) => void
   buttonRef: (el: HTMLButtonElement | null) => void
+  animateIn?: boolean
+  enterDelayMs?: number
 }) {
   const [ready, setReady] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -323,9 +328,10 @@ function GalleryThumb({
       ref={buttonRef}
       type="button"
       onClick={onSelect}
+      style={animateIn ? { animationDelay: `${enterDelayMs}ms` } : undefined}
       className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
         selected ? 'border-[var(--copper)]' : 'border-transparent'
-      }`}
+      } ${animateIn ? 'place-gallery-thumb-enter' : ''}`}
     >
       <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
       {url ? (
@@ -452,7 +458,7 @@ export function GooglePlacePage({
   const [tripadvisorFallbackResolved, setTripadvisorFallbackResolved] = useState(false)
   const [rapidApiPhotoFallbackUrl, setRapidApiPhotoFallbackUrl] = useState<string | null>(null)
   const [heroReady, setHeroReady] = useState(false)
-  const pendingGalleryAdvanceRef = useRef(false)
+  const pendingGalleryAdvanceRef = useRef<string | null>(null)
   const [wikimediaPhoto, setWikimediaPhoto] =
     useState<WikimediaPlacePhoto | null>(null)
   const [tripadvisorInfo, setTripadvisorInfo] =
@@ -556,18 +562,17 @@ export function GooglePlacePage({
   const tripadvisorPhotoLookupResolved =
     knownTripadvisorMiss ||
     (tripadvisorResolved && (isAttraction || tripadvisorFallbackResolved))
-  const restaurantGalleryPhotos = pickRestaurantGalleryPhotos({
+  const providerGalleryPhotos = pickPlaceGalleryPhotos({
+    galleryVariant,
+    bookingPhotos: details?.photos || [],
     websitePhotos: usableWebsitePhotos,
     tripadvisorPhotos: restaurantTripadvisorAlbum,
     tripadvisorResolved: tripadvisorPhotoLookupResolved,
   })
-  const photoRefs = (
-    rapidApiFallbackActive
-      ? restaurantGalleryPhotos
-      : tripadvisorRoute
-      ? restaurantGalleryPhotos
-      : restaurantGalleryPhotos
-  ).slice(0, MAX_GALLERY_PHOTOS)
+  const photoRefs =
+    galleryVariant === 'booking'
+      ? providerGalleryPhotos
+      : providerGalleryPhotos.slice(0, MAX_GALLERY_PHOTOS)
   const googlePhotos = photoRefs.filter(
     (url) => isUsablePhotoHttp(url) && !failedPhotos.includes(url),
   )
@@ -586,6 +591,8 @@ export function GooglePlacePage({
             ? [fallbackImage]
             : []
   const photos = rawPhotos.filter((url) => !failedPhotos.includes(url))
+  const photosRef = useRef(photos)
+  photosRef.current = photos
   const currentRef = photoRefs[photoIndex]
   const currentResolved =
     currentRef && isUsablePhotoHttp(currentRef) && !failedPhotos.includes(currentRef)
@@ -710,7 +717,7 @@ export function GooglePlacePage({
       !bookingPhotosFullyLoaded &&
       (photos.length <= 1 || photoIndex >= photos.length - 1)
     ) {
-      pendingGalleryAdvanceRef.current = true
+      pendingGalleryAdvanceRef.current = activePhoto
       onBookingGalleryAdvance(photoIndex + 1, photos.length)
       return
     }
@@ -805,7 +812,7 @@ export function GooglePlacePage({
     setGoogleLookupReady(false)
     setHeroReady(false)
     setPhotoIndex(0)
-    pendingGalleryAdvanceRef.current = false
+    pendingGalleryAdvanceRef.current = null
   }, [open, name])
 
   useLayoutEffect(() => {
@@ -957,10 +964,17 @@ export function GooglePlacePage({
   ])
 
   useEffect(() => {
-    if (!pendingGalleryAdvanceRef.current || photos.length < 1) return
-    pendingGalleryAdvanceRef.current = false
-    setPhotoIndex((i) => Math.min(i + 1, photos.length - 1))
-  }, [photos.length])
+    const requestedFrom = pendingGalleryAdvanceRef.current
+    const loadedPhotos = photosRef.current
+    if (!requestedFrom || loadedPhotos.length < 1) return
+    pendingGalleryAdvanceRef.current = null
+    setPhotoIndex(
+      nextGalleryPhotoIndex({
+        photos: loadedPhotos,
+        currentPhoto: requestedFrom,
+      }),
+    )
+  }, [details?.photos])
 
   useEffect(() => {
     if (!open) {
@@ -1483,6 +1497,19 @@ export function GooglePlacePage({
     Boolean(displayPhoto) &&
     heroReady &&
     tripadvisorLoading.morePhotos
+  const showBookingPhotoShimmer =
+    galleryVariant === 'booking' &&
+    bookingGalleryPhotosLoading &&
+    Boolean(displayPhoto)
+  const showInitialThumbShimmer =
+    galleryVariant !== 'booking' && showPhotoShimmer
+  const showThumbRegion =
+    showThumbStrip ||
+    showInitialThumbShimmer ||
+    showMorePhotoShimmer ||
+    showBookingPhotoShimmer
+  const animateGalleryThumbs =
+    galleryVariant !== 'booking' || bookingPhotosFullyLoaded
   const showTripadvisorChipShimmer =
     !providerOwnsSummary &&
     tripadvisorRoute &&
@@ -1720,19 +1747,18 @@ export function GooglePlacePage({
                   </>
                 )}
               </div>
-              {showPhotoShimmer ? (
-                <div className="mt-2 space-y-1">
-                  <div className="flex gap-2 overflow-hidden" aria-hidden>
-                    {Array.from({ length: 9 }, (_, i) => (
-                      <span
-                        key={i}
-                        className="relative h-14 w-20 shrink-0 rounded-lg place-hero-shimmer"
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : showThumbStrip ? (
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                className={`place-gallery-thumb-region ${
+                  showThumbRegion ? 'place-gallery-thumb-region--open' : ''
+                }`}
+              >
+              <div className="min-h-0 overflow-hidden">
+              {showThumbStrip ? (
+                <div
+                  className={`mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                    animateGalleryThumbs ? 'place-gallery-strip-enter' : ''
+                  }`}
+                >
                   {photoRefs.map((ref, i) => {
                     const url = isUsablePhotoHttp(ref) ? ref : undefined
                     return (
@@ -1741,6 +1767,8 @@ export function GooglePlacePage({
                         url={url}
                         selected={i === photoIndex}
                         onSelect={() => setPhotoIndex(i)}
+                        animateIn={animateGalleryThumbs}
+                        enterDelayMs={Math.min(i, 10) * 35}
                         onError={(failedUrl) =>
                           setFailedPhotos((current) =>
                             current.includes(failedUrl)
@@ -1755,7 +1783,18 @@ export function GooglePlacePage({
                     )
                   })}
                 </div>
-              ) : showMorePhotoShimmer ? (
+              ) : showInitialThumbShimmer ? (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-2 overflow-hidden" aria-hidden>
+                    {Array.from({ length: 9 }, (_, i) => (
+                      <span
+                        key={i}
+                        className="relative h-14 w-20 shrink-0 rounded-lg place-hero-shimmer"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : showMorePhotoShimmer || showBookingPhotoShimmer ? (
                 <div className="mt-2 space-y-1">
                   <div
                     className="flex gap-2 overflow-hidden"
@@ -1788,6 +1827,8 @@ export function GooglePlacePage({
                   </div>
                 </div>
               ) : null}
+              </div>
+              </div>
               {bookingGalleryPhotosError && !bookingGalleryPhotosLoading && (
                 <p className="text-xs text-amber-800">{bookingGalleryPhotosError}</p>
               )}

@@ -63,9 +63,9 @@ export interface TripadvisorAttractionInfo {
 }
 
 const CATALOG_PREFIX = 'tripadvisor-catalog:v1:'
-const GALLERY_PREFIX = 'tripadvisor-gallery:v17:'
-const DETAILS_PREFIX = 'tripadvisor-place-details:v14:'
-const FETCH_STATE_PREFIX = 'tripadvisor-fetch-state:v1:'
+const GALLERY_PREFIX = 'tripadvisor-gallery:v18:'
+const DETAILS_PREFIX = 'tripadvisor-place-details:v15:'
+const FETCH_STATE_PREFIX = 'tripadvisor-fetch-state:v2:'
 const QUERY_MATCH_PREFIX = 'tripadvisor-query-match:v3:'
 const QUERY_MISS_STORAGE_PREFIX = 'paris-tour-tripadvisor-query-miss-v1:'
 export const MAX_GALLERY_PHOTOS = 15
@@ -826,6 +826,71 @@ function listingLooksLikeRestaurant(listing: Record<string, unknown>): boolean {
   )
 }
 
+function listingLooksLikeAttraction(listing: Record<string, unknown>): boolean {
+  return /ATTRACTION|ACTIVITY|LANDMARK|MUSEUM|POINT_OF_INTEREST/i.test(
+    String(listing.category || listing.type || listing.placeType || ''),
+  )
+}
+
+const MIN_PRODUCT_TILE_RUN = 4
+
+/**
+ * tripadvisor34 flattens page shelves into attraction `images[]` without
+ * preserving their section names. On the current attraction page template,
+ * product/ticket cards form a long 800x800 run. The 1600x1200 editorial cards
+ * between the listing hero and that run split Must-see content from the later
+ * traveler-photo block.
+ */
+function attractionTemplateExcludedImageIndexes(
+  listing: Record<string, unknown>,
+  images: unknown[],
+): Set<number> {
+  const excluded = new Set<number>()
+  if (!listingLooksLikeAttraction(listing)) return excluded
+
+  const dimensions = images.map((entry) => {
+    const url = photoUrlFromUnknown(entry)
+    return {
+      width: photoWidthFromUrl(url),
+      height: photoHeightFromUrl(url),
+    }
+  })
+  let firstProductRunStart = -1
+
+  for (let start = 0; start < dimensions.length;) {
+    const dimension = dimensions[start]
+    if (dimension.width !== 800 || dimension.height !== 800) {
+      start += 1
+      continue
+    }
+    let end = start + 1
+    while (
+      end < dimensions.length &&
+      dimensions[end].width === 800 &&
+      dimensions[end].height === 800
+    ) {
+      end += 1
+    }
+    if (end - start >= MIN_PRODUCT_TILE_RUN) {
+      if (firstProductRunStart < 0) firstProductRunStart = start
+      for (let index = start; index < end; index += 1) excluded.add(index)
+    }
+    start = end
+  }
+
+  if (firstProductRunStart > 0) {
+    // Index 0 is the listing hero on this payload shape and remains eligible.
+    for (let index = 1; index < firstProductRunStart; index += 1) {
+      const dimension = dimensions[index]
+      if (dimension.width === 1600 && dimension.height === 1200) {
+        excluded.add(index)
+      }
+    }
+  }
+
+  return excluded
+}
+
 /** Nearby hotels leaked onto cafe/restaurant `images[]` (rooms, facades, hotel names). */
 function photoFilenameLooksLikeHotel(url: string): boolean {
   const path = tripadvisorPhotoIdentity(url).toLowerCase()
@@ -1012,6 +1077,7 @@ function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] 
   const excluded = relatedPhotoIdentities(payload)
   const restaurant = listingLooksLikeRestaurant(listing)
   const images = Array.isArray(listing.images) ? listing.images : []
+  const templateExcludedIndexes = attractionTemplateExcludedImageIndexes(listing, images)
   const groups: string[][] = []
   let current: string[] = []
   const flushGroup = () => {
@@ -1019,7 +1085,12 @@ function tripadvisor34PhotoUrls(payload: unknown, contentId?: string): string[] 
     groups.push(current)
     current = []
   }
-  for (const entry of images) {
+  for (let imageIndex = 0; imageIndex < images.length; imageIndex += 1) {
+    const entry = images[imageIndex]
+    if (templateExcludedIndexes.has(imageIndex)) {
+      flushGroup()
+      continue
+    }
     if (!photoBelongsToListing(entry, contentId)) continue
     if (imageEntryLooksRelated(entry) || imageEntryLooksCommerce(entry)) continue
     const url = photoUrlFromUnknown(entry)
