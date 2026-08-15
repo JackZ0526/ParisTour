@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 
@@ -361,6 +362,66 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        // Use the existing public/manifest.webmanifest; do not inject another one.
+        manifest: false,
+        // Inject a virtual `/registerSW.js` so the client can opt into a
+        // user-facing update prompt (we add the listener in src/main.tsx).
+        injectRegister: 'inline',
+        includeAssets: [
+          'favicon.svg',
+          'apple-touch-icon.png',
+          'icons-192.png',
+          'icons-512.png',
+          'splash.png',
+        ],
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
+          cleanupOutdatedCaches: true,
+          navigateFallback: '/index.html',
+          runtimeCaching: [
+            {
+              // Supabase REST: live data when online, last-good when offline
+              urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\//i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'supabase-rest',
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+              },
+            },
+            {
+              // Supabase Realtime handshake + WebSocket upgrades
+              urlPattern: /^https:\/\/.*\.supabase\.co\/(realtime|functions)\//i,
+              handler: 'NetworkOnly',
+            },
+            {
+              // Google Fonts CSS + woff2 (stable, cacheable)
+              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\//i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts',
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
+            {
+              // OpenStreetMap raster tiles (Paris trip map)
+              urlPattern: /^https:\/\/[abc]\.tile\.openstreetmap\.org\//i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'osm-tiles',
+                expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          // Enable SW in dev so we can test offline behavior without building.
+          enabled: true,
+          type: 'module',
+        },
+      }),
       paidApiAuthPlugin(supabaseUrl, supabaseAnon),
       shareInviteDevPlugin(),
       placeWebsiteDevPlugin(),

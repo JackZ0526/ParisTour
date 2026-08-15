@@ -1,5 +1,44 @@
 @import 'tailwindcss';
 
+/* === iOS Safari experience patches (L1) ===
+   NOTE: The root <div> in App.tsx already uses `min-h-[100svh]` for
+   dynamic viewport. Do NOT force `height: 100dvh` on html/body/#root
+   here — that fights the existing layout and breaks sticky positioning. */
+
+/* 1. Remove iOS tap highlight (no blue flash on tap) */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. Disable long-press system menu on interactive elements */
+button,
+[role='button'],
+.no-callout {
+  -webkit-touch-callout: none;
+}
+
+/* 3. Smooth scroll + contain rubber-band overscroll on nested containers.
+      Do NOT apply to body — the page-level rubber band is iconic iOS. */
+.scroll-area {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* 4. Reset iOS native form styling (round corners / inner shadow) on inputs only.
+      Buttons keep Tailwind's rounded-* utilities — applying `border-radius: 0`
+      here would clobber them. */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+/* === end iOS patches === */
+
 @keyframes chat-step-shimmer {
   0% {
     background-position: 180% 50%;
