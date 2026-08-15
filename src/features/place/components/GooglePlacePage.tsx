@@ -1625,9 +1625,9 @@ export function GooglePlacePage({
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
-        className="relative z-10 flex max-h-[min(92vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl motion-safe:transition-transform motion-safe:duration-200"
+        className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl motion-safe:transition-transform motion-safe:duration-200"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 pr-3">
             <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
               {showNameLoader ? (
@@ -1670,7 +1670,7 @@ export function GooglePlacePage({
         </div>
 
         <div
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
           aria-busy={
             loading ||
             rapidApiFallbackLoading ||
