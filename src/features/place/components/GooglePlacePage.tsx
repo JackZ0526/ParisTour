@@ -1463,7 +1463,60 @@ export function GooglePlacePage({
     googleAddress,
   ])
 
-  if (!open) return null
+  // --- iOS sheet animation ---
+  // isVisible: is the dialog in the DOM? (delayed unmount so the exit
+  //   transition has time to play)
+  // isAtRest: is the dialog at its rest position (translateY 0)?
+  //   false on first render -> off-screen below; flipped to true on the
+  //   next two animation frames so the transform transition kicks in.
+  // direction: which way the animation is going. Entrance uses a slightly
+  //   bouncy easeOutBack curve; exit uses a clean ease-in (no overshoot,
+  //   which would feel like the sheet is being thrown out).
+  const [isVisible, setIsVisible] = useState(open)
+  const [isAtRest, setIsAtRest] = useState(false)
+  const [direction, setDirection] = useState<'in' | 'out'>('in')
+  useEffect(() => {
+    if (open) {
+      setIsVisible(true)
+      setDirection('in')
+      // Double rAF: the first one lets React commit the dialog at its
+      // off-screen starting transform; the second one flips the flag so
+      // the inline transform animates to the rest position.
+      const r1 = requestAnimationFrame(() => {
+        const r2 = requestAnimationFrame(() => {
+          setIsAtRest(true)
+        })
+        return () => cancelAnimationFrame(r2)
+      })
+      return () => cancelAnimationFrame(r1)
+    }
+    // Closing — no rAF needed, just toggle and let the transition run.
+    setDirection('out')
+    setIsAtRest(false)
+    // Keep the dialog mounted for the duration of the exit transition,
+    // then drop it from the DOM. Literal 360ms — must match SHEET_DURATION_OUT
+    // below (can't reference that const here: the early return above means
+    // it isn't initialized on the first effect tick).
+    const t = window.setTimeout(() => setIsVisible(false), 360)
+    return () => window.clearTimeout(t)
+  }, [open])
+
+  if (!isVisible) return null
+
+  // Slight overshoot on entrance (y2=1.2 = ~6% overshoot) so the sheet
+  // "lands" with a soft bounce, but doesn't fling. Exit is faster (360ms)
+  // and accelerates out cleanly.
+  const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)' // easeOutBack, gentle
+  const SHEET_EASING_OUT = 'cubic-bezier(0.32, 0.72, 0, 1)' // iOS standard
+  const SHEET_DURATION_IN = 420
+  const SHEET_DURATION_OUT = 360
+  const BACKDROP_DURATION = 180
+
+  const sheetTransition =
+    direction === 'in'
+      ? `transform ${SHEET_DURATION_IN}ms ${SHEET_EASING_IN}`
+      : `transform ${SHEET_DURATION_OUT}ms ${SHEET_EASING_OUT}`
+  const backdropTransition = `opacity ${BACKDROP_DURATION}ms ease-out`
 
   const originalLabel = placeOriginalLabel(
     name,
@@ -1615,7 +1668,11 @@ export function GooglePlacePage({
     >
       <button
         type="button"
-        className="absolute inset-0 cursor-default"
+        className="absolute inset-0 cursor-default bg-black/45"
+        style={{
+          opacity: isAtRest ? 1 : 0,
+          transition: backdropTransition,
+        }}
         aria-label="关闭"
         onClick={() => {
           if (closeOnBackdrop) onClose()
@@ -1625,7 +1682,12 @@ export function GooglePlacePage({
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
-        className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl motion-safe:transition-transform motion-safe:duration-200"
+        style={{
+          transform: isAtRest ? 'translateY(0)' : 'translateY(100%)',
+          transition: sheetTransition,
+          willChange: 'transform',
+        }}
+        className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 pr-3">
