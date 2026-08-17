@@ -1506,18 +1506,18 @@ export function GooglePlacePage({
   // Slight overshoot on entrance (y2=1.2 = ~6% overshoot) so the sheet
   // "lands" with a soft bounce, but doesn't fling. Exit is faster (360ms)
   // and accelerates out cleanly.
-  // Animation curves are mathematical time-reverses of each other so the
-  // panel "arrives" and "departs" with opposite energy:
-//   entrance: cubic-bezier(0.34, 1.2, 0.64, 1)  → easeOutBack, soft overshoot
-//   exit:     cubic-bezier(0.36, 0,    0.66, -0.2) → time-reverse of entrance
-// The exit's negative y-handle lets the sheet "overshoot" slightly past
-// its off-screen rest position at the end of the animation, mirroring
-// how the entrance overshoots past its rest position before settling.
-// In practice the overshoot is invisible (the panel is already mostly
-// hidden by then) — what the eye perceives is a clean, accelerating
-// departure that *feels* like the inverse of the arrival.
+  // Animation curves are mathematical mirrors of each other: same shape
+// reversed in time, so the panel "arrives" and "departs" with opposite
+// energy instead of two near-identical motions back-to-back.
+//
+// entrance: cubic-bezier(0.34, 1.2, 0.64, 1)  → easeOutBack, soft overshoot
+// exit:     cubic-bezier(0.36, 0,    0.5,  1)  → x-handles mirror the
+//           entrance's x-positions, y-handles clamp to [0,1] so we keep
+//           the easing curve (slow start, accelerating finish) WITHOUT
+//           the entrance's overshoot — exits should not bounce past the
+//           off-screen position.
   const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)'
-  const SHEET_EASING_OUT = 'cubic-bezier(0.36, 0, 0.66, -0.2)'
+  const SHEET_EASING_OUT = 'cubic-bezier(0.36, 0, 0.5, 1)'
   const SHEET_DURATION_IN = 420
   const SHEET_DURATION_OUT = 360
   const BACKDROP_DURATION = 180
