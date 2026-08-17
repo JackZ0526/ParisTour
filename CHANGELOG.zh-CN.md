@@ -14,6 +14,8 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
+- 锁定 PWA 模式为竖屏，并禁用双指捏合缩放（iOS / Android 安装后的 app）。Android 由系统直接拒绝旋转；iOS 不遵守 manifest 的 `orientation`，所以加了一层柔和的全屏遮罩，提示用户把手机转回来，同时把背后内容模糊并冻结。
+
 ### 变更
 
 ### 修复

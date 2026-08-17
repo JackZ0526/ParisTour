@@ -15,6 +15,8 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Added
 
+- Lock the app to portrait orientation and disable pinch-zoom in PWA standalone mode (iOS / Android installed app). On Android, the OS refuses to rotate. On iOS, where the OS does not honour `manifest.webmanifest: orientation`, a soft overlay prompts the user to rotate the device back while the rest of the app blurs and freezes.
+
 ### Changed
 
 ### Fixed
