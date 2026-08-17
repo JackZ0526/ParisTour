@@ -1506,18 +1506,18 @@ export function GooglePlacePage({
   // Slight overshoot on entrance (y2=1.2 = ~6% overshoot) so the sheet
   // "lands" with a soft bounce, but doesn't fling. Exit is faster (360ms)
   // and accelerates out cleanly.
-  // Animation curves are mirrored: entrance eases out (fast → soft landing
-  // with a tiny overshoot), exit eases in (slow → accelerating away). This
-  // matches the eye's expectation: the panel "arrives" then "departs" with
-  // opposite energy, instead of two near-identical motions back-to-back.
-  //
-  // Exit easing is a clean ease-in (no second control-point dip). Earlier
-  // `cubic-bezier(0.55, 0, 1, 0.45)` felt like "fast then suddenly slow"
-  // near the end because the second handle's y=0.45 pulls the curve flat
-  // before it finishes. `cubic-bezier(0.4, 0, 1, 1)` is the CSS spec
-  // `ease-in` — velocity keeps increasing monotonically to t=1.
-  const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)' // easeOutBack — fast then settles, with a gentle overshoot
-  const SHEET_EASING_OUT = 'cubic-bezier(0.4, 0, 1, 1)' // easeIn — smooth, monotonically accelerating departure
+  // Animation curves are mathematical time-reverses of each other so the
+  // panel "arrives" and "departs" with opposite energy:
+//   entrance: cubic-bezier(0.34, 1.2, 0.64, 1)  → easeOutBack, soft overshoot
+//   exit:     cubic-bezier(0.36, 0,    0.66, -0.2) → time-reverse of entrance
+// The exit's negative y-handle lets the sheet "overshoot" slightly past
+// its off-screen rest position at the end of the animation, mirroring
+// how the entrance overshoots past its rest position before settling.
+// In practice the overshoot is invisible (the panel is already mostly
+// hidden by then) — what the eye perceives is a clean, accelerating
+// departure that *feels* like the inverse of the arrival.
+  const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)'
+  const SHEET_EASING_OUT = 'cubic-bezier(0.36, 0, 0.66, -0.2)'
   const SHEET_DURATION_IN = 420
   const SHEET_DURATION_OUT = 360
   const BACKDROP_DURATION = 180
