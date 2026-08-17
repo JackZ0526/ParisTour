@@ -26,15 +26,27 @@ button,
   overscroll-behavior: contain;
 }
 
-/* 4. Reset iOS native form styling (round corners / inner shadow) on inputs only.
-      Buttons keep Tailwind's rounded-* utilities — applying `border-radius: 0`
-      here would clobber them. */
-input,
-textarea,
-select {
-  -webkit-appearance: none;
-  appearance: none;
-  border-radius: 0;
+/* 4. Reset iOS native form chrome (default inner shadow / native radii) on
+      inputs only. Buttons keep Tailwind's rounded-* utilities.
+
+      IMPORTANT: this rule MUST live inside `@layer base`, otherwise it sits
+      outside Tailwind v4's cascade layers and outranks every utility class
+      (including `rounded-xl` / `rounded-full`). That would force every
+      form element to a hard rectangle and break consistency with cards /
+      panels / pills. Layer membership restores Tailwind's utility priority.
+
+      We use `border-radius: inherit` so inputs without an explicit
+      `rounded-*` class still pick up the parent container's radius; the
+      common case (an input with `rounded-xl` on the same element) is
+      owned by the utility class itself. */
+@layer base {
+  input,
+  textarea,
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: inherit;
+  }
 }
 
 /* === end iOS patches === */
