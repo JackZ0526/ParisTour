@@ -19,6 +19,69 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.6.0] - 2026-08-17
+
+### Added
+
+- iOS-style sheet open/close animation for place detail
+- full PWA with service worker + iOS polish + overscroll fix
+- Add place gallery photo picker and expand Tripadvisor photo tests
+- show attraction Tripadvisor reviews and restack place details
+- switch Tripadvisor to tripadvisor34 listing details
+- add photo providers, Places switch, and API meter
+- stream hotel LLM copy and patch cloud artifacts by key
+- polish hotel detail UX with animated scores and streaming advisor copy
+- enrich hotel detail popup with Booking APIs and UX polish
+- replace costly map flows and enrich Booking hotels
+- improve AI responses and realtime trip sync
+
+### Changed
+
+- splash: use full-bleed ParisTour illustration
+- update icon
+- Drop right-swipe dismiss, harden body scroll lock on iOS, unblock gallery nav clicks
+- Polish mobile UX, add PWA, swipe-to-dismiss sheet, and gallery swipe
+- Cache routes per segment and preserve map viewport on edits
+- Migrate itinerary maps and harden cached place data
+- Refine place details fallbacks and itinerary UI
+- Optimize Google Places billing fields
+- Speed up itinerary generation with Responses API, caching, and parallel days.
+- improve TripChat step UI + incremental itinerary shimmer
+- add stage3 maintenance scripts
+- tune LLM transport/provider budget
+- wire no-void-type pre-commit check
+- add vitest setup and itinerary key tests
+- extract hooks and wire App
+- extract useItineraryGeneration hook from App.tsx
+- extract useTripCore hook from App.tsx
+- extract App.tsx helpers + constants to appHelpers.ts
+- split TripChatPanel.tsx 87KB -> 4 helper files + 69KB main
+- split 137KB llm.ts into 9 focused modules + business/ subfolder
+- add scripts/_check-imports.mjs sanity check helper
+- remove obsolete layer-based directories
+- move cross-feature shared modules
+- move chat + LLM to features/chat/ and shared/services/llm/
+- move map to features/map/
+- move place to features/place/
+- move itinerary to features/itinerary/
+- move hotel to features/hotel/
+- move flight to features/flight/
+- move destination to features/destination/
+- move cloud-sync to features/cloud-sync/
+- move auth to features/auth/
+- centralize LLM config under src/config/
+
+### Fixed
+
+- tighten PWA safe-area on home-screen install
+- correct clampIsoDate import path in useItineraryGeneration
+- remove duplicate handler/state declarations in App.tsx
+- remove runtime ReferenceError from transport.ts:564
+- align ItineraryStartResult shape with business/itinerary.ts
+- re-export DestinationSuggestion + fix business/itinerary types path
+- align time picker and stabilize hook dependencies
+
+
 ## [0.5.0] - 2026-08-10
 
 AI recommendation reliability and control: verified Google candidates, editable preferences, progressive place loading, and hardened cloud/deployment behavior.
@@ -136,7 +199,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...HEAD
+- [0.6.0]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...v0.6.0
 - [0.5.0]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...v0.5.0
 - [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0
 - [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1

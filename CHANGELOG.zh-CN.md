@@ -18,6 +18,58 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.6.0] - 2026-08-17
+
+本版本为大改版：补齐 PWA / 启动页 / 移动端体验，并把代码按 features/ 结构拆分重构，配套大量稳定性与性能修复。
+
+### 新增
+
+- 完整 PWA：Service Worker、安装提示、iOS 主屏体验与橡皮筋滚动修缮
+- 启动页改为全幅 ParisTour 插画
+- 更新应用图标
+- 地点详情面板采用 iOS 风格的打开/关闭动画
+- 地点图库：照片选择器与 Tripadvisor 照片测试覆盖
+- 景点卡片展示 Tripadvisor 评论，并重排地点详情布局
+- Tripadvisor 数据源切到 tripadvisor34 listing details
+- 接入照片 provider、Google Places 切换开关与 API 用量计量
+- 酒店 LLM 文案改为流式，并按 key 修补云端产物
+- 酒店详情 UX 打磨：动效评分 + 流式顾问文案
+- 酒店详情弹窗接入 Booking API 与更多 UX 细节
+- 用更划算的酒店/地图流程替换旧的高成本实现，并丰富 Booking 酒店数据
+- AI 回复质量提升、行程实时同步更稳
+
+### 变更
+
+- 移除右滑关闭手势，加固 iOS 上的 body 滚动锁，修复图库导航点击被吞的问题
+- 移动端 UX 全面打磨：PWA、面板手势、图库左右滑动
+- 地图路线按段缓存，编辑时不再丢失当前视口
+- 行程地图迁移到新架构，并加固地点数据的本地缓存
+- 地点详情的回退文案与行程 UI 进一步打磨
+- 精简 Google Places 计费字段
+- 行程生成走 Responses API + 多日并行 + 缓存，提速明显
+- TripChat 步骤 UI 与行程加载的骨架屏改进
+- 新增 stage 3 维护脚本
+- 调优 LLM transport / provider 配额
+- 接入 no-void-type pre-commit 检查
+- 接入 vitest 设置与行程关键单测
+- 重构一：把 LLM 配置统一收口到 `src/config/`
+- 重构二（stage 2.x）：按 features/ 重新组织代码——auth → cloud-sync → destination → flight → hotel → itinerary → place → map → chat + LLM（`features/chat/`、`shared/services/llm/`）
+- 重构三：清理过时的分层目录，把跨特性共用模块上移
+- 重构四（stage 3.x）：把 137 KB 的 `llm.ts` 拆成 9 个聚焦模块 + `business/` 子目录；87 KB 的 `TripChatPanel.tsx` 拆成 4 个辅助文件 + 69 KB 主文件
+- 重构五（stage 4）：从 `App.tsx` 抽出 `useTripCore`、`useItineraryGeneration`，并把 App 助手/常量下沉到 `appHelpers.ts`
+- 新增 `scripts/_check-imports.mjs` 导入一致性自检脚本
+
+### 修复
+
+- 主屏安装 PWA 时的安全区收紧
+- 修正 `useItineraryGeneration` 中 `clampIsoDate` 的导入路径
+- 移除 `App.tsx` 重复的 handler / state 声明
+- 修复 `transport.ts:564` 的运行时 ReferenceError
+- 对齐 `ItineraryStartResult` 与 `business/itinerary.ts` 的形状
+- 重新导出 `DestinationSuggestion` 并修正 `business/itinerary` 类型路径
+- 对齐时间选择器，并稳定相关 hook 依赖
+
+
 ## [0.5.0] - 2026-08-10
 
 本版本重点提升 AI 推荐的可靠性和可控性：引入 Google 真实候选、可编辑推荐偏好、分批加载，以及更稳健的云端与部署逻辑。
@@ -135,7 +187,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...HEAD
+- [0.6.0]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...v0.6.0
 - [0.5.0]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...v0.5.0
 - [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0
 - [0.3.1]: https://github.com/JackZ0526/ParisTour/compare/v0.3.0...v0.3.1
