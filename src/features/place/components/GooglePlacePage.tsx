@@ -1494,18 +1494,15 @@ export function GooglePlacePage({
     setDirection('out')
     setIsAtRest(false)
     // Keep the dialog mounted for the duration of the exit transition,
-    // then drop it from the DOM. Literal 360ms — must match SHEET_DURATION_OUT
+    // then drop it from the DOM. Literal 420ms — must match SHEET_DURATION_OUT
     // below (can't reference that const here: the early return above means
     // it isn't initialized on the first effect tick).
-    const t = window.setTimeout(() => setIsVisible(false), 360)
+    const t = window.setTimeout(() => setIsVisible(false), 420)
     return () => window.clearTimeout(t)
   }, [open])
 
   if (!isVisible) return null
 
-  // Slight overshoot on entrance (y2=1.2 = ~6% overshoot) so the sheet
-  // "lands" with a soft bounce, but doesn't fling. Exit is faster (360ms)
-  // and accelerates out cleanly.
   // Both directions share the same visual rhythm: a fast initial move that
 // gently settles into the end position. For the entrance the sheet is
 // launched up from the bottom (translateY 100% → 0); for the exit the
@@ -1515,10 +1512,13 @@ export function GooglePlacePage({
 // symmetric — "springing up from below" on open, "retracting down to
 // below" on close — without the slow-accelerating easeIn that made the
 // exit feel like the sheet "vanished" before the eye could track it.
+//
+// Duration is also mirrored (420ms in / 420ms out) so open and close
+// read as one motion rather than an asymmetric in/out pair.
   const SHEET_EASING_IN = 'cubic-bezier(0.22, 1, 0.36, 1)' // easeOutQuint — fast lift, soft land
   const SHEET_EASING_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)' // same curve: fast pull-down, soft end
   const SHEET_DURATION_IN = 420
-  const SHEET_DURATION_OUT = 360
+  const SHEET_DURATION_OUT = 420 // mirrored with the entrance so open and close feel like one motion
   const BACKDROP_DURATION = 180
 
   const sheetTransition =
