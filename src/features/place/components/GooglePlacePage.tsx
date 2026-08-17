@@ -1510,8 +1510,14 @@ export function GooglePlacePage({
   // with a tiny overshoot), exit eases in (slow → accelerating away). This
   // matches the eye's expectation: the panel "arrives" then "departs" with
   // opposite energy, instead of two near-identical motions back-to-back.
+  //
+  // Exit easing is a clean ease-in (no second control-point dip). Earlier
+  // `cubic-bezier(0.55, 0, 1, 0.45)` felt like "fast then suddenly slow"
+  // near the end because the second handle's y=0.45 pulls the curve flat
+  // before it finishes. `cubic-bezier(0.4, 0, 1, 1)` is the CSS spec
+  // `ease-in` — velocity keeps increasing monotonically to t=1.
   const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)' // easeOutBack — fast then settles, with a gentle overshoot
-  const SHEET_EASING_OUT = 'cubic-bezier(0.55, 0, 1, 0.45)' // easeIn — slow start, accelerating to a clean dismiss
+  const SHEET_EASING_OUT = 'cubic-bezier(0.4, 0, 1, 1)' // easeIn — smooth, monotonically accelerating departure
   const SHEET_DURATION_IN = 420
   const SHEET_DURATION_OUT = 360
   const BACKDROP_DURATION = 180
