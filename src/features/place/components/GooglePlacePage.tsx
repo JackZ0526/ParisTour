@@ -1506,18 +1506,17 @@ export function GooglePlacePage({
   // Slight overshoot on entrance (y2=1.2 = ~6% overshoot) so the sheet
   // "lands" with a soft bounce, but doesn't fling. Exit is faster (360ms)
   // and accelerates out cleanly.
-  // Animation curves are mathematical mirrors of each other: same shape
-// reversed in time, so the panel "arrives" and "departs" with opposite
-// energy instead of two near-identical motions back-to-back.
+  // Both directions share the same visual rhythm: a fast initial move that
+// gently settles into the end position. For the entrance the sheet is
+// launched up from the bottom (translateY 100% → 0); for the exit the
+// sheet is pulled back down to where it came from (translateY 0 → 100%).
 //
-// entrance: cubic-bezier(0.34, 1.2, 0.64, 1)  → easeOutBack, soft overshoot
-// exit:     cubic-bezier(0.36, 0,    0.5,  1)  → x-handles mirror the
-//           entrance's x-positions, y-handles clamp to [0,1] so we keep
-//           the easing curve (slow start, accelerating finish) WITHOUT
-//           the entrance's overshoot — exits should not bounce past the
-//           off-screen position.
-  const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)'
-  const SHEET_EASING_OUT = 'cubic-bezier(0.36, 0, 0.5, 1)'
+// Using an easeOut curve on both sides keeps the motion perceptually
+// symmetric — "springing up from below" on open, "retracting down to
+// below" on close — without the slow-accelerating easeIn that made the
+// exit feel like the sheet "vanished" before the eye could track it.
+  const SHEET_EASING_IN = 'cubic-bezier(0.22, 1, 0.36, 1)' // easeOutQuint — fast lift, soft land
+  const SHEET_EASING_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)' // same curve: fast pull-down, soft end
   const SHEET_DURATION_IN = 420
   const SHEET_DURATION_OUT = 360
   const BACKDROP_DURATION = 180
