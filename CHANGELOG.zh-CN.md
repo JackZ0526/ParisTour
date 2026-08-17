@@ -18,6 +18,8 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+- iOS 表单元素的 reset 规则下放到 `@layer base`，让 Tailwind 的 `rounded-xl` 等工具类重新对 `<input>` / `<textarea>` / `<select>` 生效，表单字段跟着整体圆润设计走，不再被强制为方角。
+
 ## [0.6.0] - 2026-08-17
 
 本版本为大改版：补齐 PWA / 启动页 / 移动端体验，并把代码按 features/ 结构拆分重构，配套大量稳定性与性能修复。

@@ -19,6 +19,8 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+- Move the iOS form-element reset into `@layer base` so Tailwind utilities like `rounded-xl` keep priority on `<input>` / `<textarea>` / `<select>`. Form fields now inherit the app's rounded design language instead of being forced to hard rectangles.
+
 ## [0.6.0] - 2026-08-17
 
 ### Added
