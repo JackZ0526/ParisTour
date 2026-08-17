@@ -51,32 +51,56 @@ button,
 
 /* === end iOS patches === */
 
-/* 5. Lock to portrait in PWA. iOS does not strictly honour
-      `manifest.webmanifest: orientation`, so we rotate the app back to
-      portrait in landscape when running as an installed PWA.
+/* 5. Portrait-only PWA: do NOT rotate the app to fake-portrait.
+      Strategy:
+        - manifest.webmanifest already sets `orientation: "portrait"` —
+          Android Chrome honours this and refuses to rotate.
+        - iOS does NOT honour manifest orientation; we don't try to
+          rotate the content. Instead, show a friendly full-screen
+          overlay asking the user to rotate back, and freeze the rest of
+          the app so it stays usable while tilted.
+      `is-pwa` is added to <body> by src/main.tsx when running as an
+      installed PWA; `orientation-landscape` when the viewport is wider
+      than tall. Browser tabs are unaffected (no classes get added). */
 
-      Triggered by the `is-pwa` class on <body>, set by src/main.tsx when
-      the browser exposes `display-mode: standalone` or `fullscreen`.
-      Browser tabs (including desktop DevTools) are unaffected because
-      the class is only added in installed PWA sessions.
-
-      Implementation note: do NOT use `@media (display-mode: standalone)`
-      here — Tailwind v4's Lightning CSS parser rejects it as
-      `Missing opening {`. A class toggle is both safer and clearer. */
 body.is-pwa.orientation-landscape {
-  position: relative;
   overflow: hidden;
+  position: fixed;
+  inset: 0;
 }
 body.is-pwa.orientation-landscape #root {
-  transform: rotate(90deg);
-  transform-origin: center center;
-  width: 100vh;
-  height: 100vw;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  margin-top: -50vw;
-  margin-left: -50vh;
+  filter: blur(8px) saturate(0.6);
+  pointer-events: none;
+  user-select: none;
+}
+body.is-pwa.orientation-landscape::before {
+  content: '请将手机竖过来以使用 ParisTour';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  text-align: center;
+  font-family: 'Noto Serif SC', 'Noto Serif', Georgia, serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 50% 40%,
+      color-mix(in srgb, var(--sage) 70%, var(--ink)) 0%,
+      var(--ink) 70%
+    );
+}
+body.is-pwa.orientation-landscape::after {
+  content: '';
+  position: fixed;
+  z-index: 9998;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(28, 36, 32, 0.55);
 }
 
 @keyframes chat-step-shimmer {
