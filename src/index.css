@@ -51,7 +51,30 @@ button,
 
 /* === end iOS patches === */
 
-@keyframes chat-step-shimmer {
+/* 5. Lock to portrait in PWA. iOS does not strictly honour
+      `manifest.webmanifest: orientation`, so we rotate the app back to
+      portrait in landscape when running as an installed PWA.
+      Browser tabs (including desktop DevTools) are unaffected because we
+      scope this to `display-mode: standalone` / `fullscreen`. */
+@media (orientation: landscape) and (display-mode: standalone),
+  (orientation: landscape) and (display-mode: fullscreen) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    transform: rotate(90deg);
+    transform-origin: center center;
+    width: 100vh;
+    height: 100vw;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-top: -50vw;
+    margin-left: -50vh;
+  }
+}
   0% {
     background-position: 180% 50%;
   }
