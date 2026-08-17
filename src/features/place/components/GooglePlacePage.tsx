@@ -1506,8 +1506,12 @@ export function GooglePlacePage({
   // Slight overshoot on entrance (y2=1.2 = ~6% overshoot) so the sheet
   // "lands" with a soft bounce, but doesn't fling. Exit is faster (360ms)
   // and accelerates out cleanly.
-  const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)' // easeOutBack, gentle
-  const SHEET_EASING_OUT = 'cubic-bezier(0.32, 0.72, 0, 1)' // iOS standard
+  // Animation curves are mirrored: entrance eases out (fast → soft landing
+  // with a tiny overshoot), exit eases in (slow → accelerating away). This
+  // matches the eye's expectation: the panel "arrives" then "departs" with
+  // opposite energy, instead of two near-identical motions back-to-back.
+  const SHEET_EASING_IN = 'cubic-bezier(0.34, 1.2, 0.64, 1)' // easeOutBack — fast then settles, with a gentle overshoot
+  const SHEET_EASING_OUT = 'cubic-bezier(0.55, 0, 1, 0.45)' // easeIn — slow start, accelerating to a clean dismiss
   const SHEET_DURATION_IN = 420
   const SHEET_DURATION_OUT = 360
   const BACKDROP_DURATION = 180
