@@ -43,3 +43,31 @@ createRoot(document.getElementById('root')!).render(
     </AuthProvider>
   </StrictMode>,
 )
+
+// PWA mode detection + orientation class for portrait lock.
+// Triggers `body.is-pwa` and `body.orientation-landscape` when running
+// inside an installed PWA, so CSS can lock the layout to portrait.
+// `display-mode` is a media-query level 4 feature that Tailwind v4's
+// Lightning CSS parser doesn't accept in @media queries, so we use
+// `matchMedia` from JS instead.
+{
+  const mqlDisplay = window.matchMedia('(display-mode: standalone)')
+  const mqlFullscreen = window.matchMedia('(display-mode: fullscreen)')
+  const updatePwa = () => {
+    const isPwa = mqlDisplay.matches || mqlFullscreen.matches
+    document.body.classList.toggle('is-pwa', isPwa)
+  }
+  updatePwa()
+  mqlDisplay.addEventListener('change', updatePwa)
+  mqlFullscreen.addEventListener('change', updatePwa)
+
+  const mqlOrient = window.matchMedia('(orientation: landscape)')
+  const updateOrient = () => {
+    document.body.classList.toggle(
+      'orientation-landscape',
+      mqlOrient.matches,
+    )
+  }
+  updateOrient()
+  mqlOrient.addEventListener('change', updateOrient)
+}
