@@ -40,7 +40,7 @@ button,
       common case (an input with `rounded-xl` on the same element) is
       owned by the utility class itself. */
 @layer base {
-  input,
+  input:not([type='checkbox']):not([type='radio']),
   textarea,
   select {
     -webkit-appearance: none;
