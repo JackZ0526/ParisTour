@@ -238,11 +238,11 @@ body.is-pwa.orientation-landscape::after {
 }
 
 .place-gallery-strip-enter {
-  animation: place-gallery-strip-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: place-gallery-strip-enter var(--dur-card) var(--ease-out-smooth) both;
 }
 
 .place-gallery-thumb-enter {
-  animation: place-gallery-thumb-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: place-gallery-thumb-enter 360ms var(--ease-out-smooth) both;
 }
 
 .place-gallery-thumb-region {
@@ -250,8 +250,8 @@ body.is-pwa.orientation-landscape::after {
   grid-template-rows: 0fr;
   opacity: 0;
   transition:
-    grid-template-rows 340ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 220ms ease;
+    grid-template-rows 340ms var(--ease-out-smooth),
+    opacity var(--dur-pop) ease;
 }
 
 .place-gallery-thumb-region--open {
@@ -289,21 +289,21 @@ body.is-pwa.orientation-landscape::after {
 /* Smooth non-linear resize when a day tab leaves shimmer for real title. */
 .day-tab-button {
   transition:
-    width 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 480ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 200ms ease,
-    color 200ms ease;
+    width 480ms var(--ease-out-smooth),
+    height 480ms var(--ease-out-smooth),
+    background-color var(--dur-base) ease,
+    color var(--dur-base) ease;
 }
 
 .llm-narrative-body {
-  transition: height 480ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height 480ms var(--ease-out-smooth);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .day-tab-button {
     transition:
-      background-color 200ms ease,
-      color 200ms ease;
+      background-color var(--dur-base) ease,
+      color var(--dur-base) ease;
   }
 
   .llm-narrative-body {
@@ -322,13 +322,42 @@ body.is-pwa.orientation-landscape::after {
   --river: #5f7a78;
   --card: rgba(255, 252, 247, 0.88);
   --shadow: 0 18px 50px rgba(28, 36, 32, 0.12);
-  /* Timeline motion tokens — shared by card swap morph + leg body height */
-  --timeline-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --timeline-ease-soft: cubic-bezier(0.25, 0.85, 0.3, 1);
-  --timeline-leg-morph-ms: 320ms;
-  --timeline-leg-fade-ms: 220ms;
-  --timeline-swap-wipe-ms: 720ms;
-  --timeline-reorder-ms: 420ms;
+  /* === Motion tokens ===
+     Easings & durations are project-wide single source of truth.
+     Timeline / API-meter / LLM / sheet all read from these so a global
+     "tighten the feel" change is a single edit here. Values are unchanged
+     from when they were scattered as magic numbers — tokenization only. */
+
+  /* Easings — semantic name, geometric value */
+  --ease-out-smooth: cubic-bezier(0.22, 1, 0.36, 1);       /* easeOutQuint, main entrance */
+  --ease-out-soft: cubic-bezier(0.33, 0.1, 0.2, 1);        /* timeline exit slot collapse */
+  --ease-out-emph: cubic-bezier(0.33, 0.05, 0.35, 1);      /* gommage delete */
+  --ease-out-snap: cubic-bezier(0.4, 0.05, 0.2, 1);        /* swap-wipe / exit */
+  --ease-out-lift: cubic-bezier(0.22, 1.15, 0.36, 1);      /* drag lift */
+  --ease-spring-soft: cubic-bezier(0.34, 1.15, 0.64, 1);   /* LLM slider hover/idle */
+  --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);         /* LLM slider toggle */
+  --ease-spring-strong: cubic-bezier(0.34, 1.45, 0.64, 1); /* LLM slider settle */
+  --ease-charge: cubic-bezier(0.45, 0.05, 0.25, 1);        /* llm-think-charge */
+  --ease-petal: cubic-bezier(0.18, 0.55, 0.28, 1);         /* gommage-petal-drift */
+  --ease-tick: cubic-bezier(0.25, 0.85, 0.3, 1);           /* llm-think-tick */
+
+  /* Durations — semantic tiers, scoped to usage */
+  --dur-quick: 180ms;        /* backdrop fade */
+  --dur-base: 200ms;         /* generic base transition */
+  --dur-pop: 220ms;          /* sheet / popover entrance */
+  --dur-card: 280ms;         /* LLM slider / leg body content */
+  --dur-mid: 320ms;          /* mid-speed expansion */
+  --dur-slow: 420ms;         /* sheet main */
+  --dur-cinematic: 520ms;    /* card-enter */
+  --dur-wipe: 720ms;         /* wipe / route draw */
+
+  /* Timeline motion tokens — kept for back-compat, redirect to the canonical names */
+  --timeline-ease: var(--ease-out-smooth);
+  --timeline-ease-soft: var(--ease-tick);
+  --timeline-leg-morph-ms: var(--dur-mid);
+  --timeline-leg-fade-ms: var(--dur-pop);
+  --timeline-swap-wipe-ms: var(--dur-wipe);
+  --timeline-reorder-ms: var(--dur-slow);
   font-family: 'Outfit', system-ui, sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -435,7 +464,7 @@ select {
 }
 
 .add-place-body--ready {
-  transition: height 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height 340ms var(--ease-out-smooth);
 }
 
 @keyframes add-place-tab-in {
@@ -448,7 +477,7 @@ select {
 }
 
 .add-place-tab-pane {
-  animation: add-place-tab-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: add-place-tab-in var(--dur-mid) var(--ease-out-smooth) both;
 }
 
 /* Shared wait / progress ? same family as CloudSave orbit + equalizer bars */
@@ -581,7 +610,7 @@ select {
   width: fit-content;
   max-width: min(18rem, calc(100vw - 2rem));
   pointer-events: none;
-  animation: cloud-save-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: cloud-save-slide 0.38s var(--ease-out-smooth);
 }
 
 @media (min-width: 640px) {
@@ -591,8 +620,8 @@ select {
 }
 
 .api-meter {
-  --api-meter-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --api-meter-ease-in: cubic-bezier(0.4, 0.05, 0.2, 1);
+  --api-meter-ease-out: var(--ease-out-smooth);
+  --api-meter-ease-in: var(--ease-out-snap);
   --api-meter-rail: 1.85rem;
   position: fixed;
   z-index: 1900;
@@ -700,13 +729,13 @@ select {
   pointer-events: none;
   transform: translateX(-10px);
   transition:
-    max-width 520ms var(--api-meter-ease-out),
-    opacity 280ms var(--api-meter-ease-out),
-    transform 520ms var(--api-meter-ease-out);
+    max-width var(--dur-cinematic) var(--api-meter-ease-out),
+    opacity var(--dur-card) var(--api-meter-ease-out),
+    transform var(--dur-cinematic) var(--api-meter-ease-out);
 }
 
 .api-meter:not(.is-details-open) .api-meter-details {
-  transition-duration: 360ms, 220ms, 360ms;
+  transition-duration: 360ms, var(--dur-pop), 360ms;
   transition-timing-function: var(--api-meter-ease-in);
 }
 
@@ -955,7 +984,7 @@ select {
     );
   color: var(--paper);
   box-shadow: inset 0 1px 0 rgba(255, 252, 247, 0.08);
-  animation: llm-think-chip-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: llm-think-chip-in 0.28s var(--ease-out-smooth);
 }
 
 .llm-think-chip::after {
@@ -1102,7 +1131,7 @@ select {
   border-radius: 1px;
   background: currentColor;
   transform-origin: bottom;
-  animation: llm-think-charge 1.15s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation: llm-think-charge 1.15s var(--ease-charge) infinite;
 }
 
 .llm-charge-bars.load-bars--sm i {
@@ -1150,7 +1179,7 @@ select {
     );
   color: var(--ink);
   box-shadow: inset 0 1px 0 rgba(255, 252, 247, 0.55);
-  animation: llm-think-chip-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: llm-think-chip-in 0.28s var(--ease-out-smooth);
 }
 
 .llm-gen-chip--sm {
@@ -1236,7 +1265,7 @@ select {
   background: #9bb59f;
   color: #f6faf7;
   box-shadow: 0 2px 7px rgba(12, 19, 15, 0.38);
-  animation: cloud-save-badge-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: cloud-save-badge-pop 0.35s var(--ease-out-smooth);
 }
 
 .cloud-save-copy {
@@ -1285,15 +1314,15 @@ body.timeline-dragging {
 }
 
 .timeline-drag-float-lifted {
-  transition: transform 180ms cubic-bezier(0.22, 1.2, 0.36, 1);
+  transition: transform var(--dur-quick) var(--ease-spring);
   transform: translate3d(0, 0, 0) scale(1.02) rotate(1.15deg);
 }
 
 .timeline-drag-float-settle {
   transition:
-    left 200ms cubic-bezier(0.22, 1.15, 0.36, 1),
-    top 200ms cubic-bezier(0.22, 1.15, 0.36, 1),
-    transform 200ms ease;
+    left var(--dur-base) var(--ease-out-lift),
+    top var(--dur-base) var(--ease-out-lift),
+    transform var(--dur-base) ease;
   transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
 }
 
@@ -1316,7 +1345,7 @@ body.timeline-dragging {
 
 .timeline-drag-float-settle .timeline-drag-float-content {
   transform: rotate(0deg);
-  transition: transform 200ms ease;
+  transition: transform var(--dur-base) ease;
 }
 
 .timeline-sortable-item {
@@ -1364,7 +1393,7 @@ body.timeline-dragging {
 }
 
 .timeline-swap-over-wiping {
-  animation: timeline-swap-wipe var(--timeline-swap-wipe-ms) cubic-bezier(0.4, 0.05, 0.2, 1) both;
+  animation: timeline-swap-wipe var(--timeline-swap-wipe-ms) var(--ease-out-snap) both;
 }
 
 @keyframes timeline-swap-wipe {
@@ -1390,7 +1419,7 @@ body.timeline-dragging {
 }
 
 .timeline-card-entering {
-  animation: timeline-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: timeline-card-enter var(--dur-cinematic) var(--ease-out-smooth) both;
   transform-origin: 50% 0%;
   backface-visibility: hidden;
 }
@@ -1471,19 +1500,19 @@ body.timeline-dragging {
 
 .timeline-card-exiting.timeline-card-exiting-collapse {
   overflow: hidden;
-  animation: timeline-exit-slot-collapse 400ms cubic-bezier(0.33, 0.1, 0.2, 1) forwards;
+  animation: timeline-exit-slot-collapse 400ms var(--ease-out-soft) forwards;
 }
 
 /* Exiting card's own leg: fade only ? do not collapse spacing. */
 .timeline-card-exiting .timeline-leg-slot {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
+  transition: opacity var(--dur-base) ease;
 }
 
 .timeline-card-gommage {
   position: relative;
-  animation: timeline-card-gommage 620ms cubic-bezier(0.33, 0.05, 0.35, 1) forwards;
+  animation: timeline-card-gommage 620ms var(--ease-out-emph) forwards;
   transform-origin: center center;
   will-change: transform, opacity, filter, clip-path;
 }
@@ -1503,7 +1532,7 @@ body.timeline-dragging {
   box-shadow: 0 1px 2px rgba(90, 16, 28, 0.22);
   opacity: 0;
   will-change: transform, opacity;
-  animation: gommage-petal-drift var(--gommage-dur, 720ms) cubic-bezier(0.18, 0.55, 0.28, 1)
+  animation: gommage-petal-drift var(--gommage-dur, var(--dur-wipe)) var(--ease-petal)
     var(--gommage-delay, 0ms) both;
 }
 
@@ -1524,8 +1553,8 @@ body.timeline-dragging {
   opacity: 1;
   transform: translateY(0);
   transition:
-    opacity 200ms ease,
-    transform 220ms ease;
+    opacity var(--dur-base) ease,
+    transform var(--dur-pop) ease;
 }
 
 /*
@@ -1546,7 +1575,7 @@ body.timeline-dragging {
 }
 
 .timeline-leg-body-content {
-  animation: timeline-leg-content-in 180ms ease both;
+  animation: timeline-leg-content-in var(--dur-quick) ease both;
 }
 
 /* Route links: distinct travel-mode colors with a tactile, non-linear response. */
@@ -1561,10 +1590,10 @@ body.timeline-dragging {
   backdrop-filter: blur(12px) saturate(125%);
   -webkit-backdrop-filter: blur(12px) saturate(125%);
   transition:
-    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 320ms ease,
-    background-color 320ms ease,
-    box-shadow 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform var(--dur-slow) var(--ease-out-smooth),
+    border-color var(--dur-mid) ease,
+    background-color var(--dur-mid) ease,
+    box-shadow var(--dur-slow) var(--ease-out-smooth),
     color 240ms ease;
 }
 
@@ -1601,7 +1630,7 @@ body.timeline-dragging {
     transparent 80%
   );
   transform: translate3d(-125%, 0, 0) skewX(-16deg);
-  transition: transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 680ms var(--ease-out-smooth);
 }
 
 .timeline-route-link-label,
@@ -1614,7 +1643,7 @@ body.timeline-dragging {
   opacity: 0.72;
   transform: translate3d(0, 0, 0);
   transition:
-    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform var(--dur-slow) var(--ease-out-smooth),
     opacity 240ms ease;
 }
 
@@ -1714,7 +1743,7 @@ body.timeline-dragging {
   transition:
     grid-template-rows var(--timeline-leg-morph-ms) var(--timeline-ease) 90ms,
     margin var(--timeline-leg-morph-ms) var(--timeline-ease) 90ms,
-    opacity 280ms ease;
+    opacity var(--dur-card) ease;
 }
 
 /* Drag: collapse to a soft gap — content fades out first, then height eases in. */
@@ -1730,7 +1759,7 @@ body.timeline-dragging {
   transform: translateY(-4px);
   transition:
     opacity 160ms ease,
-    transform 180ms ease;
+    transform var(--dur-quick) ease;
 }
 
 /* Drag expand: open height first, then fade content back in */
@@ -1738,12 +1767,12 @@ body.timeline-dragging {
   transition:
     grid-template-rows var(--timeline-leg-morph-ms) var(--timeline-ease),
     margin var(--timeline-leg-morph-ms) ease,
-    opacity 280ms ease;
+    opacity var(--dur-card) ease;
 }
 
 .timeline-leg-slot:not(.timeline-leg-slot-collapsed) .timeline-leg-slot-inner {
   transition:
-    opacity 220ms ease 140ms,
+    opacity var(--dur-pop) ease 140ms,
     transform 240ms ease 140ms;
 }
 @keyframes trip-map-route-draw {
@@ -1760,7 +1789,7 @@ body.timeline-dragging {
 }
 
 .trip-map-route-enter {
-  animation: trip-map-route-draw 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: trip-map-route-draw var(--dur-wipe) var(--ease-out-smooth) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
