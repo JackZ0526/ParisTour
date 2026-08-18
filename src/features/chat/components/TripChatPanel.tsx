@@ -84,7 +84,6 @@ import {
 
 const NO_ACTION_APPLIED_NOTE = '行程未改动，请再说一下你想要的调整。'
 const DETAIL_CONFIRM_MISSING_NOTE = '行程未改动：请在详情页确认是否加入。'
-const TRIP_CHAT_FAB_Z = 2050
 const TRIP_CHAT_BACKDROP_Z = 2040
 const TRIP_CHAT_PANEL_Z = 2045
 
@@ -201,11 +200,16 @@ export function TripChatPanel({
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
-  const sheetBottom = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
-  // Fires when the panel's y transition completes (enter or exit).
-  // We use it to flip `panelEntered` so the scrollIntoView effect only runs
-  // after the enter animation has settled — never on a still-transforming panel.
+  // Spring for the FAB↔panel container transform. stiffness 300 / damping 24
+  // gives a subtle ~3% overshoot (iOS Reminders-style) and settles in ~450ms.
+  const morphSpring = { type: 'spring' as const, stiffness: 300, damping: 24 }
+  // Internal panel content fade. Slight delay so the morph gets a head start
+  // and the content doesn't pop in while the container is still small.
+  const contentFade = { duration: 0.2, delay: 0.1, ease: 'easeOut' as const }
+  // Fires when the panel's layout animation completes. We use it to flip
+  // `panelEntered` so the scrollIntoView effect only runs after the morph
+  // has settled — never on a still-transforming panel.
   const handlePanelAnimationComplete = useCallback(() => {
     setPanelEntered(open)
   }, [open])
@@ -1725,22 +1729,26 @@ export function TripChatPanel({
     <>
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] flex flex-col-reverse items-end gap-2 sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
-          open ? 'max-sm:pointer-events-none max-sm:invisible' : ''
+        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col-reverse items-end gap-2 transition-opacity sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
+          open ? 'pointer-events-none invisible opacity-0' : ''
         }`}
-        style={{ zIndex: TRIP_CHAT_FAB_Z }}
       >
         <LlmModelPicker />
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-label={open ? '关闭行程助手' : '打开行程助手'}
-          title={open ? '关闭行程助手' : '行程助手'}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow)] transition hover:bg-[var(--sage)] sm:h-auto sm:w-auto sm:px-4 sm:py-3 sm:text-sm sm:font-medium"
-        >
-          <ChatBubbleIcon className="h-5 w-5 sm:hidden" />
-          <span className="hidden sm:inline">{open ? '关闭助手' : '行程助手'}</span>
-        </button>
+        {!open && (
+          <motion.button
+            layoutId="trip-chat-card"
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="打开行程助手"
+            title="行程助手"
+            whileTap={{ scale: 0.94 }}
+            transition={{ scale: { duration: 0.12, ease: 'easeOut' } }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow)] transition-colors hover:bg-[var(--sage)] sm:h-auto sm:w-auto sm:px-4 sm:py-3 sm:text-sm sm:font-medium"
+          >
+            <ChatBubbleIcon className="h-5 w-5 sm:hidden" />
+            <span className="hidden sm:inline">行程助手</span>
+          </motion.button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -1764,21 +1772,25 @@ export function TripChatPanel({
         {open && (
           <motion.div
             key="trip-chat-panel"
+            layoutId="trip-chat-card"
             data-trip-chat-panel="1"
             role="dialog"
             aria-label="行程助手"
             aria-hidden={!open}
             inert={!open || undefined}
-            initial={sheetBottom.initial}
-            animate={sheetBottom.animate}
-            exit={sheetBottom.exit}
-            transition={sheetBottom.transition}
+            transition={{ layout: morphSpring }}
             onAnimationComplete={handlePanelAnimationComplete}
-            className="fixed flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur inset-x-0 bottom-0 h-[min(85dvh,640px)] w-full rounded-t-3xl sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(70vh,560px)] sm:w-[min(92vw,380px)] sm:rounded-2xl"
-            style={{ zIndex: TRIP_CHAT_PANEL_Z }}
+            style={{ transformOrigin: 'bottom right', zIndex: TRIP_CHAT_PANEL_Z }}
+            className="fixed flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] h-[min(70dvh,560px)] w-[min(92vw,380px)] rounded-2xl sm:bottom-5 sm:right-5"
           >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={contentFade}
+              className="flex h-full flex-col"
+            >
           <div className="border-b border-[var(--mist)] px-4 py-3">
-            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--mist)] sm:hidden" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="font-display text-xl leading-tight">行程助手</h3>
@@ -1793,7 +1805,6 @@ export function TripChatPanel({
               <CloseIconButton
                 onClick={() => setOpen(false)}
                 aria-label="关闭助手"
-                className="sm:hidden"
               />
             </div>
           </div>
@@ -1974,6 +1985,7 @@ export function TripChatPanel({
             </button>
           </form>
           </motion.div>
+            </motion.div>
         )}
       </AnimatePresence>
     </>
