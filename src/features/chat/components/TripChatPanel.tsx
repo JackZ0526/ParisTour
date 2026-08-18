@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
@@ -177,7 +179,6 @@ export function TripChatPanel({
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<TripChatTurn[]>([])
   const [actionNotes, setActionNotes] = useState<string[]>([])
-  const [panelMounted, setPanelMounted] = useState(false)
   const [panelEntered, setPanelEntered] = useState(false)
   const [pendingPlaces, setPendingPlaces] = useState<PendingPlaceConfirm[]>([])
   /** Bumps GooglePlacePage remount when confirm overlay must be forced visible. */
@@ -200,6 +201,14 @@ export function TripChatPanel({
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
+  const sheetBottom = useEnterExit('sheet-bottom')
+  const backdrop = useEnterExit('fade')
+  // Fires when the panel's y transition completes (enter or exit).
+  // We use it to flip `panelEntered` so the scrollIntoView effect only runs
+  // after the enter animation has settled — never on a still-transforming panel.
+  const handlePanelAnimationComplete = useCallback(() => {
+    setPanelEntered(open)
+  }, [open])
   const workStepsRef = useRef<ChatWorkStep[]>([])
   const reasoningTextRef = useRef('')
   const chatBusy = useLlmBusyMode({
@@ -420,23 +429,9 @@ export function TripChatPanel({
     return () => window.clearTimeout(timer)
   }, [activePendingId, factsSig])
 
-  // Keep the panel mounted through the close animation so exit can play.
-  useEffect(() => {
-    if (open) {
-      setPanelMounted(true)
-      return
-    }
-    setPanelEntered(false)
-  }, [open])
-
-  useEffect(() => {
-    if (!panelMounted || !open) return
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setPanelEntered(true))
-    })
-    return () => cancelAnimationFrame(id)
-  }, [panelMounted, open])
-
+  // AnimatePresence keeps the panel mounted through the close animation, so the
+  // panelEntered gate below is set by `handlePanelAnimationComplete` instead of
+  // a double-rAF trick.
   useEffect(() => {
     if (!open) {
       wasOpenRef.current = false
@@ -1748,37 +1743,40 @@ export function TripChatPanel({
         </button>
       </div>
 
-      {panelMounted && (
-        <button
-          type="button"
-          aria-label="关闭行程助手"
-          className={`fixed inset-0 bg-black/45 transition-opacity duration-300 sm:hidden ${
-            panelEntered ? 'opacity-100' : 'pointer-events-none opacity-0'
-          }`}
-          style={{ zIndex: TRIP_CHAT_BACKDROP_Z }}
-          onClick={() => setOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {open && (
+          <motion.button
+            key="trip-chat-backdrop"
+            type="button"
+            aria-label="关闭行程助手"
+            initial={backdrop.initial}
+            animate={backdrop.animate}
+            exit={backdrop.exit}
+            transition={backdrop.transition}
+            className="fixed inset-0 bg-black/45 sm:hidden"
+            style={{ zIndex: TRIP_CHAT_BACKDROP_Z }}
+            onClick={() => setOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {panelMounted && (
-        <div
-          data-trip-chat-panel="1"
-          role="dialog"
-          aria-label="行程助手"
-          aria-hidden={!open}
-          inert={!open || undefined}
-          onTransitionEnd={(e) => {
-            if (e.target !== e.currentTarget) return
-            if (e.propertyName !== 'opacity' && e.propertyName !== 'transform') return
-            if (!open) setPanelMounted(false)
-          }}
-          className={`fixed flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] inset-x-0 bottom-0 h-[min(85dvh,640px)] w-full rounded-t-3xl sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(70vh,560px)] sm:w-[min(92vw,380px)] sm:rounded-2xl ${
-            panelEntered
-              ? 'translate-x-0 translate-y-0 opacity-100'
-              : 'pointer-events-none translate-y-6 opacity-0 sm:translate-x-2 sm:translate-y-3'
-          }`}
-          style={{ zIndex: TRIP_CHAT_PANEL_Z }}
-        >
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="trip-chat-panel"
+            data-trip-chat-panel="1"
+            role="dialog"
+            aria-label="行程助手"
+            aria-hidden={!open}
+            inert={!open || undefined}
+            initial={sheetBottom.initial}
+            animate={sheetBottom.animate}
+            exit={sheetBottom.exit}
+            transition={sheetBottom.transition}
+            onAnimationComplete={handlePanelAnimationComplete}
+            className="fixed flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur inset-x-0 bottom-0 h-[min(85dvh,640px)] w-full rounded-t-3xl sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(70vh,560px)] sm:w-[min(92vw,380px)] sm:rounded-2xl"
+            style={{ zIndex: TRIP_CHAT_PANEL_Z }}
+          >
           <div className="border-b border-[var(--mist)] px-4 py-3">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--mist)] sm:hidden" />
             <div className="flex items-start justify-between gap-3">
@@ -1975,8 +1973,9 @@ export function TripChatPanel({
               )}
             </button>
           </form>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 
