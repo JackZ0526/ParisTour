@@ -7,8 +7,9 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import {
   DEEPSEEK_MODEL_OPTIONS,
   getActiveLlmLabel,
@@ -49,6 +50,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const popoverId = useId()
   const canThink = supportsThinkingControls(model)
   const deepseek = isDeepSeekModel(model)
+  const popover = useEnterExit('popover')
 
   useEffect(() => {
     if (!open) {
@@ -95,13 +97,18 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         <ChevronDown aria-hidden strokeWidth={1.75} className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <div
-          id={popoverId}
-          role="dialog"
-          aria-label="模型与思考设置"
-          className="absolute bottom-[calc(100%+0.5rem)] right-0 z-[1] w-[min(calc(100vw-2.5rem),17.5rem)] overflow-hidden rounded-2xl border border-[var(--ink)]/10 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur"
-        >
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            id={popoverId}
+            role="dialog"
+            aria-label="模型与思考设置"
+            initial={popover.initial}
+            animate={popover.animate}
+            exit={popover.exit}
+            transition={popover.transition}
+            className="absolute bottom-[calc(100%+0.5rem)] right-0 z-[1] w-[min(calc(100vw-2.5rem),17.5rem)] overflow-hidden rounded-2xl border border-[var(--ink)]/10 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur"
+          >
           {panel === 'root' && (
             <div className="p-3.5">
               {canThink ? (
@@ -165,8 +172,9 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
               </ModelGroup>
             </SubPanel>
           )}
-        </div>
+        </motion.div>
       )}
+    </AnimatePresence>
     </div>
   )
 }
