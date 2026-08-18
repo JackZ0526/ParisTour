@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import {
   listTripSnapshotBackups,
   restoreTripSnapshotBackup,
@@ -87,7 +89,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  if (!open) return null
+  const sheet = useEnterExit('sheet-bottom')
 
   async function restore(backup: TripSnapshotBackup) {
     const ok = window.confirm(
@@ -106,14 +108,22 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[2050] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
-      <button
-        type="button"
-        aria-label="关闭存档备份"
-        className="absolute inset-0"
-        onClick={onClose}
-      />
-      <section className="relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7">
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[2050] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            aria-label="关闭存档备份"
+            className="absolute inset-0"
+            onClick={onClose}
+          />
+          <motion.section
+            initial={sheet.initial}
+            animate={sheet.animate}
+            exit={sheet.exit}
+            transition={sheet.transition}
+            className="relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7"
+          >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>
@@ -184,8 +194,10 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
             </p>
           )}
         </div>
-      </section>
-    </div>,
+          </motion.section>
+        </div>
+      )}
+    </AnimatePresence>,
     document.body,
   )
 }

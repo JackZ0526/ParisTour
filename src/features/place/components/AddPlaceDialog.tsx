@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchGooglePlaceDetails,
@@ -890,7 +892,9 @@ export function AddPlaceDialog({
     return () => window.clearTimeout(timer)
   }, [googleDetail, googleDetailKey, factsSig])
 
-  if (!open || typeof document === 'undefined') return null
+  const sheet = useEnterExit('sheet-bottom')
+
+  if (typeof document === 'undefined') return null
 
   const googleBusyBest =
     googleDetail != null && addingName === `${googleDetail.details.name}:best`
@@ -898,19 +902,25 @@ export function AddPlaceDialog({
     googleDetail != null && addingName === `${googleDetail.details.name}:end`
 
   return createPortal(
-    <>
-      {/* Keep search sheet under the Google detail page while previewing. */}
-      <div
-        className={`fixed inset-0 z-[2100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${
-          googleDetail ? 'pointer-events-none invisible' : ''
-        }`}
-      >
-      <button type="button" className="absolute inset-0" aria-label="关闭" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative z-10 flex max-h-[min(88dvh,88vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
-      >
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Keep search sheet under the Google detail page while previewing. */}
+          <motion.div
+            className={`fixed inset-0 z-[2100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${
+              googleDetail ? 'pointer-events-none invisible' : ''
+            }`}
+            initial={sheet.initial}
+            animate={sheet.animate}
+            exit={sheet.exit}
+            transition={sheet.transition}
+          >
+          <button type="button" className="absolute inset-0" aria-label="关闭" onClick={onClose} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative z-10 flex max-h-[min(88dvh,88vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+          >
         <div ref={chromeRef} className="shrink-0">
           <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
             <div>
@@ -1318,7 +1328,7 @@ export function AddPlaceDialog({
           </div>
         </div>
       </div>
-      </div>
+      </motion.div>
 
       <GooglePlacePage
         open={Boolean(googleDetail)}
@@ -1405,7 +1415,9 @@ export function AddPlaceDialog({
         }
         onClose={closeGoogleDetail}
       />
-    </>,
+        </>
+      )}
+    </AnimatePresence>,
     document.body,
   )
 }

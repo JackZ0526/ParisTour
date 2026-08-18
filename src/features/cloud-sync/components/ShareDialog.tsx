@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import {
   listTripShares,
   removeTripShare,
@@ -103,7 +105,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  if (!open) return null
+  const sheet = useEnterExit('sheet-bottom')
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -165,21 +167,27 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--ink)]/50 backdrop-blur-[2px] transition"
-        aria-label="关闭分享面板"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[2000] flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[var(--ink)]/50 backdrop-blur-[2px] transition"
+            aria-label="关闭分享面板"
+            onClick={onClose}
+          />
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="animate-fade-up relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            initial={sheet.initial}
+            animate={sheet.animate}
+            exit={sheet.exit}
+            transition={sheet.transition}
+            className="relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
         <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-5 sm:px-6">
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-80"
@@ -304,8 +312,10 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
             )}
           </section>
         </div>
-      </div>
-    </div>,
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>,
     document.body,
   )
 }

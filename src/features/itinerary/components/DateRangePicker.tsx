@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 
 export interface DateRangeValue {
   startDate: string
@@ -200,6 +202,8 @@ export function DateRangePicker({
       ? '先选出发日期，再选返程'
       : null
 
+  const popover = useEnterExit('popover')
+
   return (
     <div ref={rootRef} className="relative block text-sm">
       {label && (
@@ -226,13 +230,17 @@ export function DateRangePicker({
         <CalendarDays className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label={label ? `${label}日历` : '选择行程日期'}
-          className="absolute left-0 z-40 mt-2 w-[min(100%,20rem)] origin-top animate-fade-up rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
-          style={{ animationDuration: '0.22s' }}
-        >
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="dialog"
+            aria-label={label ? `${label}日历` : '选择行程日期'}
+            initial={popover.initial}
+            animate={popover.animate}
+            exit={popover.exit}
+            transition={popover.transition}
+            className="absolute left-0 z-40 mt-2 w-[min(100%,20rem)] rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
+          >
           <div className="mb-2 flex items-center justify-between gap-2">
             <button
               type="button"
@@ -324,8 +332,9 @@ export function DateRangePicker({
             </span>
             {hint && <span>{hint}</span>}
           </div>
-        </div>
-      )}
+        </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
