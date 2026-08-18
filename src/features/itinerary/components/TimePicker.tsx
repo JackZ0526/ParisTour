@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
+import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 
 interface Props {
   value: string
@@ -33,64 +33,92 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
   const parsed = parseTime(value)
   const [draftHour, setDraftHour] = useState(parsed.hour)
   const [draftMinute, setDraftMinute] = useState(parsed.minute)
-  const panelRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const popover = useEnterExit('popover')
 
   useEffect(() => {
     if (!open) return
     const next = parseTime(value)
     setDraftHour(next.hour)
     setDraftMinute(next.minute)
+  }, [open, value])
 
-    const onKeyDown = (event: KeyboardEvent) => {
+  useEffect(() => {
+    if (!open) return
+
+    function onPointerDown(event: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation()
         setOpen(false)
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, value])
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   const minuteOptions = MINUTES.includes(draftMinute)
     ? MINUTES
     : [...MINUTES, draftMinute].sort((a, b) => a - b)
 
-  const panel = createPortal(
-    <AnimatePresence>
-      {open && (
-        <div
-          className="fixed inset-0 z-[2700] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setOpen(false)
-            }
-          }}
-        >
+  return (
+    <div ref={rootRef} className="relative block text-sm">
+      {label && (
+        <label htmlFor={id} className="font-medium text-[var(--ink)]">
+          {label}
+        </label>
+      )}
+      <button
+        type="button"
+        id={id}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={[
+          'mt-2 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2 text-left outline-none transition',
+          open
+            ? 'border-[var(--sage)] shadow-[0_0_0_3px_rgba(74,99,86,0.12)]'
+            : 'border-[var(--mist)] hover:border-[var(--sage)]/60 focus:border-[var(--sage)]',
+        ].join(' ')}
+      >
+        <span className="tabular-nums text-[var(--ink)]">{value}</span>
+        <Clock3 className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
+      </button>
+
+      <AnimatePresence>
+        {open && (
           <motion.div
-            key="time-picker-panel"
-            ref={panelRef}
+            key="time-picker-popover"
             role="dialog"
-            aria-modal="true"
             aria-label={label ? `${label}选择器` : '选择时间'}
-            initial={{ opacity: 0, scale: 0.94, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 12 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="max-h-[min(calc(100dvh-2rem),calc(100vh-2rem))] w-full max-w-sm overflow-y-auto rounded-3xl border border-white/80 bg-[#fffcf7] p-5 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            initial={popover.initial}
+            animate={popover.animate}
+            exit={popover.exit}
+            transition={popover.transition}
+            className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 max-h-[min(70dvh,420px)] overflow-y-auto rounded-2xl border border-white/70 bg-[#fffcf7] p-4 shadow-[var(--shadow)]"
           >
-            <div className="mb-4 flex items-center justify-between gap-3 border-b border-[var(--mist)] pb-3">
-              <p className="font-display text-lg tracking-wide text-[var(--ink)]">
+            <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)] pb-2">
+              <p className="font-display text-base tracking-wide text-[var(--ink)]">
                 选择开始时间
               </p>
-              <span className="rounded-full bg-[var(--sage)]/10 px-3 py-1 text-sm font-medium tabular-nums text-[var(--sage)]">
+              <span className="rounded-full bg-[var(--sage)]/10 px-2.5 py-0.5 text-sm font-medium tabular-nums text-[var(--sage)]">
                 {formatTime(draftHour, draftMinute)}
               </span>
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-medium text-[var(--stone)]">小时</p>
-              <div className="grid grid-cols-6 gap-1.5">
+              <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">小时</p>
+              <div className="grid grid-cols-6 gap-1">
                 {HOURS.map((hour) => (
                   <button
                     key={hour}
@@ -98,7 +126,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     aria-pressed={draftHour === hour}
                     onClick={() => setDraftHour(hour)}
                     className={[
-                      'rounded-xl py-2 text-sm tabular-nums outline-none transition',
+                      'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
                       draftHour === hour
                         ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
                         : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
@@ -110,9 +138,9 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               </div>
             </div>
 
-            <div className="mt-4 border-t border-[var(--mist)] pt-3">
-              <p className="mb-2 text-xs font-medium text-[var(--stone)]">分钟</p>
-              <div className="grid grid-cols-6 gap-1.5">
+            <div className="mt-3 border-t border-[var(--mist)] pt-2">
+              <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">分钟</p>
+              <div className="grid grid-cols-6 gap-1">
                 {minuteOptions.map((minute) => (
                   <button
                     key={minute}
@@ -120,7 +148,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     aria-pressed={draftMinute === minute}
                     onClick={() => setDraftMinute(minute)}
                     className={[
-                      'rounded-xl py-2 text-sm tabular-nums outline-none transition',
+                      'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
                       draftMinute === minute
                         ? 'bg-[var(--sage)] font-medium text-[var(--paper)] shadow-sm'
                         : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
@@ -132,11 +160,11 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2 border-t border-[var(--mist)] pt-4">
+            <div className="mt-3 flex justify-end gap-2 border-t border-[var(--mist)] pt-3">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-full border border-[var(--stone)]/30 px-4 py-2 text-sm text-[var(--stone)] transition hover:border-[var(--sage)]"
+                className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-xs text-[var(--stone)] transition hover:border-[var(--sage)]"
               >
                 取消
               </button>
@@ -146,42 +174,14 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                   onChange(formatTime(draftHour, draftMinute))
                   setOpen(false)
                 }}
-                className="rounded-full bg-[var(--ink)] px-5 py-2 text-sm text-[var(--paper)] transition hover:opacity-90 shadow-sm"
+                className="rounded-full bg-[var(--ink)] px-4 py-1.5 text-xs text-[var(--paper)] transition hover:opacity-90 shadow-sm"
               >
                 完成
               </button>
             </div>
           </motion.div>
-        </div>
-      )}
-    </AnimatePresence>,
-    document.body,
-  )
-
-  return (
-    <div className="relative block text-sm">
-      {label && (
-        <label htmlFor={id} className="font-medium text-[var(--ink)]">
-          {label}
-        </label>
-      )}
-      <button
-        type="button"
-        id={id}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-        className={[
-          'mt-2 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2 text-left outline-none transition',
-          open
-            ? 'border-[var(--sage)] shadow-[0_0_0_3px_rgba(74,99,86,0.12)]'
-            : 'border-[var(--mist)] hover:border-[var(--sage)]/60 focus:border-[var(--sage)]',
-        ].join(' ')}
-      >
-        <span className="tabular-nums text-[var(--ink)]">{value}</span>
-        <Clock3 className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
-      </button>
-      {panel}
+        )}
+      </AnimatePresence>
     </div>
   )
 }
