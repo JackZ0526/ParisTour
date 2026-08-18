@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
@@ -198,6 +198,7 @@ export function TripChatPanel({
     undefined,
   )
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const backdrop = useEnterExit('fade')
@@ -207,15 +208,6 @@ export function TripChatPanel({
   // aspect-ratio change (48×48 → 380×560) is much larger — too much bounce
   // reads as "the button flew away" rather than "grew".
   const morphSpring = { type: 'spring' as const, stiffness: 350, damping: 30 }
-  // Internal panel content fade. Slight delay so the morph gets a head start
-  // and the content doesn't pop in while the container is still small.
-  const contentFade = { duration: 0.2, delay: 0.1, ease: 'easeOut' as const }
-  // Fires when the panel's layout animation completes. We use it to flip
-  // `panelEntered` so the scrollIntoView effect only runs after the morph
-  // has settled — never on a still-transforming panel.
-  const handlePanelAnimationComplete = useCallback(() => {
-    setPanelEntered(open)
-  }, [open])
   const workStepsRef = useRef<ChatWorkStep[]>([])
   const reasoningTextRef = useRef('')
   const chatBusy = useLlmBusyMode({
@@ -437,8 +429,8 @@ export function TripChatPanel({
   }, [activePendingId, factsSig])
 
   // AnimatePresence keeps the panel mounted through the close animation, so the
-  // panelEntered gate below is set by `handlePanelAnimationComplete` instead of
-  // a double-rAF trick.
+  // panelEntered gate below is set by `onAnimationComplete` on the panel
+  // motion.div (when the height animation settles).
   useEffect(() => {
     if (!open) {
       wasOpenRef.current = false
@@ -453,6 +445,32 @@ export function TripChatPanel({
     wasOpenRef.current = true
     bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
   }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open, panelEntered])
+
+  // Outside-click + Escape close handlers. Only active when the panel is
+  // open; the panel itself is the rootRef so any pointer event landing
+  // outside it (including the FAB area) triggers a close.
+  useEffect(() => {
+    if (!open) return
+
+    function onPointerDown(event: PointerEvent) {
+      const root = rootRef.current
+      if (root && !root.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   function beginWorkPipeline(userText: string) {
     setWorkSteps(initialChatWorkSteps(userText))
@@ -1730,6 +1748,8 @@ export function TripChatPanel({
 
   const chatChrome = (
     <>
+      {/* LlmModelPicker stays anchored at the FAB position; hidden when the
+          chat panel is open so the morphing card can take over the corner. */}
       <div
         data-trip-chat-fab="1"
         className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
@@ -1737,21 +1757,6 @@ export function TripChatPanel({
         }`}
       >
         <LlmModelPicker />
-        {!open && (
-          <motion.button
-            layoutId="trip-chat-card"
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label="打开行程助手"
-            title="行程助手"
-            whileTap={{ scale: 0.94 }}
-            transition={{ scale: { duration: 0.12, ease: 'easeOut' } }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] shadow-[var(--shadow)] transition-colors hover:bg-[var(--sage)] sm:h-auto sm:w-auto sm:px-4 sm:py-3 sm:text-sm sm:font-medium"
-          >
-            <ChatBubbleIcon className="h-5 w-5 sm:hidden" />
-            <span className="hidden sm:inline">行程助手</span>
-          </motion.button>
-        )}
       </div>
 
       <AnimatePresence>
@@ -1771,28 +1776,88 @@ export function TripChatPanel({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="trip-chat-panel"
-            layoutId="trip-chat-card"
-            data-trip-chat-panel="1"
-            role="dialog"
-            aria-label="行程助手"
-            aria-hidden={!open}
-            inert={!open || undefined}
-            transition={{ layout: morphSpring }}
-            onAnimationComplete={handlePanelAnimationComplete}
-            style={{ transformOrigin: 'bottom right', zIndex: TRIP_CHAT_PANEL_Z }}
-            className="fixed flex flex-col overflow-hidden border border-white/70 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] h-[min(70dvh,560px)] w-[min(92vw,380px)] rounded-2xl sm:bottom-5 sm:right-5"
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={contentFade}
-              className="flex h-full flex-col"
-            >
+      {/*
+        The chat panel is a single element that morphs from a 48×48 black
+        FAB into a 380×560 floating card. Staged so:
+        - opening: width 48→380 first, then height 48→560
+        - closing: height 560→48 first, then width 380→48
+        Background + icon fade happen during the first stage; panel
+        content fades in during the second stage.
+      */}
+      <motion.div
+        ref={rootRef}
+        role={open ? 'dialog' : 'button'}
+        tabIndex={open ? -1 : 0}
+        aria-label={open ? '行程助手' : '打开行程助手'}
+        aria-expanded={open}
+        onClick={open ? undefined : () => setOpen(true)}
+        onKeyDown={
+          open
+            ? undefined
+            : (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setOpen(true)
+                }
+              }
+        }
+        whileTap={open ? undefined : { scale: 0.94 }}
+        initial={false}
+        animate={{
+          width: open ? 380 : 48,
+          height: open ? 560 : 48,
+          backgroundColor: open ? '#fffcf7' : '#1c2420',
+        }}
+        transition={{
+          width: { ...morphSpring, delay: open ? 0 : 0.18 },
+          height: { ...morphSpring, delay: open ? 0.18 : 0 },
+          backgroundColor: { duration: 0.18, ease: 'easeOut' },
+        }}
+        onAnimationComplete={(definition) => {
+          // Fires per-property; only the height run is the last to settle.
+          if (definition === 'height') {
+            setPanelEntered(open)
+          }
+        }}
+        style={{
+          position: 'fixed',
+          bottom: 'max(1.25rem, env(safe-area-inset-bottom))',
+          right: 'max(1.25rem, env(safe-area-inset-right))',
+          borderRadius: 24,
+          overflow: 'hidden',
+          zIndex: TRIP_CHAT_PANEL_Z,
+          transformOrigin: 'bottom right',
+          color: 'var(--ink)',
+          border: '1px solid rgba(255,255,255,0.7)',
+          boxShadow: 'var(--shadow)',
+          backdropFilter: 'blur(8px)',
+        }}
+        className="fixed flex flex-col sm:bottom-5 sm:right-5"
+      >
+        {/* Icon layer — visible when closed, fades out during the width-grow stage */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: open ? 0 : 1 }}
+          transition={{
+            opacity: { duration: 0.18, delay: open ? 0 : 0.32, ease: 'easeOut' },
+          }}
+          aria-hidden={!open}
+          className="absolute inset-0 flex items-center justify-center text-[var(--paper)]"
+        >
+          <ChatBubbleIcon className="h-5 w-5" />
+        </motion.div>
+
+        {/* Panel content layer — visible when open, fades in during the height-grow stage */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: open ? 1 : 0 }}
+          transition={{
+            opacity: { duration: 0.2, delay: open ? 0.18 : 0, ease: 'easeOut' },
+          }}
+          inert={!open || undefined}
+          aria-hidden={!open}
+          className="absolute inset-0 flex flex-col"
+        >
           <div className="border-b border-[var(--mist)] px-4 py-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -1987,10 +2052,8 @@ export function TripChatPanel({
               )}
             </button>
           </form>
-          </motion.div>
-            </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      </motion.div>
     </>
   )
 
