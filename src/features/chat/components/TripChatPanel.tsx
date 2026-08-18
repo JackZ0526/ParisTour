@@ -201,9 +201,12 @@ export function TripChatPanel({
   const wasOpenRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const backdrop = useEnterExit('fade')
-  // Spring for the FAB↔panel container transform. stiffness 300 / damping 24
-  // gives a subtle ~3% overshoot (iOS Reminders-style) and settles in ~450ms.
-  const morphSpring = { type: 'spring' as const, stiffness: 300, damping: 24 }
+  // Spring for the FAB↔panel container transform. stiffness 350 / damping 30
+  // gives just a hint of overshoot (iOS modal presentation feel) and settles
+  // in ~320ms. Higher stiffness than the TimePicker morph because the
+  // aspect-ratio change (48×48 → 380×560) is much larger — too much bounce
+  // reads as "the button flew away" rather than "grew".
+  const morphSpring = { type: 'spring' as const, stiffness: 350, damping: 30 }
   // Internal panel content fade. Slight delay so the morph gets a head start
   // and the content doesn't pop in while the container is still small.
   const contentFade = { duration: 0.2, delay: 0.1, ease: 'easeOut' as const }
@@ -1729,7 +1732,7 @@ export function TripChatPanel({
     <>
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col-reverse items-end gap-2 transition-opacity sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
+        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
           open ? 'pointer-events-none invisible opacity-0' : ''
         }`}
       >
