@@ -610,7 +610,6 @@ select {
   width: fit-content;
   max-width: min(18rem, calc(100vw - 2rem));
   pointer-events: none;
-  animation: cloud-save-slide 0.38s var(--ease-out-smooth);
 }
 
 @media (min-width: 640px) {
@@ -620,8 +619,6 @@ select {
 }
 
 .api-meter {
-  --api-meter-ease-out: var(--ease-out-smooth);
-  --api-meter-ease-in: var(--ease-out-snap);
   --api-meter-rail: 1.85rem;
   position: fixed;
   z-index: 1900;
@@ -723,27 +720,9 @@ select {
   top: 0;
   left: 100%;
   width: 22.5rem;
-  max-width: 0;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-10px);
-  transition:
-    max-width var(--dur-cinematic) var(--api-meter-ease-out),
-    opacity var(--dur-card) var(--api-meter-ease-out),
-    transform var(--dur-cinematic) var(--api-meter-ease-out);
-}
-
-.api-meter:not(.is-details-open) .api-meter-details {
-  transition-duration: 360ms, var(--dur-pop), 360ms;
-  transition-timing-function: var(--api-meter-ease-in);
-}
-
-.api-meter.is-details-open .api-meter-details {
-  max-width: 22.5rem;
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(0);
+  /* Enter/exit is now driven by Framer Motion (ApiRequestMeter.tsx); the
+     block below keeps the static "shell" so motion can mount/unmount
+     without depending on a .is-details-open toggle. */
 }
 
 .api-meter-details-panel {

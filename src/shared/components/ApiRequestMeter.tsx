@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
+import { useEnterExit } from '../hooks/useEnterExit'
 import {
   API_REQUEST_GROUPS,
   API_REQUEST_SUMMARY_GROUP_IDS,
@@ -58,6 +60,8 @@ export function ApiRequestMeter() {
     }
   }, [])
 
+  const popover = useEnterExit('popover')
+
   function scheduleDetailsOpen() {
     if (closeTimer.current) {
       window.clearTimeout(closeTimer.current)
@@ -84,12 +88,8 @@ export function ApiRequestMeter() {
 
   if (typeof document === 'undefined') return null
 
-  const className = ['api-meter', detailsOpen ? 'is-details-open' : '']
-    .filter(Boolean)
-    .join(' ')
-
   return createPortal(
-    <aside className={className} aria-label="今日 API 请求次数">
+    <aside className="api-meter" aria-label="今日 API 请求次数">
       <div
         className="api-meter-shell"
         onMouseEnter={scheduleDetailsOpen}
@@ -116,38 +116,50 @@ export function ApiRequestMeter() {
             })}
           </ul>
         </div>
-        <div className="api-meter-details">
-          <div className="api-meter-details-panel">
-            <ul className="api-meter-details-grid">
-              {DETAILS_GROUPS.map((group) => {
-                const total = groupCount(snapshot, group)
-                return (
-                  <li key={group.id}>
-                    <div className="flex items-baseline justify-between gap-2 text-[12px]">
-                      <span className="text-[var(--ink)]">{group.label}</span>
-                      <span className="tabular-nums text-[var(--sage)]">{total}</span>
-                    </div>
-                    <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)]">
-                      {group.kinds
-                        .filter(
-                          (item) =>
-                            !item.legacy || Boolean(snapshot.byKind[item.kind]),
-                        )
-                        .map((item) => (
-                          <li key={item.kind} className="flex justify-between gap-2">
-                            <span>{item.label}</span>
-                            <span className="tabular-nums">
-                              {snapshot.byKind[item.kind] || 0}
-                            </span>
-                          </li>
-                        ))}
-                    </ul>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        </div>
+        <AnimatePresence>
+          {detailsOpen && (
+            <motion.div
+              initial={popover.initial}
+              animate={popover.animate}
+              exit={popover.exit}
+              transition={popover.transition}
+              className="api-meter-details"
+              onMouseEnter={scheduleDetailsOpen}
+              onMouseLeave={scheduleDetailsClose}
+            >
+              <div className="api-meter-details-panel">
+                <ul className="api-meter-details-grid">
+                  {DETAILS_GROUPS.map((group) => {
+                    const total = groupCount(snapshot, group)
+                    return (
+                      <li key={group.id}>
+                        <div className="flex items-baseline justify-between gap-2 text-[12px]">
+                          <span className="text-[var(--ink)]">{group.label}</span>
+                          <span className="tabular-nums text-[var(--sage)]">{total}</span>
+                        </div>
+                        <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)]">
+                          {group.kinds
+                            .filter(
+                              (item) =>
+                                !item.legacy || Boolean(snapshot.byKind[item.kind]),
+                            )
+                            .map((item) => (
+                              <li key={item.kind} className="flex justify-between gap-2">
+                                <span>{item.label}</span>
+                                <span className="tabular-nums">
+                                  {snapshot.byKind[item.kind] || 0}
+                                </span>
+                              </li>
+                            ))}
+                        </ul>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </aside>,
     document.body,

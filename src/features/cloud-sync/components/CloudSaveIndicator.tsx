@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
   getCloudSaveError,
@@ -80,7 +81,7 @@ export function CloudSaveIndicator() {
         ? 'sync'
         : null
 
-  if (!kind || typeof document === 'undefined') return null
+  if (typeof document === 'undefined') return null
 
   const isSave = kind === 'save'
   const label = isSave ? saveLabel(saveStatus, saveError) : syncLabel(syncStatus)
@@ -97,7 +98,17 @@ export function CloudSaveIndicator() {
     (isSave && saveStatus === 'saved') || (!isSave && syncStatus === 'synced')
 
   return createPortal(
-    <div role="status" aria-live="polite" className={`cloud-save-toast ${tone}`}>
+    <AnimatePresence>
+      {kind && (
+        <motion.div
+          role="status"
+          aria-live="polite"
+          initial={{ opacity: 0, y: 10, scale: 0.94 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.94 }}
+          transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+          className={`cloud-save-toast ${tone}`}
+        >
       <div className="cloud-save-toast-glow" aria-hidden />
       <div className="cloud-save-toast-inner">
         <div className="cloud-save-icon-wrap">
@@ -121,7 +132,9 @@ export function CloudSaveIndicator() {
           <span className="cloud-save-label">{label}</span>
         </div>
       </div>
-    </div>,
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   )
 }
