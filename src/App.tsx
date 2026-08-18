@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
+import { useEnterExit } from './shared/hooks/useEnterExit'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
@@ -77,6 +79,26 @@ export default function App() {
     tripSyncEpoch,
   } = useAuth()
   const readOnly = !canEdit
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!mobileMenuRef.current?.contains(e.target as Node)) {
+        setMobileMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [mobileMenuOpen])
+  const popover = useEnterExit('popover')
   const {
     shareOpen,
     setShareOpen,
@@ -561,59 +583,80 @@ export default function App() {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
           {/* Mobile (< sm): collapse into a "⋯" overflow menu. */}
-          <details className="relative sm:hidden">
-            <summary
-              className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] [&::-webkit-details-marker]:hidden"
+          <div ref={mobileMenuRef} className="relative sm:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((v) => !v)}
               aria-label="更多操作"
+              aria-expanded={mobileMenuOpen}
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
             >
               <span aria-hidden>⋯</span>
-            </summary>
-            <div className="absolute right-0 top-12 z-30 flex min-w-[10rem] flex-col gap-1 rounded-2xl border border-white/70 bg-[var(--paper)] p-2 shadow-[var(--shadow)]">
-              {activeTrip && (
-                <button
-                  type="button"
-                  onClick={() => setBackupOpen(true)}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+            </button>
+            <AnimatePresence>
+              {mobileMenuOpen && (
+                <motion.div
+                  initial={popover.initial}
+                  animate={popover.animate}
+                  exit={popover.exit}
+                  transition={popover.transition}
+                  className="absolute right-0 top-12 z-30 flex min-w-[10rem] flex-col gap-1 rounded-2xl border border-white/70 bg-[var(--paper)] p-2 shadow-[var(--shadow)]"
                 >
-                  <Archive size={16} strokeWidth={1.8} aria-hidden />
-                  存档
-                </button>
+                  {activeTrip && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false)
+                        setBackupOpen(true)
+                      }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                    >
+                      <Archive size={16} strokeWidth={1.8} aria-hidden />
+                      存档
+                    </button>
+                  )}
+                  {role === 'owner' && activeTrip && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false)
+                        setShareOpen(true)
+                        void refreshTrips().catch(() => undefined)
+                      }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                    >
+                      <Share2 size={16} strokeWidth={1.8} aria-hidden />
+                      分享
+                    </button>
+                  )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false)
+                        handleClearAllTripState()
+                      }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                    >
+                      <Trash2 size={16} strokeWidth={1.8} aria-hidden />
+                      清空全部
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      void signOut()
+                    }}
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
+                  >
+                    <LogOut size={16} strokeWidth={1.8} aria-hidden />
+                    退出
+                  </button>
+                </motion.div>
               )}
-              {role === 'owner' && activeTrip && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShareOpen(true)
-                    void refreshTrips().catch(() => undefined)
-                  }}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
-                >
-                  <Share2 size={16} strokeWidth={1.8} aria-hidden />
-                  分享
-                </button>
-              )}
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={handleClearAllTripState}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
-                >
-                  <Trash2 size={16} strokeWidth={1.8} aria-hidden />
-                  清空全部
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  void signOut()
-                }}
-                className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)]"
-              >
-                <LogOut size={16} strokeWidth={1.8} aria-hidden />
-                退出
-              </button>
-            </div>
-          </details>
+            </AnimatePresence>
+          </div>
           {/* Desktop (≥ sm): inline action buttons as before. */}
           <div className="hidden items-center gap-1.5 sm:flex sm:gap-2">
             {activeTrip && (
