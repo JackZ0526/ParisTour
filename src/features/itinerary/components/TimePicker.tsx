@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
-import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 
 interface Props {
   value: string
@@ -26,6 +25,9 @@ function formatTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
+const MORPH_EASE = [0.22, 1, 0.36, 1] as const
+const MORPH_DURATION = 0.32
+
 export function TimePicker({ value, onChange, label, id: idProp }: Props) {
   const autoId = useId()
   const id = idProp ?? autoId
@@ -34,7 +36,6 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
   const [draftHour, setDraftHour] = useState(parsed.hour)
   const [draftMinute, setDraftMinute] = useState(parsed.minute)
   const rootRef = useRef<HTMLDivElement>(null)
-  const popover = useEnterExit('popover')
 
   useEffect(() => {
     if (!open) return
@@ -45,20 +46,17 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
 
   useEffect(() => {
     if (!open) return
-
     function onPointerDown(event: PointerEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false)
       }
     }
-
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation()
         setOpen(false)
       }
     }
-
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
     return () => {
@@ -78,110 +76,126 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           {label}
         </label>
       )}
-      <button
-        type="button"
-        id={id}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className={[
-          'mt-2 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2 text-left outline-none transition',
-          open
-            ? 'border-[var(--sage)] shadow-[0_0_0_3px_rgba(74,99,86,0.12)]'
-            : 'border-[var(--mist)] hover:border-[var(--sage)]/60 focus:border-[var(--sage)]',
-        ].join(' ')}
-      >
-        <span className="tabular-nums text-[var(--ink)]">{value}</span>
-        <Clock3 className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
-      </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="time-picker-popover"
-            role="dialog"
-            aria-label={label ? `${label}选择器` : '选择时间'}
-            initial={popover.initial}
-            animate={popover.animate}
-            exit={popover.exit}
-            transition={popover.transition}
-            className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 max-h-[min(70dvh,420px)] overflow-y-auto rounded-2xl border border-white/70 bg-[#fffcf7] p-4 shadow-[var(--shadow)]"
-          >
-            <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)] pb-2">
-              <p className="font-display text-base tracking-wide text-[var(--ink)]">
-                选择开始时间
-              </p>
-              <span className="rounded-full bg-[var(--sage)]/10 px-2.5 py-0.5 text-sm font-medium tabular-nums text-[var(--sage)]">
-                {formatTime(draftHour, draftMinute)}
-              </span>
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">小时</p>
-              <div className="grid grid-cols-6 gap-1">
-                {HOURS.map((hour) => (
-                  <button
-                    key={hour}
-                    type="button"
-                    aria-pressed={draftHour === hour}
-                    onClick={() => setDraftHour(hour)}
-                    className={[
-                      'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
-                      draftHour === hour
-                        ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
-                        : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
-                    ].join(' ')}
-                  >
-                    {String(hour).padStart(2, '0')}
-                  </button>
-                ))}
+      {/*
+        Sub-wrapper holds the shared layoutId. min-h-[2.25rem] reserves the
+        button's vertical slot so the cards below don't jump when the
+        popover (absolute) replaces the in-flow button.
+      */}
+      <div className="relative mt-2 min-h-[2.25rem]">
+        <AnimatePresence>
+          {!open ? (
+            <motion.button
+              key="time-picker-button"
+              layoutId="time-picker-card"
+              type="button"
+              id={id}
+              aria-haspopup="dialog"
+              aria-expanded={false}
+              onClick={() => setOpen(true)}
+              transition={{
+                opacity: { duration: 0.18, ease: 'easeOut' },
+                layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
+              }}
+              className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-left outline-none transition-colors hover:border-[var(--sage)]/60 focus-visible:border-[var(--sage)] focus-visible:ring-2 focus-visible:ring-[var(--sage)]/25"
+            >
+              <span className="tabular-nums text-[var(--ink)]">{value}</span>
+              <Clock3
+                className="h-4 w-4 shrink-0 text-[var(--sage)]"
+                strokeWidth={1.6}
+                aria-hidden
+              />
+            </motion.button>
+          ) : (
+            <motion.div
+              key="time-picker-popover"
+              layoutId="time-picker-card"
+              role="dialog"
+              aria-modal="true"
+              aria-label={label ? `${label}选择器` : '选择时间'}
+              transition={{
+                opacity: { duration: 0.18, ease: 'easeOut' },
+                layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
+              }}
+              style={{ transformOrigin: 'top center' }}
+              className="absolute inset-x-0 top-0 z-30 max-h-[min(70dvh,420px)] overflow-y-auto rounded-2xl border border-white/70 bg-[#fffcf7] p-4 shadow-[var(--shadow)]"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)] pb-2">
+                <p className="font-display text-base tracking-wide text-[var(--ink)]">
+                  选择开始时间
+                </p>
+                <span className="rounded-full bg-[var(--sage)]/10 px-2.5 py-0.5 text-sm font-medium tabular-nums text-[var(--sage)]">
+                  {formatTime(draftHour, draftMinute)}
+                </span>
               </div>
-            </div>
 
-            <div className="mt-3 border-t border-[var(--mist)] pt-2">
-              <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">分钟</p>
-              <div className="grid grid-cols-6 gap-1">
-                {minuteOptions.map((minute) => (
-                  <button
-                    key={minute}
-                    type="button"
-                    aria-pressed={draftMinute === minute}
-                    onClick={() => setDraftMinute(minute)}
-                    className={[
-                      'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
-                      draftMinute === minute
-                        ? 'bg-[var(--sage)] font-medium text-[var(--paper)] shadow-sm'
-                        : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
-                    ].join(' ')}
-                  >
-                    {String(minute).padStart(2, '0')}
-                  </button>
-                ))}
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">小时</p>
+                <div className="grid grid-cols-6 gap-1">
+                  {HOURS.map((hour) => (
+                    <button
+                      key={hour}
+                      type="button"
+                      aria-pressed={draftHour === hour}
+                      onClick={() => setDraftHour(hour)}
+                      className={[
+                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
+                        draftHour === hour
+                          ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
+                          : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
+                      ].join(' ')}
+                    >
+                      {String(hour).padStart(2, '0')}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="mt-3 flex justify-end gap-2 border-t border-[var(--mist)] pt-3">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-xs text-[var(--stone)] transition hover:border-[var(--sage)]"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(formatTime(draftHour, draftMinute))
-                  setOpen(false)
-                }}
-                className="rounded-full bg-[var(--ink)] px-4 py-1.5 text-xs text-[var(--paper)] transition hover:opacity-90 shadow-sm"
-              >
-                完成
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <div className="mt-3 border-t border-[var(--mist)] pt-2">
+                <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">分钟</p>
+                <div className="grid grid-cols-6 gap-1">
+                  {minuteOptions.map((minute) => (
+                    <button
+                      key={minute}
+                      type="button"
+                      aria-pressed={draftMinute === minute}
+                      onClick={() => setDraftMinute(minute)}
+                      className={[
+                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
+                        draftMinute === minute
+                          ? 'bg-[var(--sage)] font-medium text-[var(--paper)] shadow-sm'
+                          : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
+                      ].join(' ')}
+                    >
+                      {String(minute).padStart(2, '0')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 flex justify-end gap-2 border-t border-[var(--mist)] pt-3">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-xs text-[var(--stone)] transition hover:border-[var(--sage)]"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(formatTime(draftHour, draftMinute))
+                    setOpen(false)
+                  }}
+                  className="rounded-full bg-[var(--ink)] px-4 py-1.5 text-xs text-[var(--paper)] transition hover:opacity-90 shadow-sm"
+                >
+                  完成
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
