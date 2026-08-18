@@ -9,6 +9,7 @@ import {
   type RecommendationPreferences,
 } from '../services/recommendationPreferences'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { Checkbox } from '../../../shared/components/Checkbox'
 import { TimePicker } from '../../itinerary/components/TimePicker'
 
 interface Props {
@@ -139,12 +140,12 @@ export function RecommendationPreferencesDialog({
                   <span className="block text-sm font-medium text-[var(--ink)]">{option.label}</span>
                   <span className="mt-0.5 block text-xs leading-relaxed text-[var(--stone)]">{option.description}</span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={draft[option.key]}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, [option.key]: event.target.checked }))}
-                  className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-[var(--sage)]"
-                />
+                <span className="mt-0.5">
+                  <Checkbox
+                    checked={draft[option.key]}
+                    onCheckedChange={(on) => setDraft((prev) => ({ ...prev, [option.key]: on }))}
+                  />
+                </span>
               </label>
             ))}
           </div>

@@ -10,6 +10,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
+import { Checkbox } from '../../../shared/components/Checkbox'
 import {
   DEEPSEEK_MODEL_OPTIONS,
   getActiveLlmLabel,
@@ -226,11 +227,12 @@ function ThinkingControls({
                 autoDisabled ? 'cursor-default' : 'cursor-pointer'
               }`}
             >
-              <SecondaryCheckbox
+              <Checkbox
                 id={autoCheckboxId}
                 checked={autoOn}
                 disabled={autoDisabled}
                 onCheckedChange={setAuto}
+                size="sm"
               />
               <span className="min-w-0 flex-1">
                 <span className="block text-[11px] font-medium leading-snug text-[var(--stone)]">
@@ -321,38 +323,7 @@ function PillSwitch({
 }
 
 /** Secondary checkbox — nested under 思考 (自动), distinct from primary PillSwitch. */
-function SecondaryCheckbox({
-  id,
-  checked,
-  disabled,
-  onCheckedChange,
-}: {
-  id: string
-  checked: boolean
-  disabled?: boolean
-  onCheckedChange: (on: boolean) => void
-}) {
-  return (
-    <span className="relative mt-0.5 flex shrink-0">
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onCheckedChange(e.target.checked)}
-        className="peer sr-only"
-      />
-      <span
-        aria-hidden
-        className={`flex h-4 w-4 items-center justify-center rounded-[4px] border transition-colors duration-150 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--sage)]/35 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-[var(--mist)] peer-disabled:opacity-50 peer-checked:border-[var(--sage)] peer-checked:bg-[var(--sage)] peer-checked:text-white ${
-          checked ? '' : 'border-[var(--ink)]/22 bg-[var(--card)]'
-        }`}
-      >
-        <Check strokeWidth={2.25} className={`h-2.5 w-2.5 transition-opacity duration-100 ${checked ? 'opacity-100' : 'opacity-0'}`} />
-      </span>
-    </span>
-  )
-}
+
 
 /** Three snap positions: 低 · 中 · 高 (自动 is a separate nested checkbox). */
 const THINKING_SLIDER_OPTIONS = THINKING_EFFORT_OPTIONS.map((o) => ({
