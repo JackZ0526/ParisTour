@@ -500,11 +500,23 @@ function ThinkingIntensitySlider({
 
   useEffect(() => () => clearSettleTimer(), [])
 
-  // Framer Motion drives both the fill bar (scaleX) and the knob
-  // (scale + box-shadow). The transition object is shared: zero-length while
-  // dragging (so the finger stays in lock-step), spring-style cubic on
-  // settle, gentle ease on idle. Pointer events, magnetize(), and commitStop()
-  // are kept verbatim — they're the project's magnetic-snap business logic.
+  // Two parallel transition policies because fill bar and knob have different
+  // tracking needs during a drag:
+  //   - Fill bar uses CSS (`motionEase`) + inline `style.width`. The width
+  //     value updates synchronously with React state, so on a fast drag the
+  //     bar stays glued to the thumb. Framer Motion's `animate` runs through
+  //     setState and lags inline style by a frame, which is visible as
+  //     "fill stops halfway while the thumb keeps moving".
+  //   - Knob uses Framer Motion (`motionTransition`) for scale + box-shadow.
+  //     The knob's `left` is still inline style (sync). The scale / shadow
+  //     only change on drag start/end so the 1-frame lag is imperceptible.
+  // Pointer events, magnetize(), and commitStop() are kept verbatim — they're
+  // the project's magnetic-snap business logic.
+  const motionEase = dragging
+    ? ''
+    : settling
+      ? 'duration-[280ms] ease-[cubic-bezier(0.34,1.45,0.64,1)]'
+      : 'duration-200 ease-[cubic-bezier(0.34,1.15,0.64,1)]'
   const motionTransition = dragging
     ? { duration: 0 }
     : settling
@@ -538,15 +550,20 @@ function ThinkingIntensitySlider({
           className="relative h-3 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--mist)_55%,var(--stone)_45%)] shadow-[inset_0_1px_2px_rgba(28,36,32,0.18)]"
         >
           {/*
-            Fill bar: width is expressed as `scaleX` (transform-based) so it
-            stays GPU-composited and the inset 10px on each side comes from
-            the parent.  scaleX(0) = empty, scaleX(1) = full inset width.
+            Fill bar — CSS transition + inline `style.width` (not Framer Motion).
+            Two reasons: (1) drag-time tracking has to be frame-perfect, and
+            Framer Motion's `animate` runs through setState so the bar can lag
+            a frame behind the thumb on a fast drag; (2) the inset-10px look
+            on the left only works when width is `calc(10px + ratio*(100%-20px))`
+            and the container starts at left:0, so the bar visually reaches the
+            left edge for any non-zero ratio.
           */}
-          <motion.div
-            className="absolute inset-y-0 left-[10px] right-[10px] origin-left rounded-full bg-[color-mix(in_srgb,var(--sage)_88%,#7a9a8e)]"
-            animate={{ scaleX: ratio }}
-            transition={motionTransition}
-            style={{ willChange: 'transform' }}
+          <div
+            aria-hidden
+            className={`absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_srgb,var(--sage)_88%,#7a9a8e)] ${
+              motionEase ? `transition-[width] ${motionEase}` : ''
+            }`}
+            style={{ width: `calc(10px + ${ratio} * (100% - 20px))` }}
           />
         </div>
 
