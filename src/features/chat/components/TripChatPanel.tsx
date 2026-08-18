@@ -1749,10 +1749,15 @@ export function TripChatPanel({
   const chatChrome = (
     <>
       {/* LlmModelPicker stays anchored at the FAB position; hidden when the
-          chat panel is open so the morphing card can take over the corner. */}
+          chat panel is open so the morphing card can take over the corner.
+          Mobile: stacked above the chat button (column, 8px gap → bottom
+          offset = 48px button + 8px gap = 56px = 3.5rem). Desktop: the
+          `sm:bottom-5` / `sm:right-5` overrides reset it to the same corner
+          as the chat button (intentional — desktop layout is owned by the
+          `sm:flex-row` block below). */}
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
+        className={`fixed bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+3.5rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-5 sm:flex-row sm:items-center sm:gap-2.5 ${
           open ? 'pointer-events-none invisible opacity-0' : ''
         }`}
       >
