@@ -7,9 +7,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import { Checkbox } from '../../../shared/components/Checkbox'
 import {
   DEEPSEEK_MODEL_OPTIONS,
@@ -38,10 +37,36 @@ type Props = {
 
 type Panel = 'root' | 'model'
 
+// Spring for the chip↔popover morph. Same feel as TripChatPanel: a touch
+// of overshoot (iOS modal presentation) settling in ~320ms.
+const MORPH_SPRING = { type: 'spring' as const, stiffness: 350, damping: 30 }
+
+// Popover width target: 17.5rem max, but never wider than viewport − 2.5rem
+// margin (prevents the popover from running off the left edge on narrow phones).
+const POPOVER_MAX_WIDTH = 'min(calc(100vw - 2.5rem), 17.5rem)'
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia(query)
+    setMatches(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [query])
+  return matches
+}
+
 /**
- * Compact FAB chip + popover:
- * brand icon + model name + chevron; thinking controls live in the popover only.
- * ParisTour paper/ink/sage palette.
+ * FAB chip that morphs into a popover at the same position (iOS Reminders
+ * pattern). Two-stage animation:
+ *   - opening:  width 48→280 first, then height 48→auto
+ *   - closing:  height auto→48 first, then width 280→48
+ * Asymmetric close matches "card collapsing back" rather than reversing
+ * the opening axis. Single `<div role="button">` swaps role/aria-label/
+ * tabIndex/keydown between button (closed) and dialog (open) — same
+ * a11y tradeoff as TripChatPanel.
  */
 export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const { model, setModel, thinkingMode } = useLlmSettings()
@@ -49,9 +74,12 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const [panel, setPanel] = useState<Panel>('root')
   const rootRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
+  // Mobile: closed chip is a 48px circle. Desktop: closed chip is a pill
+  // (auto width up to 15.5rem, 48px tall) — the morph widens the pill
+  // before the popover content unfurls upward.
+  const isDesktop = useMediaQuery('(min-width: 640px)')
   const canThink = supportsThinkingControls(model)
   const deepseek = isDeepSeekModel(model)
-  const popover = useEnterExit('popover')
 
   useEffect(() => {
     if (!open) {
@@ -81,35 +109,90 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const fullLabel = getActiveLlmLabel(model)
 
   return (
-    <div ref={rootRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        disabled={disabled}
-        aria-haspopup="dialog"
+    <div className={`relative ${className}`}>
+      <motion.div
+        ref={rootRef}
+        id={popoverId}
+        role={open ? 'dialog' : 'button'}
+        tabIndex={open ? -1 : 0}
+        aria-haspopup={!open ? 'dialog' : undefined}
         aria-expanded={open}
-        aria-controls={popoverId}
-        aria-label={fullLabel}
-        title={fullLabel}
-        onClick={() => setOpen((v) => !v)}
-        className="group flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--ink)]/12 bg-[var(--card)] text-xs font-medium text-[var(--ink)] shadow-[0_8px_24px_rgba(28,36,32,0.08)] backdrop-blur transition hover:border-[var(--sage)]/40 hover:bg-[color-mix(in_srgb,var(--paper)_92%,white)] disabled:opacity-50 sm:h-auto sm:w-auto sm:max-w-[15.5rem] sm:justify-start sm:gap-1.5 sm:px-3 sm:py-2.5 sm:text-sm"
+        aria-label={open ? '模型与思考设置' : fullLabel}
+        title={!open ? fullLabel : undefined}
+        onClick={open ? undefined : () => setOpen(true)}
+        onKeyDown={
+          open
+            ? undefined
+            : (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setOpen(true)
+                }
+              }
+        }
+        whileTap={open ? undefined : { scale: 0.96 }}
+        initial={false}
+        animate={{
+          width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
+          height: open ? 'auto' : 48,
+        }}
+        transition={{
+          width: { ...MORPH_SPRING, delay: open ? 0 : 0.18 },
+          height: { ...MORPH_SPRING, delay: open ? 0.18 : 0 },
+        }}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          right: 0,
+          zIndex: 1,
+          borderRadius: 24,
+          // overflow auto only when open; closed = hidden so the always-mounted
+          // popover content (opacity 0) doesn't draw a scrollbar inside the
+          // 48×48 chip.
+          overflow: open ? 'hidden auto' : 'hidden',
+          // Cap the popover so it never extends past the top of the viewport.
+          // 2.5rem = 40px headroom (20px top + 20px bottom margins).
+          maxHeight: 'calc(100vh - 2.5rem)',
+          transformOrigin: 'bottom right',
+          color: 'var(--ink)',
+          backgroundColor: 'var(--card)',
+          border: '1px solid var(--ink)/10',
+          boxShadow: 'var(--shadow)',
+          backdropFilter: 'blur(8px)',
+        }}
       >
-        <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-        <span className="hidden min-w-0 truncate tracking-tight sm:inline">{chip}</span>
-        <ChevronDown aria-hidden strokeWidth={1.75} className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${open ? 'rotate-180' : ''}`} />
-      </button>
+        {/* Chip content — visible when closed, fades out during width-grow stage */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: open ? 0 : 1 }}
+          transition={{
+            opacity: { duration: 0.18, delay: open ? 0 : 0.32, ease: 'easeOut' },
+          }}
+          aria-hidden={!open}
+          className="absolute inset-0 flex items-center justify-center gap-1.5 sm:justify-start sm:gap-1.5 sm:px-3 sm:py-2.5"
+        >
+          <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
+          <span className="hidden min-w-0 truncate text-sm sm:inline">{chip}</span>
+          <ChevronDown
+            aria-hidden
+            strokeWidth={1.75}
+            className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </motion.div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            id={popoverId}
-            role="dialog"
-            aria-label="模型与思考设置"
-            initial={popover.initial}
-            animate={popover.animate}
-            exit={popover.exit}
-            transition={popover.transition}
-            className="absolute bottom-[calc(100%+0.5rem)] right-0 z-[1] w-[min(calc(100vw-2.5rem),17.5rem)] overflow-hidden rounded-2xl border border-[var(--ink)]/10 bg-[var(--card)] shadow-[var(--shadow)] backdrop-blur"
-          >
+        {/* Popover content — visible when open, fades in during height-grow stage */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: open ? 1 : 0 }}
+          transition={{
+            opacity: { duration: 0.2, delay: open ? 0.18 : 0, ease: 'easeOut' },
+          }}
+          inert={!open || undefined}
+          aria-hidden={!open}
+          className="absolute inset-0 flex flex-col"
+        >
           {panel === 'root' && (
             <div className="p-3.5">
               {canThink ? (
@@ -174,8 +257,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             </SubPanel>
           )}
         </motion.div>
-      )}
-    </AnimatePresence>
+      </motion.div>
     </div>
   )
 }
