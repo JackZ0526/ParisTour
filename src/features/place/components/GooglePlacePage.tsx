@@ -18,6 +18,7 @@ import {
   RotateCw,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   fetchRapidApiGooglePhotoFallbackById,
   fetchRapidApiGooglePlaceDetailsById,
@@ -1463,69 +1464,14 @@ export function GooglePlacePage({
     googleAddress,
   ])
 
-  // --- iOS sheet animation ---
-  // isVisible: is the dialog in the DOM? (delayed unmount so the exit
-  //   transition has time to play)
-  // isAtRest: is the dialog at its rest position (translateY 0)?
-  //   false on first render -> off-screen below; flipped to true on the
-  //   next two animation frames so the transform transition kicks in.
-  // direction: which way the animation is going. Entrance uses a slightly
-  //   bouncy easeOutBack curve; exit uses a clean ease-in (no overshoot,
-  //   which would feel like the sheet is being thrown out).
-  const [isVisible, setIsVisible] = useState(open)
-  const [isAtRest, setIsAtRest] = useState(false)
-  const [direction, setDirection] = useState<'in' | 'out'>('in')
-  useEffect(() => {
-    if (open) {
-      setIsVisible(true)
-      setDirection('in')
-      // Double rAF: the first one lets React commit the dialog at its
-      // off-screen starting transform; the second one flips the flag so
-      // the inline transform animates to the rest position.
-      const r1 = requestAnimationFrame(() => {
-        const r2 = requestAnimationFrame(() => {
-          setIsAtRest(true)
-        })
-        return () => cancelAnimationFrame(r2)
-      })
-      return () => cancelAnimationFrame(r1)
-    }
-    // Closing — no rAF needed, just toggle and let the transition run.
-    setDirection('out')
-    setIsAtRest(false)
-    // Keep the dialog mounted for the duration of the exit transition,
-    // then drop it from the DOM. Literal 420ms — must match SHEET_DURATION_OUT
-    // below (can't reference that const here: the early return above means
-    // it isn't initialized on the first effect tick).
-    const t = window.setTimeout(() => setIsVisible(false), 420)
-    return () => window.clearTimeout(t)
-  }, [open])
-
-  if (!isVisible) return null
-
-  // Both directions share the same visual rhythm: a fast initial move that
-// gently settles into the end position. For the entrance the sheet is
-// launched up from the bottom (translateY 100% → 0); for the exit the
-// sheet is pulled back down to where it came from (translateY 0 → 100%).
-//
-// Using an easeOut curve on both sides keeps the motion perceptually
-// symmetric — "springing up from below" on open, "retracting down to
-// below" on close — without the slow-accelerating easeIn that made the
-// exit feel like the sheet "vanished" before the eye could track it.
-//
-// Duration is also mirrored (420ms in / 420ms out) so open and close
-// read as one motion rather than an asymmetric in/out pair.
-  const SHEET_EASING_IN = 'cubic-bezier(0.22, 1, 0.36, 1)' // easeOutQuint — fast lift, soft land
-  const SHEET_EASING_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)' // same curve: fast pull-down, soft end
-  const SHEET_DURATION_IN = 420
-  const SHEET_DURATION_OUT = 420 // mirrored with the entrance so open and close feel like one motion
-  const BACKDROP_DURATION = 180
-
-  const sheetTransition =
-    direction === 'in'
-      ? `transform ${SHEET_DURATION_IN}ms ${SHEET_EASING_IN}`
-      : `transform ${SHEET_DURATION_OUT}ms ${SHEET_EASING_OUT}`
-  const backdropTransition = `opacity ${BACKDROP_DURATION}ms ease-out`
+  // --- iOS sheet animation (Framer Motion) ---
+  // Entrance and exit share a single easeOutQuint curve (0.22, 1, 0.36, 1)
+  // at 420ms — mirrored timing so open and close read as one motion. AnimatePresence
+  // handles the deferred unmount automatically; we no longer track isVisible /
+  // isAtRest / direction state or a double-rAF.
+  const SHEET_DURATION = 0.42
+  const SHEET_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+  const BACKDROP_DURATION = 0.18
 
   const originalLabel = placeOriginalLabel(
     name,
@@ -1669,35 +1615,37 @@ export function GooglePlacePage({
           : null
 
   return createPortal(
-    <div
-      data-google-place-page="1"
-      data-pending-place-confirm={footer ? '1' : undefined}
-      className={`fixed inset-0 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${overlayClassName}`}
-      style={{ zIndex: overlayZIndex ?? 2000 }}
-    >
-      <button
-        type="button"
-        className="absolute inset-0 cursor-default bg-black/45"
-        style={{
-          opacity: isAtRest ? 1 : 0,
-          transition: backdropTransition,
-        }}
-        aria-label="关闭"
-        onClick={() => {
-          if (closeOnBackdrop) onClose()
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={dialogLabel}
-        style={{
-          transform: isAtRest ? 'translateY(0)' : 'translateY(100%)',
-          transition: sheetTransition,
-          willChange: 'transform',
-        }}
-        className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
-      >
+    <AnimatePresence>
+      {open && (
+        <div
+          data-google-place-page="1"
+          data-pending-place-confirm={footer ? '1' : undefined}
+          className={`fixed inset-0 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${overlayClassName}`}
+          style={{ zIndex: overlayZIndex ?? 2000 }}
+        >
+          <motion.button
+            type="button"
+            className="absolute inset-0 cursor-default bg-black/45"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: BACKDROP_DURATION, ease: 'easeOut' }}
+            aria-label="关闭"
+            onClick={() => {
+              if (closeOnBackdrop) onClose()
+            }}
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={dialogLabel}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: SHEET_DURATION, ease: SHEET_EASE }}
+            style={{ willChange: 'transform' }}
+            className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+          >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 pr-3">
             <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
@@ -2284,8 +2232,10 @@ export function GooglePlacePage({
             {footer}
           </div>
         )}
+        </motion.div>
       </div>
-    </div>,
+    )}
+  </AnimatePresence>,
     document.body,
   )
 }

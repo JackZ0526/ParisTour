@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { motion } from 'framer-motion'
 import {
   DEEPSEEK_MODEL_OPTIONS,
   getActiveLlmLabel,
@@ -499,11 +500,16 @@ function ThinkingIntensitySlider({
 
   useEffect(() => () => clearSettleTimer(), [])
 
-  const motionEase = settling
-    ? 'duration-[280ms] ease-[cubic-bezier(0.34,1.45,0.64,1)]'
-    : dragging
-      ? ''
-      : 'duration-200 ease-[cubic-bezier(0.34,1.15,0.64,1)]'
+  // Framer Motion drives both the fill bar (scaleX) and the knob
+  // (scale + box-shadow). The transition object is shared: zero-length while
+  // dragging (so the finger stays in lock-step), spring-style cubic on
+  // settle, gentle ease on idle. Pointer events, magnetize(), and commitStop()
+  // are kept verbatim — they're the project's magnetic-snap business logic.
+  const motionTransition = dragging
+    ? { duration: 0 }
+    : settling
+      ? { duration: 0.28, ease: [0.34, 1.45, 0.64, 1] as [number, number, number, number] }
+      : { duration: 0.2, ease: [0.34, 1.15, 0.64, 1] as [number, number, number, number] }
 
   return (
     <div className={disabled ? 'opacity-50' : ''}>
@@ -531,11 +537,16 @@ function ThinkingIntensitySlider({
           aria-hidden
           className="relative h-3 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--mist)_55%,var(--stone)_45%)] shadow-[inset_0_1px_2px_rgba(28,36,32,0.18)]"
         >
-          <div
-            className={`absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_srgb,var(--sage)_88%,#7a9a8e)] ${
-              motionEase ? `transition-[width] ${motionEase}` : ''
-            }`}
-            style={{ width: `calc(10px + ${ratio} * (100% - 20px))` }}
+          {/*
+            Fill bar: width is expressed as `scaleX` (transform-based) so it
+            stays GPU-composited and the inset 10px on each side comes from
+            the parent.  scaleX(0) = empty, scaleX(1) = full inset width.
+          */}
+          <motion.div
+            className="absolute inset-y-0 left-[10px] right-[10px] origin-left rounded-full bg-[color-mix(in_srgb,var(--sage)_88%,#7a9a8e)]"
+            animate={{ scaleX: ratio }}
+            transition={motionTransition}
+            style={{ willChange: 'transform' }}
           />
         </div>
 
@@ -565,17 +576,22 @@ function ThinkingIntensitySlider({
           aria-hidden
           className="pointer-events-none absolute top-1/2 left-[10px] right-[10px] -translate-y-1/2"
         >
-          <div
-            className={`absolute top-1/2 h-[1.3125rem] w-[1.3125rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white will-change-transform ${
-              dragging
-                ? 'scale-[1.18] shadow-[0_3px_10px_rgba(28,36,32,0.28)]'
-                : `shadow-[0_1px_4px_rgba(28,36,32,0.2),0_0_0_1px_rgba(28,36,32,0.06)] transition-[left,transform,box-shadow] ${
-                    settling
-                      ? 'duration-[280ms] ease-[cubic-bezier(0.34,1.45,0.64,1)]'
-                      : 'duration-200 ease-[cubic-bezier(0.34,1.15,0.64,1)]'
-                  } group-hover:scale-[1.12] group-hover:shadow-[0_2px_8px_rgba(28,36,32,0.24)] group-focus-visible:scale-[1.12]`
-            }`}
-            style={{ left: `${ratio * 100}%` }}
+          {/*
+            Knob: left stays as inline % (the magnetic-snap math is in %).
+            Motion drives only `scale` + `box-shadow` — the two properties
+            that previously needed a ternary className + transition.
+            CSS still handles group-hover / group-focus-visible.
+          */}
+          <motion.div
+            className="absolute top-1/2 h-[1.3125rem] w-[1.3125rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white group-hover:scale-[1.12] group-hover:shadow-[0_2px_8px_rgba(28,36,32,0.24)] group-focus-visible:scale-[1.12]"
+            animate={{
+              scale: dragging ? 1.18 : 1,
+              boxShadow: dragging
+                ? '0 3px 10px rgba(28, 36, 32, 0.28)'
+                : '0 1px 4px rgba(28, 36, 32, 0.2), 0 0 0 1px rgba(28, 36, 32, 0.06)',
+            }}
+            transition={motionTransition}
+            style={{ left: `${ratio * 100}%`, willChange: 'transform' }}
           />
         </div>
       </div>
