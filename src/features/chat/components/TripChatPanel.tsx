@@ -86,6 +86,11 @@ const NO_ACTION_APPLIED_NOTE = '行程未改动，请再说一下你想要的调
 const DETAIL_CONFIRM_MISSING_NOTE = '行程未改动：请在详情页确认是否加入。'
 const TRIP_CHAT_BACKDROP_Z = 2040
 const TRIP_CHAT_PANEL_Z = 2045
+// Panel width target: 23.75rem (380px) on wide viewports, but never
+// wider than viewport − 2.5rem margin (prevents the panel from running
+// off the left edge on narrow phones, where the chip→panel morph would
+// otherwise overshoot the screen).
+const TRIP_CHAT_PANEL_WIDTH = 'min(calc(100vw - 2.5rem), 23.75rem)'
 
 export interface TripChatHandlers {
   switchDay: (day: number) => void
@@ -1782,7 +1787,8 @@ export function TripChatPanel({
 
       {/*
         The chat panel is a single element that morphs from a 48×48 black
-        FAB into a 380×560 floating card. Staged so:
+        FAB into a 380×560 floating card (clamped to viewport − 2.5rem
+        on narrow screens so it doesn't run off the left edge). Staged so:
         - opening: width 48→380 first, then height 48→560
         - closing: height 560→48 first, then width 380→48
         Background + icon fade happen during the first stage; panel
@@ -1808,7 +1814,7 @@ export function TripChatPanel({
         whileTap={open ? undefined : { scale: 0.94 }}
         initial={false}
         animate={{
-          width: open ? 380 : 48,
+          width: open ? TRIP_CHAT_PANEL_WIDTH : 48,
           height: open ? 560 : 48,
           backgroundColor: open ? '#fffcf7' : '#1c2420',
         }}

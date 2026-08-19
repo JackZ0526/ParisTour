@@ -92,6 +92,12 @@ function useMediaQuery(query: string): boolean {
  * would only flip on the second render and the morph would run as
  * simultaneous width+height). Internal content changes (panel swap,
  * thinking toggle) leave `justOpened=false` and animate immediately.
+ * `heightAnimating` is set to true on those same triggers and cleared
+ * by the motion.div's `onAnimationComplete('height')` callback, so
+ * `overflow: hidden` is held while ANY height animation is in flight
+ * (opening morph, internal re-target, closing morph) — `overflow: auto`
+ * would briefly show a scrollbar while the content is taller than
+ * the in-flight motion.div.
  *
  * Panel swap (root ↔ model sub-panel) is wrapped in `AnimatePresence`
  * with a quick cross-fade so the content swap feels intentional rather
@@ -142,13 +148,14 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   // thinking toggle) don't want that delay — the user expects immediate
   // motion when they click something, not a "wait then grow" lag.
   //
-  // `morphSettled` is the same window but exposed as state (not a ref)
-  // because the rendered `overflow` value depends on it — the popover
-  // content overflows the motion.div mid-morph (height still animating
-  // up), and `overflow: auto` would briefly show a scrollbar. We keep
-  // `overflow: hidden` until the morph completes, then flip to
-  // `'hidden auto'` so the panel can scroll if it ever exceeds
-  // maxHeight.
+  // `heightAnimating` is `true` while the motion.div's height is in
+  // flight (opening morph, internal re-targets from panel switch /
+  // thinking toggle, closing morph). It's exposed as state because the
+  // rendered `overflow` value depends on it: the popover content can be
+  // taller than the in-flight height mid-morph, and `overflow: auto`
+  // would briefly show a scrollbar. We keep `overflow: hidden` while
+  // the height is animating, then flip to `'hidden auto'` so the panel
+  // can scroll if it ever exceeds maxHeight.
   //
   // The previous-open ref is updated in useLayoutEffect (not in render)
   // because React 18 strict mode invokes the render function twice; an
@@ -161,15 +168,17 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   useLayoutEffect(() => {
     prevOpenRef.current = open
   }, [open])
-  const [morphSettled, setMorphSettled] = useState(!open)
+  const [heightAnimating, setHeightAnimating] = useState(false)
+  // Mark animating synchronously with any state change that re-targets
+  // height: `open` flipping (opening morph), `open` flipping back
+  // (closing morph), or panel / model / thinkingMode changing while
+  // open (internal re-target). The `onAnimationComplete('height')`
+  // callback on the motion.div flips it back. This catches all three
+  // cases — the old time-based gate only covered the opening morph and
+  // missed internal re-targets + the closing morph.
   useEffect(() => {
-    if (!open) {
-      setMorphSettled(false)
-      return
-    }
-    const t = setTimeout(() => setMorphSettled(true), 520)
-    return () => clearTimeout(t)
-  }, [open])
+    setHeightAnimating(true)
+  }, [open, panel, model, thinkingMode])
 
   useEffect(() => {
     if (!open) {
@@ -238,6 +247,15 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           delay: justOpened ? 0.18 : 0,
         },
       }}
+      onAnimationComplete={(definition) => {
+        // Fires once per property when each settles. The height run is
+        // the last to finish, so we know heightAnimating can be cleared
+        // on the height callback (whether the morph was the opening
+        // morph, an internal re-target, or the closing morph).
+        if (definition === 'height') {
+          setHeightAnimating(false)
+        }
+      }}
       style={{
         // Anchored to the viewport (not a 0x0 relative wrapper) so the
         // desktop pill actually has room to size itself. Responsive
@@ -253,12 +271,14 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           : 'max(1.25rem, env(safe-area-inset-right))',
         zIndex: 1,
         borderRadius: 24,
-        // overflow: hidden during the opening morph (the popover content
-        // is taller than the in-flight motion.div, so 'auto' would briefly
-        // show a scrollbar). Once the morph settles we switch to
+        // overflow: hidden while the height is animating (opening morph,
+        // internal re-target from panel switch / thinking toggle, closing
+        // morph) — the popover content can be taller than the in-flight
+        // motion.div, so 'auto' would briefly show a scrollbar. Once
+        // the height run settles (onAnimationComplete), we switch to
         // 'hidden auto' so the panel can scroll if the sentinel-reported
         // height ever exceeds maxHeight.
-        overflow: morphSettled ? 'hidden auto' : 'hidden',
+        overflow: heightAnimating ? 'hidden' : 'hidden auto',
         // Cap the popover so it never extends past the top of the viewport.
         // 2.5rem = 40px headroom (20px top + 20px bottom margins).
         maxHeight: 'calc(100vh - 2.5rem)',
