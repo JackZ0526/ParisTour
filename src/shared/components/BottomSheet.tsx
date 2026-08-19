@@ -47,7 +47,7 @@ export function BottomSheet({
   useBodyScrollLock(open)
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
-  const { sheetRef, dragProps } = useSheetDragDismiss<HTMLDivElement>({ onClose })
+  const { sheetRef, backdropOpacity, dragProps } = useSheetDragDismiss<HTMLDivElement>({ onClose })
 
   useEffect(() => {
     if (!open) return
@@ -71,7 +71,10 @@ export function BottomSheet({
             animate={backdrop.animate}
             exit={backdrop.exit}
             transition={backdrop.transition}
-            style={{ zIndex: overlayZIndex }}
+            style={{
+              zIndex: overlayZIndex,
+              opacity: backdropOpacity,
+            }}
             className={`fixed inset-0 cursor-default bg-black/45 ${
               hideBackdrop ? 'pointer-events-none invisible' : ''
             } ${overlayClassName}`}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { animate, useMotionValue, type MotionValue } from 'framer-motion'
+import { animate, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
 
 interface UseSheetDragDismissOptions {
   onClose: () => void
@@ -10,6 +10,7 @@ interface UseSheetDragDismissOptions {
 export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElement> {
   sheetRef: React.RefObject<T | null>
   y: MotionValue<number>
+  backdropOpacity: MotionValue<number>
   dragProps: {
     style: {
       y: MotionValue<number>
@@ -35,6 +36,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 }: UseSheetDragDismissOptions): UseSheetDragDismissReturn<T> {
   const sheetRef = useRef<T | null>(null)
   const y = useMotionValue(0)
+  const backdropOpacity = useTransform(y, [0, 360], [1, 0], { clamp: true })
 
   useEffect(() => {
     const el = sheetRef.current
@@ -248,6 +250,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   return {
     sheetRef,
     y,
+    backdropOpacity,
     dragProps: {
       style: {
         y,
