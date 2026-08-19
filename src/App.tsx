@@ -1016,10 +1016,18 @@ export default function App() {
                             <motion.span
                               layoutId="itinerary-pane-pill"
                               className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
-                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                              animate={{
+                                scaleX: [1, 1.15, 0.95, 1],
+                                scaleY: [1, 0.88, 1.04, 1],
+                              }}
+                              transition={{
+                                layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                              }}
                             />
                           )}
-                          <span className={`relative z-10 ${mobileItineraryPane === 'timeline' ? 'text-white' : 'text-[var(--ink)]'}`}>
+                          <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'text-white' : 'text-[var(--ink)]'}`}>
                             时间线
                           </span>
                         </button>
@@ -1034,10 +1042,18 @@ export default function App() {
                             <motion.span
                               layoutId="itinerary-pane-pill"
                               className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
-                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                              animate={{
+                                scaleX: [1, 1.15, 0.95, 1],
+                                scaleY: [1, 0.88, 1.04, 1],
+                              }}
+                              transition={{
+                                layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                              }}
                             />
                           )}
-                          <span className={`relative z-10 ${mobileItineraryPane === 'map' ? 'text-white' : 'text-[var(--ink)]'}`}>
+                          <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'text-white' : 'text-[var(--ink)]'}`}>
                             地图
                           </span>
                         </button>
