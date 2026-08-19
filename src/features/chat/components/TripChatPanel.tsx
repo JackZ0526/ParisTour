@@ -184,6 +184,19 @@ export function TripChatPanel({
   const [history, setHistory] = useState<TripChatTurn[]>([])
   const [actionNotes, setActionNotes] = useState<string[]>([])
   const [panelEntered, setPanelEntered] = useState(false)
+  // `onAnimationComplete('height')` on the morph sets `panelEntered` when
+  // the height run settles, but that's a single point in time. A
+  // closing morph (or any interrupted animation) wouldn't reset it, so
+  // re-opening later could see the wrong value. Reset it explicitly on
+  // close and back to true on the opening settle, with a timer as a
+  // belt-and-braces fallback in case the callback doesn't fire.
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => setPanelEntered(true), 520)
+      return () => clearTimeout(t)
+    }
+    setPanelEntered(false)
+  }, [open])
   const [pendingPlaces, setPendingPlaces] = useState<PendingPlaceConfirm[]>([])
   /** Bumps GooglePlacePage remount when confirm overlay must be forced visible. */
   const [confirmEpoch, setConfirmEpoch] = useState(0)
@@ -1825,6 +1838,10 @@ export function TripChatPanel({
         }}
         onAnimationComplete={(definition) => {
           // Fires per-property; only the height run is the last to settle.
+          // Belt-and-braces with the timer above: if the callback fires
+          // first, panelEntered flips earlier and the inner column
+          // becomes scrollable mid-morph. The timer would still set it
+          // again to the same value 520ms later.
           if (definition === 'height') {
             setPanelEntered(open)
           }
