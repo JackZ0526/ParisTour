@@ -1,5 +1,5 @@
-import { useCallback, useRef } from 'react'
-import { useDragControls, type PanInfo } from 'framer-motion'
+import { useEffect, useRef } from 'react'
+import { animate, useMotionValue, type MotionValue } from 'framer-motion'
 
 interface UseSheetDragDismissOptions {
   onClose: () => void
@@ -7,145 +7,249 @@ interface UseSheetDragDismissOptions {
   velocityThreshold?: number
 }
 
+export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElement> {
+  sheetRef: React.RefObject<T | null>
+  y: MotionValue<number>
+  dragProps: {
+    style: {
+      y: MotionValue<number>
+    }
+  }
+}
+
 /**
- * Enhanced Bottom Sheet pull-down-to-dismiss gesture hook.
+ * Non-passive native touch & mouse gesture arbiter for bottom sheets.
  *
- * Implements a Directional Touch Arbiter:
- * 1. Non-scrollable surfaces (headers, empty areas, toolbars):
- *    - Pulling down smoothly drags the sheet.
- * 2. Scrollable content areas (lists, detail cards):
- *    - When `scrollTop > 0` (viewing scrolled content): native scroll handles browsing.
- *    - When `scrollTop <= 0` (top of content): pulling down immediately transfers
- *      control to sheet drag, preventing browser native rubberband overscroll.
- *    - Swiping up from top immediately scrolls content without sheet jitter.
+ * Why this is needed:
+ * Browsers process touch scrolling on their compositor thread. React's passive
+ * event handlers cannot prevent the browser's native rubberband/overscroll bounce.
+ *
+ * By attaching a non-passive `touchmove` listener directly to the sheet element:
+ * - When `scrollTop <= 0` and the user swipes down, we call `e.preventDefault()`
+ *   to completely suppress native rubberbanding and drive sheet dismissal via MotionValue.
+ * - When `scrollTop > 0` or the user scrolls up, `e.preventDefault()` is NOT called,
+ *   preserving 100% native momentum scrolling inside the content.
  */
 export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   onClose,
   threshold = 110,
   velocityThreshold = 400,
-}: UseSheetDragDismissOptions) {
-  const dragControls = useDragControls()
+}: UseSheetDragDismissOptions): UseSheetDragDismissReturn<T> {
   const sheetRef = useRef<T | null>(null)
-  const touchTrackingRef = useRef<{
-    startY: number
-    startX: number
-    scrollEl: HTMLElement | null
-    captured: boolean
-  } | null>(null)
+  const y = useMotionValue(0)
 
-  const findScrollableAncestor = (target: HTMLElement | null): HTMLElement | null => {
-    let el = target
-    while (el && el !== sheetRef.current && el !== document.body) {
-      if (el.scrollHeight > el.clientHeight + 1) {
-        const overflowY = window.getComputedStyle(el).overflowY
-        if (overflowY === 'auto' || overflowY === 'scroll') {
-          return el
-        }
-      }
-      el = el.parentElement
+  useEffect(() => {
+    const el = sheetRef.current
+    if (!el) return
+
+    let startY = 0
+    let startX = 0
+    let scrollEl: HTMLElement | null = null
+    let isDraggingSheet = false
+    let lastY = 0
+    let lastTime = 0
+    let velocityY = 0
+
+    const isFormInteractive = (target: HTMLElement | null): boolean => {
+      if (!target) return false
+      const tag = target.tagName.toLowerCase()
+      return (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        target.isContentEditable
+      )
     }
-    return null
-  }
 
-  const isFormInteractive = (target: HTMLElement | null): boolean => {
-    if (!target) return false
-    const tag = target.tagName.toLowerCase()
-    return (
-      tag === 'input' ||
-      tag === 'textarea' ||
-      tag === 'select' ||
-      target.isContentEditable
-    )
-  }
+    const findScrollableAncestor = (target: HTMLElement | null): HTMLElement | null => {
+      let current = target
+      while (current && current !== el && current !== document.body) {
+        if (current.scrollHeight > current.clientHeight + 1) {
+          const overflowY = window.getComputedStyle(current).overflowY
+          if (overflowY === 'auto' || overflowY === 'scroll') {
+            return current
+          }
+        }
+        current = current.parentElement
+      }
+      return null
+    }
 
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      const target = e.target as HTMLElement | null
+    // --- Touch handling (Mobile) ---
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      const touch = e.touches[0]
+      const target = touch.target as HTMLElement | null
       if (isFormInteractive(target)) return
 
-      const scrollEl = findScrollableAncestor(target)
+      startY = touch.clientY
+      startX = touch.clientX
+      lastY = touch.clientY
+      lastTime = performance.now()
+      velocityY = 0
+      isDraggingSheet = false
+      scrollEl = findScrollableAncestor(target)
+    }
 
-      // If clicked on a non-scrollable header/chrome and not a button, start drag immediately
-      const isButtonOrLink = Boolean(
-        target?.closest('button, a, [role="button"], input, textarea'),
-      )
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      const touch = e.touches[0]
+      const deltaY = touch.clientY - startY
+      const deltaX = touch.clientX - startX
 
-      if (!scrollEl && !isButtonOrLink) {
-        dragControls.start(e)
-        return
+      const now = performance.now()
+      const dt = now - lastTime
+      if (dt > 0) {
+        velocityY = ((touch.clientY - lastY) / dt) * 1000
       }
+      lastY = touch.clientY
+      lastTime = now
 
-      // Track touch on scrollable content or interactive buttons to decide intent
-      touchTrackingRef.current = {
-        startY: e.clientY,
-        startX: e.clientX,
-        scrollEl,
-        captured: false,
-      }
-    },
-    [dragControls],
-  )
+      if (!isDraggingSheet) {
+        if (Math.abs(deltaY) < 5 && Math.abs(deltaX) < 5) return
 
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      const tracking = touchTrackingRef.current
-      if (!tracking || tracking.captured) return
+        const isVerticalDown = deltaY > 5 && deltaY > Math.abs(deltaX) * 1.1
+        const atTop = !scrollEl || scrollEl.scrollTop <= 0
 
-      const deltaY = e.clientY - tracking.startY
-      const deltaX = e.clientX - tracking.startX
-
-      // Jitter tolerance
-      if (Math.abs(deltaY) < 6 && Math.abs(deltaX) < 6) return
-
-      const isVerticalDown = deltaY > 6 && deltaY > Math.abs(deltaX) * 1.1
-
-      if (isVerticalDown) {
-        const atTop = !tracking.scrollEl || tracking.scrollEl.scrollTop <= 0
-        if (atTop) {
-          // Top of content pulled down -> Start dragging sheet to dismiss
-          tracking.captured = true
-          dragControls.start(e)
+        if (isVerticalDown && atTop) {
+          isDraggingSheet = true
+        } else {
           return
         }
       }
 
-      // Otherwise let normal scroll or horizontal gesture continue
-      if (deltaY < -6 || (tracking.scrollEl && tracking.scrollEl.scrollTop > 0)) {
-        touchTrackingRef.current = null
-      }
-    },
-    [dragControls],
-  )
+      if (isDraggingSheet) {
+        // Suppress native rubberband bounce
+        if (e.cancelable) {
+          e.preventDefault()
+        }
 
-  const handlePointerEnd = useCallback(() => {
-    touchTrackingRef.current = null
-  }, [])
-
-  const handleDragEnd = useCallback(
-    (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-      touchTrackingRef.current = null
-      if (info.offset.y > threshold || info.velocity.y > velocityThreshold) {
-        onClose()
+        const currentDelta = touch.clientY - startY
+        if (currentDelta > 0) {
+          y.set(currentDelta)
+        } else {
+          // Elastic resistance when dragged up
+          y.set(currentDelta * 0.15)
+        }
       }
-    },
-    [onClose, threshold, velocityThreshold],
-  )
+    }
+
+    const onTouchEnd = () => {
+      if (isDraggingSheet) {
+        isDraggingSheet = false
+        const currentY = y.get()
+        if (currentY > threshold || velocityY > velocityThreshold) {
+          animate(y, window.innerHeight, {
+            duration: 0.22,
+            ease: [0.22, 1, 0.36, 1] as const,
+          }).then(onClose)
+        } else {
+          animate(y, 0, {
+            type: 'spring',
+            stiffness: 420,
+            damping: 32,
+            mass: 0.8,
+          })
+        }
+      }
+    }
+
+    // --- Mouse handling (Desktop) ---
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      const target = e.target as HTMLElement | null
+      if (isFormInteractive(target)) return
+      if (target?.closest('button, a, [role="button"], input, textarea, select')) return
+
+      const scrollAncestor = findScrollableAncestor(target)
+      if (scrollAncestor && scrollAncestor.scrollTop > 0) return
+
+      startY = e.clientY
+      startX = e.clientX
+      lastY = e.clientY
+      lastTime = performance.now()
+      velocityY = 0
+      isDraggingSheet = false
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        const deltaY = moveEvent.clientY - startY
+        const deltaX = moveEvent.clientX - startX
+
+        const now = performance.now()
+        const dt = now - lastTime
+        if (dt > 0) {
+          velocityY = ((moveEvent.clientY - lastY) / dt) * 1000
+        }
+        lastY = moveEvent.clientY
+        lastTime = now
+
+        if (!isDraggingSheet) {
+          if (Math.abs(deltaY) < 5 && Math.abs(deltaX) < 5) return
+          if (deltaY > 5 && deltaY > Math.abs(deltaX)) {
+            isDraggingSheet = true
+          } else {
+            return
+          }
+        }
+
+        if (isDraggingSheet) {
+          const currentDelta = moveEvent.clientY - startY
+          if (currentDelta > 0) {
+            y.set(currentDelta)
+          } else {
+            y.set(currentDelta * 0.15)
+          }
+        }
+      }
+
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove)
+        window.removeEventListener('mouseup', onMouseUp)
+        if (isDraggingSheet) {
+          isDraggingSheet = false
+          const currentY = y.get()
+          if (currentY > threshold || velocityY > velocityThreshold) {
+            animate(y, window.innerHeight, {
+              duration: 0.22,
+              ease: [0.22, 1, 0.36, 1] as const,
+            }).then(onClose)
+          } else {
+            animate(y, 0, {
+              type: 'spring',
+              stiffness: 420,
+              damping: 32,
+              mass: 0.8,
+            })
+          }
+        }
+      }
+
+      window.addEventListener('mousemove', onMouseMove)
+      window.addEventListener('mouseup', onMouseUp)
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
+    el.addEventListener('mousedown', onMouseDown)
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+      el.removeEventListener('mousedown', onMouseDown)
+    }
+  }, [onClose, threshold, velocityThreshold, y])
 
   return {
     sheetRef,
+    y,
     dragProps: {
-      drag: 'y' as const,
-      dragControls,
-      dragListener: false,
-      dragDirectionLock: true,
-      dragConstraints: { top: 0, bottom: 0 },
-      dragElastic: { top: 0.05, bottom: 0.75 },
-      dragSnapToOrigin: true,
-      onPointerDown: handlePointerDown,
-      onPointerMove: handlePointerMove,
-      onPointerUp: handlePointerEnd,
-      onPointerCancel: handlePointerEnd,
-      onDragEnd: handleDragEnd,
+      style: {
+        y,
+      },
     },
   }
 }
