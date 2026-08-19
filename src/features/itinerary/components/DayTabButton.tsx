@@ -97,7 +97,7 @@ export function DayTabButton({
               className={`block max-w-[9.5rem] truncate sm:max-w-none ${
                 streamingTitle
                   ? 'chat-step-shimmer'
-                  : 'opacity-80 animate-fade-up'
+                  : 'opacity-80'
               }`}
             >
               {title}
