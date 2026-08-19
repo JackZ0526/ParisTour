@@ -438,7 +438,11 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
                   </div>
                 )}
 
-                <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}>
+                <div
+                  className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}
+                  data-debug-model={model}
+                  data-debug-label={getOpenAIModelShortLabel(model)}
+                >
                   <SectionHeader>模型</SectionHeader>
                   <SettingsRow
                     label={getOpenAIModelShortLabel(model)}
