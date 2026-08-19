@@ -47,7 +47,9 @@ const MORPH_SPRING = { type: 'spring' as const, stiffness: 350, damping: 30 }
 const POPOVER_MAX_WIDTH = 'min(calc(100vw - 2.5rem), 17.5rem)'
 
 function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+  )
   useEffect(() => {
     if (typeof window === 'undefined') return
     const mq = window.matchMedia(query)
