@@ -1616,7 +1616,7 @@ export function GooglePlacePage({
       }}
       className="flex max-h-[min(75dvh,calc(100dvh-2rem))] max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
           <div className="min-w-0 pr-3">
             <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
               {showNameLoader ? (
