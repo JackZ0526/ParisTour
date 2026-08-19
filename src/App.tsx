@@ -990,7 +990,7 @@ export default function App() {
                       </div>
 
                       <div
-                        className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1"
+                        className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
                         role="tablist"
                         aria-label="行程视图"
                       >
