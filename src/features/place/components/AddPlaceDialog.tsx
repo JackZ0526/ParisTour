@@ -893,6 +893,7 @@ export function AddPlaceDialog({
   }, [googleDetail, googleDetailKey, factsSig])
 
   const sheet = useEnterExit('sheet-bottom')
+  const backdrop = useEnterExit('fade')
 
   if (typeof document === 'undefined') return null
 
@@ -905,22 +906,32 @@ export function AddPlaceDialog({
     <AnimatePresence>
       {open && (
         <>
-          {/* Keep search sheet under the Google detail page while previewing. */}
+          {/* Backdrop fades in independently from the sheet so the dim
+              overlay doesn't slide up from the bottom with the panel. */}
           <motion.div
-            className={`fixed inset-0 z-[2100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${
+            className={`fixed inset-0 z-[2100] bg-black/45 ${
               googleDetail ? 'pointer-events-none invisible' : ''
             }`}
+            initial={backdrop.initial}
+            animate={backdrop.animate}
+            exit={backdrop.exit}
+            transition={backdrop.transition}
+            onClick={onClose}
+          />
+          {/* Sheet slides up from the bottom. Lives outside the backdrop's
+              flex container so the dim layer doesn't get pulled along. */}
+          <motion.div
+            className="fixed inset-x-0 bottom-0 z-[2101] flex justify-center p-0 sm:inset-0 sm:items-center sm:p-4"
             initial={sheet.initial}
             animate={sheet.animate}
             exit={sheet.exit}
             transition={sheet.transition}
           >
-          <button type="button" className="absolute inset-0" aria-label="关闭" onClick={onClose} />
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative z-10 flex max-h-[min(88dvh,88vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
-          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative z-10 flex max-h-[min(88dvh,88vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+            >
         <div ref={chromeRef} className="shrink-0">
           <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
             <div>
@@ -1328,7 +1339,7 @@ export function AddPlaceDialog({
           </div>
         </div>
       </div>
-      </motion.div>
+          </motion.div>
 
       <GooglePlacePage
         open={Boolean(googleDetail)}
