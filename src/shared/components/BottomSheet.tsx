@@ -23,15 +23,12 @@ export interface BottomSheetProps {
 /**
  * Unified Bottom Sheet container for modal dialogs across the application.
  *
- * Encapsulates:
- * - Portal mounting to document.body
- * - AnimatePresence exit coordination
- * - useBodyScrollLock non-destructive scroll locking
- * - useEnterExit('sheet-bottom') and ('fade') transition presets
- * - useSheetDragDismiss full-surface pull-down-to-dismiss gesture
- * - Escape key dismissal
- * - Backdrop click dismissal
- * - Responsive handle bar on mobile / 'X' button on desktop
+ * Architecture:
+ * - Outer motion.div: Handles 420ms iOS quintic slide-up entrance and exit transitions
+ *   via useEnterExit('sheet-bottom').
+ * - Inner motion.div: Handles real-time pull-down gesture displacement (dragY), velocity
+ *   physics, and rubberband overscroll suppression without style collision.
+ * - Backdrop: Fades independently via useEnterExit('fade').
  */
 export function BottomSheet({
   open,
@@ -50,7 +47,7 @@ export function BottomSheet({
   useBodyScrollLock(open)
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
-  const { sheetRef, dragProps } = useSheetDragDismiss<HTMLDivElement>({ onClose })
+  const { sheetRef, dragY } = useSheetDragDismiss<HTMLDivElement>({ onClose })
 
   useEffect(() => {
     if (!open) return
@@ -88,7 +85,6 @@ export function BottomSheet({
             {...containerProps}
           >
             <motion.div
-              ref={sheetRef}
               role="dialog"
               aria-modal="true"
               aria-label={ariaLabel}
@@ -97,18 +93,23 @@ export function BottomSheet({
               animate={sheet.animate}
               exit={sheet.exit}
               transition={sheet.transition}
-              {...dragProps}
-              className={`pointer-events-auto relative z-10 w-full [touch-action:pan-y] [overscroll-behavior-y:contain] ${className}`}
+              className="pointer-events-auto relative z-10 flex w-full justify-center"
             >
-              {showHandle && (
-                <div
-                  className="flex sm:hidden w-full shrink-0 justify-center pt-2.5 pb-1 select-none pointer-events-none"
-                  aria-hidden="true"
-                >
-                  <div className="h-1 w-10 rounded-full bg-[var(--stone)]/35" />
-                </div>
-              )}
-              {children}
+              <motion.div
+                ref={sheetRef}
+                style={{ y: dragY }}
+                className={`relative w-full [touch-action:pan-y] [overscroll-behavior-y:contain] ${className}`}
+              >
+                {showHandle && (
+                  <div
+                    className="flex sm:hidden w-full shrink-0 justify-center pt-2.5 pb-1 select-none pointer-events-none"
+                    aria-hidden="true"
+                  >
+                    <div className="h-1 w-10 rounded-full bg-[var(--stone)]/35" />
+                  </div>
+                )}
+                {children}
+              </motion.div>
             </motion.div>
           </div>
         </>
