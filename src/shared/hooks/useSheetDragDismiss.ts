@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react'
-import { animate, useMotionValue, type MotionValue } from 'framer-motion'
+import { useCallback, useEffect, useRef } from 'react'
+import type { PanInfo } from 'framer-motion'
 
 interface UseSheetDragDismissOptions {
-  open?: boolean
   onClose: () => void
   threshold?: number
   velocityThreshold?: number
@@ -10,42 +9,32 @@ interface UseSheetDragDismissOptions {
 
 export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElement> {
   sheetRef: React.RefObject<T | null>
-  y: MotionValue<number>
   dragProps: {
-    style: {
-      y: MotionValue<number>
-    }
+    drag: 'y'
+    dragDirectionLock: boolean
+    dragConstraints: { top: number; bottom: number }
+    dragElastic: { top: number; bottom: number }
+    dragSnapToOrigin: boolean
+    onDragEnd: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void
   }
 }
 
 /**
- * Non-passive native touch & mouse gesture arbiter for bottom sheets.
+ * Bottom Sheet pull-down-to-dismiss gesture hook.
  *
- * Features:
- * 1. Non-passive touch listener intercepts downward swipe at scrollTop <= 0,
- *    completely suppressing native browser overscroll/rubber-banding.
- * 2. Directly drives sheet displacement via MotionValue during active drag.
- * 3. On release:
- *    - If released below threshold: springs back to 0.
- *    - If released above threshold or swiped with downward velocity: immediately
- *      triggers onClose() so AnimatePresence coordinates synchronous exit of both
- *      the sheet and the backdrop without lag or lingering overlay.
+ * Coordinates:
+ * 1. Framer Motion's native `drag="y"` for hardware-accelerated drag and exit.
+ * 2. Non-passive native `touchmove` listener to call `e.preventDefault()` when
+ *    content is at top (`scrollTop <= 0`), completely suppressing browser rubberband overscroll.
+ * 3. Preserves `initial: { y: '100%' }` -> `animate: { y: 0 }` entrance transitions without
+ *    MotionValue style collisions.
  */
 export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
-  open = true,
   onClose,
   threshold = 100,
   velocityThreshold = 350,
 }: UseSheetDragDismissOptions): UseSheetDragDismissReturn<T> {
   const sheetRef = useRef<T | null>(null)
-  const y = useMotionValue(0)
-
-  // Reset y to 0 whenever the sheet opens or remounts
-  useEffect(() => {
-    if (open) {
-      y.set(0)
-    }
-  }, [open, y])
 
   useEffect(() => {
     const el = sheetRef.current
@@ -54,10 +43,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     let startY = 0
     let startX = 0
     let scrollEl: HTMLElement | null = null
-    let isDraggingSheet = false
-    let lastY = 0
-    let lastTime = 0
-    let velocityY = 0
+    let isIntercepting = false
 
     const isFormInteractive = (target: HTMLElement | null): boolean => {
       if (!target) return false
@@ -84,29 +70,6 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
       return null
     }
 
-    const settleOnRelease = (releaseVelocity: number) => {
-      isDraggingSheet = false
-      const currentY = y.get()
-      const shouldDismiss =
-        currentY > threshold || releaseVelocity > velocityThreshold
-
-      if (shouldDismiss) {
-        // Immediately invoke onClose so AnimatePresence orchestrates
-        // simultaneous, lag-free exit for both sheet and backdrop.
-        onClose()
-      } else {
-        // Snap back to top
-        animate(y, 0, {
-          type: 'spring',
-          velocity: releaseVelocity,
-          stiffness: 420,
-          damping: 32,
-          mass: 0.8,
-        })
-      }
-    }
-
-    // --- Touch handling (Mobile) ---
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
       const touch = e.touches[0]
@@ -115,10 +78,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 
       startY = touch.clientY
       startX = touch.clientX
-      lastY = touch.clientY
-      lastTime = performance.now()
-      velocityY = 0
-      isDraggingSheet = false
+      isIntercepting = false
       scrollEl = findScrollableAncestor(target)
     }
 
@@ -128,133 +88,61 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
       const deltaY = touch.clientY - startY
       const deltaX = touch.clientX - startX
 
-      const now = performance.now()
-      const dt = now - lastTime
-      if (dt > 4 && dt < 120) {
-        const instantVelocity = ((touch.clientY - lastY) / dt) * 1000
-        velocityY = velocityY ? velocityY * 0.35 + instantVelocity * 0.65 : instantVelocity
-      }
-      lastY = touch.clientY
-      lastTime = now
-
-      if (!isDraggingSheet) {
-        if (Math.abs(deltaY) < 5 && Math.abs(deltaX) < 5) return
-
-        const isVerticalDown = deltaY > 5 && deltaY > Math.abs(deltaX) * 1.1
+      if (!isIntercepting) {
+        if (Math.abs(deltaY) < 4 && Math.abs(deltaX) < 4) return
+        const isVerticalDown = deltaY > 4 && deltaY > Math.abs(deltaX) * 1.1
         const atTop = !scrollEl || scrollEl.scrollTop <= 0
 
         if (isVerticalDown && atTop) {
-          isDraggingSheet = true
+          isIntercepting = true
         } else {
           return
         }
       }
 
-      if (isDraggingSheet) {
-        // Suppress native rubberband bounce
+      if (isIntercepting) {
+        // Prevent browser's native overscroll bounce
         if (e.cancelable) {
           e.preventDefault()
-        }
-
-        const currentDelta = touch.clientY - startY
-        if (currentDelta > 0) {
-          y.set(currentDelta)
-        } else {
-          // Elastic resistance when dragged up
-          y.set(currentDelta * 0.15)
         }
       }
     }
 
     const onTouchEnd = () => {
-      if (isDraggingSheet) {
-        settleOnRelease(velocityY)
-      }
-    }
-
-    // --- Mouse handling (Desktop) ---
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-      const target = e.target as HTMLElement | null
-      if (isFormInteractive(target)) return
-      if (target?.closest('button, a, [role="button"], input, textarea, select')) return
-
-      const scrollAncestor = findScrollableAncestor(target)
-      if (scrollAncestor && scrollAncestor.scrollTop > 0) return
-
-      startY = e.clientY
-      startX = e.clientX
-      lastY = e.clientY
-      lastTime = performance.now()
-      velocityY = 0
-      isDraggingSheet = false
-
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const deltaY = moveEvent.clientY - startY
-        const deltaX = moveEvent.clientX - startX
-
-        const now = performance.now()
-        const dt = now - lastTime
-        if (dt > 4 && dt < 120) {
-          const instantVelocity = ((moveEvent.clientY - lastY) / dt) * 1000
-          velocityY = velocityY ? velocityY * 0.35 + instantVelocity * 0.65 : instantVelocity
-        }
-        lastY = moveEvent.clientY
-        lastTime = now
-
-        if (!isDraggingSheet) {
-          if (Math.abs(deltaY) < 5 && Math.abs(deltaX) < 5) return
-          if (deltaY > 5 && deltaY > Math.abs(deltaX)) {
-            isDraggingSheet = true
-          } else {
-            return
-          }
-        }
-
-        if (isDraggingSheet) {
-          const currentDelta = moveEvent.clientY - startY
-          if (currentDelta > 0) {
-            y.set(currentDelta)
-          } else {
-            y.set(currentDelta * 0.15)
-          }
-        }
-      }
-
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove)
-        window.removeEventListener('mouseup', onMouseUp)
-        if (isDraggingSheet) {
-          settleOnRelease(velocityY)
-        }
-      }
-
-      window.addEventListener('mousemove', onMouseMove)
-      window.addEventListener('mouseup', onMouseUp)
+      isIntercepting = false
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: false })
     el.addEventListener('touchend', onTouchEnd, { passive: true })
     el.addEventListener('touchcancel', onTouchEnd, { passive: true })
-    el.addEventListener('mousedown', onMouseDown)
 
     return () => {
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
       el.removeEventListener('touchcancel', onTouchEnd)
-      el.removeEventListener('mousedown', onMouseDown)
     }
-  }, [onClose, threshold, velocityThreshold, y])
+  }, [])
+
+  const handleDragEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      if (info.offset.y > threshold || info.velocity.y > velocityThreshold) {
+        onClose()
+      }
+    },
+    [onClose, threshold, velocityThreshold],
+  )
 
   return {
     sheetRef,
-    y,
     dragProps: {
-      style: {
-        y,
-      },
+      drag: 'y' as const,
+      dragDirectionLock: true,
+      dragConstraints: { top: 0, bottom: 0 },
+      dragElastic: { top: 0.05, bottom: 0.75 },
+      dragSnapToOrigin: true,
+      onDragEnd: handleDragEnd,
     },
   }
 }
