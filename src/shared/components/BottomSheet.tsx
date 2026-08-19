@@ -31,7 +31,7 @@ export interface BottomSheetProps {
  * - useSheetDragDismiss full-surface pull-down-to-dismiss gesture
  * - Escape key dismissal
  * - Backdrop click dismissal
- * - Built-in pull-down drag handle bar
+ * - Responsive handle bar on mobile / 'X' button on desktop
  */
 export function BottomSheet({
   open,
@@ -50,7 +50,7 @@ export function BottomSheet({
   useBodyScrollLock(open)
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
-  const { sheetRef, backdropBg, dragProps } = useSheetDragDismiss<HTMLDivElement>({ open, onClose })
+  const { sheetRef, dragProps } = useSheetDragDismiss<HTMLDivElement>({ open, onClose })
 
   useEffect(() => {
     if (!open) return
@@ -74,11 +74,8 @@ export function BottomSheet({
             animate={backdrop.animate}
             exit={backdrop.exit}
             transition={backdrop.transition}
-            style={{
-              zIndex: overlayZIndex,
-              backgroundColor: backdropBg,
-            }}
-            className={`fixed -inset-y-32 inset-x-0 min-h-[140vh] cursor-default ${
+            style={{ zIndex: overlayZIndex }}
+            className={`fixed inset-0 cursor-default bg-black/45 ${
               hideBackdrop ? 'pointer-events-none invisible' : ''
             } ${overlayClassName}`}
             onClick={() => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { animate, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
+import { animate, useMotionValue, type MotionValue } from 'framer-motion'
 
 interface UseSheetDragDismissOptions {
   open?: boolean
@@ -11,8 +11,6 @@ interface UseSheetDragDismissOptions {
 export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElement> {
   sheetRef: React.RefObject<T | null>
   y: MotionValue<number>
-  backdropOpacity: MotionValue<number>
-  backdropBg: MotionValue<string>
   dragProps: {
     style: {
       y: MotionValue<number>
@@ -24,28 +22,23 @@ export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElemen
  * Non-passive native touch & mouse gesture arbiter for bottom sheets.
  *
  * Features:
- * 1. Non-passive touch listener prevents browser rubberband overscroll at scrollTop <= 0.
- * 2. Real-time velocity tracker with exponential smoothing.
- * 3. Velocity-inherited spring physics upon release:
- *    - Fling downwards: inherits momentum and sweeps offscreen at finger speed.
- *    - Slow release: smooth glide offscreen.
- *    - Cancel / rebound: inherits release velocity into snap-back spring.
+ * 1. Non-passive touch listener intercepts downward swipe at scrollTop <= 0,
+ *    completely suppressing native browser overscroll/rubber-banding.
+ * 2. Directly drives sheet displacement via MotionValue during active drag.
+ * 3. On release:
+ *    - If released below threshold: springs back to 0.
+ *    - If released above threshold or swiped with downward velocity: immediately
+ *      triggers onClose() so AnimatePresence coordinates synchronous exit of both
+ *      the sheet and the backdrop without lag or lingering overlay.
  */
 export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   open = true,
   onClose,
-  threshold = 110,
-  velocityThreshold = 380,
+  threshold = 100,
+  velocityThreshold = 350,
 }: UseSheetDragDismissOptions): UseSheetDragDismissReturn<T> {
   const sheetRef = useRef<T | null>(null)
   const y = useMotionValue(0)
-  const backdropOpacity = useTransform(y, [0, 360], [1, 0], { clamp: true })
-  const backdropBg = useTransform(
-    y,
-    [0, 360],
-    ['rgba(0, 0, 0, 0.45)', 'rgba(0, 0, 0, 0)'],
-    { clamp: true },
-  )
 
   // Reset y to 0 whenever the sheet opens or remounts
   useEffect(() => {
@@ -98,18 +91,11 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
         currentY > threshold || releaseVelocity > velocityThreshold
 
       if (shouldDismiss) {
-        const targetY = (typeof window !== 'undefined' ? window.innerHeight : 800) + 60
-        const initialV = Math.max(releaseVelocity, 450)
-
-        animate(y, targetY, {
-          type: 'spring',
-          velocity: initialV,
-          stiffness: 340,
-          damping: 32,
-          mass: 0.6,
-        }).then(onClose)
+        // Immediately invoke onClose so AnimatePresence orchestrates
+        // simultaneous, lag-free exit for both sheet and backdrop.
+        onClose()
       } else {
-        // Snap back to top, incorporating any residual touch velocity
+        // Snap back to top
         animate(y, 0, {
           type: 'spring',
           velocity: releaseVelocity,
@@ -146,7 +132,6 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
       const dt = now - lastTime
       if (dt > 4 && dt < 120) {
         const instantVelocity = ((touch.clientY - lastY) / dt) * 1000
-        // Exponential moving average for smooth velocity continuity
         velocityY = velocityY ? velocityY * 0.35 + instantVelocity * 0.65 : instantVelocity
       }
       lastY = touch.clientY
@@ -266,8 +251,6 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   return {
     sheetRef,
     y,
-    backdropOpacity,
-    backdropBg,
     dragProps: {
       style: {
         y,
