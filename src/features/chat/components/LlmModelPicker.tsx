@@ -526,76 +526,88 @@ function ThinkingControls({
       </div>
 
       {/* L2: nested under 思考 — 自动 checkbox (child) + 低/中/高 when custom */}
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
-          thinkingOn ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="mt-2.5 ml-1 rounded-xl bg-[var(--mist)]/40 px-2.5 py-2 pl-3">
-            <label
-              htmlFor={autoCheckboxId}
-              className={`flex items-start gap-2.5 ${
-                autoDisabled ? 'cursor-default' : 'cursor-pointer'
-              }`}
-            >
-              <Checkbox
-                id={autoCheckboxId}
-                checked={autoOn}
-                disabled={autoDisabled}
-                onCheckedChange={setAuto}
-                size="sm"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-medium leading-snug text-[var(--stone)]">
-                  自动选择强度
+      <AnimatePresence initial={false}>
+        {thinkingOn && (
+          <motion.div
+            key="thinking-on"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2.5 ml-1 rounded-xl bg-[var(--mist)]/40 px-2.5 py-2 pl-3">
+              <label
+                htmlFor={autoCheckboxId}
+                className={`flex items-start gap-2.5 ${
+                  autoDisabled ? 'cursor-default' : 'cursor-pointer'
+                }`}
+              >
+                <Checkbox
+                  id={autoCheckboxId}
+                  checked={autoOn}
+                  disabled={autoDisabled}
+                  onCheckedChange={setAuto}
+                  size="sm"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-medium leading-snug text-[var(--stone)]">
+                    自动选择强度
+                  </span>
+                  <span className="mt-0.5 block text-[10px] leading-snug text-[var(--stone)]/70">
+                    按当前操作自动选择思考强度
+                  </span>
                 </span>
-                <span className="mt-0.5 block text-[10px] leading-snug text-[var(--stone)]/70">
-                  按当前操作自动选择思考强度
-                </span>
-              </span>
-            </label>
+              </label>
 
-            <div
-              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                autoOn ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
-              }`}
-            >
-              <div className="min-h-0 overflow-hidden">
-                <div className="pt-2">
-                  <ThinkingIntensitySlider
-                    value={sliderValue}
-                    disabled={disabled || !thinkingOn || autoOn}
-                    onChange={setThinkingEffort}
-                  />
-                </div>
-              </div>
+              <AnimatePresence initial={false}>
+                {!autoOn && (
+                  <motion.div
+                    key="slider"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-2">
+                      <ThinkingIntensitySlider
+                        value={sliderValue}
+                        disabled={disabled || !thinkingOn || autoOn}
+                        onChange={setThinkingEffort}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Skip notice — same grid-rows pattern as L2 (300ms ease-out) so it
-          expands in sync with L2's collapse when thinking toggles off,
-          giving a monotonic height change instead of the prior "skip
-          appears at full size while L2 is still expanding" bump. */}
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
-          !thinkingOn ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[var(--mist)]/35 px-2.5 py-2">
-            <span
-              aria-hidden
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/45"
-            />
-            <p className="text-[11px] leading-snug text-[var(--stone)]">
-              跳过额外推理，响应更直接
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Skip notice */}
+      <AnimatePresence initial={false}>
+        {!thinkingOn && (
+          <motion.div
+            key="thinking-off"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[var(--mist)]/35 px-2.5 py-2">
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/45"
+              />
+              <p className="text-[11px] leading-snug text-[var(--stone)]">
+                跳过额外推理，响应更直接
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <span className="sr-only">当前模式 {mode}</span>
     </div>
