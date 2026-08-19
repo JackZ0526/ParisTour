@@ -119,7 +119,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   // absolutely positioned, there's nothing in-flow for `height: 'auto'`
   // to measure against, so we duplicate the markup off-screen and let a
   // ResizeObserver feed the value back into the animate.height target.
-  const [popoverHeight, setPopoverHeight] = useState(200)
+  const [popoverHeight, setPopoverHeight] = useState(260)
   // Mobile: closed chip is a 48px circle. Desktop: closed chip is a pill
   // (auto width up to 15.5rem, 48px tall) — the morph widens the pill
   // before the popover content unfurls upward.
@@ -127,8 +127,8 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const canThink = supportsThinkingControls(model)
   const deepseek = isDeepSeekModel(model)
 
-  // Track the popover's natural height. Re-measures when `panel` or
-  // `thinkingMode` change (the two things that mutate the rendered size).
+  // Track the popover's natural height. Re-measures when `open`, `panel`,
+  // `model`, or `thinkingMode` change.
   useLayoutEffect(() => {
     const el = sentinelRef.current
     if (!el) return
@@ -140,7 +140,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
     const observer = new ResizeObserver(update)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [panel, model, thinkingMode])
+  }, [open, panel, model, thinkingMode])
 
   // Track whether we're currently in the chip→popover opening morph so
   // the height animation can be delayed (width-first → height-second, the
@@ -172,11 +172,9 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   // Mark animating synchronously with any state change that re-targets
   // height: `open` flipping (opening morph), `open` flipping back
   // (closing morph), or panel / model / thinkingMode changing while
-  // open (internal re-target). The `onAnimationComplete('height')`
-  // callback on the motion.div flips it back. This catches all three
-  // cases — the old time-based gate only covered the opening morph and
-  // missed internal re-targets + the closing morph.
-  useEffect(() => {
+  // open (internal re-target). The `onAnimationComplete` callback
+  // on the motion.div flips it back.
+  useLayoutEffect(() => {
     setHeightAnimating(true)
   }, [open, panel, model, thinkingMode])
 
@@ -247,14 +245,8 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           delay: justOpened ? 0.18 : 0,
         },
       }}
-      onAnimationComplete={(definition) => {
-        // Fires once per property when each settles. The height run is
-        // the last to finish, so we know heightAnimating can be cleared
-        // on the height callback (whether the morph was the opening
-        // morph, an internal re-target, or the closing morph).
-        if (definition === 'height') {
-          setHeightAnimating(false)
-        }
+      onAnimationComplete={() => {
+        setHeightAnimating(false)
       }}
       style={{
         // Anchored to the viewport (not a 0x0 relative wrapper) so the
@@ -271,14 +263,14 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           : 'max(1.25rem, env(safe-area-inset-right))',
         zIndex: 1,
         borderRadius: 24,
-        // overflow: hidden while the height is animating (opening morph,
+        // overflow: hidden while closed or while the height is animating (opening morph,
         // internal re-target from panel switch / thinking toggle, closing
         // morph) — the popover content can be taller than the in-flight
         // motion.div, so 'auto' would briefly show a scrollbar. Once
         // the height run settles (onAnimationComplete), we switch to
         // 'hidden auto' so the panel can scroll if the sentinel-reported
         // height ever exceeds maxHeight.
-        overflow: heightAnimating ? 'hidden' : 'hidden auto',
+        overflow: !open || heightAnimating ? 'hidden' : 'hidden auto',
         // Cap the popover so it never extends past the top of the viewport.
         // 2.5rem = 40px headroom (20px top + 20px bottom margins).
         maxHeight: 'calc(100vh - 2.5rem)',
@@ -289,7 +281,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         boxShadow: 'var(--shadow)',
         backdropFilter: 'blur(8px)',
       }}
-      className={`fixed ${className}`}
+      className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
       {/* Sentinel -- off-screen, invisible, non-interactive copy of the
           popover content. Used solely for height measurement (its content
@@ -299,12 +291,13 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         ref={sentinelRef}
         aria-hidden
         style={{
-          position: 'absolute',
+          position: 'fixed',
           left: '-9999px',
           top: 0,
           width: 'min(calc(100vw - 2.5rem), 17.5rem)',
           pointerEvents: 'none',
           visibility: 'hidden',
+          zIndex: -1,
         }}
       >
         {panel === 'root' ? (
@@ -413,7 +406,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         inert={!open || undefined}
         aria-hidden={!open}
         style={{ position: 'absolute', inset: 0 }}
-        className="flex flex-col"
+        className="flex flex-col overflow-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {panel === 'root' ? (
