@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { lookupFlight, meaningfulFlightStatus } from '../services/flightLookup'
 import { purgeNonApiFlightCache } from '../services/flightCache'
 import {
@@ -324,24 +325,63 @@ export function FlightPanel({
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       </div>
 
-      {hasCards && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {outbound && (
-            <FlightCard
-              title="去程"
-              info={outbound}
-              loading={busy === 'outbound' || busy === 'both'}
-            />
-          )}
-          {inbound && (
-            <FlightCard
-              title="返程"
-              info={inbound}
-              loading={busy === 'return' || busy === 'both'}
-            />
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {hasCards && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{
+              height: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
+              opacity: { duration: 0.25, ease: 'easeOut' },
+            }}
+            className="overflow-hidden"
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AnimatePresence mode="popLayout">
+                {outbound && (
+                  <motion.div
+                    key={`flight-outbound-${outbound.flightNumber}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.96, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -6 }}
+                    transition={{
+                      duration: 0.32,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                  >
+                    <FlightCard
+                      title="去程"
+                      info={outbound}
+                      loading={busy === 'outbound' || busy === 'both'}
+                    />
+                  </motion.div>
+                )}
+                {inbound && (
+                  <motion.div
+                    key={`flight-inbound-${inbound.flightNumber}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.96, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -6 }}
+                    transition={{
+                      duration: 0.32,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                  >
+                    <FlightCard
+                      title="返程"
+                      info={inbound}
+                      loading={busy === 'return' || busy === 'both'}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   )
 }

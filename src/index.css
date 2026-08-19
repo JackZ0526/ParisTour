@@ -628,37 +628,32 @@ select {
 
 @media (min-width: 1024px) {
   .api-meter {
-    top: 50%;
-    transform: translateY(-50%);
+    top: 36%;
+    transform: none;
   }
 }
 
 .api-meter-shell {
   position: relative;
-  display: flex;
-  align-items: flex-start;
-  width: max-content;
   margin-left: max(0.45rem, env(safe-area-inset-left));
-}
-
-.api-meter-rail,
-.api-meter-details-panel {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: var(--card);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .api-meter-rail {
+  position: absolute;
+  inset: 0;
   display: flex;
-  width: var(--api-meter-rail);
-  flex-shrink: 0;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.18rem;
-  padding: 0.6rem 0.08rem 0.65rem;
-  border-radius: 0.95rem;
+  padding: 0.55rem 0.08rem;
+  box-sizing: border-box;
 }
 
 .api-meter-rail-label,
@@ -715,22 +710,24 @@ select {
   color: var(--sage);
 }
 
-.api-meter-details {
+.api-meter-details-panel-inner {
   position: absolute;
-  top: 0;
-  left: 100%;
-  width: 22.5rem;
-  /* Enter/exit is now driven by Framer Motion (ApiRequestMeter.tsx); the
-     block below keeps the static "shell" so motion can mount/unmount
-     without depending on a .is-details-open toggle. */
+  inset: 0;
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
-.api-meter-details-panel {
-  width: 21.5rem;
-  margin-left: 0.45rem;
-  overflow: visible;
-  border-radius: 1rem;
-  padding: 0.65rem 0.7rem 0.7rem;
+.api-meter-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .api-meter-details-grid {
@@ -1773,6 +1770,83 @@ body.timeline-dragging {
 
 @media (prefers-reduced-motion: reduce) {
   .trip-map-route-enter {
+    animation: none;
+  }
+}
+
+/* Map-Timeline Interactivity: Marker spring bounce & pulse halo */
+@keyframes marker-pulse-halo {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  60% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
+@keyframes marker-spring-bounce {
+  0% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(1.24) translateY(-3px);
+  }
+  70% {
+    transform: scale(1.06) translateY(-1px);
+  }
+  100% {
+    transform: scale(1.12) translateY(-2px);
+  }
+}
+
+.trip-map-marker-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trip-map-marker-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(185, 87, 47, 0.45) 0%, rgba(185, 87, 47, 0.08) 70%, transparent 100%);
+  pointer-events: none;
+  animation: marker-pulse-halo 2.2s infinite ease-out;
+  z-index: -1;
+}
+
+.trip-map-marker-active img {
+  animation: marker-spring-bounce 450ms var(--ease-spring) both;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.28));
+}
+
+/* Timeline card selected highlight shimmer */
+@keyframes timeline-card-shimmer-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 99, 86, 0);
+  }
+  30% {
+    box-shadow: 0 0 0 4px rgba(74, 99, 86, 0.35), 0 4px 16px rgba(74, 99, 86, 0.15);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(74, 99, 86, 0.25), 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.timeline-card-selected-highlight {
+  animation: timeline-card-shimmer-flash 1.2s var(--ease-out-smooth) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-map-marker-halo,
+  .trip-map-marker-active img,
+  .timeline-card-selected-highlight {
     animation: none;
   }
 }

@@ -112,20 +112,58 @@ export function CloudSaveIndicator() {
       <div className="cloud-save-toast-glow" aria-hidden />
       <div className="cloud-save-toast-inner">
         <div className="cloud-save-icon-wrap">
-          {isSave && saveStatus === 'error' ? (
-            <CircleAlert size={28} strokeWidth={1.8} aria-hidden />
-          ) : done ? (
-            <div className="cloud-save-ok">
-              {isSave ? <FloppyIcon /> : <SyncOrbitIcon spinning={false} />}
-              <span className="cloud-save-check-badge" aria-hidden>
-                <Check size={11} strokeWidth={3} />
-              </span>
-            </div>
-          ) : isSave ? (
-            <FloppyIcon spinning={busy} />
-          ) : (
-            <SyncOrbitIcon spinning={busy} />
-          )}
+          <AnimatePresence mode="wait">
+            {isSave && saveStatus === 'error' ? (
+              <motion.div
+                key="error"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <CircleAlert size={28} strokeWidth={1.8} aria-hidden />
+              </motion.div>
+            ) : done ? (
+              <motion.div
+                key="done"
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.85, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 450, damping: 24 }}
+                className="cloud-save-ok"
+              >
+                {isSave ? <FloppyIcon /> : <SyncOrbitIcon spinning={false} />}
+                <motion.span
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 20,
+                    delay: 0.05,
+                  }}
+                  className="cloud-save-check-badge"
+                  aria-hidden
+                >
+                  <Check size={11} strokeWidth={3} />
+                </motion.span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="busy"
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.85, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                {isSave ? (
+                  <FloppyIcon spinning={busy} />
+                ) : (
+                  <SyncOrbitIcon spinning={busy} />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         <div className="cloud-save-copy">
           <span className="cloud-save-kicker">{isSave ? 'AUTO SAVE' : 'LIVE SYNC'}</span>

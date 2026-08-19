@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
 import { MobileActionMenu } from './features/auth/components/MobileActionMenu'
 import { useAuth } from './features/auth/authContext'
@@ -64,6 +64,28 @@ import {
   buildHeroCopy,
   chineseDayCount,
 } from './appHelpers'
+
+const timelineContainerVariants = {
+  enter: (_direction: number) => ({
+    transition: {
+      staggerChildren: 0.034,
+      delayChildren: 0,
+    },
+  }),
+  center: (_direction: number) => ({
+    transition: {
+      staggerChildren: 0.034,
+      delayChildren: 0,
+    },
+  }),
+  exit: (_direction: number) => ({
+    opacity: 0,
+    transition: {
+      duration: 0.06,
+      ease: 'easeIn' as const,
+    },
+  }),
+}
 
 export default function App() {
   const {
@@ -141,6 +163,8 @@ export default function App() {
     },
     { numberOfDaysRef },
   )
+  const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
+
   const [openHotelDetailToken, setOpenHotelDetailToken] = useState(0)
   const handleSelectPlace = useCallback(
     (id: string) => {
@@ -211,6 +235,16 @@ export default function App() {
       recommendationPreferences,
     },
     { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
+  )
+  const handleSelectDay = useCallback(
+    (nextDayIndex: number) => {
+      if (nextDayIndex === dayIndex) return
+      setDaySlideDirection(nextDayIndex > dayIndex ? 1 : -1)
+      setDayIndex(nextDayIndex)
+      setSelectedPlaceId(null)
+      setDayRegenError(null)
+    },
+    [dayIndex, setDayIndex, setSelectedPlaceId, setDayRegenError],
   )
   numberOfDaysRef.current = numberOfDays
   const routePrefetchPlan = useMemo(
@@ -897,11 +931,7 @@ export default function App() {
                               title={d.title}
                               pending={isDayGenerationPending(d.day)}
                               active={i === dayIndex}
-                              onSelect={() => {
-                                setDayIndex(i)
-                                setSelectedPlaceId(null)
-                                setDayRegenError(null)
-                              }}
+                              onSelect={() => handleSelectDay(i)}
                             />
                           )
                         })}
@@ -982,38 +1012,50 @@ export default function App() {
                       <div
                         className={
                           mobileItineraryPane === 'timeline'
-                            ? 'block'
-                            : 'hidden lg:block'
+                            ? 'block w-full min-w-0 max-w-full'
+                            : 'hidden lg:block lg:w-full lg:min-w-0 lg:max-w-full'
                         }
                       >
-                        <DayTimeline
-                          key={`timeline-${day.day}-${hotel.id}`}
-                          day={day}
-                          hotel={hotel}
-                          customPlaces={placesWithHotel}
-                          selectedPlaceId={selectedPlaceId}
-                          navPlan={navPlan}
-                          copyRefreshing={copyRefreshing}
-                          dayRegenerating={dayRegenerating}
-                          dayRegenError={dayRegenError}
-                          dayRestoring={dayRestoring}
-                          dayPending={dayPending}
-                          isLastDay={day.day === lastDayNum}
-                          onSelectPlace={handleSelectPlace}
-                          onReorder={handleReorder}
-                          onDelete={handleDelete}
-                          onAddCustom={handleAddCustom}
-                          onResetDay={() => {
-                            void handleResetDay(dayIndex)
-                          }}
-                          canRestoreDayDefault={canRestoreDayDefault}
-                          onRestoreDayDefault={() => {
-                            handleRestoreDayDefault(dayIndex)
-                          }}
-                          tripPlaceNames={tripPlaceNames}
-                          readOnly={readOnly}
-                          recommendationPreferences={recommendationPreferences}
-                        />
+                        <AnimatePresence mode="wait" custom={daySlideDirection} initial={false}>
+                          <motion.div
+                            key={`timeline-${day.day}-${hotel.id}`}
+                            custom={daySlideDirection}
+                            variants={timelineContainerVariants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            className="w-full min-w-0 max-w-full"
+                          >
+                            <DayTimeline
+                              day={day}
+                              hotel={hotel}
+                              direction={daySlideDirection}
+                              customPlaces={placesWithHotel}
+                              selectedPlaceId={selectedPlaceId}
+                              navPlan={navPlan}
+                              copyRefreshing={copyRefreshing}
+                              dayRegenerating={dayRegenerating}
+                              dayRegenError={dayRegenError}
+                              dayRestoring={dayRestoring}
+                              dayPending={dayPending}
+                              isLastDay={day.day === lastDayNum}
+                              onSelectPlace={handleSelectPlace}
+                              onReorder={handleReorder}
+                              onDelete={handleDelete}
+                              onAddCustom={handleAddCustom}
+                              onResetDay={() => {
+                                void handleResetDay(dayIndex)
+                              }}
+                              canRestoreDayDefault={canRestoreDayDefault}
+                              onRestoreDayDefault={() => {
+                                handleRestoreDayDefault(dayIndex)
+                              }}
+                              tripPlaceNames={tripPlaceNames}
+                              readOnly={readOnly}
+                              recommendationPreferences={recommendationPreferences}
+                            />
+                          </motion.div>
+                        </AnimatePresence>
                       </div>
                       <div
                         className={`space-y-4 ${

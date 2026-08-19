@@ -7,6 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { PENDING_HOTEL, isHotelSelected } from '../constants/hotels'
 import { loadHotelCache } from '../services/hotelCache'
 import {
@@ -2187,89 +2188,101 @@ export function HotelPicker({
         <div className="space-y-2">
           <h3 className="font-medium text-[var(--ink)]">当前选择的酒店</h3>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {selectedCandidate ? (
-              <div
-                ref={currentSlotRef}
-                className={`group relative overflow-hidden rounded-2xl border text-left shadow-[var(--shadow)] ring-2 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
-                  currentSlotDropReady
-                    ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
-                    : currentSlotHighlight
-                      ? 'border-[var(--copper)] ring-[var(--copper)]/50 bg-[var(--copper)]/5'
-                      : 'border-[var(--copper)] ring-[var(--copper)]/30'
-                }`}
-              >
-                <div className="absolute right-2 top-2 z-10 flex gap-1.5">
-                  {selectedCandidate.source === 'custom' && (
+            <AnimatePresence mode="wait">
+              {selectedCandidate ? (
+                <motion.div
+                  key={`selected-hotel-${selectedCandidate.id}`}
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  ref={currentSlotRef}
+                  className={`group relative overflow-hidden rounded-2xl border text-left shadow-[var(--shadow)] ring-2 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                    currentSlotDropReady
+                      ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
+                      : currentSlotHighlight
+                        ? 'border-[var(--copper)] ring-[var(--copper)]/50 bg-[var(--copper)]/5'
+                        : 'border-[var(--copper)] ring-[var(--copper)]/30'
+                  }`}
+                >
+                  <div className="absolute right-2 top-2 z-10 flex gap-1.5">
+                    {selectedCandidate.source === 'custom' && (
+                      <button
+                        type="button"
+                        data-hotel-no-drag
+                        aria-label={`删除 ${selectedCandidate.name}`}
+                        title="删除自定义酒店"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeHotel(selectedCandidate)
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
+                      >
+                        <TrashIcon />
+                      </button>
+                    )}
                     <button
                       type="button"
                       data-hotel-no-drag
-                      aria-label={`删除 ${selectedCandidate.name}`}
-                      title="删除自定义酒店"
+                      aria-label="取消当前选择"
+                      title="取消当前选择"
                       onClick={(e) => {
                         e.stopPropagation()
-                        removeHotel(selectedCandidate)
+                        clearCurrentSelection()
                       }}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-[var(--copper)]"
                     >
-                      <TrashIcon />
+                      <UnselectIcon />
                     </button>
+                  </div>
+                  {currentSlotHighlight && (
+                    <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-[var(--sage)]/15">
+                      <span className="rounded-full bg-[var(--ink)]/80 px-3 py-1 text-sm text-[var(--paper)]">
+                        {currentSlotDropReady ? '松开以更换住宿' : '拖到此处更换'}
+                      </span>
+                    </div>
                   )}
                   <button
                     type="button"
-                    data-hotel-no-drag
-                    aria-label="取消当前选择"
-                    title="取消当前选择"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      clearCurrentSelection()
-                    }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-[var(--copper)]"
+                    onClick={() => openHotelCard(selectedCandidate)}
+                    className="w-full text-left"
                   >
-                    <UnselectIcon />
+                    <HotelCardFace
+                      hotel={selectedCandidate}
+                      blurb={cardBlurbStream[selectedCandidate.id]}
+                      blurbLoading={
+                        needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
+                      }
+                    />
                   </button>
-                </div>
-                {currentSlotHighlight && (
-                  <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-[var(--sage)]/15">
-                    <span className="rounded-full bg-[var(--ink)]/80 px-3 py-1 text-sm text-[var(--paper)]">
-                      {currentSlotDropReady ? '松开以更换住宿' : '拖到此处更换'}
-                    </span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => openHotelCard(selectedCandidate)}
-                  className="w-full text-left"
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty-hotel-slot"
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  ref={currentSlotRef}
+                  className={`rounded-2xl border border-dashed p-4 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                    currentSlotDropReady
+                      ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
+                      : currentSlotHighlight
+                        ? 'border-[var(--copper)] bg-[var(--copper)]/10 ring-2 ring-[var(--copper)]/30'
+                        : 'border-[var(--copper)]/35 bg-[var(--card)]'
+                  }`}
                 >
-                  <HotelCardFace
-                    hotel={selectedCandidate}
-                    blurb={cardBlurbStream[selectedCandidate.id]}
-                    blurbLoading={
-                      needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
-                    }
-                  />
-                </button>
-              </div>
-            ) : (
-              <div
-                ref={currentSlotRef}
-                className={`rounded-2xl border border-dashed p-4 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
-                  currentSlotDropReady
-                    ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
-                    : currentSlotHighlight
-                      ? 'border-[var(--copper)] bg-[var(--copper)]/10 ring-2 ring-[var(--copper)]/30'
-                      : 'border-[var(--copper)]/35 bg-[var(--card)]'
-                }`}
-              >
-                <p className="font-medium text-[var(--ink)]">
-                  {currentSlotHighlight ? '拖放到这里设为住宿' : '尚未选定住宿'}
-                </p>
-                <p className="mt-1 text-sm text-[var(--stone)]">
-                  {currentSlotHighlight
-                    ? '松开鼠标即可选择该酒店并开始行程安排。'
-                    : '可从下方拖拽酒店卡片到此处，或点开详情后选择「就住这儿了」。'}
-                </p>
-              </div>
-            )}
+                  <p className="font-medium text-[var(--ink)]">
+                    {currentSlotHighlight ? '拖放到这里设为住宿' : '尚未选定住宿'}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--stone)]">
+                    {currentSlotHighlight
+                      ? '松开鼠标即可选择该酒店并开始行程安排。'
+                      : '可从下方拖拽酒店卡片到此处，或点开详情后选择「就住这儿了」。'}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="rounded-2xl border border-dashed border-[var(--stone)]/40 bg-[var(--card)] p-3">
               <p className="text-xs text-[var(--copper)]">自定义</p>
@@ -2344,8 +2357,10 @@ export function HotelPicker({
                   } ${dragging ? 'select-none' : ''}`}
                 >
                   {(selectedCandidate ? otherCandidates : candidates).map((hotel) => (
-                    <div
+                    <motion.div
+                      layout="position"
                       key={hotel.id}
+                      transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
                       onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
                       className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                         dragHotelId === hotel.id
@@ -2373,7 +2388,7 @@ export function HotelPicker({
                         blurb={cardBlurbStream[hotel.id]}
                         blurbLoading={needsCustomCardBlurb(hotel) && isLlmConfigured()}
                       />
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </div>

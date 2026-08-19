@@ -68,7 +68,7 @@ function markerElement(
   imageUrl: string,
   size: number,
   title: string,
-  options?: { faded?: boolean; onClick?: () => void },
+  options?: { active?: boolean; faded?: boolean; onClick?: () => void },
 ): HTMLElement {
   const element = document.createElement(options?.onClick ? 'button' : 'div')
   element.title = title
@@ -84,7 +84,14 @@ function markerElement(
   element.style.background = 'transparent'
   element.style.opacity = options?.faded ? '0.55' : '1'
   element.style.cursor = options?.onClick ? 'pointer' : 'default'
-  element.style.zIndex = '2'
+  element.style.zIndex = options?.active ? '15' : '2'
+  element.className = `trip-map-marker-container ${options?.active ? 'trip-map-marker-active' : ''}`
+
+  if (options?.active) {
+    const halo = document.createElement('span')
+    halo.className = 'trip-map-marker-halo'
+    element.appendChild(halo)
+  }
 
   const image = document.createElement('img')
   image.src = imageUrl
@@ -93,6 +100,9 @@ function markerElement(
   image.style.display = 'block'
   image.style.width = `${size}px`
   image.style.height = `${size}px`
+  image.style.position = 'relative'
+  image.style.zIndex = '1'
+  image.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
   element.appendChild(image)
   if (options?.onClick) element.addEventListener('click', options.onClick)
   return element
@@ -381,6 +391,7 @@ export function TripMap({
       markers.push(
         new MapLibreMarker({
           element: markerElement(icon, size, title, {
+            active,
             faded:
               Boolean(selectedPlaceId) &&
               !active &&
@@ -406,6 +417,30 @@ export function TripMap({
     selectedPlaceId,
     stopNumbers,
   ])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !selectedPlaceId) return
+
+    // Only auto-pan camera on desktop (≥ 1024px) where map and timeline are side-by-side
+    const isDesktopDualPane =
+      typeof window !== 'undefined' && window.innerWidth >= 1024
+    if (!isDesktopDualPane) return
+
+    const activeStop = markerStops.find(
+      ({ place }) => place.id === selectedPlaceId,
+    )
+    if (activeStop) {
+      map.easeTo({
+        center: [
+          activeStop.place.location.lng,
+          activeStop.place.location.lat,
+        ],
+        duration: 450,
+        essential: true,
+      })
+    }
+  }, [mapReady, markerStops, selectedPlaceId])
 
   const setPathRef =
     (reactKey: string, kind: 'casing' | 'line') =>

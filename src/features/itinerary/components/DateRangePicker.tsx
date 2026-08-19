@@ -85,6 +85,7 @@ export function DateRangePicker({
     parseIso(draftStart || committedStart || today) ?? parseIso(today)!
   const [viewY, setViewY] = useState(viewAnchor.y)
   const [viewM, setViewM] = useState(viewAnchor.m)
+  const [monthSlideDirection, setMonthSlideDirection] = useState<1 | -1>(1)
 
   useEffect(() => {
     if (!open) {
@@ -127,6 +128,7 @@ export function DateRangePicker({
   }, [open])
 
   function shiftMonth(delta: number) {
+    setMonthSlideDirection(delta > 0 ? 1 : -1)
     const d = new Date(viewY, viewM + delta, 1)
     setViewY(d.getFullYear())
     setViewM(d.getMonth())
@@ -212,6 +214,21 @@ export function DateRangePicker({
       : { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const },
   }
 
+  const monthSlideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 28 : -28,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (direction: number) => ({
+      x: direction > 0 ? -28 : 28,
+      opacity: 0,
+    }),
+  }
+
   return (
     <div ref={rootRef} className="relative block text-sm">
       {label && (
@@ -280,56 +297,71 @@ export function DateRangePicker({
             ))}
           </div>
 
-          <div
-            className="grid grid-cols-7 gap-y-0.5"
-            onMouseLeave={() => setHoverIso(null)}
-          >
-            {cells.map((cell, i) => {
-              if (!cell) {
-                return <div key={`e-${i}`} className="aspect-square" />
-              }
-              const { isStart, isEnd, inRange, isToday } = dayTone(cell.iso)
-              const hasSpan = Boolean(rangeStart && rangeEnd && rangeStart !== rangeEnd)
-              const railClass = !hasSpan
-                ? ''
-                : inRange
-                  ? 'bg-[var(--sage)]/12'
-                  : isStart
-                    ? 'rounded-l-xl bg-[var(--sage)]/12'
-                    : isEnd
-                      ? 'rounded-r-xl bg-[var(--sage)]/12'
-                      : ''
-
-              return (
-                <div
-                  key={cell.iso}
-                  className={['relative aspect-square', railClass].filter(Boolean).join(' ')}
-                >
-                  <button
-                    type="button"
-                    onClick={() => selectDay(cell.iso)}
-                    onMouseEnter={() => {
-                      if (pickingEnd) setHoverIso(cell.iso)
-                    }}
-                    className={[
-                      'relative z-[1] flex h-full w-full items-center justify-center rounded-xl text-sm transition outline-none',
-                      'hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
-                      isStart
-                        ? 'bg-[var(--copper)] font-medium text-[var(--paper)] hover:bg-[var(--copper)]'
+          <div className="relative overflow-hidden" style={{ minHeight: '190px' }}>
+            <AnimatePresence mode="popLayout" custom={monthSlideDirection} initial={false}>
+              <motion.div
+                key={`${viewY}-${viewM}`}
+                custom={monthSlideDirection}
+                variants={monthSlideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={
+                  reduce
+                    ? { duration: 0.01 }
+                    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                }
+                className="grid grid-cols-7 gap-y-0.5"
+                onMouseLeave={() => setHoverIso(null)}
+              >
+                {cells.map((cell, i) => {
+                  if (!cell) {
+                    return <div key={`e-${i}`} className="aspect-square" />
+                  }
+                  const { isStart, isEnd, inRange, isToday } = dayTone(cell.iso)
+                  const hasSpan = Boolean(rangeStart && rangeEnd && rangeStart !== rangeEnd)
+                  const railClass = !hasSpan
+                    ? ''
+                    : inRange
+                      ? 'bg-[var(--sage)]/12'
+                      : isStart
+                        ? 'rounded-l-xl bg-[var(--sage)]/12'
                         : isEnd
-                          ? 'bg-[var(--sage)] font-medium text-[var(--paper)] hover:bg-[var(--sage)]'
-                          : inRange
-                            ? 'text-[var(--ink)] hover:bg-[var(--sage)]/18'
-                            : isToday
-                              ? 'font-medium text-[var(--sage)] ring-1 ring-[var(--sage)]/35'
-                              : 'text-[var(--ink)]',
-                    ].join(' ')}
-                  >
-                    {cell.day}
-                  </button>
-                </div>
-              )
-            })}
+                          ? 'rounded-r-xl bg-[var(--sage)]/12'
+                          : ''
+
+                  return (
+                    <div
+                      key={cell.iso}
+                      className={['relative aspect-square', railClass].filter(Boolean).join(' ')}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => selectDay(cell.iso)}
+                        onMouseEnter={() => {
+                          if (pickingEnd) setHoverIso(cell.iso)
+                        }}
+                        className={[
+                          'relative z-[1] flex h-full w-full items-center justify-center rounded-xl text-sm transition outline-none',
+                          'hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
+                          isStart
+                            ? 'bg-[var(--copper)] font-medium text-[var(--paper)] hover:bg-[var(--copper)]'
+                            : isEnd
+                              ? 'bg-[var(--sage)] font-medium text-[var(--paper)] hover:bg-[var(--sage)]'
+                              : inRange
+                                ? 'text-[var(--ink)] hover:bg-[var(--sage)]/18'
+                                : isToday
+                                  ? 'font-medium text-[var(--sage)] ring-1 ring-[var(--sage)]/35'
+                                  : 'text-[var(--ink)]',
+                        ].join(' ')}
+                      >
+                        {cell.day}
+                      </button>
+                    </div>
+                  )
+                })}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[var(--stone)]">

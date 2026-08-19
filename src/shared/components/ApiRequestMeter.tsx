@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { useEnterExit } from '../hooks/useEnterExit'
 import {
   API_REQUEST_GROUPS,
   API_REQUEST_SUMMARY_GROUP_IDS,
@@ -39,6 +38,13 @@ const RAIL_LABELS: Record<string, string> = {
 const OPEN_DELAY_MS = 420
 const CLOSE_DELAY_MS = 240
 
+const morphSpring = {
+  type: 'spring' as const,
+  stiffness: 380,
+  damping: 32,
+  mass: 0.5,
+}
+
 export function ApiRequestMeter() {
   const openTimer = useRef<number | null>(null)
   const closeTimer = useRef<number | null>(null)
@@ -59,8 +65,6 @@ export function ApiRequestMeter() {
       if (closeTimer.current) window.clearTimeout(closeTimer.current)
     }
   }, [])
-
-  const popover = useEnterExit('popover')
 
   function scheduleDetailsOpen() {
     if (closeTimer.current) {
@@ -90,77 +94,122 @@ export function ApiRequestMeter() {
 
   return createPortal(
     <aside className="api-meter" aria-label="今日 API 请求次数">
-      <div
+      <motion.div
         className="api-meter-shell"
         onMouseEnter={scheduleDetailsOpen}
         onMouseLeave={scheduleDetailsClose}
+        initial={false}
+        animate={{
+          width: detailsOpen ? 370 : 30,
+          height: detailsOpen ? 418 : 148,
+          borderRadius: detailsOpen ? 20 : 15,
+        }}
+        transition={{
+          width: { ...morphSpring, delay: detailsOpen ? 0 : 0.16 },
+          height: { ...morphSpring, delay: detailsOpen ? 0.16 : 0 },
+          borderRadius: { duration: 0.2 },
+        }}
+        style={{ transformOrigin: 'top left' }}
       >
-        <div className="api-meter-rail">
+        {/* Layer 1: Compact Rail — visible when closed, fades out when opening */}
+        <motion.div
+          initial={false}
+          animate={{
+            opacity: detailsOpen ? 0 : 1,
+            pointerEvents: detailsOpen ? 'none' : 'auto',
+          }}
+          transition={{
+            opacity: {
+              duration: 0.14,
+              delay: detailsOpen ? 0 : 0.22,
+              ease: 'easeOut',
+            },
+          }}
+          className="api-meter-rail"
+        >
           <p className="api-meter-rail-label">API</p>
-          <p className="api-meter-rail-value">{snapshot.used}</p>
+          <motion.p
+            key={snapshot.used}
+            initial={{ opacity: 0.4, scale: 1.15 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="api-meter-rail-value"
+          >
+            {snapshot.used}
+          </motion.p>
           <ul className="api-meter-rail-groups">
             {SUMMARY_GROUPS.map((group) => {
               const total = groupCount(snapshot, group)
               return (
                 <li key={group.id}>
                   <p className="api-meter-rail-label">{RAIL_LABELS[group.id] || group.shortLabel}</p>
-                  <p
+                  <motion.p
+                    key={total}
+                    initial={{ opacity: 0.4, scale: 1.15 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2 }}
                     className={`api-meter-rail-group-value ${
                       total > 0 ? 'is-active' : ''
                     }`}
                   >
                     {total}
-                  </p>
+                  </motion.p>
                 </li>
               )
             })}
           </ul>
-        </div>
-        <AnimatePresence>
-          {detailsOpen && (
-            <motion.div
-              initial={popover.initial}
-              animate={popover.animate}
-              exit={popover.exit}
-              transition={popover.transition}
-              className="api-meter-details"
-              onMouseEnter={scheduleDetailsOpen}
-              onMouseLeave={scheduleDetailsClose}
-            >
-              <div className="api-meter-details-panel">
-                <ul className="api-meter-details-grid">
-                  {DETAILS_GROUPS.map((group) => {
-                    const total = groupCount(snapshot, group)
-                    return (
-                      <li key={group.id}>
-                        <div className="flex items-baseline justify-between gap-2 text-[12px]">
-                          <span className="text-[var(--ink)]">{group.label}</span>
-                          <span className="tabular-nums text-[var(--sage)]">{total}</span>
-                        </div>
-                        <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)]">
-                          {group.kinds
-                            .filter(
-                              (item) =>
-                                !item.legacy || Boolean(snapshot.byKind[item.kind]),
-                            )
-                            .map((item) => (
-                              <li key={item.kind} className="flex justify-between gap-2">
-                                <span>{item.label}</span>
-                                <span className="tabular-nums">
-                                  {snapshot.byKind[item.kind] || 0}
-                                </span>
-                              </li>
-                            ))}
-                        </ul>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+        </motion.div>
+
+        {/* Layer 2: Expanded Details Panel — replaces the rail completely */}
+        <motion.div
+          initial={false}
+          animate={{
+            opacity: detailsOpen ? 1 : 0,
+            pointerEvents: detailsOpen ? 'auto' : 'none',
+          }}
+          transition={{
+            opacity: {
+              duration: 0.18,
+              delay: detailsOpen ? 0.16 : 0,
+              ease: 'easeOut',
+            },
+          }}
+          className="api-meter-details-panel-inner"
+        >
+          <div className="api-meter-details-header">
+            <span className="text-[12px] font-semibold text-[var(--ink)]">API 调用明细</span>
+            <span className="text-[11px] text-[var(--stone)]">今日总计: {snapshot.used} 次</span>
+          </div>
+          <ul className="api-meter-details-grid">
+            {DETAILS_GROUPS.map((group) => {
+              const total = groupCount(snapshot, group)
+              return (
+                <li key={group.id}>
+                  <div className="flex items-baseline justify-between gap-2 text-[12px]">
+                    <span className="font-medium text-[var(--ink)]">{group.label}</span>
+                    <span className="tabular-nums font-semibold text-[var(--sage)]">{total}</span>
+                  </div>
+                  <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)]">
+                    {group.kinds
+                      .filter(
+                        (item) =>
+                          !item.legacy || Boolean(snapshot.byKind[item.kind]),
+                      )
+                      .map((item) => (
+                        <li key={item.kind} className="flex justify-between gap-2">
+                          <span>{item.label}</span>
+                          <span className="tabular-nums">
+                            {snapshot.byKind[item.kind] || 0}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </li>
+              )
+            })}
+          </ul>
+        </motion.div>
+      </motion.div>
     </aside>,
     document.body,
   )

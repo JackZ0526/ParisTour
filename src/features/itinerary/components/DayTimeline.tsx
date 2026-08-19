@@ -1,5 +1,34 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { getPlace } from '../../place/constants/places'
+
+export const timelineItemVariants: Variants = {
+  enter: (direction: number) => ({
+    x: (direction || 1) > 0 ? 44 : -44,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      x: {
+        type: 'spring',
+        stiffness: 380,
+        damping: 32,
+        mass: 0.5,
+      },
+      opacity: { duration: 0.16, ease: 'easeOut' as const },
+    },
+  },
+  exit: (direction: number) => ({
+    x: (direction || 1) > 0 ? -24 : 24,
+    opacity: 0,
+    transition: {
+      x: { duration: 0.08, ease: 'easeIn' as const },
+      opacity: { duration: 0.06, ease: 'easeIn' as const },
+    },
+  }),
+}
 import type { DayNavPlan, ResolvedDayLeg } from '../../map/services/googleNav'
 import { PATH_MODE_COLORS } from '../../map/services/googleNav'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
@@ -427,6 +456,7 @@ interface Props {
   tripPlaceNames: string[]
   recommendationPreferences: RecommendationPreferences
   readOnly?: boolean
+  direction?: 1 | -1
 }
 
 /** iOS-like list shift while dragging `from` toward `hover`. */
@@ -519,6 +549,7 @@ export function DayTimeline({
   tripPlaceNames,
   recommendationPreferences,
   readOnly = false,
+  direction = 1,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [drag, setDrag] = useState<DragSession | null>(null)
@@ -616,6 +647,25 @@ export function DayTimeline({
     }
     setReorderFlip(null)
   }
+
+  useEffect(() => {
+    if (!selectedPlaceId) return
+
+    // Only auto-scroll in desktop dual-pane mode (≥ 1024px)
+    const isDesktopDualPane =
+      typeof window !== 'undefined' && window.innerWidth >= 1024
+    if (!isDesktopDualPane) return
+
+    const activeIndex = day.stops.findIndex(
+      (s) => s.placeId === selectedPlaceId,
+    )
+    if (activeIndex !== -1 && itemRefs.current[activeIndex]) {
+      itemRefs.current[activeIndex]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      })
+    }
+  }, [day.stops, selectedPlaceId])
 
   const scheduleSwapClear = (totalMs: number) => {
     if (swapTimerRef.current != null) {
@@ -1418,10 +1468,14 @@ export function DayTimeline({
       .join(' ')
 
   return (
-    <div className="space-y-4">
-      <div className="animate-fade-up rounded-2xl border border-white/70 bg-[var(--card)] p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="w-full min-w-0 max-w-full space-y-4">
+      <motion.div
+        custom={direction}
+        variants={timelineItemVariants}
+        className="w-full min-w-0 max-w-full rounded-2xl border border-white/70 bg-[var(--card)] p-3.5 sm:p-4 shadow-sm"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-xs text-[var(--paper)]">
               Day {day.day}
             </span>
@@ -1459,7 +1513,7 @@ export function DayTimeline({
             )}
           </div>
           {!readOnly && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {canRestoreDayDefault && onRestoreDayDefault && (
               <button
                 type="button"
@@ -1487,21 +1541,21 @@ export function DayTimeline({
           </div>
           )}
         </div>
-        <h3 className="font-display mt-2 text-2xl sm:text-3xl">
+        <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl">
           {dayPending ? (
             <span className="mt-1 inline-block h-8 w-2/3 rounded-full day-tab-shimmer" />
           ) : (
             day.title
           )}
         </h3>
-        <p className="text-sm text-[var(--copper)]">
+        <p className="break-words text-sm text-[var(--copper)]">
           {dayPending ? (
             <span className="inline-block h-4 w-1/2 rounded-full day-tab-shimmer" />
           ) : (
             day.theme
           )}
         </p>
-        <p className="mt-2 text-sm text-[var(--stone)]">
+        <p className="mt-2 break-words text-sm text-[var(--stone)]">
           {dayPending ? (
             <span className="mt-1 inline-block h-4 w-full rounded-full day-tab-shimmer" />
           ) : (
@@ -1540,16 +1594,20 @@ export function DayTimeline({
           </div>
         )}
         <div className="mt-3">
-          <p className="rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-sm">
+          <p className="break-words rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-xs sm:text-sm">
             <span className="font-medium">路线导航：</span>
             点击每段交通，在 Google Maps 查看实时路线
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Day-1 airport origin chip (not an itinerary stop; matches map plane marker). */}
       {!dayPending && dayOrigin.kind === 'airport' && (
-        <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+        <motion.div
+          custom={direction}
+          variants={timelineItemVariants}
+          className="flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3"
+        >
           <span
             className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
             title="机场"
@@ -1561,14 +1619,16 @@ export function DayTimeline({
             <span className="text-xs text-[var(--stone)]">今日起点</span>
             <p className="mt-1 font-medium">{dayOrigin.label}</p>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Day origin → first stop (airport on day 1, hotel otherwise) */}
       {!dayPending &&
         (day.stops.length > 0 || exitGhosts.length > 0) && (
-        <div
-          className={legSlotClassName()}
+        <motion.div
+          custom={direction}
+          variants={timelineItemVariants}
+          className={`w-full min-w-0 max-w-full ${legSlotClassName()}`}
           aria-hidden={collapseLegs || fadeLegs || undefined}
         >
           <div className="timeline-leg-slot-inner">
@@ -1583,7 +1643,7 @@ export function DayTimeline({
               fallbackLabel={`${googleMapsTravelModeLabel(firstRouteMode)} · Google Maps`}
             />
           </div>
-        </div>
+        </motion.div>
       )}
 
       {dayPending ? (
@@ -1599,16 +1659,7 @@ export function DayTimeline({
         </div>
       ) : (
         <ol
-          className={`space-y-1 ${dragging ? 'select-none' : ''} ${
-            enterAnim ||
-            enteringKeys.length ||
-            exitAnim ||
-            exitGhosts.length ||
-            swapAnim ||
-            reorderFlip
-              ? 'overflow-visible'
-              : ''
-          }`}
+          className={`w-full min-w-0 max-w-full list-none p-0 m-0 space-y-1 overflow-visible ${dragging ? 'select-none' : ''}`}
         >
         {displayItems.map((item, displayIndex) => {
           const { stop, stopKey, liveIndex, ghost } = item
@@ -1707,7 +1758,7 @@ export function DayTimeline({
           }
 
           const cardInner = isReturnAirport ? (
-            <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+            <div className="flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
               <span
                 className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
                 title="机场"
@@ -1722,9 +1773,9 @@ export function DayTimeline({
             </div>
           ) : (
             <div
-              className={`flex items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 ${
+              className={`flex w-full min-w-0 max-w-full items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 transition-[border-color,box-shadow,background-color] duration-200 ${
                 active
-                  ? 'border-[var(--copper)] bg-white shadow-[var(--shadow)]'
+                  ? 'border-[var(--copper)] bg-white shadow-[var(--shadow)] ring-2 ring-[var(--copper)]/40 timeline-card-selected-highlight'
                   : 'border-white/70 bg-[var(--card)]'
               }`}
             >
@@ -1831,8 +1882,8 @@ export function DayTimeline({
               ) : (
                 <button
                   type="button"
-                  title="删除地点"
-                  aria-label="删除地点"
+                  title="删除此地点"
+                  aria-label="删除此地点"
                   disabled={
                     dayRestoring ||
                     Boolean(exitAnim) ||
@@ -1862,7 +1913,7 @@ export function DayTimeline({
               ref={(el) => {
                 if (liveIndex != null) itemRefs.current[liveIndex] = el
               }}
-              className={`timeline-sortable-item relative ${
+              className={`timeline-sortable-item relative w-full min-w-0 max-w-full overflow-visible ${
                 isEntering ? 'timeline-card-entering' : ''
               } ${isExiting ? 'timeline-card-exiting' : ''} ${
                 isExiting && isCollapsing ? 'timeline-card-exiting-collapse' : ''
@@ -1914,11 +1965,15 @@ export function DayTimeline({
                 })
               }}
             >
-              <div className="relative">
+              <motion.div
+                custom={direction}
+                variants={timelineItemVariants}
+                className="relative w-full min-w-0 max-w-full"
+              >
                 {isSwappingHere && swapAnim && oldSwapPlace ? (
                   <div
                     ref={swapStageRef}
-                    className={`timeline-swap-stage${
+                    className={`timeline-swap-stage w-full min-w-0 max-w-full${
                       swapAnim.phase === 'morph' ? ' timeline-swap-morphing' : ''
                     }${
                       swapAnim.phase === 'wipe' ? ' timeline-swap-wiping' : ''
@@ -1941,7 +1996,7 @@ export function DayTimeline({
                     >
                       <div
                         data-timeline-card
-                        className="rounded-2xl border border-transparent"
+                        className="w-full min-w-0 max-w-full rounded-2xl border border-transparent"
                       >
                         {cardInner}
                       </div>
@@ -1955,9 +2010,9 @@ export function DayTimeline({
                     >
                       <div
                         data-timeline-card
-                        className="rounded-2xl border border-transparent"
+                        className="w-full min-w-0 max-w-full rounded-2xl border border-transparent"
                       >
-                        <div className="flex items-start gap-2 rounded-2xl border border-white/70 bg-[var(--card)] p-2.5 sm:gap-3 sm:p-3">
+                        <div className="flex w-full min-w-0 max-w-full items-start gap-2 rounded-2xl border border-white/70 bg-[var(--card)] p-2.5 sm:gap-3 sm:p-3">
                           <span className="mt-1 inline-flex h-7 w-7" aria-hidden />
                           <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
                             {n}
@@ -2002,7 +2057,7 @@ export function DayTimeline({
                   <>
                     <div
                       data-timeline-card
-                      className={`rounded-2xl border ${
+                      className={`w-full min-w-0 max-w-full rounded-2xl border ${
                         isDropTarget
                           ? 'border-[var(--copper)]/50 ring-2 ring-[var(--copper)]/20'
                           : 'border-transparent'
@@ -2020,11 +2075,13 @@ export function DayTimeline({
                     {isExiting && !isCollapsing && <GommagePetals />}
                   </>
                 )}
-              </div>
+              </motion.div>
 
               {liveIndex != null && liveIndex < day.stops.length - 1 && (
-                <div
-                  className={legSlotClassName()}
+                <motion.div
+                  custom={direction}
+                  variants={timelineItemVariants}
+                  className={`w-full min-w-0 max-w-full ${legSlotClassName()}`}
                   aria-hidden={collapseLegs || fadeLegs || undefined}
                 >
                   <div className="timeline-leg-slot-inner">
@@ -2057,7 +2114,7 @@ export function DayTimeline({
                       }
                     />
                   </div>
-                </div>
+                </motion.div>
               )}
             </li>
           )
@@ -2163,22 +2220,28 @@ export function DayTimeline({
       )}
 
       {!dayPending && !day.stops.length && !exitGhosts.length && (
-        <p className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]">
+        <motion.p
+          custom={direction}
+          variants={timelineItemVariants}
+          className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]"
+        >
           {readOnly ? '本日还没有地点。' : '本日还没有地点，点击下方添加。'}
-        </p>
+        </motion.p>
       )}
 
       {!readOnly && !dayPending && (
         <>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            disabled={dayRestoring}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
-          >
-            <Plus size={15} strokeWidth={2} aria-hidden />
-            添加地点
-          </button>
+          <motion.div custom={direction} variants={timelineItemVariants} className="pt-3 sm:pt-4">
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              disabled={dayRestoring}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
+            >
+              <Plus size={15} strokeWidth={2} aria-hidden />
+              添加地点
+            </button>
+          </motion.div>
 
           <AddPlaceDialog
             open={addOpen}

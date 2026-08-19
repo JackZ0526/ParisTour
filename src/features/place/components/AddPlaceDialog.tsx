@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchGooglePlaceDetails,
@@ -144,6 +145,7 @@ export function AddPlaceDialog({
   const recommendationEpochRef = useRef(0)
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
+  const [tabsInteractive, setTabsInteractive] = useState(false)
 
   const expandedPhotoIndex = expandedKey ? photoIndexByKey[expandedKey] || 0 : 0
   useEffect(() => {
@@ -155,11 +157,15 @@ export function AddPlaceDialog({
     })
   }, [expandedKey, expandedPhotoIndex])
 
-  // Reset height animation gate when the sheet closes so reopen doesn't tween from stale size.
+  // Reset height and tab animation gate when the sheet closes so reopen doesn't tween from stale size or fly in.
   useLayoutEffect(() => {
     if (!open) {
+      setTabsInteractive(false)
       setHeightReady(false)
       setBodyHeight(undefined)
+    } else {
+      const timer = setTimeout(() => setTabsInteractive(true), 320)
+      return () => clearTimeout(timer)
     }
   }, [open])
 
@@ -910,31 +916,69 @@ export function AddPlaceDialog({
             <CloseIconButton onClick={onClose} className="hidden sm:flex mt-0.5" />
           </div>
 
-          <div className="flex gap-2 px-4 pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                setMainTab('ai')
-                closeGoogleDetail()
-              }}
-              className={`rounded-full px-3 py-1.5 text-sm ${
-                mainTab === 'ai' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
-              }`}
+          <div className="px-4 pt-3">
+            <div
+              className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1"
+              role="tablist"
+              aria-label="添加地点视图"
             >
-              AI 推荐
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMainTab('google')
-                closeGoogleDetail()
-              }}
-              className={`rounded-full px-3 py-1.5 text-sm ${
-                mainTab === 'google' ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--mist)]'
-              }`}
-            >
-              Google 搜索
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mainTab === 'ai'}
+                onClick={() => {
+                  setMainTab('ai')
+                  closeGoogleDetail()
+                }}
+                className="relative isolate flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                {mainTab === 'ai' &&
+                  (tabsInteractive ? (
+                    <motion.span
+                      layoutId="add-place-main-tab-pill"
+                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm"
+                      transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+                    />
+                  ) : (
+                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm" />
+                  ))}
+                <span
+                  className={`relative z-10 transition-colors duration-200 ${
+                    mainTab === 'ai' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'
+                  }`}
+                >
+                  AI 推荐
+                </span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mainTab === 'google'}
+                onClick={() => {
+                  setMainTab('google')
+                  closeGoogleDetail()
+                }}
+                className="relative isolate flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                {mainTab === 'google' &&
+                  (tabsInteractive ? (
+                    <motion.span
+                      layoutId="add-place-main-tab-pill"
+                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm"
+                      transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+                    />
+                  ) : (
+                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm" />
+                  ))}
+                <span
+                  className={`relative z-10 transition-colors duration-200 ${
+                    mainTab === 'google' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'
+                  }`}
+                >
+                  Google 搜索
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -954,30 +998,45 @@ export function AddPlaceDialog({
                 根据今天「{dayTitle}」给出推荐。点「换一批」可刷新列表；已加入行程的地点会暂时隐藏。
               </p>
 
-              <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x]">
-                {recommendTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setCategory(tab.id)
-                      setExpandedKey(null)
-                      void ensureRecommendationCategory(tab.id)
-                    }}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${
-                      category === tab.id
-                        ? 'bg-[var(--sage)] text-white'
-                        : 'bg-[var(--mist)] text-[var(--ink)]'
-                    }`}
-                  >
-                    {tab.label}
-                    <span className="ml-1 opacity-70">
-                      {loadingByCategory[tab.id] && !grouped[tab.id].length
-                        ? '(…)'
-                        : `(${grouped[tab.id].length})`}
-                    </span>
-                  </button>
-                ))}
+              <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {recommendTabs.map((tab) => {
+                  const active = category === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setCategory(tab.id)
+                        setExpandedKey(null)
+                        void ensureRecommendationCategory(tab.id)
+                      }}
+                      className="relative isolate shrink-0 rounded-full bg-white/70 px-3 py-1.5 text-sm transition-colors hover:bg-white/90"
+                    >
+                      {active &&
+                        (tabsInteractive ? (
+                          <motion.span
+                            layoutId="add-place-category-pill"
+                            className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm"
+                            transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+                          />
+                        ) : (
+                          <span className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm" />
+                        ))}
+                      <span
+                        className={`relative z-10 font-medium transition-colors duration-200 ${
+                          active ? 'text-white' : 'text-[var(--ink)]'
+                        }`}
+                      >
+                        {tab.label}
+                        <span className={`ml-1 ${active ? 'text-white/80' : 'opacity-70'}`}>
+                          {loadingByCategory[tab.id] && !grouped[tab.id].length
+                            ? '(…)'
+                            : `(${grouped[tab.id].length})`}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
 
               {loadingRecs && !refreshingRecs ? (
@@ -1006,9 +1065,13 @@ export function AddPlaceDialog({
                     const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel)
 
                     return (
-                      <li key={key}>
+                      <motion.li
+                        key={key}
+                        layout="position"
+                        transition={{ layout: { duration: 0.24, ease: [0.22, 1, 0.36, 1] } }}
+                      >
                         <div
-                          className={`overflow-hidden rounded-xl border bg-[var(--card)] transition ${
+                          className={`overflow-hidden rounded-xl border bg-[var(--card)] transition-colors duration-200 ${
                             expanded
                               ? 'border-[var(--copper)] shadow-[var(--shadow)]'
                               : 'border-white/70 hover:border-[var(--gold)]'
@@ -1036,202 +1099,210 @@ export function AddPlaceDialog({
                             </div>
                           </button>
 
-                          {expanded && (
-                            <div className="space-y-3 border-t border-[var(--mist)] px-3 pb-3 pt-3">
-                              {loadingDetails ? (
-                                <LoadingIndicator
-                                  label="正在加载 Google 照片…"
-                                  showDots
-                                  size="sm"
-                                />
-                              ) : (
-                                <>
-                                  {activePhoto ? (
-                                    <div className="space-y-2">
-                                      <div
-                                        className="relative overflow-hidden rounded-xl select-none"
-                                        onPointerDown={(e) => {
-                                          if (photos.length < 2) return
-                                          photoSwipeStartX.current = e.clientX
-                                        }}
-                                        onPointerUp={(e) => {
-                                          if (
-                                            photoSwipeStartX.current == null ||
-                                            photos.length < 2
-                                          )
-                                            return
-                                          const dx = e.clientX - photoSwipeStartX.current
-                                          photoSwipeStartX.current = null
-                                          if (Math.abs(dx) < 40) return
-                                          stepPhoto(key, photos.length, dx < 0 ? 1 : -1)
-                                        }}
-                                        onPointerCancel={() => {
-                                          photoSwipeStartX.current = null
-                                        }}
-                                      >
-                                        <img
-                                          src={activePhoto}
-                                          alt={item.name}
-                                          className="h-44 w-full object-cover"
-                                          loading="lazy"
-                                          decoding="async"
-                                          referrerPolicy="no-referrer-when-downgrade"
-                                          draggable={false}
-                                        />
-                                        {wikimedia && activePhoto === wikimedia.url && (
-                                          <a
-                                            href={wikimedia.sourcePage}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
-                                            title={`${wikimedia.attribution || 'Wikimedia Commons'}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`}
+                          <AnimatePresence initial={false}>
+                            {expanded && (
+                              <motion.div
+                                key="recommend-expanded-panel"
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{
+                                  height: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
+                                  opacity: { duration: 0.16, ease: 'easeOut' },
+                                }}
+                                className="overflow-hidden border-t border-[var(--mist)]"
+                              >
+                                <div className="space-y-3 px-3 pb-3 pt-3">
+                                  {loadingDetails ? (
+                                    <LoadingIndicator
+                                      label="正在加载 Google 照片…"
+                                      showDots
+                                      size="sm"
+                                    />
+                                  ) : (
+                                    <>
+                                      {activePhoto ? (
+                                        <div className="space-y-2">
+                                          <div
+                                            className="relative overflow-hidden rounded-xl select-none"
+                                            onPointerDown={(e) => {
+                                              if (photos.length < 2) return
+                                              photoSwipeStartX.current = e.clientX
+                                            }}
+                                            onPointerUp={(e) => {
+                                              if (
+                                                photoSwipeStartX.current == null ||
+                                                photos.length < 2
+                                              )
+                                                return
+                                              const dx = e.clientX - photoSwipeStartX.current
+                                              photoSwipeStartX.current = null
+                                              if (Math.abs(dx) < 40) return
+                                              stepPhoto(key, photos.length, dx < 0 ? 1 : -1)
+                                            }}
+                                            onPointerCancel={() => {
+                                              photoSwipeStartX.current = null
+                                            }}
                                           >
-                                            图片：{wikimedia.attribution || 'Wikimedia Commons'}
-                                            {wikimedia.license ? ` · ${wikimedia.license}` : ''}
-                                          </a>
-                                        )}
-                                        {photos.length > 1 && (
-                                          <>
-                                            <button
-                                              type="button"
-                                              aria-label="上一张"
-                                              onClick={() => stepPhoto(key, photos.length, -1)}
-                                              className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
-                                            >
-                                              <ChevronLeft size={14} strokeWidth={2.2} aria-hidden />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              aria-label="下一张"
-                                              onClick={() => stepPhoto(key, photos.length, 1)}
-                                              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65"
-                                            >
-                                              <ChevronRight size={14} strokeWidth={2.2} aria-hidden />
-                                            </button>
-                                            <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
-                                              {photoIndex + 1} / {photos.length}
+                                            <img
+                                              src={activePhoto}
+                                              alt={item.name}
+                                              className="h-44 w-full object-cover"
+                                              loading="lazy"
+                                              decoding="async"
+                                              referrerPolicy="no-referrer-when-downgrade"
+                                              draggable={false}
+                                            />
+                                            {wikimedia && activePhoto === wikimedia.url && (
+                                              <a
+                                                href={wikimedia.sourcePage}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="absolute bottom-2 left-2 max-w-[80%] truncate rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white"
+                                                title={wikimedia.attribution || 'Wikimedia Commons'}
+                                              >
+                                                图片：{wikimedia.attribution || 'Wikimedia Commons'}
+                                              </a>
+                                            )}
+                                            {photos.length > 1 && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => stepPhoto(key, photos.length, -1)}
+                                                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                                                  aria-label="上一张图片"
+                                                >
+                                                  <ChevronLeft size={16} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => stepPhoto(key, photos.length, 1)}
+                                                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                                                  aria-label="下一张图片"
+                                                >
+                                                  <ChevronRight size={16} />
+                                                </button>
+                                                <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                                                  {photoIndex + 1}/{photos.length}
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+
+                                          {photos.length > 1 && (
+                                            <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x]">
+                                              {photos.map((url, i) => (
+                                                <button
+                                                  key={url + i}
+                                                  ref={(el) => {
+                                                    if (!thumbRefsByKey.current[key]) {
+                                                      thumbRefsByKey.current[key] = []
+                                                    }
+                                                    thumbRefsByKey.current[key][i] = el
+                                                  }}
+                                                  type="button"
+                                                  onClick={() => setPhotoIndexByKey((prev) => ({ ...prev, [key]: i }))}
+                                                  className={`relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
+                                                    i === photoIndex
+                                                      ? 'border-[var(--copper)]'
+                                                      : 'border-transparent'
+                                                  }`}
+                                                >
+                                                  <img
+                                                    src={url}
+                                                    alt=""
+                                                    className="h-full w-full object-cover"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    referrerPolicy="no-referrer-when-downgrade"
+                                                  />
+                                                </button>
+                                              ))}
                                             </div>
-                                          </>
+                                          )}
+                                        </div>
+                                      ) : null}
+
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-[var(--sage)]">
+                                          {item.type}
+                                        </span>
+                                        {details?.rating != null && (
+                                          <span className="rounded-full bg-[var(--gold)]/25 px-2.5 py-1">
+                                            ★ {details.rating.toFixed(1)}
+                                            {details.userRatingCount != null
+                                              ? `（${details.userRatingCount}）`
+                                              : ''}
+                                          </span>
+                                        )}
+                                        {priceLevelLabel && (
+                                          <span className="rounded-full bg-[var(--mist)] px-2.5 py-1">
+                                            {priceLevelLabel}
+                                          </span>
                                         )}
                                       </div>
-                                      {photos.length > 1 && (
-                                        <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                          {photos.slice(0, 8).map((url, i) => (
-                                            <button
-                                              key={url + i}
-                                              ref={(el) => {
-                                                if (!thumbRefsByKey.current[key]) {
-                                                  thumbRefsByKey.current[key] = []
-                                                }
-                                                thumbRefsByKey.current[key][i] = el
-                                              }}
-                                              type="button"
-                                              onClick={() =>
-                                                setPhotoIndexByKey((prev) => ({
-                                                  ...prev,
-                                                  [key]: i,
-                                                }))
-                                              }
-                                              className={`h-12 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
-                                                i === photoIndex
-                                                  ? 'border-[var(--copper)]'
-                                                  : 'border-transparent'
-                                              }`}
-                                            >
-                                              <img
-                                                src={url}
-                                                alt=""
-                                                className="h-full w-full object-cover"
-                                                loading="lazy"
-                                                decoding="async"
-                                                referrerPolicy="no-referrer-when-downgrade"
-                                              />
-                                            </button>
-                                          ))}
-                                        </div>
+
+                                      {details?.address && (
+                                        <p className="text-xs text-[var(--stone)]">{details.address}</p>
                                       )}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-[var(--stone)]">
-                                      暂未获取到 Google 照片，仍可查看介绍后加入。
-                                    </p>
+
+                                      <div className="space-y-2 text-sm leading-relaxed text-[var(--ink)]/90">
+                                        <p>{item.intro}</p>
+                                        <p className="text-[var(--stone)]">
+                                          <span className="font-medium text-[var(--ink)]">为何适合今天：</span>
+                                          {item.reason}
+                                        </p>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                          type="button"
+                                          disabled={searching}
+                                          onClick={() =>
+                                            void resolveAndAdd(
+                                              item.name,
+                                              item.type,
+                                              'best',
+                                              item.intro || item.reason,
+                                              details,
+                                            )
+                                          }
+                                          aria-busy={busyBest || undefined}
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
+                                        >
+                                          {busyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
+                                          {busyBest ? '加入中…' : '最顺路'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={searching}
+                                          onClick={() =>
+                                            void resolveAndAdd(
+                                              item.name,
+                                              item.type,
+                                              'end',
+                                              item.intro || item.reason,
+                                              details,
+                                            )
+                                          }
+                                          aria-busy={busyEnd || undefined}
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
+                                        >
+                                          {busyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
+                                          {busyEnd ? '加入中…' : '加到最后'}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-[var(--stone)]">
+                                        「最顺路」会插到当天更合适的位置；「加到最后」追加到当天末尾。
+                                      </p>
+                                    </>
                                   )}
-
-                                  <div className="flex flex-wrap gap-2 text-xs">
-                                    {details?.rating != null && (
-                                      <span className="rounded-full bg-[var(--gold)]/25 px-2.5 py-1">
-                                        ★ {details.rating.toFixed(1)}
-                                        {details.userRatingCount != null
-                                          ? `（${details.userRatingCount}）`
-                                          : ''}
-                                      </span>
-                                    )}
-                                    {priceLevelLabel && (
-                                      <span className="rounded-full bg-[var(--mist)] px-2.5 py-1">
-                                        {priceLevelLabel}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {details?.address && (
-                                    <p className="text-xs text-[var(--stone)]">{details.address}</p>
-                                  )}
-
-                                  <div className="space-y-2 text-sm leading-relaxed text-[var(--ink)]/90">
-                                    <p>{item.intro}</p>
-                                    <p className="text-[var(--stone)]">
-                                      <span className="font-medium text-[var(--ink)]">为何适合今天：</span>
-                                      {item.reason}
-                                    </p>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                      type="button"
-                                      disabled={searching}
-                                      onClick={() =>
-                                        void resolveAndAdd(
-                                          item.name,
-                                          item.type,
-                                          'best',
-                                          item.intro || item.reason,
-                                          details,
-                                        )
-                                      }
-                                      aria-busy={busyBest || undefined}
-                                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
-                                    >
-                                      {busyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
-                                      {busyBest ? '加入中…' : '最顺路'}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={searching}
-                                      onClick={() =>
-                                        void resolveAndAdd(
-                                          item.name,
-                                          item.type,
-                                          'end',
-                                          item.intro || item.reason,
-                                          details,
-                                        )
-                                      }
-                                      aria-busy={busyEnd || undefined}
-                                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
-                                    >
-                                      {busyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
-                                      {busyEnd ? '加入中…' : '加到最后'}
-                                    </button>
-                                  </div>
-                                  <p className="text-xs text-[var(--stone)]">
-                                    「最顺路」会插到当天更合适的位置；「加到最后」追加到当天末尾。
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                          )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                      </li>
+                      </motion.li>
                     )
                   })}
                   {!visible.length && (

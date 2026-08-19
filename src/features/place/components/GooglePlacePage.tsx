@@ -7,6 +7,7 @@ import {
   type HTMLAttributeReferrerPolicy,
   type ReactNode,
 } from 'react'
+import { motion } from 'framer-motion'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import {
   ChevronLeft,
@@ -324,16 +325,27 @@ function GalleryThumb({
   }, [url])
 
   return (
-    <button
+    <motion.button
       ref={buttonRef}
       type="button"
       onClick={onSelect}
+      whileTap={{ scale: 0.94 }}
       style={animateIn ? { animationDelay: `${enterDelayMs}ms` } : undefined}
-      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${
-        selected ? 'border-[var(--copper)]' : 'border-transparent'
-      } ${animateIn ? 'place-gallery-thumb-enter' : ''}`}
+      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-lg outline-none ${
+        animateIn ? 'place-gallery-thumb-enter' : ''
+      }`}
     >
       <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
+      {selected &&
+        (animateIn ? (
+          <span className="absolute inset-0 z-10 rounded-lg border-2 border-[var(--copper)] shadow-sm pointer-events-none" />
+        ) : (
+          <motion.span
+            layoutId="active-gallery-thumb-ring"
+            className="absolute inset-0 z-10 rounded-lg border-2 border-[var(--copper)] shadow-sm pointer-events-none"
+            transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+          />
+        ))}
       {url ? (
         <img
           ref={imgRef}
@@ -347,7 +359,7 @@ function GalleryThumb({
           onError={() => onError(url)}
         />
       ) : null}
-    </button>
+    </motion.button>
   )
 }
 
