@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
-import { useEnterExit } from '../../../shared/hooks/useEnterExit'
+import { useReducedMotion } from '../../../shared/hooks/useReducedMotion'
 
 export interface DateRangeValue {
   startDate: string
@@ -202,7 +202,15 @@ export function DateRangePicker({
       ? '先选出发日期，再选返程'
       : null
 
-  const popover = useEnterExit('popover')
+  const reduce = useReducedMotion()
+  const popoverAnim = {
+    initial: { opacity: 0, scaleY: 0.78, scaleX: 0.95, y: -8 },
+    animate: { opacity: 1, scaleY: 1, scaleX: 1, y: 0 },
+    exit: { opacity: 0, scaleY: 0.82, scaleX: 0.95, y: -6 },
+    transition: reduce
+      ? { duration: 0.01 }
+      : { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
+  }
 
   return (
     <div ref={rootRef} className="relative block text-sm">
@@ -235,10 +243,11 @@ export function DateRangePicker({
           <motion.div
             role="dialog"
             aria-label={label ? `${label}日历` : '选择行程日期'}
-            initial={popover.initial}
-            animate={popover.animate}
-            exit={popover.exit}
-            transition={popover.transition}
+            initial={popoverAnim.initial}
+            animate={popoverAnim.animate}
+            exit={popoverAnim.exit}
+            transition={popoverAnim.transition}
+            style={{ transformOrigin: 'top left' }}
             className="absolute left-0 z-40 mt-2 w-[min(100%,20rem)] rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
           >
           <div className="mb-2 flex items-center justify-between gap-2">
