@@ -7,6 +7,7 @@ import {
 import { Checkbox } from '../../../shared/components/Checkbox'
 import { TimePicker } from '../../itinerary/components/TimePicker'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 
 interface Props {
   open: boolean
@@ -94,13 +95,16 @@ export function RecommendationPreferencesDialog({
       ariaLabelledBy="recommendation-preferences-title"
       className="max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl"
     >
-      <div className="border-b border-[var(--mist)] px-5 py-4">
-        <h2 id="recommendation-preferences-title" className="font-serif text-2xl text-[var(--ink)]">
-          推荐偏好
-        </h2>
-        <p className="mt-1 text-sm text-[var(--stone)]">
-          这些是默认倾向，不是不可违反的硬规则；保存后用于下一次地点推荐或行程生成。
-        </p>
+      <div className="flex items-start justify-between border-b border-[var(--mist)] px-5 py-4">
+        <div>
+          <h2 id="recommendation-preferences-title" className="font-serif text-2xl text-[var(--ink)]">
+            推荐偏好
+          </h2>
+          <p className="mt-1 text-sm text-[var(--stone)]">
+            这些是默认倾向，不是不可违反的硬规则；保存后用于下一次地点推荐或行程生成。
+          </p>
+        </div>
+        <CloseIconButton onClick={onClose} className="hidden sm:flex" />
       </div>
 
       <div className="max-h-[min(68dvh,68vh)] space-y-5 overflow-y-auto px-5 py-4">

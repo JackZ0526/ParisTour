@@ -62,6 +62,7 @@ import type { Coordinates, PlaceType } from '../../../types'
 import type { PlaceAdvisorFacts } from '../services/placeAdvisorFacts'
 import { placeOriginalLabel, placeTitleLines } from '../../../shared/utils/placeTitle'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GoogleReviewsList } from './GoogleReviewsList'
 import { PlaceSourceMark } from './PlaceSourceMark'
 import {
@@ -1654,6 +1655,7 @@ export function GooglePlacePage({
               <p className="text-sm text-[var(--stone)]">{subtitle}</p>
             )}
           </div>
+          <CloseIconButton onClick={onClose} className="hidden sm:flex mt-0.5" />
         </div>
 
         <div

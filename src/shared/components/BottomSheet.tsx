@@ -105,7 +105,7 @@ export function BottomSheet({
             >
               {showHandle && (
                 <div
-                  className="flex w-full shrink-0 justify-center pt-2.5 pb-1 select-none pointer-events-none"
+                  className="flex sm:hidden w-full shrink-0 justify-center pt-2.5 pb-1 select-none pointer-events-none"
                   aria-hidden="true"
                 >
                   <div className="h-1 w-10 rounded-full bg-[var(--stone)]/35" />

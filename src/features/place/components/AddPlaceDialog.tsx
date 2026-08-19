@@ -36,6 +36,7 @@ import type { Place, PlaceType } from '../../../types'
 import type { RecommendationPreferences } from '../services/recommendationPreferences'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
@@ -902,8 +903,11 @@ export function AddPlaceDialog({
         className="flex max-h-[min(88dvh,88vh)] max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
       >
         <div ref={chromeRef} className="shrink-0">
-          <div className="border-b border-[var(--mist)] px-4 py-3">
-            <h3 className="font-display text-2xl">添加地点</h3>
+          <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
+            <div>
+              <h3 className="font-display text-2xl">添加地点</h3>
+            </div>
+            <CloseIconButton onClick={onClose} className="hidden sm:flex mt-0.5" />
           </div>
 
           <div className="flex gap-2 px-4 pt-3">

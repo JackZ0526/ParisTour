@@ -9,6 +9,7 @@ import {
   type TripShareRow,
 } from '../services/tripCloud'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 
 type Props = {
   tripId: string
@@ -166,13 +167,16 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
               'radial-gradient(ellipse 70% 90% at 0% 0%, rgba(196,165,116,0.22), transparent 60%), radial-gradient(ellipse 50% 80% at 100% 0%, rgba(74,99,86,0.16), transparent 55%)',
           }}
         />
-        <div className="relative">
-          <h2 id={titleId} className="font-display text-2xl text-[var(--ink)]">
-            分享与协作
-          </h2>
-          <p className="mt-1 text-sm text-[var(--stone)]">
-            邀请旅伴一起查看或编辑行程；修改会实时同步到云端。
-          </p>
+        <div className="relative flex items-start justify-between gap-4">
+          <div>
+            <h2 id={titleId} className="font-display text-2xl text-[var(--ink)]">
+              分享与协作
+            </h2>
+            <p className="mt-1 text-sm text-[var(--stone)]">
+              邀请旅伴一起查看或编辑行程；修改会实时同步到云端。
+            </p>
+          </div>
+          <CloseIconButton onClick={onClose} className="hidden sm:flex" />
         </div>
       </header>
 
