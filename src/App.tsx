@@ -965,7 +965,7 @@ export default function App() {
 
                 {showItineraryContent && (
                   <>
-                    <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-20 -mx-3 space-y-2 bg-[color-mix(in_srgb,var(--paper)_92%,transparent)] px-3 py-2 backdrop-blur-md sm:static sm:top-0 sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+                    <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-20 -mx-3 space-y-2 px-3 py-2 backdrop-blur-md sm:static sm:top-0 sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
                       <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {days.map((d, i) => {
                           const cal = dateForTripDay(itineraryStartDate, d.day)
@@ -990,30 +990,36 @@ export default function App() {
                       </div>
 
                       <div
-                        className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
+                        className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1"
                         role="tablist"
                         aria-label="行程视图"
                       >
-                        {/* iOS-style sliding pill: same layoutId on both tabs'
-                            background motion.divs, so Framer Motion tracks
-                            the position across mounts and animates between
-                            them with the spring below. Text color also
-                            cross-fades via motion's automatic color tween. */}
+                        {/* iOS-style sliding pill: a single motion.span with
+                            `layoutId` that's always mounted inside the active
+                            tab. Framer Motion tracks its position when the
+                            active tab changes and tweens between buttons
+                            with the spring below. Pure black for max
+                            contrast against the white active label. The
+                            previous conditional-render approach had the
+                            pill being filled by the tablist's full width
+                            (`absolute inset-0` resolved against the wrong
+                            stacking context in some viewport widths), so the
+                            pill was effectively invisible. */}
                         <button
                           type="button"
                           role="tab"
                           aria-selected={mobileItineraryPane === 'timeline'}
                           onClick={() => setMobileItineraryPane('timeline')}
-                          className="relative flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                          className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
                         >
                           {mobileItineraryPane === 'timeline' && (
                             <motion.span
                               layoutId="itinerary-pane-pill"
-                              className="absolute inset-0 -z-10 rounded-full bg-[var(--ink)] shadow-sm"
+                              className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
                               transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                             />
                           )}
-                          <span className={mobileItineraryPane === 'timeline' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'}>
+                          <span className={`relative z-10 ${mobileItineraryPane === 'timeline' ? 'text-white' : 'text-[var(--ink)]'}`}>
                             时间线
                           </span>
                         </button>
@@ -1022,16 +1028,16 @@ export default function App() {
                           role="tab"
                           aria-selected={mobileItineraryPane === 'map'}
                           onClick={() => setMobileItineraryPane('map')}
-                          className="relative flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                          className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
                         >
                           {mobileItineraryPane === 'map' && (
                             <motion.span
                               layoutId="itinerary-pane-pill"
-                              className="absolute inset-0 -z-10 rounded-full bg-[var(--ink)] shadow-sm"
+                              className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
                               transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                             />
                           )}
-                          <span className={mobileItineraryPane === 'map' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'}>
+                          <span className={`relative z-10 ${mobileItineraryPane === 'map' ? 'text-white' : 'text-[var(--ink)]'}`}>
                             地图
                           </span>
                         </button>
