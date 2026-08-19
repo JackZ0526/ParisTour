@@ -1,13 +1,14 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Checkbox } from '../../../shared/components/Checkbox'
 import {
@@ -61,25 +62,114 @@ function useMediaQuery(query: string): boolean {
 /**
  * FAB chip that morphs into a popover at the same position (iOS Reminders
  * pattern). Two-stage animation:
- *   - opening:  width 48→280 first, then height 48→auto
- *   - closing:  height auto→48 first, then width 280→48
+ *   - opening:  width 48→POPOVER_MAX_WIDTH first, then height 48→measured
+ *   - closing:  height measured→48 first, then width →48
  * Asymmetric close matches "card collapsing back" rather than reversing
  * the opening axis. Single `<div role="button">` swaps role/aria-label/
  * tabIndex/keydown between button (closed) and dialog (open) — same
  * a11y tradeoff as TripChatPanel.
+ *
+ * NOTE: the height delay during the opening morph is read from
+ * `prevOpenRef` (not `useState` + `useEffect`) because the first render
+ * after `open` flips needs to know `justOpened` synchronously — otherwise
+ * the height animation starts with `delay: 0` on the first frame, then
+ * the second render swaps the delay in mid-animation, which Framer
+ * Motion doesn't pick up. The ref is updated in `useLayoutEffect` (not
+ * during render) so React 18 strict mode's double-render doesn't leak
+ * the in-render mutation from call #1 into call #2.
+ *
+ * Positioning: `position: fixed` anchored to the viewport bottom-right with
+ * the same offsets the outer FAB container uses.
+ *
+ * Both the chip and the popover content layers are absolutely-positioned
+ * overlays (the chip always, the popover always). An invisible sentinel
+ * `<div>` renders the same popover markup off-screen for height
+ * measurement; a ResizeObserver reads its `offsetHeight` and feeds it
+ * back into `animate.height` so the motion.div always matches the
+ * popover's natural height. `prevOpenRef` lets the first render after
+ * `open` flips to true see `justOpened=true`, so the height animation
+ * gets its 0.18s delay from the start (otherwise `useState` + `useEffect`
+ * would only flip on the second render and the morph would run as
+ * simultaneous width+height). Internal content changes (panel swap,
+ * thinking toggle) leave `justOpened=false` and animate immediately.
+ *
+ * Panel swap (root ↔ model sub-panel) is wrapped in `AnimatePresence`
+ * with a quick cross-fade so the content swap feels intentional rather
+ * than instantaneous.
+ *
+ * ThinkingControls' L2 (auto checkbox + slider) and the "skip notice"
+ * both use the same `grid-rows-[1fr] ↔ [0fr]` 300ms ease-out pattern,
+ * so toggling thinking off collapses L2 and expands the skip notice in
+ * lockstep — the total popover height changes monotonically.
  */
 export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const { model, setModel, thinkingMode } = useLlmSettings()
   const [open, setOpen] = useState(false)
   const [panel, setPanel] = useState<Panel>('root')
   const rootRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
+  // Sentinel measures the popover's natural height. With all real layers
+  // absolutely positioned, there's nothing in-flow for `height: 'auto'`
+  // to measure against, so we duplicate the markup off-screen and let a
+  // ResizeObserver feed the value back into the animate.height target.
+  const [popoverHeight, setPopoverHeight] = useState(200)
   // Mobile: closed chip is a 48px circle. Desktop: closed chip is a pill
   // (auto width up to 15.5rem, 48px tall) — the morph widens the pill
   // before the popover content unfurls upward.
   const isDesktop = useMediaQuery('(min-width: 640px)')
   const canThink = supportsThinkingControls(model)
   const deepseek = isDeepSeekModel(model)
+
+  // Track the popover's natural height. Re-measures when `panel` or
+  // `thinkingMode` change (the two things that mutate the rendered size).
+  useLayoutEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const update = () => {
+      const h = el.offsetHeight
+      if (h > 0) setPopoverHeight(h)
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [panel, model, thinkingMode])
+
+  // Track whether we're currently in the chip→popover opening morph so
+  // the height animation can be delayed (width-first → height-second, the
+  // iOS Reminders staged feel). Internal content changes (panel swap,
+  // thinking toggle) don't want that delay — the user expects immediate
+  // motion when they click something, not a "wait then grow" lag.
+  //
+  // `morphSettled` is the same window but exposed as state (not a ref)
+  // because the rendered `overflow` value depends on it — the popover
+  // content overflows the motion.div mid-morph (height still animating
+  // up), and `overflow: auto` would briefly show a scrollbar. We keep
+  // `overflow: hidden` until the morph completes, then flip to
+  // `'hidden auto'` so the panel can scroll if it ever exceeds
+  // maxHeight.
+  //
+  // The previous-open ref is updated in useLayoutEffect (not in render)
+  // because React 18 strict mode invokes the render function twice; an
+  // in-render mutation would leak from call #1 into call #2 and make
+  // `justOpened` false on the second (committed) call, dropping the
+  // height delay. useLayoutEffect runs after both render calls, so
+  // both see the same value.
+  const prevOpenRef = useRef(open)
+  const justOpened = open && !prevOpenRef.current
+  useLayoutEffect(() => {
+    prevOpenRef.current = open
+  }, [open])
+  const [morphSettled, setMorphSettled] = useState(!open)
+  useEffect(() => {
+    if (!open) {
+      setMorphSettled(false)
+      return
+    }
+    const t = setTimeout(() => setMorphSettled(true), 520)
+    return () => clearTimeout(t)
+  }, [open])
 
   useEffect(() => {
     if (!open) {
@@ -109,156 +199,283 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const fullLabel = getActiveLlmLabel(model)
 
   return (
-    <div className={`relative ${className}`}>
-      <motion.div
-        ref={rootRef}
-        id={popoverId}
-        role={open ? 'dialog' : 'button'}
-        tabIndex={open ? -1 : 0}
-        aria-haspopup={!open ? 'dialog' : undefined}
-        aria-expanded={open}
-        aria-label={open ? '模型与思考设置' : fullLabel}
-        title={!open ? fullLabel : undefined}
-        onClick={open ? undefined : () => setOpen(true)}
-        onKeyDown={
-          open
-            ? undefined
-            : (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  setOpen(true)
-                }
+    <motion.div
+      ref={rootRef}
+      id={popoverId}
+      role={open ? 'dialog' : 'button'}
+      tabIndex={open ? -1 : 0}
+      aria-haspopup={!open ? 'dialog' : undefined}
+      aria-expanded={open}
+      aria-label={open ? '模型与思考设置' : fullLabel}
+      title={!open ? fullLabel : undefined}
+      onClick={open ? undefined : () => setOpen(true)}
+      onKeyDown={
+        open
+          ? undefined
+          : (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                setOpen(true)
               }
-        }
-        whileTap={open ? undefined : { scale: 0.96 }}
-        initial={false}
-        animate={{
-          width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
-          height: open ? 'auto' : 48,
-        }}
-        transition={{
-          width: { ...MORPH_SPRING, delay: open ? 0 : 0.18 },
-          height: { ...MORPH_SPRING, delay: open ? 0.18 : 0 },
-        }}
+            }
+      }
+      whileTap={open ? undefined : { scale: 0.96 }}
+      initial={false}
+      animate={{
+        width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
+        height: open ? popoverHeight : 48,
+      }}
+      transition={{
+        // Width keeps the spring feel (chip → pill morph has a touch of
+        // overshoot). Height uses a smooth tween (no spring overshoot on
+        // internal content re-targets). The opening morph stages width
+        // first then height (0.18s delay) so the chip "expands then
+        // grows"; everything else animates both at once.
+        width: { ...MORPH_SPRING, delay: open ? 0 : 0.18 },
+        height: {
+          duration: 0.32,
+          ease: [0.22, 1, 0.36, 1],
+          delay: justOpened ? 0.18 : 0,
+        },
+      }}
+      style={{
+        // Anchored to the viewport (not a 0x0 relative wrapper) so the
+        // desktop pill actually has room to size itself. Responsive
+        // bottom/right mirror the outer FAB container offsets so the
+        // picker sits in the same corner on mobile (above chat) and
+        // desktop (left of chat).
+        position: 'fixed',
+        bottom: isDesktop
+          ? '1.25rem'
+          : 'calc(max(1.25rem, env(safe-area-inset-bottom)) + 3.5rem)',
+        right: isDesktop
+          ? 'calc(max(1.25rem, env(safe-area-inset-right)) + 3.625rem)'
+          : 'max(1.25rem, env(safe-area-inset-right))',
+        zIndex: 1,
+        borderRadius: 24,
+        // overflow: hidden during the opening morph (the popover content
+        // is taller than the in-flight motion.div, so 'auto' would briefly
+        // show a scrollbar). Once the morph settles we switch to
+        // 'hidden auto' so the panel can scroll if the sentinel-reported
+        // height ever exceeds maxHeight.
+        overflow: morphSettled ? 'hidden auto' : 'hidden',
+        // Cap the popover so it never extends past the top of the viewport.
+        // 2.5rem = 40px headroom (20px top + 20px bottom margins).
+        maxHeight: 'calc(100vh - 2.5rem)',
+        transformOrigin: 'bottom right',
+        color: 'var(--ink)',
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--ink)/10',
+        boxShadow: 'var(--shadow)',
+        backdropFilter: 'blur(8px)',
+      }}
+      className={`fixed ${className}`}
+    >
+      {/* Sentinel -- off-screen, invisible, non-interactive copy of the
+          popover content. Used solely for height measurement (its content
+          updates with `panel`/`model`/`thinkingMode`, and ResizeObserver
+          feeds `offsetHeight` into `animate.height` above). */}
+      <div
+        ref={sentinelRef}
+        aria-hidden
         style={{
           position: 'absolute',
-          bottom: 0,
-          right: 0,
-          zIndex: 1,
-          borderRadius: 24,
-          // overflow auto only when open; closed = hidden so the always-mounted
-          // popover content (opacity 0) doesn't draw a scrollbar inside the
-          // 48×48 chip.
-          overflow: open ? 'hidden auto' : 'hidden',
-          // Cap the popover so it never extends past the top of the viewport.
-          // 2.5rem = 40px headroom (20px top + 20px bottom margins).
-          maxHeight: 'calc(100vh - 2.5rem)',
-          transformOrigin: 'bottom right',
-          color: 'var(--ink)',
-          backgroundColor: 'var(--card)',
-          border: '1px solid var(--ink)/10',
-          boxShadow: 'var(--shadow)',
-          backdropFilter: 'blur(8px)',
+          left: '-9999px',
+          top: 0,
+          width: 'min(calc(100vw - 2.5rem), 17.5rem)',
+          pointerEvents: 'none',
+          visibility: 'hidden',
         }}
       >
-        {/* Chip content — visible when closed, fades out during width-grow stage */}
-        <motion.div
-          initial={false}
-          animate={{ opacity: open ? 0 : 1 }}
-          transition={{
-            opacity: { duration: 0.18, delay: open ? 0 : 0.32, ease: 'easeOut' },
-          }}
-          aria-hidden={!open}
-          className="absolute inset-0 flex items-center justify-center gap-1.5 sm:justify-start sm:gap-1.5 sm:px-3 sm:py-2.5"
-        >
-          <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-          <span className="hidden min-w-0 truncate text-sm sm:inline">{chip}</span>
-          <ChevronDown
-            aria-hidden
-            strokeWidth={1.75}
-            className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
-              open ? 'rotate-180' : ''
-            }`}
-          />
-        </motion.div>
-
-        {/* Popover content — visible when open, fades in during height-grow stage */}
-        <motion.div
-          initial={false}
-          animate={{ opacity: open ? 1 : 0 }}
-          transition={{
-            opacity: { duration: 0.2, delay: open ? 0.18 : 0, ease: 'easeOut' },
-          }}
-          inert={!open || undefined}
-          aria-hidden={!open}
-          className="absolute inset-0 flex flex-col"
-        >
-          {panel === 'root' && (
-            <div className="p-3.5">
-              {canThink ? (
-                <ThinkingControls mode={thinkingMode} disabled={disabled} />
-              ) : (
-                <div>
-                  <SectionHeader>思考</SectionHeader>
-                  <div className="rounded-xl bg-[var(--mist)]/45 px-3 py-2.5">
-                    <p className="text-[11px] leading-snug text-[var(--stone)]">
-                      当前模型不支持思考强度设置
-                    </p>
-                  </div>
+        {panel === 'root' ? (
+          <div className="p-3.5">
+            {canThink ? (
+              <ThinkingControls mode={thinkingMode} disabled={disabled} />
+            ) : (
+              <div>
+                <SectionHeader>思考</SectionHeader>
+                <div className="rounded-xl bg-[var(--mist)]/45 px-3 py-2.5">
+                  <p className="text-[11px] leading-snug text-[var(--stone)]">
+                    当前模型不支持思考强度设置
+                  </p>
                 </div>
-              )}
-
-              <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}>
-                <SectionHeader>模型</SectionHeader>
-                <SettingsRow
-                  label={getOpenAIModelShortLabel(model)}
-                  icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
-                  disabled={disabled}
-                  onClick={() => setPanel('model')}
-                />
               </div>
-            </div>
-          )}
+            )}
 
-          {panel === 'model' && (
-            <SubPanel title="模型" onBack={() => setPanel('root')}>
-              <ModelGroup label="DeepSeek">
-                {DEEPSEEK_MODEL_OPTIONS.map((m) => (
-                  <ModelOption
-                    key={m.id}
-                    label={m.shortLabel}
-                    detail={m.label}
-                    selected={m.id === model}
-                    disabled={disabled}
-                    icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
-                    onSelect={() => {
-                      setModel(m.id)
-                      setPanel('root')
-                    }}
-                  />
-                ))}
-              </ModelGroup>
-              <ModelGroup label="OpenAI">
-                {OPENAI_ONLY_MODEL_OPTIONS.map((m) => (
-                  <ModelOption
-                    key={m.id}
-                    label={m.shortLabel}
-                    detail={m.label}
-                    selected={m.id === model}
-                    disabled={disabled}
-                    icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
-                    onSelect={() => {
-                      setModel(m.id)
-                      setPanel('root')
-                    }}
-                  />
-                ))}
-              </ModelGroup>
-            </SubPanel>
-          )}
-        </motion.div>
+            <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}>
+              <SectionHeader>模型</SectionHeader>
+              <SettingsRow
+                label={getOpenAIModelShortLabel(model)}
+                icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
+                disabled={disabled}
+                onClick={() => setPanel('model')}
+              />
+            </div>
+          </div>
+        ) : (
+          <SubPanel title="模型" onBack={() => setPanel('root')}>
+            <ModelGroup label="DeepSeek">
+              {DEEPSEEK_MODEL_OPTIONS.map((m) => (
+                <ModelOption
+                  key={m.id}
+                  label={m.shortLabel}
+                  detail={m.label}
+                  selected={m.id === model}
+                  disabled={disabled}
+                  icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
+                  onSelect={() => {
+                    setModel(m.id)
+                    setPanel('root')
+                  }}
+                />
+              ))}
+            </ModelGroup>
+            <ModelGroup label="OpenAI">
+              {OPENAI_ONLY_MODEL_OPTIONS.map((m) => (
+                <ModelOption
+                  key={m.id}
+                  label={m.shortLabel}
+                  detail={m.label}
+                  selected={m.id === model}
+                  disabled={disabled}
+                  icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
+                  onSelect={() => {
+                    setModel(m.id)
+                    setPanel('root')
+                  }}
+                />
+              ))}
+            </ModelGroup>
+          </SubPanel>
+        )}
+      </div>
+
+      {/* Visible chip content -- absolute overlay, fills the motion.div.
+          `pointer-events: none` always: this layer is purely visual; the
+          outer motion.div owns the click handler, and when the popover is
+          open this overlay would otherwise swallow clicks meant for the
+          model/thinking controls underneath. */}
+      <motion.div
+        initial={false}
+        animate={{ opacity: open ? 0 : 1 }}
+        transition={{
+          opacity: { duration: 0.18, delay: 0, ease: 'easeOut' },
+        }}
+        aria-hidden={!open}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+        }}
+        className="flex items-center justify-center gap-1.5 sm:max-w-[15.5rem] sm:justify-start sm:gap-1.5 sm:px-3 sm:py-2.5"
+      >
+        <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
+        <span className="hidden min-w-0 truncate text-sm sm:inline">{chip}</span>
+        <ChevronDown
+          aria-hidden
+          strokeWidth={1.75}
+          className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
       </motion.div>
-    </div>
+
+      {/* Visible popover content -- absolute overlay, fills the motion.div.
+          The panel swap (root ↔ model sub-panel) is wrapped in
+          `AnimatePresence` with mode="popLayout" so the content cross-fades
+          while the motion.div animates to its new measured height. */}
+      <motion.div
+        initial={false}
+        animate={{ opacity: open ? 1 : 0 }}
+        transition={{
+          opacity: { duration: 0.2, delay: open ? 0.18 : 0, ease: 'easeOut' },
+        }}
+        inert={!open || undefined}
+        aria-hidden={!open}
+        style={{ position: 'absolute', inset: 0 }}
+        className="flex flex-col"
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          {panel === 'root' ? (
+            <motion.div
+              key="root"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <div className="p-3.5">
+                {canThink ? (
+                  <ThinkingControls mode={thinkingMode} disabled={disabled} />
+                ) : (
+                  <div>
+                    <SectionHeader>思考</SectionHeader>
+                    <div className="rounded-xl bg-[var(--mist)]/45 px-3 py-2.5">
+                      <p className="text-[11px] leading-snug text-[var(--stone)]">
+                        当前模型不支持思考强度设置
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}>
+                  <SectionHeader>模型</SectionHeader>
+                  <SettingsRow
+                    label={getOpenAIModelShortLabel(model)}
+                    icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
+                    disabled={disabled}
+                    onClick={() => setPanel('model')}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="model"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <SubPanel title="模型" onBack={() => setPanel('root')}>
+                <ModelGroup label="DeepSeek">
+                  {DEEPSEEK_MODEL_OPTIONS.map((m) => (
+                    <ModelOption
+                      key={m.id}
+                      label={m.shortLabel}
+                      detail={m.label}
+                      selected={m.id === model}
+                      disabled={disabled}
+                      icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
+                      onSelect={() => {
+                        setModel(m.id)
+                        setPanel('root')
+                      }}
+                    />
+                  ))}
+                </ModelGroup>
+                <ModelGroup label="OpenAI">
+                  {OPENAI_ONLY_MODEL_OPTIONS.map((m) => (
+                    <ModelOption
+                      key={m.id}
+                      label={m.shortLabel}
+                      detail={m.label}
+                      selected={m.id === model}
+                      disabled={disabled}
+                      icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
+                      onSelect={() => {
+                        setModel(m.id)
+                        setPanel('root')
+                      }}
+                    />
+                  ))}
+                </ModelGroup>
+              </SubPanel>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -345,17 +562,27 @@ function ThinkingControls({
         </div>
       </div>
 
-      {!thinkingOn && (
-        <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[var(--mist)]/35 px-2.5 py-2">
-          <span
-            aria-hidden
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/45"
-          />
-          <p className="text-[11px] leading-snug text-[var(--stone)]">
-            跳过额外推理，响应更直接
-          </p>
+      {/* Skip notice — same grid-rows pattern as L2 (300ms ease-out) so it
+          expands in sync with L2's collapse when thinking toggles off,
+          giving a monotonic height change instead of the prior "skip
+          appears at full size while L2 is still expanding" bump. */}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+          !thinkingOn ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[var(--mist)]/35 px-2.5 py-2">
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/45"
+            />
+            <p className="text-[11px] leading-snug text-[var(--stone)]">
+              跳过额外推理，响应更直接
+            </p>
+          </div>
         </div>
-      )}
+      </div>
 
       <span className="sr-only">当前模式 {mode}</span>
     </div>

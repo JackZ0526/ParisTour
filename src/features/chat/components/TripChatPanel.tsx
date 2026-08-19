@@ -1881,7 +1881,12 @@ export function TripChatPanel({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3">
+          {/* overflow-y-hidden during the opening morph — the inner column
+              hasn't grown to its final height yet, and `auto` would briefly
+              show a scrollbar as the panel expands. `panelEntered` flips
+              true when the height animation settles, after which we want
+              scrolling for long chat histories. */}
+          <div className={`min-h-0 flex-1 space-y-3 ${panelEntered ? 'overflow-y-auto' : 'overflow-y-hidden'} overscroll-contain px-3 py-3`}>
             {!history.some((t) => !t.hidden) && (
               <div className="space-y-2">
                 <p className="text-sm text-[var(--stone)]">
