@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { animate, useMotionValue, type MotionValue } from 'framer-motion'
 
 interface UseSheetDragDismissOptions {
+  open?: boolean
   onClose: () => void
   threshold?: number
   velocityThreshold?: number
@@ -27,12 +28,20 @@ export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElemen
  * - Handles velocity-based release physics (dismiss on fast flick or passing threshold).
  */
 export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
+  open = true,
   onClose,
   threshold = 100,
   velocityThreshold = 350,
 }: UseSheetDragDismissOptions): UseSheetDragDismissReturn<T> {
   const sheetRef = useRef<T | null>(null)
   const dragY = useMotionValue(0)
+
+  // Always reset drag offset whenever the sheet opens
+  useEffect(() => {
+    if (open) {
+      dragY.set(0)
+    }
+  }, [open, dragY])
 
   useEffect(() => {
     const el = sheetRef.current

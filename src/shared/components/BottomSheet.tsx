@@ -47,7 +47,7 @@ export function BottomSheet({
   useBodyScrollLock(open)
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
-  const { sheetRef, dragY } = useSheetDragDismiss<HTMLDivElement>({ onClose })
+  const { sheetRef, dragY } = useSheetDragDismiss<HTMLDivElement>({ open, onClose })
 
   useEffect(() => {
     if (!open) return
