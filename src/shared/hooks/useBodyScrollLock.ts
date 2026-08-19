@@ -23,10 +23,19 @@ export function useBodyScrollLock(active: boolean): void {
     body.style.overflow = 'hidden'
     html.style.overscrollBehavior = 'none'
 
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    const prevThemeColor = metaThemeColor?.getAttribute('content')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', '#0e1210')
+    }
+
     return () => {
       html.style.overflow = prevHtmlOverflow
       body.style.overflow = prevBodyOverflow
       html.style.overscrollBehavior = prevHtmlOverscroll
+      if (metaThemeColor && prevThemeColor) {
+        metaThemeColor.setAttribute('content', prevThemeColor)
+      }
     }
   }, [active])
 }

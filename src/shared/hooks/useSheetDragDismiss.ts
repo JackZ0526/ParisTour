@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { animate, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
 
 interface UseSheetDragDismissOptions {
+  open?: boolean
   onClose: () => void
   threshold?: number
   velocityThreshold?: number
@@ -31,6 +32,7 @@ export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElemen
  *    - Cancel / rebound: inherits release velocity into snap-back spring.
  */
 export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
+  open = true,
   onClose,
   threshold = 110,
   velocityThreshold = 380,
@@ -44,6 +46,13 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     ['rgba(0, 0, 0, 0.45)', 'rgba(0, 0, 0, 0)'],
     { clamp: true },
   )
+
+  // Reset y to 0 whenever the sheet opens or remounts
+  useEffect(() => {
+    if (open) {
+      y.set(0)
+    }
+  }, [open, y])
 
   useEffect(() => {
     const el = sheetRef.current
