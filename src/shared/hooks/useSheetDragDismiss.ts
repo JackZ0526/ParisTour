@@ -20,20 +20,18 @@ export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElemen
 /**
  * Non-passive native touch & mouse gesture arbiter for bottom sheets.
  *
- * Why this is needed:
- * Browsers process touch scrolling on their compositor thread. React's passive
- * event handlers cannot prevent the browser's native rubberband/overscroll bounce.
- *
- * By attaching a non-passive `touchmove` listener directly to the sheet element:
- * - When `scrollTop <= 0` and the user swipes down, we call `e.preventDefault()`
- *   to completely suppress native rubberbanding and drive sheet dismissal via MotionValue.
- * - When `scrollTop > 0` or the user scrolls up, `e.preventDefault()` is NOT called,
- *   preserving 100% native momentum scrolling inside the content.
+ * Features:
+ * 1. Non-passive touch listener prevents browser rubberband overscroll at scrollTop <= 0.
+ * 2. Real-time velocity tracker with exponential smoothing.
+ * 3. Velocity-inherited spring physics upon release:
+ *    - Fling downwards: inherits momentum and sweeps offscreen at finger speed.
+ *    - Slow release: smooth glide offscreen.
+ *    - Cancel / rebound: inherits release velocity into snap-back spring.
  */
 export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   onClose,
   threshold = 110,
-  velocityThreshold = 400,
+  velocityThreshold = 380,
 }: UseSheetDragDismissOptions): UseSheetDragDismissReturn<T> {
   const sheetRef = useRef<T | null>(null)
   const y = useMotionValue(0)
@@ -75,6 +73,35 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
       return null
     }
 
+    const settleOnRelease = (releaseVelocity: number) => {
+      isDraggingSheet = false
+      const currentY = y.get()
+      const shouldDismiss =
+        currentY > threshold || releaseVelocity > velocityThreshold
+
+      if (shouldDismiss) {
+        const targetY = (typeof window !== 'undefined' ? window.innerHeight : 800) + 60
+        const initialV = Math.max(releaseVelocity, 450)
+
+        animate(y, targetY, {
+          type: 'spring',
+          velocity: initialV,
+          stiffness: 340,
+          damping: 32,
+          mass: 0.6,
+        }).then(onClose)
+      } else {
+        // Snap back to top, incorporating any residual touch velocity
+        animate(y, 0, {
+          type: 'spring',
+          velocity: releaseVelocity,
+          stiffness: 420,
+          damping: 32,
+          mass: 0.8,
+        })
+      }
+    }
+
     // --- Touch handling (Mobile) ---
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
@@ -99,8 +126,10 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 
       const now = performance.now()
       const dt = now - lastTime
-      if (dt > 0) {
-        velocityY = ((touch.clientY - lastY) / dt) * 1000
+      if (dt > 4 && dt < 120) {
+        const instantVelocity = ((touch.clientY - lastY) / dt) * 1000
+        // Exponential moving average for smooth velocity continuity
+        velocityY = velocityY ? velocityY * 0.35 + instantVelocity * 0.65 : instantVelocity
       }
       lastY = touch.clientY
       lastTime = now
@@ -136,21 +165,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 
     const onTouchEnd = () => {
       if (isDraggingSheet) {
-        isDraggingSheet = false
-        const currentY = y.get()
-        if (currentY > threshold || velocityY > velocityThreshold) {
-          animate(y, window.innerHeight, {
-            duration: 0.22,
-            ease: [0.22, 1, 0.36, 1] as const,
-          }).then(onClose)
-        } else {
-          animate(y, 0, {
-            type: 'spring',
-            stiffness: 420,
-            damping: 32,
-            mass: 0.8,
-          })
-        }
+        settleOnRelease(velocityY)
       }
     }
 
@@ -177,8 +192,9 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 
         const now = performance.now()
         const dt = now - lastTime
-        if (dt > 0) {
-          velocityY = ((moveEvent.clientY - lastY) / dt) * 1000
+        if (dt > 4 && dt < 120) {
+          const instantVelocity = ((moveEvent.clientY - lastY) / dt) * 1000
+          velocityY = velocityY ? velocityY * 0.35 + instantVelocity * 0.65 : instantVelocity
         }
         lastY = moveEvent.clientY
         lastTime = now
@@ -206,21 +222,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
         window.removeEventListener('mousemove', onMouseMove)
         window.removeEventListener('mouseup', onMouseUp)
         if (isDraggingSheet) {
-          isDraggingSheet = false
-          const currentY = y.get()
-          if (currentY > threshold || velocityY > velocityThreshold) {
-            animate(y, window.innerHeight, {
-              duration: 0.22,
-              ease: [0.22, 1, 0.36, 1] as const,
-            }).then(onClose)
-          } else {
-            animate(y, 0, {
-              type: 'spring',
-              stiffness: 420,
-              damping: 32,
-              mass: 0.8,
-            })
-          }
+          settleOnRelease(velocityY)
         }
       }
 
