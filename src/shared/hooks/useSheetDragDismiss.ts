@@ -11,6 +11,7 @@ export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElemen
   sheetRef: React.RefObject<T | null>
   y: MotionValue<number>
   backdropOpacity: MotionValue<number>
+  backdropBg: MotionValue<string>
   dragProps: {
     style: {
       y: MotionValue<number>
@@ -37,6 +38,12 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   const sheetRef = useRef<T | null>(null)
   const y = useMotionValue(0)
   const backdropOpacity = useTransform(y, [0, 360], [1, 0], { clamp: true })
+  const backdropBg = useTransform(
+    y,
+    [0, 360],
+    ['rgba(0, 0, 0, 0.45)', 'rgba(0, 0, 0, 0)'],
+    { clamp: true },
+  )
 
   useEffect(() => {
     const el = sheetRef.current
@@ -251,6 +258,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     sheetRef,
     y,
     backdropOpacity,
+    backdropBg,
     dragProps: {
       style: {
         y,
