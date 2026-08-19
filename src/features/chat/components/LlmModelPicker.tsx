@@ -363,7 +363,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         )}
       </div>
 
-      {/* Visible chip content -- absolute overlay, fills the motion.div.
+      {/* Visible chip content -- fills the motion.div.
           `pointer-events: none` always: this layer is purely visual; the
           outer motion.div owns the click handler, and when the popover is
           open this overlay would otherwise swallow clicks meant for the
@@ -376,18 +376,16 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         }}
         aria-hidden={!open}
         style={{
-          position: 'absolute',
-          inset: 0,
           pointerEvents: 'none',
         }}
-        className="flex items-center justify-center gap-1.5 sm:max-w-[15.5rem] sm:justify-start sm:gap-1.5 sm:px-3 sm:py-2.5"
+        className="flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
       >
         <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-        <span className="hidden min-w-0 truncate text-sm sm:inline">{chip}</span>
+        <span className="hidden min-w-0 truncate text-sm font-medium leading-none sm:inline">{chip}</span>
         <ChevronDown
           aria-hidden
-          strokeWidth={1.75}
-          className={`hidden h-2.5 w-2.5 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
+          strokeWidth={2}
+          className={`hidden h-3 w-3 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
             open ? 'rotate-180' : ''
           }`}
         />
