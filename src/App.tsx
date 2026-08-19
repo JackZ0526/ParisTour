@@ -990,35 +990,50 @@ export default function App() {
                       </div>
 
                       <div
-                        className="flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
+                        className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
                         role="tablist"
                         aria-label="行程视图"
                       >
+                        {/* iOS-style sliding pill: same layoutId on both tabs'
+                            background motion.divs, so Framer Motion tracks
+                            the position across mounts and animates between
+                            them with the spring below. Text color also
+                            cross-fades via motion's automatic color tween. */}
                         <button
                           type="button"
                           role="tab"
                           aria-selected={mobileItineraryPane === 'timeline'}
                           onClick={() => setMobileItineraryPane('timeline')}
-                          className={`flex-1 rounded-full px-3 py-2 text-sm transition ${
-                            mobileItineraryPane === 'timeline'
-                              ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
-                              : 'text-[var(--ink)]'
-                          }`}
+                          className="relative flex-1 rounded-full px-3 py-2 text-sm transition-colors"
                         >
-                          时间线
+                          {mobileItineraryPane === 'timeline' && (
+                            <motion.span
+                              layoutId="itinerary-pane-pill"
+                              className="absolute inset-0 -z-10 rounded-full bg-[var(--ink)] shadow-sm"
+                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                            />
+                          )}
+                          <span className={mobileItineraryPane === 'timeline' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'}>
+                            时间线
+                          </span>
                         </button>
                         <button
                           type="button"
                           role="tab"
                           aria-selected={mobileItineraryPane === 'map'}
                           onClick={() => setMobileItineraryPane('map')}
-                          className={`flex-1 rounded-full px-3 py-2 text-sm transition ${
-                            mobileItineraryPane === 'map'
-                              ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
-                              : 'text-[var(--ink)]'
-                          }`}
+                          className="relative flex-1 rounded-full px-3 py-2 text-sm transition-colors"
                         >
-                          地图
+                          {mobileItineraryPane === 'map' && (
+                            <motion.span
+                              layoutId="itinerary-pane-pill"
+                              className="absolute inset-0 -z-10 rounded-full bg-[var(--ink)] shadow-sm"
+                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                            />
+                          )}
+                          <span className={mobileItineraryPane === 'map' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'}>
+                            地图
+                          </span>
                         </button>
                       </div>
                     </div>
