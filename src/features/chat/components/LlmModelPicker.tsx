@@ -372,7 +372,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         initial={false}
         animate={{ opacity: open ? 0 : 1 }}
         transition={{
-          opacity: { duration: 0.18, delay: 0, ease: 'easeOut' },
+          opacity: { duration: 0.2, delay: open ? 0 : 0.28, ease: 'easeOut' },
         }}
         aria-hidden={!open}
         style={{
@@ -381,7 +381,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         className="flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
       >
         <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-        <span className="hidden min-w-0 truncate text-sm font-medium leading-none sm:inline">{chip}</span>
+        <span className="hidden whitespace-nowrap text-sm font-medium leading-none sm:inline">{chip}</span>
         <ChevronDown
           aria-hidden
           strokeWidth={2}
