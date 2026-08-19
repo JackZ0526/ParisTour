@@ -9,6 +9,7 @@ import {
   type TripSnapshotBackup,
 } from '../services/tripCloud'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
 import { LoaderCircle, RotateCcw } from 'lucide-react'
 
 interface Props {
@@ -91,6 +92,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
 
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
+  const { sheetRef, dragProps } = useSheetDragDismiss<HTMLElement>({ onClose })
 
   async function restore(backup: TripSnapshotBackup) {
     const ok = window.confirm(
@@ -124,11 +126,13 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
           />
           <div className="pointer-events-none fixed inset-0 z-[2051] flex items-end justify-center p-0 sm:items-center sm:p-4">
             <motion.section
+              ref={sheetRef}
               initial={sheet.initial}
               animate={sheet.animate}
               exit={sheet.exit}
               transition={sheet.transition}
-              className="pointer-events-auto relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7"
+              {...dragProps}
+              className="pointer-events-auto relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7 [touch-action:pan-y]"
             >
         <div className="flex items-start justify-between gap-4">
           <div>

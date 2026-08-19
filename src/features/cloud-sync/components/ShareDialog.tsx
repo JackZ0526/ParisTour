@@ -13,6 +13,7 @@ import {
   type TripShareRow,
 } from '../services/tripCloud'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
 
 type Props = {
   tripId: string
@@ -107,6 +108,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
 
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
+  const { sheetRef, dragProps } = useSheetDragDismiss({ onClose })
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -183,6 +185,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
           />
           <div className="pointer-events-none fixed inset-0 z-[2001] flex items-end justify-center p-0 sm:items-center sm:p-4">
             <motion.div
+              ref={sheetRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
@@ -190,7 +193,8 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
               animate={sheet.animate}
               exit={sheet.exit}
               transition={sheet.transition}
-              className="pointer-events-auto relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
+              {...dragProps}
+              className="pointer-events-auto relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl [touch-action:pan-y]"
               onClick={(e) => e.stopPropagation()}
             >
         <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-5 sm:px-6">

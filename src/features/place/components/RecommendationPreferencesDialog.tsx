@@ -12,6 +12,8 @@ import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { Checkbox } from '../../../shared/components/Checkbox'
 import { TimePicker } from '../../itinerary/components/TimePicker'
 
+import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
+
 interface Props {
   open: boolean
   value: RecommendationPreferences
@@ -102,6 +104,7 @@ export function RecommendationPreferencesDialog({
 
   const sheet = useEnterExit('sheet-bottom')
   const backdrop = useEnterExit('fade')
+  const { sheetRef, dragProps } = useSheetDragDismiss({ onClose })
 
   return createPortal(
     <AnimatePresence>
@@ -117,6 +120,7 @@ export function RecommendationPreferencesDialog({
           />
           <div className="pointer-events-none fixed inset-0 z-[2601] flex items-end justify-center p-0 sm:items-center sm:p-4">
             <motion.div
+              ref={sheetRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby="recommendation-preferences-title"
@@ -124,7 +128,8 @@ export function RecommendationPreferencesDialog({
               animate={sheet.animate}
               exit={sheet.exit}
               transition={sheet.transition}
-              className="pointer-events-auto w-full max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl"
+              {...dragProps}
+              className="pointer-events-auto w-full max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl [touch-action:pan-y]"
             >
         <div className="flex items-start justify-between border-b border-[var(--mist)] px-5 py-4">
           <div>

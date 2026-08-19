@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
+import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
 import {
   ChevronLeft,
   ChevronRight,
@@ -449,6 +450,7 @@ export function GooglePlacePage({
   onClose,
 }: Props) {
   useBodyScrollLock(open)
+  const { sheetRef, dragProps } = useSheetDragDismiss({ onClose })
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLookupReady, setGoogleLookupReady] = useState(false)
@@ -1636,6 +1638,7 @@ export function GooglePlacePage({
             }}
           />
           <motion.div
+            ref={sheetRef}
             role="dialog"
             aria-modal="true"
             aria-label={dialogLabel}
@@ -1643,8 +1646,9 @@ export function GooglePlacePage({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ duration: SHEET_DURATION, ease: SHEET_EASE }}
+            {...dragProps}
             style={{ willChange: 'transform' }}
-            className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+            className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl [touch-action:pan-y]"
           >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 pr-3">
