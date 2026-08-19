@@ -209,7 +209,7 @@ export function DateRangePicker({
     exit: { opacity: 0, scaleY: 0.82, scaleX: 0.95, y: -6 },
     transition: reduce
       ? { duration: 0.01 }
-      : { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
+      : { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const },
   }
 
   return (
