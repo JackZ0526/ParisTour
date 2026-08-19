@@ -14,6 +14,7 @@ export interface BottomSheetProps {
   overlayClassName?: string
   hideBackdrop?: boolean
   closeOnBackdrop?: boolean
+  showHandle?: boolean
   ariaLabel?: string
   ariaLabelledBy?: string
   containerProps?: Record<string, unknown>
@@ -30,6 +31,7 @@ export interface BottomSheetProps {
  * - useSheetDragDismiss full-surface pull-down-to-dismiss gesture
  * - Escape key dismissal
  * - Backdrop click dismissal
+ * - Built-in pull-down drag handle bar
  */
 export function BottomSheet({
   open,
@@ -40,6 +42,7 @@ export function BottomSheet({
   overlayClassName = '',
   hideBackdrop = false,
   closeOnBackdrop = true,
+  showHandle = true,
   ariaLabel,
   ariaLabelledBy,
   containerProps,
@@ -100,6 +103,14 @@ export function BottomSheet({
               {...dragProps}
               className={`pointer-events-auto relative z-10 w-full [touch-action:pan-y] [overscroll-behavior-y:contain] ${className}`}
             >
+              {showHandle && (
+                <div
+                  className="flex w-full shrink-0 justify-center pt-2.5 pb-1 select-none pointer-events-none"
+                  aria-hidden="true"
+                >
+                  <div className="h-1 w-10 rounded-full bg-[var(--stone)]/35" />
+                </div>
+              )}
               {children}
             </motion.div>
           </div>

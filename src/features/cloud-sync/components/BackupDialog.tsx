@@ -4,7 +4,6 @@ import {
   restoreTripSnapshotBackup,
   type TripSnapshotBackup,
 } from '../services/tripCloud'
-import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { LoaderCircle, RotateCcw } from 'lucide-react'
 
@@ -99,14 +98,11 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
       overlayZIndex={2050}
       className="max-h-[min(85dvh,85vh)] max-w-2xl overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:rounded-3xl sm:p-7"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>
-          <p className="mt-1 text-sm text-[var(--stone)]">
-            每次保存前自动保留旧版本，最多 5 份。出错时可以从这里恢复。
-          </p>
-        </div>
-        <CloseIconButton onClick={onClose} />
+      <div>
+        <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>
+        <p className="mt-1 text-sm text-[var(--stone)]">
+          每次保存前自动保留旧版本，最多 5 份。出错时可以从这里恢复。
+        </p>
       </div>
 
       {error && (
