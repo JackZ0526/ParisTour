@@ -95,7 +95,7 @@ export function BottomSheet({
               exit={sheet.exit}
               transition={sheet.transition}
               {...dragProps}
-              className={`pointer-events-auto relative z-10 w-full [touch-action:pan-y] ${className}`}
+              className={`pointer-events-auto relative z-10 w-full [touch-action:pan-y] [overscroll-behavior-y:contain] ${className}`}
             >
               {children}
             </motion.div>
