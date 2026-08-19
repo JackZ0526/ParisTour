@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 
 type DayTabButtonProps = {
   dayNumber: number
@@ -12,6 +13,7 @@ type DayTabButtonProps = {
 /**
  * Day switcher tab that animates width/height when content swaps from
  * shimmer skeleton → real title (cubic ease-out, not linear).
+ * Features a fluid shared "ink blob" that glides between active days.
  */
 export function DayTabButton({
   dayNumber,
@@ -60,14 +62,30 @@ export function DayTabButton({
       aria-busy={pending || undefined}
       aria-label={pending ? `第 ${dayNumber} 天，正在生成` : undefined}
       style={box ? { width: box.w, height: box.h } : undefined}
-      className={`day-tab-button snap-start shrink-0 overflow-hidden rounded-full px-3 py-2 text-sm sm:px-4 ${
-        active
-          ? 'bg-[var(--ink)] text-[var(--paper)]'
-          : 'bg-white/70 text-[var(--ink)] hover:bg-white'
-      }`}
+      className="day-tab-button relative isolate snap-start shrink-0 rounded-full bg-white/70 px-3 py-2 text-sm outline-none transition-colors duration-200 hover:bg-white/90 sm:px-4"
     >
-      <span className="block w-max max-w-none">
-        <span className="block leading-tight">{dateLine}</span>
+      {active && (
+        <motion.span
+          layoutId="active-day-tab-ink"
+          className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm"
+          animate={{
+            scaleX: [1, 1.15, 0.95, 1],
+            scaleY: [1, 0.88, 1.04, 1],
+          }}
+          transition={{
+            layout: { type: 'spring', stiffness: 400, damping: 28, mass: 0.8 },
+            scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
+            scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
+          }}
+        />
+      )}
+
+      <span
+        className={`relative z-10 block w-max max-w-none transition-colors duration-200 ${
+          active ? 'text-[var(--paper)]' : 'text-[var(--ink)]'
+        }`}
+      >
+        <span className="block leading-tight font-medium">{dateLine}</span>
         <span className="mt-0.5 block text-[11px] leading-[1.25]">
           {pending && !streamingTitle ? (
             <span
