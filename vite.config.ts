@@ -379,6 +379,16 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
           cleanupOutdatedCaches: true,
+          // Take over the current page as soon as a new SW activates.
+          // Without this, the install on the *next* launch keeps serving
+          // the stale precache — e.g. a Picker layout fix in the latest
+          // bundle wouldn't reach an already-installed PWA until the user
+          // killed every tab. The LLM picker had a "model row blank on
+          // first open" bug that lingered in the installed PWA for this
+          // reason; this claim makes the fix take effect on the next
+          // foreground transition.
+          clientsClaim: true,
+          skipWaiting: true,
           navigateFallback: '/index.html',
           runtimeCaching: [
             {
