@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
-import { createPortal } from 'react-dom'
-import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import {
   listTripShares,
   removeTripShare,
@@ -13,7 +9,7 @@ import {
   type TripShareRow,
 } from '../services/tripCloud'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
-import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
+import { BottomSheet } from '../../../shared/components/BottomSheet'
 
 type Props = {
   tripId: string
@@ -68,7 +64,6 @@ function RoleToggle({
 }
 
 export function ShareDialog({ tripId, open, onClose }: Props) {
-  useBodyScrollLock(open)
   const titleId = useId()
   const [shares, setShares] = useState<TripShareRow[]>([])
   const [email, setEmail] = useState('')
@@ -96,19 +91,6 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       setError(err instanceof Error ? err.message : '加载共享列表失败')
     })
   }, [open, reload])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  const sheet = useEnterExit('sheet-bottom')
-  const backdrop = useEnterExit('fade')
-  const { sheetRef, dragProps } = useSheetDragDismiss({ onClose })
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -169,108 +151,69 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     }
   }
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.button
-            type="button"
-            className="fixed inset-0 z-[2000] bg-black/45"
-            initial={backdrop.initial}
-            animate={backdrop.animate}
-            exit={backdrop.exit}
-            transition={backdrop.transition}
-            aria-label="关闭分享面板"
-            onClick={onClose}
-          />
-          <div className="pointer-events-none fixed inset-0 z-[2001] flex items-end justify-center p-0 sm:items-center sm:p-4">
-            <motion.div
-              ref={sheetRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={titleId}
-              initial={sheet.initial}
-              animate={sheet.animate}
-              exit={sheet.exit}
-              transition={sheet.transition}
-              {...dragProps}
-              className="pointer-events-auto relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl [touch-action:pan-y]"
-              onClick={(e) => e.stopPropagation()}
-            >
-        <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-5 sm:px-6">
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-80"
-            style={{
-              background:
-                'radial-gradient(ellipse 70% 90% at 0% 0%, rgba(196,165,116,0.22), transparent 60%), radial-gradient(ellipse 50% 80% at 100% 0%, rgba(74,99,86,0.16), transparent 55%)',
-            }}
-          />
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--sage)]">
-                Collaboration
-              </p>
-              <h2 id={titleId} className="font-display mt-1 text-3xl leading-none text-[var(--ink)]">
-                分享行程
-              </h2>
-              <p className="mt-2 max-w-sm text-sm leading-relaxed text-[var(--stone)]">
-                输入同伴邮箱并发送邀请后，对方会收到邮件，按提示注册或登录后即可查看行程。
-              </p>
-            </div>
-            <CloseIconButton onClick={onClose} className="mt-0.5" />
+  return (
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      overlayZIndex={2000}
+      ariaLabelledBy={titleId}
+      className="flex max-h-[min(88vh,100dvh)] max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
+    >
+      <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-5 sm:px-6">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-80"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 90% at 0% 0%, rgba(196,165,116,0.22), transparent 60%), radial-gradient(ellipse 50% 80% at 100% 0%, rgba(74,99,86,0.16), transparent 55%)',
+          }}
+        />
+        <div className="relative flex items-start justify-between gap-4">
+          <div>
+            <h2 id={titleId} className="font-display text-2xl text-[var(--ink)]">
+              分享与协作
+            </h2>
+            <p className="mt-1 text-sm text-[var(--stone)]">
+              邀请旅伴一起查看或编辑行程；修改会实时同步到云端。
+            </p>
           </div>
-        </header>
+          <CloseIconButton onClick={onClose} />
+        </div>
+      </header>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
-          <form onSubmit={onAdd} className="space-y-3">
-            <label className="block text-sm">
-              <span className="font-medium text-[var(--ink)]">邀请邮箱</span>
+      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
+        {error && (
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
+        )}
+        {info && (
+          <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{info}</p>
+        )}
+
+        <form onSubmit={onAdd} className="space-y-3">
+          <label className="block text-xs font-medium text-[var(--stone)]">
+            邀请新成员
+            <div className="mt-1.5 flex flex-wrap gap-2">
               <input
                 type="email"
-                inputMode="email"
-                enterKeyHint="send"
                 required
-                autoComplete="email"
-                placeholder="friend@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full border-0 border-b border-[var(--stone)]/35 bg-transparent px-0 py-2 outline-none transition placeholder:text-[var(--stone)]/50 focus:border-[var(--sage)]"
+                placeholder="partner@example.com"
+                className="min-w-0 flex-1 rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--sage)]"
               />
-            </label>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-[var(--stone)]">权限</span>
-                <RoleToggle
-                  name="invite-role"
-                  value={role}
-                  onChange={setRole}
-                  disabled={busy}
-                />
-              </div>
+              <RoleToggle value={role} onChange={setRole} disabled={busy} name="newRole" />
               <button
                 type="submit"
                 disabled={busy || !email.trim()}
-                className="rounded-lg bg-[var(--sage)] px-4 py-2 text-sm font-medium text-[var(--paper)] transition hover:bg-[var(--ink)] disabled:opacity-50"
+                className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] transition hover:bg-[var(--ink)]/90 disabled:opacity-50"
               >
                 {busy ? '处理中…' : '发送邀请'}
               </button>
             </div>
-          </form>
+          </label>
+        </form>
 
-          {error && (
-            <p className="rounded-lg border border-[var(--copper)]/30 bg-[var(--copper)]/10 px-3 py-2 text-sm text-[var(--ink)]">
-              {error}
-            </p>
-          )}
-          {info && (
-            <p className="rounded-lg border border-[var(--sage)]/30 bg-[var(--sage)]/10 px-3 py-2 text-sm text-[var(--ink)] break-all">
-              {info}
-            </p>
-          )}
-
-          <section>
-            <div className="mb-3 flex items-baseline justify-between gap-2">
+        <section>
+          <div className="mb-3 flex items-baseline justify-between gap-2">
               <h3 className="text-sm font-medium text-[var(--ink)]">已分享</h3>
               <span className="text-xs text-[var(--stone)]">
                 {loadingList ? '加载中…' : `${shares.length} 人`}
@@ -321,11 +264,6 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
             )}
           </section>
         </div>
-            </motion.div>
-          </div>
-        </>
-      )}
-    </AnimatePresence>,
-    document.body,
+    </BottomSheet>
   )
 }

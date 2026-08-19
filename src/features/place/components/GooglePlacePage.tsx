@@ -7,8 +7,7 @@ import {
   type HTMLAttributeReferrerPolicy,
   type ReactNode,
 } from 'react'
-import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
-import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
+import { BottomSheet } from '../../../shared/components/BottomSheet'
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,8 +17,6 @@ import {
   RefreshCw,
   RotateCw,
 } from 'lucide-react'
-import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
 import {
   fetchRapidApiGooglePhotoFallbackById,
   fetchRapidApiGooglePlaceDetailsById,
@@ -449,8 +446,6 @@ export function GooglePlacePage({
   onAdvisorFacts,
   onClose,
 }: Props) {
-  useBodyScrollLock(open)
-  const { sheetRef, dragProps } = useSheetDragDismiss({ onClose })
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLookupReady, setGoogleLookupReady] = useState(false)
@@ -1466,15 +1461,6 @@ export function GooglePlacePage({
     googleAddress,
   ])
 
-  // --- iOS sheet animation (Framer Motion) ---
-  // Entrance and exit share a single easeOutQuint curve (0.22, 1, 0.36, 1)
-  // at 420ms — mirrored timing so open and close read as one motion. AnimatePresence
-  // handles the deferred unmount automatically; we no longer track isVisible /
-  // isAtRest / direction state or a double-rAF.
-  const SHEET_DURATION = 0.42
-  const SHEET_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-  const BACKDROP_DURATION = 0.18
-
   const originalLabel = placeOriginalLabel(
     name,
     nameLocal,
@@ -1616,41 +1602,21 @@ export function GooglePlacePage({
           ? <PlaceReviewsShimmer />
           : null
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <div
-          data-google-place-page="1"
-          data-pending-place-confirm={footer ? '1' : undefined}
-          className={`fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4 ${overlayClassName}`}
-          style={{ zIndex: overlayZIndex ?? 2000 }}
-        >
-          <motion.button
-            type="button"
-            className="absolute inset-0 cursor-default bg-black/45"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: BACKDROP_DURATION, ease: 'easeOut' }}
-            aria-label="关闭"
-            onClick={() => {
-              if (closeOnBackdrop) onClose()
-            }}
-          />
-          <motion.div
-            ref={sheetRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={dialogLabel}
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ duration: SHEET_DURATION, ease: SHEET_EASE }}
-            {...dragProps}
-            style={{ willChange: 'transform' }}
-            className="relative z-10 flex max-h-[min(75dvh,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl [touch-action:pan-y]"
-          >
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+  return (
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      overlayZIndex={overlayZIndex ?? 2000}
+      overlayClassName={overlayClassName}
+      closeOnBackdrop={closeOnBackdrop}
+      ariaLabel={dialogLabel}
+      containerProps={{
+        'data-google-place-page': '1',
+        'data-pending-place-confirm': footer ? '1' : undefined,
+      }}
+      className="flex max-h-[min(75dvh,calc(100dvh-2rem))] max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 pr-3">
             <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
               {showNameLoader ? (
@@ -2236,10 +2202,6 @@ export function GooglePlacePage({
             {footer}
           </div>
         )}
-        </motion.div>
-      </div>
-    )}
-  </AnimatePresence>,
-    document.body,
+    </BottomSheet>
   )
 }

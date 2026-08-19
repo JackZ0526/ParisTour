@@ -1,8 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
-import { createPortal } from 'react-dom'
-import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchGooglePlaceDetails,
@@ -40,7 +36,7 @@ import type { Place, PlaceType } from '../../../types'
 import type { RecommendationPreferences } from '../services/recommendationPreferences'
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
-import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
+import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { GooglePlacePage } from './GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
@@ -102,7 +98,6 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
-  useBodyScrollLock(open)
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -893,47 +888,20 @@ export function AddPlaceDialog({
     return () => window.clearTimeout(timer)
   }, [googleDetail, googleDetailKey, factsSig])
 
-  const sheet = useEnterExit('sheet-bottom')
-  const backdrop = useEnterExit('fade')
-  const { sheetRef, dragProps } = useSheetDragDismiss({ onClose })
-
-  if (typeof document === 'undefined') return null
-
   const googleBusyBest =
     googleDetail != null && addingName === `${googleDetail.details.name}:best`
   const googleBusyEnd =
     googleDetail != null && addingName === `${googleDetail.details.name}:end`
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop fades in independently from the sheet so the dim
-              overlay doesn't slide up from the bottom with the panel. */}
-          <motion.div
-            className={`fixed inset-0 z-[2100] bg-black/45 ${
-              googleDetail ? 'pointer-events-none invisible' : ''
-            }`}
-            initial={backdrop.initial}
-            animate={backdrop.animate}
-            exit={backdrop.exit}
-            transition={backdrop.transition}
-            onClick={onClose}
-          />
-          {/* Sheet slides up from the bottom. Lives outside the backdrop's
-              flex container so the dim layer doesn't get pulled along. */}
-          <div className="pointer-events-none fixed inset-0 z-[2101] flex items-end justify-center p-0 sm:items-center sm:p-4">
-            <motion.div
-              ref={sheetRef}
-              role="dialog"
-              aria-modal="true"
-              initial={sheet.initial}
-              animate={sheet.animate}
-              exit={sheet.exit}
-              transition={sheet.transition}
-              {...dragProps}
-              className="pointer-events-auto relative z-10 flex max-h-[min(88dvh,88vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl [touch-action:pan-y]"
-            >
+  return (
+    <>
+      <BottomSheet
+        open={open}
+        onClose={onClose}
+        overlayZIndex={2100}
+        hideBackdrop={Boolean(googleDetail)}
+        className="flex max-h-[min(88dvh,88vh)] max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+      >
         <div ref={chromeRef} className="shrink-0">
           <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
             <div>
@@ -1340,8 +1308,7 @@ export function AddPlaceDialog({
             </div>
           </div>
         </div>
-            </motion.div>
-          </div>
+      </BottomSheet>
 
       <GooglePlacePage
         open={Boolean(googleDetail)}
@@ -1428,9 +1395,6 @@ export function AddPlaceDialog({
         }
         onClose={closeGoogleDetail}
       />
-        </>
-      )}
-    </AnimatePresence>,
-    document.body,
+    </>
   )
 }

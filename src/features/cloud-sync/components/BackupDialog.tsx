@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
-import { createPortal } from 'react-dom'
-import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import {
   listTripSnapshotBackups,
   restoreTripSnapshotBackup,
   type TripSnapshotBackup,
 } from '../services/tripCloud'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
-import { useSheetDragDismiss } from '../../../shared/hooks/useSheetDragDismiss'
+import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { LoaderCircle, RotateCcw } from 'lucide-react'
 
 interface Props {
@@ -53,7 +49,6 @@ function formatBackupTime(value: string): string {
 }
 
 export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
-  useBodyScrollLock(open)
   const [backups, setBackups] = useState<TripSnapshotBackup[]>([])
   const [loading, setLoading] = useState(false)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -81,19 +76,6 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     }
   }, [open, tripId])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  const sheet = useEnterExit('sheet-bottom')
-  const backdrop = useEnterExit('fade')
-  const { sheetRef, dragProps } = useSheetDragDismiss<HTMLElement>({ onClose })
-
   async function restore(backup: TripSnapshotBackup) {
     const ok = window.confirm(
       `恢复 ${formatBackupTime(backup.createdAt)} 的版本？当前内容会先自动备份，因此可以撤销这次恢复。`,
@@ -110,105 +92,83 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     }
   }
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.button
-            type="button"
-            aria-label="关闭存档备份"
-            initial={backdrop.initial}
-            animate={backdrop.animate}
-            exit={backdrop.exit}
-            transition={backdrop.transition}
-            className="fixed inset-0 z-[2050] bg-black/45"
-            onClick={onClose}
-          />
-          <div className="pointer-events-none fixed inset-0 z-[2051] flex items-end justify-center p-0 sm:items-center sm:p-4">
-            <motion.section
-              ref={sheetRef}
-              initial={sheet.initial}
-              animate={sheet.animate}
-              exit={sheet.exit}
-              transition={sheet.transition}
-              {...dragProps}
-              className="pointer-events-auto relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7 [touch-action:pan-y]"
-            >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>
-            <p className="mt-1 text-sm text-[var(--stone)]">
-              每次保存前自动保留旧版本，最多 5 份。出错时可以从这里恢复。
-            </p>
-          </div>
-          <CloseIconButton onClick={onClose} />
+  return (
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      overlayZIndex={2050}
+      className="max-h-[min(85dvh,85vh)] max-w-2xl overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:rounded-3xl sm:p-7"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>
+          <p className="mt-1 text-sm text-[var(--stone)]">
+            每次保存前自动保留旧版本，最多 5 份。出错时可以从这里恢复。
+          </p>
         </div>
+        <CloseIconButton onClick={onClose} />
+      </div>
 
-        {error && (
-          <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
-        )}
-
-        <div className="mt-5 space-y-3">
-          {loading ? (
-            <p className="rounded-2xl bg-[var(--mist)]/60 px-4 py-6 text-center text-sm text-[var(--stone)]">
-              正在读取备份…
-            </p>
-          ) : backups.length ? (
-            backups.map((backup, index) => (
-              <article
-                key={backup.id}
-                className="rounded-2xl border border-[var(--stone)]/20 bg-white/70 p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--ink)]">
-                      {index === 0 ? '最近备份' : `备份 ${index + 1}`} ·{' '}
-                      {formatBackupTime(backup.createdAt)}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--stone)]">
-                      {backupSummary(backup)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={Boolean(restoringId)}
-                    onClick={() => void restore(backup)}
-                    aria-label="恢复此版本"
-                    aria-busy={restoringId === backup.id || undefined}
-                    title={
-                      restoringId === backup.id ? '正在恢复…' : '恢复此版本'
-                    }
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50"
-                  >
-                    {restoringId === backup.id ? (
-                      <LoaderCircle
-                        className="animate-spin"
-                        size={16}
-                        strokeWidth={2}
-                        aria-hidden
-                      />
-                    ) : (
-                      <RotateCcw
-                        size={16}
-                        strokeWidth={2}
-                        aria-hidden
-                      />
-                    )}
-                  </button>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]">
-              还没有历史备份。下次保存时会自动创建。
-            </p>
-          )}
-        </div>
-            </motion.section>
-          </div>
-        </>
+      {error && (
+        <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
       )}
-    </AnimatePresence>,
-    document.body,
+
+      <div className="mt-5 space-y-3">
+        {loading ? (
+          <p className="rounded-2xl bg-[var(--mist)]/60 px-4 py-6 text-center text-sm text-[var(--stone)]">
+            正在读取备份…
+          </p>
+        ) : backups.length ? (
+          backups.map((backup, index) => (
+            <article
+              key={backup.id}
+              className="rounded-2xl border border-[var(--stone)]/20 bg-white/70 p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-[var(--ink)]">
+                    {index === 0 ? '最近备份' : `备份 ${index + 1}`} ·{' '}
+                    {formatBackupTime(backup.createdAt)}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--stone)]">
+                    {backupSummary(backup)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={Boolean(restoringId)}
+                  onClick={() => void restore(backup)}
+                  aria-label="恢复此版本"
+                  aria-busy={restoringId === backup.id || undefined}
+                  title={
+                    restoringId === backup.id ? '正在恢复…' : '恢复此版本'
+                  }
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50"
+                >
+                  {restoringId === backup.id ? (
+                    <LoaderCircle
+                      className="animate-spin"
+                      size={16}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  ) : (
+                    <RotateCcw
+                      size={16}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]">
+            还没有历史备份。下次保存时会自动创建。
+          </p>
+        )}
+      </div>
+    </BottomSheet>
   )
 }
