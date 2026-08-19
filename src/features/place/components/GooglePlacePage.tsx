@@ -1620,7 +1620,7 @@ export function GooglePlacePage({
         <div
           data-google-place-page="1"
           data-pending-place-confirm={footer ? '1' : undefined}
-          className={`fixed inset-0 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 ${overlayClassName}`}
+          className={`fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4 ${overlayClassName}`}
           style={{ zIndex: overlayZIndex ?? 2000 }}
         >
           <motion.button

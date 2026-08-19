@@ -90,6 +90,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
   }, [open, onClose])
 
   const sheet = useEnterExit('sheet-bottom')
+  const backdrop = useEnterExit('fade')
 
   async function restore(backup: TripSnapshotBackup) {
     const ok = window.confirm(
@@ -110,20 +111,25 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[2050] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
-          <button
+        <>
+          <motion.button
             type="button"
             aria-label="关闭存档备份"
-            className="absolute inset-0"
+            initial={backdrop.initial}
+            animate={backdrop.animate}
+            exit={backdrop.exit}
+            transition={backdrop.transition}
+            className="fixed inset-0 z-[2050] bg-black/45"
             onClick={onClose}
           />
-          <motion.section
-            initial={sheet.initial}
-            animate={sheet.animate}
-            exit={sheet.exit}
-            transition={sheet.transition}
-            className="relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7"
-          >
+          <div className="pointer-events-none fixed inset-0 z-[2051] flex items-end justify-center p-0 sm:items-center sm:p-4">
+            <motion.section
+              initial={sheet.initial}
+              animate={sheet.animate}
+              exit={sheet.exit}
+              transition={sheet.transition}
+              className="pointer-events-auto relative z-10 max-h-[min(85dvh,85vh)] w-full overflow-y-auto rounded-t-3xl bg-[var(--paper)] p-5 shadow-2xl sm:max-w-2xl sm:rounded-3xl sm:p-7"
+            >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">存档备份</h2>
@@ -194,8 +200,9 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
             </p>
           )}
         </div>
-          </motion.section>
-        </div>
+            </motion.section>
+          </div>
+        </>
       )}
     </AnimatePresence>,
     document.body,

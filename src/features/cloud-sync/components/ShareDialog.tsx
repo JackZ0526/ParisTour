@@ -106,6 +106,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
   }, [open, onClose])
 
   const sheet = useEnterExit('sheet-bottom')
+  const backdrop = useEnterExit('fade')
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -169,25 +170,29 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[2000] flex items-end justify-center p-0 sm:items-center sm:p-4">
-          <button
+        <>
+          <motion.button
             type="button"
-            className="absolute inset-0 bg-[var(--ink)]/50 backdrop-blur-[2px] transition"
+            className="fixed inset-0 z-[2000] bg-black/45"
+            initial={backdrop.initial}
+            animate={backdrop.animate}
+            exit={backdrop.exit}
+            transition={backdrop.transition}
             aria-label="关闭分享面板"
             onClick={onClose}
           />
-
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            initial={sheet.initial}
-            animate={sheet.animate}
-            exit={sheet.exit}
-            transition={sheet.transition}
-            className="relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="pointer-events-none fixed inset-0 z-[2001] flex items-end justify-center p-0 sm:items-center sm:p-4">
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={titleId}
+              initial={sheet.initial}
+              animate={sheet.animate}
+              exit={sheet.exit}
+              transition={sheet.transition}
+              className="pointer-events-auto relative z-10 flex max-h-[min(88vh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
         <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-5 sm:px-6">
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-80"
@@ -312,8 +317,9 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
             )}
           </section>
         </div>
-          </motion.div>
-        </div>
+            </motion.div>
+          </div>
+        </>
       )}
     </AnimatePresence>,
     document.body,

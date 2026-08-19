@@ -101,23 +101,31 @@ export function RecommendationPreferencesDialog({
   }, [open, onClose])
 
   const sheet = useEnterExit('sheet-bottom')
+  const backdrop = useEnterExit('fade')
 
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[2600] flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={(event) => {
-          if (event.target === event.currentTarget) onClose()
-        }}>
+        <>
           <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="recommendation-preferences-title"
-            initial={sheet.initial}
-            animate={sheet.animate}
-            exit={sheet.exit}
-            transition={sheet.transition}
-            className="w-full max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl"
-          >
+            className="fixed inset-0 z-[2600] bg-black/45"
+            initial={backdrop.initial}
+            animate={backdrop.animate}
+            exit={backdrop.exit}
+            transition={backdrop.transition}
+            onClick={onClose}
+          />
+          <div className="pointer-events-none fixed inset-0 z-[2601] flex items-end justify-center p-0 sm:items-center sm:p-4">
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="recommendation-preferences-title"
+              initial={sheet.initial}
+              animate={sheet.animate}
+              exit={sheet.exit}
+              transition={sheet.transition}
+              className="pointer-events-auto w-full max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl"
+            >
         <div className="flex items-start justify-between border-b border-[var(--mist)] px-5 py-4">
           <div>
             <h2 id="recommendation-preferences-title" className="font-serif text-2xl text-[var(--ink)]">推荐偏好</h2>
@@ -169,8 +177,9 @@ export function RecommendationPreferencesDialog({
             <button type="button" onClick={() => { onSave(draft); onClose() }} className="rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper)]">保存偏好</button>
           </div>
         </div>
-          </motion.div>
-        </div>
+            </motion.div>
+          </div>
+        </>
       )}
     </AnimatePresence>,
     document.body,
