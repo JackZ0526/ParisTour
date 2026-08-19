@@ -545,7 +545,7 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-[100svh] max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(2.5rem,env(safe-area-inset-top))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+    <div className="mx-auto min-h-[100svh] max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(3.25rem,calc(env(safe-area-inset-top)+0.75rem))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
       <ApiRequestMeter />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
@@ -965,7 +965,7 @@ export default function App() {
 
                 {showItineraryContent && (
                   <>
-                    <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-20 -mx-3 space-y-2 px-3 py-2 backdrop-blur-md sm:static sm:top-0 sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+                    <div className="space-y-2">
                       <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {days.map((d, i) => {
                           const cal = dateForTripDay(itineraryStartDate, d.day)
