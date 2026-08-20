@@ -51,12 +51,32 @@ jobs:
           let body = match
             ? `${match[0].trim()}\n`
             : `## ${version}\n\nSee [CHANGELOG.md](./CHANGELOG.md).\n`
-          body += `\n---\n\n中文：[CHANGELOG.zh-CN.md](./CHANGELOG.zh-CN.md)\n`
+
+          try {
+            const zhMd = readFileSync('CHANGELOG.zh-CN.md', 'utf8')
+            const zhMatch = zhMd.match(re)
+            if (zhMatch) {
+              const zhContent = zhMatch[0].replace(/^##\s*\[.*?\][^\n]*/, '').trim()
+              if (zhContent) {
+                body += `\n---\n\n### 🇨🇳 中文更新日志\n\n${zhContent}\n`
+              }
+            }
+          } catch {}
+
+          body += `\n---\n\n[Full Changelog (EN)](./CHANGELOG.md) · [完整更新日志 (中文)](./CHANGELOG.zh-CN.md)\n`
           writeFileSync('release-notes.md', body)
           console.log(body)
           NODE
 
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file release-notes.md \
-            --verify-tag
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, updating notes..."
+            gh release edit "$TAG" \
+              --title "$TAG" \
+              --notes-file release-notes.md
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file release-notes.md \
+              --verify-tag
+          fi
