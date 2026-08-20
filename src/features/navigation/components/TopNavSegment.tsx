@@ -29,8 +29,22 @@ export function TopNavSegment({
     <div
       role="tablist"
       aria-label="主要导航"
-      className={`relative inline-flex items-center overflow-hidden rounded-full border border-white/90 bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
+      className={`relative inline-flex items-center overflow-hidden rounded-full bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
     >
+      {/* Liquid Glass Flowing Gradient Border (流光折射渐变发丝描边) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-full p-[1px]"
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.22) 28%, rgba(255, 255, 255, 0.06) 55%, rgba(255, 255, 255, 0.75) 85%, rgba(255, 255, 255, 0.3) 100%)',
+          WebkitMask:
+            'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          WebkitMaskComposite: 'xor',
+          maskComposite: 'exclude',
+        }}
+      />
+
       {/* Specular Light Reflection Highlights (顶部与底部玻璃反光弧光) */}
       <span
         aria-hidden
@@ -55,7 +69,7 @@ export function TopNavSegment({
             {isActive && (
               <motion.span
                 layoutId="light-top-nav-active-pill"
-                className="absolute inset-0 overflow-hidden rounded-full border border-white/95 bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
+                className="absolute inset-0 overflow-hidden rounded-full bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
                 animate={{
                   scaleX: [1, 1.15, 0.95, 1],
                   scaleY: [1, 0.88, 1.04, 1],
@@ -66,6 +80,19 @@ export function TopNavSegment({
                   scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                 }}
               >
+                {/* Dynamic Pill Gradient Border (活动滑块流光描边) */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 rounded-full p-[1px]"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.32) 35%, rgba(255, 255, 255, 0.1) 65%, rgba(255, 255, 255, 0.85) 100%)',
+                    WebkitMask:
+                      'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                    WebkitMaskComposite: 'xor',
+                    maskComposite: 'exclude',
+                  }}
+                />
                 <span
                   aria-hidden
                   className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent"
