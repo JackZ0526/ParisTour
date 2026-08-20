@@ -1,4 +1,4 @@
-import { getSupabase } from '../../../shared/lib/supabase'
+import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import { yieldToMain } from '../../../shared/lib/yieldToMain'
 import {
   flushHotelCacheToStorage,
@@ -1016,6 +1016,8 @@ export function subscribeTripRealtime(
   tripId: string,
   onRemoteApply: () => void,
 ): () => void {
+  // localhost dev: skip realtime channel to save Supabase bandwidth
+  if (!isCloudSyncEnabled()) return () => {}
   const sb = getSupabase()
   if (realtimeChannel) {
     void sb.removeChannel(realtimeChannel)
@@ -1093,6 +1095,7 @@ export function scheduleTripCloudSave(
   },
 ) {
   if (!canEdit || !tripId) return
+  if (!isCloudSyncEnabled()) return // localhost dev: local-only saves
   saveTripId = tripId
 
   // After live sync, remount effects often look like "changes". Swallow those
@@ -1149,6 +1152,7 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     clearTimeout(saveTimer)
     saveTimer = null
   }
+  if (!isCloudSyncEnabled()) return // localhost dev: skip cloud writes
   const tripId = saveTripId
   if (!tripId) return
   if (saveInFlight) {

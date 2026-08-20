@@ -2,9 +2,15 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../authContext'
 import { LoginPage } from './LoginPage'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import { isCloudSyncEnabled, isLocalhost } from '../../../shared/lib/supabase'
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { status, tripReady, error } = useAuth()
+
+  // Localhost local-only mode: skip auth entirely
+  if (!isCloudSyncEnabled() && isLocalhost()) {
+    return <>{children}</>
+  }
 
   if (status === 'unconfigured') {
     return (

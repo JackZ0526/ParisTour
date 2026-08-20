@@ -20,6 +20,8 @@ import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
   glassCardSurfaceClass,
+  glassSageCardSurfaceClass,
+  glassVioletCardSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 import { DateRangePicker } from '../../itinerary/components/DateRangePicker'
 import { Calendar, Plane, PlaneTakeoff, PlaneLanding, RefreshCw, Edit3, ArrowRight, Trash2, X } from 'lucide-react'
@@ -289,7 +291,7 @@ export function LogisticsTravelSection({
                 {/* 1. Outbound Ticket Card / Input Form                                      */}
                 {/* ========================================================================= */}
                 {outbound && !editingOutbound ? (
-                  <div className={`flex flex-col justify-between rounded-2xl ${glassCardSurfaceClass} p-4 sm:p-5 shadow-sm transition-all hover:border-[var(--sage)]/50`}>
+                  <div className={`flex flex-col justify-between rounded-2xl ${glassSageCardSurfaceClass} p-4 sm:p-5 shadow-sm transition-all hover:border-[var(--sage)]/70`}>
                     <div>
                       {/* Outbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
@@ -331,7 +333,7 @@ export function LogisticsTravelSection({
                         {outbound.airline || '航班计划'}
                       </p>
 
-                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 p-3 border border-white/70 text-sm backdrop-blur-sm">
+                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 p-3 border border-white/80 text-sm backdrop-blur-sm shadow-xs">
                         <div className="col-span-2">
                           <p className="text-xs text-[var(--stone)]">出发</p>
                           <p className="font-bold text-base text-[var(--ink)]">
@@ -382,7 +384,7 @@ export function LogisticsTravelSection({
                   </div>
                 ) : (
                   /* Outbound Input Form */
-                  <div className={`flex flex-col justify-between rounded-2xl border border-dashed border-[var(--sage)]/50 ${glassCardSurfaceClass} p-4 sm:p-5 shadow-sm`}>
+                  <div className={`flex flex-col justify-between rounded-2xl border border-dashed border-[var(--sage)]/50 ${glassSageCardSurfaceClass} p-4 sm:p-5 shadow-sm`}>
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sage)]">
@@ -440,7 +442,7 @@ export function LogisticsTravelSection({
                 {/* 2. Inbound Ticket Card / Input Form                                       */}
                 {/* ========================================================================= */}
                 {inbound && !editingInbound ? (
-                  <div className={`flex flex-col justify-between rounded-2xl ${glassCardSurfaceClass} p-4 sm:p-5 shadow-sm transition-all hover:border-purple-300`}>
+                  <div className={`flex flex-col justify-between rounded-2xl ${glassVioletCardSurfaceClass} p-4 sm:p-5 shadow-sm transition-all hover:border-purple-300`}>
                     <div>
                       {/* Inbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
@@ -482,7 +484,7 @@ export function LogisticsTravelSection({
                         {inbound.airline || '航班计划'}
                       </p>
 
-                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 p-3 border border-white/70 text-sm backdrop-blur-sm">
+                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 p-3 border border-white/80 text-sm backdrop-blur-sm shadow-xs">
                         <div className="col-span-2">
                           <p className="text-xs text-[var(--stone)]">出发</p>
                           <p className="font-bold text-base text-[var(--ink)]">
@@ -533,7 +535,7 @@ export function LogisticsTravelSection({
                   </div>
                 ) : (
                   /* Inbound Input Form */
-                  <div className={`flex flex-col justify-between rounded-2xl border border-dashed border-purple-300 ${glassCardSurfaceClass} p-4 sm:p-5 shadow-sm`}>
+                  <div className={`flex flex-col justify-between rounded-2xl border border-dashed border-purple-300 ${glassVioletCardSurfaceClass} p-4 sm:p-5 shadow-sm`}>
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-900">

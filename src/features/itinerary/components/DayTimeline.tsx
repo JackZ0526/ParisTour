@@ -128,7 +128,7 @@ const typeLabel: Record<string, string> = {
 const timelineCapsuleClass = `${glassCapsuleSurfaceClass} inline-flex items-center`
 
 function TrashIcon() {
-  return <Trash2 size={16} strokeWidth={1.8} aria-hidden />
+  return <Trash2 size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function PinIcon() {
@@ -1918,7 +1918,7 @@ export function DayTimeline({
                       name: place.name,
                     })
                   }}
-                  className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/70 transition-colors hover:bg-red-500/10 hover:text-red-600 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+                  className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40`}
                 >
                   <TrashIcon />
                 </button>

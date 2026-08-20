@@ -7,8 +7,13 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import {
+  getSupabase,
+  isCloudSyncEnabled,
+  isLocalhost,
+  isSupabaseConfigured,
+} from '../../shared/lib/supabase'
 import { normalizeAuthEmail } from './devTestAccount'
-import { getSupabase, isSupabaseConfigured } from '../../shared/lib/supabase'
 import {
   applyAccessibleTripLocally,
   flushTripCloudSave,
@@ -22,11 +27,25 @@ import {
   type AccessibleTrip,
 } from '../cloud-sync/services/tripCloud'
 import { subscribeLlmArtifacts } from '../../shared/services/llm/llmArtifactStore'
+import { emptyTripSnapshot } from '../cloud-sync/services/tripSnapshot'
 import {
   AuthContext,
   type AuthContextValue,
   type AuthStatus,
 } from './authContext'
+
+function localDebugTrip(): AccessibleTrip {
+  return {
+    id: 'local-trip',
+    title: '本地调试行程',
+    ownerId: 'local-user',
+    isPrimary: true,
+    role: 'owner',
+    updatedAt: new Date().toISOString(),
+    snapshot: emptyTripSnapshot(),
+    label: '本地调试行程',
+  }
+}
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
   const msg = (err.message || '').trim()
@@ -62,27 +81,34 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>(() =>
-    isSupabaseConfigured() ? 'loading' : 'unconfigured',
-  )
+  const isLocalDebug = !isCloudSyncEnabled() && isLocalhost()
+
+  const [status, setStatus] = useState<AuthStatus>(() => {
+    if (isLocalDebug) return 'ready'
+    return isSupabaseConfigured() ? 'loading' : 'unconfigured'
+  })
   const [session, setSession] = useState<Session | null>(null)
-  const [allowlisted, setAllowlisted] = useState(false)
-  const [trips, setTrips] = useState<AccessibleTrip[]>([])
-  const [activeTripId, setActiveTripId] = useState<string | null>(null)
-  const [tripReady, setTripReady] = useState(false)
+  const [allowlisted, setAllowlisted] = useState(() => isLocalDebug)
+  const [trips, setTrips] = useState<AccessibleTrip[]>(() =>
+    isLocalDebug ? [localDebugTrip()] : [],
+  )
+  const [activeTripId, setActiveTripId] = useState<string | null>(() =>
+    isLocalDebug ? 'local-trip' : null,
+  )
+  const [tripReady, setTripReady] = useState(() => isLocalDebug)
   const [error, setError] = useState<string | null>(null)
   const [bootKey, setBootKey] = useState(0)
   const [tripSyncEpoch, setTripSyncEpoch] = useState(0)
 
   const user = session?.user ?? null
-  const email = (user?.email || '').toLowerCase()
+  const email = (user?.email || (isLocalDebug ? 'local@localhost' : '')).toLowerCase()
 
   const activeTrip = useMemo(
     () => trips.find((t) => t.id === activeTripId) ?? trips[0] ?? null,
     [trips, activeTripId],
   )
-  const role = activeTrip?.role ?? null
-  const canEdit = role === 'owner' || role === 'editor'
+  const role = activeTrip?.role ?? (isLocalDebug ? 'owner' : null)
+  const canEdit = isLocalDebug || role === 'owner' || role === 'editor'
 
   const statusRef = useRef(status)
   const tripReadyRef = useRef(tripReady)
@@ -158,8 +184,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setStatus('unconfigured')
+    if (!isCloudSyncEnabled()) {
+      if (isLocalhost()) {
+        setStatus('ready')
+        setTripReady(true)
+        setAllowlisted(true)
+        setTrips([localDebugTrip()])
+        setActiveTripId('local-trip')
+      } else {
+        setStatus('unconfigured')
+      }
       return
     }
 
@@ -177,10 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
     const { data: sub } = sb.auth.onAuthStateChange((event, nextSession) => {
-      // Initial session handled above; avoid double-bootstrap on TOKEN_REFRESHED.
       if (event === 'INITIAL_SESSION') return
-      // Tab focus runs Supabase _recoverAndRefresh → SIGNED_IN with the same user.
-      // Treat like TOKEN_REFRESHED so AuthGate/App don't remount.
       const resumeSignedIn =
         event === 'SIGNED_IN' &&
         nextSession?.user?.id &&

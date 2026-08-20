@@ -12,6 +12,7 @@ import {
 } from '../services/tripCloud'
 import { SyncOrbitIcon } from '../../../shared/components/LoadingIndicator'
 import { Check, CircleAlert, Save } from 'lucide-react'
+import { isCloudSyncEnabled } from '../../../shared/lib/supabase'
 
 type ToastKind = 'save' | 'sync'
 
@@ -55,6 +56,9 @@ function FloppyIcon({ spinning }: { spinning?: boolean }) {
 }
 
 export function CloudSaveIndicator() {
+  // In localhost dev mode, cloud saves are disabled — nothing to show.
+  if (!isCloudSyncEnabled()) return null
+
   const [saveStatus, setSaveStatus] = useState<CloudSaveStatus>(() => getCloudSaveStatus())
   const [saveError, setSaveError] = useState<string | null>(() => getCloudSaveError())
   const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>(() => getCloudSyncStatus())
