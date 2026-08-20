@@ -944,7 +944,7 @@ export function HotelPicker({
   const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
   const [dropping, setDropping] = useState(false)
   const bootstrappedRef = useRef(false)
-  const lastOpenSelectedDetailTokenRef = useRef(openSelectedDetailToken)
+  const lastOpenSelectedDetailTokenRef = useRef(0)
   const candidatesRef = useRef(candidates)
   const daysRef = useRef(days)
   const selectedRef = useRef(selected)
@@ -1233,11 +1233,14 @@ export function HotelPicker({
     if (!openSelectedDetailToken) return
     if (openSelectedDetailToken === lastOpenSelectedDetailTokenRef.current) return
     lastOpenSelectedDetailTokenRef.current = openSelectedDetailToken
-    const card = candidatesRef.current.find((h) => h.id === selectedRef.current.id)
+    const targetId = selected.id || selectedRef.current.id
+    const card =
+      candidates.find((h) => h.id === targetId) ||
+      candidatesRef.current.find((h) => h.id === targetId)
     if (!card) return
     setPendingCustom(null)
     setPopupHotelId(card.id)
-  }, [openSelectedDetailToken])
+  }, [openSelectedDetailToken, candidates, selected.id])
 
   const decidingCustom = Boolean(pendingCustom)
 

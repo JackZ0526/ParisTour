@@ -166,18 +166,19 @@ export default function App() {
     { numberOfDaysRef },
   )
   const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
-
+  const [activeTab, setActiveTab] = useState<AppTab>('itinerary')
   const [openHotelDetailToken, setOpenHotelDetailToken] = useState(0)
   const handleSelectPlace = useCallback(
     (id: string) => {
       if (id === SELECTED_HOTEL_PLACE_ID) {
         setSelectedPlaceId(null)
+        setActiveTab('logistics')
         setOpenHotelDetailToken((n) => n + 1)
         return
       }
       setSelectedPlaceId(id)
     },
-    [setSelectedPlaceId],
+    [setSelectedPlaceId, setActiveTab],
   )
   const handleRouteCacheChanged = useCallback(() => {
     notifyTripChanged()
@@ -249,7 +250,6 @@ export default function App() {
     [dayIndex, setDayIndex, setSelectedPlaceId, setDayRegenError],
   )
   numberOfDaysRef.current = numberOfDays
-  const [activeTab, setActiveTab] = useState<AppTab>('itinerary')
   const routePrefetchPlan = useMemo(
     () =>
       days
@@ -724,9 +724,17 @@ export default function App() {
                       </span>
                     )}
                     {hotel?.name && (
-                      <span className="rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs text-[var(--ink)] font-medium">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('logistics')
+                          setOpenHotelDetailToken((n) => n + 1)
+                        }}
+                        className="rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-black/[0.08] active:scale-95"
+                        title="点击查看酒店详情"
+                      >
                         🏨 {hotel.name}
-                      </span>
+                      </button>
                     )}
                     {itineraryStartLoading && !itineraryStart ? (
                       <span className="text-[var(--stone)] text-xs">（正在核对抵达时间…）</span>
