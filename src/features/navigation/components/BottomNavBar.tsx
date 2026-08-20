@@ -1,10 +1,5 @@
 import { motion } from 'framer-motion'
-import {
-  CalendarDays,
-  Luggage,
-  SlidersHorizontal,
-  Sparkles,
-} from 'lucide-react'
+import { CalendarDays, Luggage, SlidersHorizontal, Sparkles } from 'lucide-react'
 import type { AppTab } from '../types'
 
 export interface BottomNavBarProps {
@@ -34,18 +29,15 @@ export function BottomNavBar({
 }: BottomNavBarProps) {
   return (
     <aside
-      aria-label="iOS 悬浮液态玻璃导航栏"
-      className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[350px] select-none lg:hidden"
+      aria-label="悬浮导航栏"
+      className="fixed bottom-[max(1.15rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[340px] select-none lg:hidden"
     >
-      {/* Outer Liquid Glass Island Capsule */}
+      {/* Clean Frosted Glass Capsule */}
       <nav
         aria-label="主要导航"
-        className="relative flex h-[62px] items-center justify-between gap-1 rounded-full border border-white/70 bg-white/45 p-1.5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.05),0_18px_38px_-6px_rgba(0,0,0,0.15),0_6px_14px_-2px_rgba(0,0,0,0.08)] backdrop-blur-3xl backdrop-saturate-[200%] transition-colors dark:border-white/20 dark:bg-[rgba(28,28,32,0.55)] dark:shadow-[inset_0_1.5px_1.5px_rgba(255,255,255,0.2),0_20px_42px_rgba(0,0,0,0.5)]"
+        className="flex h-[58px] items-center justify-between gap-1 rounded-full border border-black/5 bg-white/70 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-2xl transition-colors dark:border-white/10 dark:bg-zinc-900/75 dark:shadow-[0_12px_36px_rgba(0,0,0,0.4)]"
       >
-        {/* Specular Liquid Light Sheen on top half */}
-        <div className="pointer-events-none absolute inset-x-4 top-0 h-[45%] rounded-t-full bg-gradient-to-b from-white/50 via-white/15 to-transparent dark:from-white/20" />
-
-        {/* Navigation Tabs (Left cluster) */}
+        {/* Navigation Tabs */}
         <div className="flex flex-1 items-center justify-around gap-1">
           {TABS.map(({ id, label, Icon }) => {
             const isActive = activeTab === id
@@ -54,62 +46,58 @@ export function BottomNavBar({
                 key={id}
                 type="button"
                 onClick={() => onSelectTab(id)}
-                whileTap={{ scale: 0.91 }}
-                className="relative flex h-[50px] flex-1 items-center justify-center rounded-[22px] outline-none transition-transform"
+                whileTap={{ scale: 0.92 }}
+                className="relative flex h-[46px] flex-1 items-center justify-center rounded-full outline-none transition-colors"
               >
-                {/* iOS Tinted Glass Active Bubble (Exact Apple Music Liquid Glass Pill) */}
+                {/* Clean Translucent Active Pill */}
                 {isActive && (
                   <motion.div
-                    layoutId="ios-liquid-active-pill"
-                    className="absolute inset-0 rounded-[22px] border border-[var(--copper)]/30 bg-[var(--copper)]/15 shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.7),0_3px_10px_rgba(190,90,50,0.18)] backdrop-blur-md dark:border-[var(--gold)]/35 dark:bg-[var(--gold)]/20"
+                    layoutId="clean-frosted-active-pill"
+                    className="absolute inset-0 rounded-full bg-[var(--copper)]/12 dark:bg-[var(--copper)]/20"
                     transition={{
                       type: 'spring',
                       stiffness: 480,
                       damping: 32,
                       mass: 0.65,
                     }}
-                  >
-                    {/* Inner highlight */}
-                    <div className="absolute inset-x-2 top-0 h-[40%] rounded-t-[22px] bg-gradient-to-b from-white/30 to-transparent" />
-                  </motion.div>
+                  />
                 )}
 
                 {/* Tab Icon & Label */}
-                <div className="relative z-10 flex flex-col items-center justify-center py-0.5">
+                <div className="relative z-10 flex flex-col items-center justify-center">
                   <div className="relative">
                     <motion.div
                       animate={{
-                        scale: isActive ? 1.08 : 1,
-                        y: isActive ? -1 : 0,
+                        scale: isActive ? 1.05 : 1,
                       }}
                       transition={{ type: 'spring', stiffness: 450, damping: 28 }}
                     >
                       <Icon
-                        size={19}
-                        strokeWidth={isActive ? 2.4 : 1.8}
+                        size={18}
+                        strokeWidth={isActive ? 2.3 : 1.8}
                         className={
                           isActive
-                            ? 'text-[var(--copper)] drop-shadow-[0_1px_2px_rgba(190,90,50,0.25)] dark:text-[var(--gold)]'
-                            : 'text-zinc-700/80 transition-colors hover:text-zinc-950 dark:text-zinc-300'
+                            ? 'text-[var(--copper)]'
+                            : 'text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                         }
                       />
                     </motion.div>
 
                     {/* Setup / Unread indicator dot */}
                     {id === 'logistics' && !itineraryReady && (
-                      <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-[var(--copper)] ring-2 ring-white/90 dark:ring-black/90" />
+                      <span className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--copper)]" />
                     )}
 
                     {id === 'assistant' && unreadAssistant && (
-                      <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white/90 dark:ring-black/90" />
+                      <span className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     )}
                   </div>
 
                   <span
-                    className={`mt-0.5 text-[10px] tracking-tight transition-colors ${
+                    className={`text-[10px] tracking-tight transition-colors ${
                       isActive
-                        ? 'font-bold text-[var(--copper)] dark:text-[var(--gold)]'
-                        : 'font-medium text-zinc-600 dark:text-zinc-400'
+                        ? 'font-semibold text-[var(--copper)]'
+                        : 'font-medium text-zinc-500 dark:text-zinc-400'
                     }`}
                   >
                     {label}
@@ -120,21 +108,17 @@ export function BottomNavBar({
           })}
         </div>
 
-        {/* Right Circular Quick Preferences / Action Glass Pill (Like the Search button in iOS reference) */}
+        {/* Right Preferences Button */}
         {onOpenPreferences && (
           <motion.button
             type="button"
             onClick={onOpenPreferences}
-            whileTap={{ scale: 0.88 }}
+            whileTap={{ scale: 0.9 }}
             title="偏好设置"
             aria-label="偏好设置"
-            className="relative flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full border border-white/60 bg-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.06)] backdrop-blur-xl transition-all hover:bg-white/60 active:bg-white/80 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-zinc-600 transition-colors hover:bg-black/[0.08] hover:text-zinc-900 active:bg-black/[0.12] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
           >
-            <SlidersHorizontal
-              size={17}
-              strokeWidth={2}
-              className="text-zinc-700 transition-colors dark:text-zinc-200"
-            />
+            <SlidersHorizontal size={16} strokeWidth={1.9} />
           </motion.button>
         )}
       </nav>
