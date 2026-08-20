@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarDays, History, Luggage, Sparkles } from 'lucide-react'
+import { Archive, CalendarDays, History, Luggage, Share2, Sparkles, User } from 'lucide-react'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
@@ -567,23 +567,43 @@ export default function App() {
       <CloudSaveIndicator />
       <ApiRequestMeter />
       <div className="mb-4 flex items-center justify-between gap-3">
-        {/* Brand Title */}
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--copper)]/15 text-base shadow-inner">
+        {/* Left: Brand Title & Trip Selector */}
+        <div className="flex items-center gap-3 lg:min-w-[260px]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[var(--copper)]/15 text-lg shadow-inner">
             🇫🇷
           </span>
-          <div>
+          <div className="min-w-0">
             <h1 className="font-display text-base font-semibold leading-tight text-[var(--ink)] sm:text-lg">
               Paris Tour
             </h1>
-            <p className="text-[11px] text-[var(--stone)]">
-              {chineseDayCount(numberOfDays)}行程规划
-            </p>
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)]">
+              <span>{chineseDayCount(numberOfDays)}行程规划</span>
+              {trips.length > 1 && (
+                <>
+                  <span>·</span>
+                  <select
+                    className="max-w-[130px] truncate rounded border border-[var(--stone)]/20 bg-transparent text-[11px] text-[var(--ink)] outline-none hover:border-[var(--copper)]"
+                    value={activeTrip?.id || ''}
+                    onChange={(e) => {
+                      void switchTrip(e.target.value).catch((err) => {
+                        window.alert(err instanceof Error ? err.message : '切换失败')
+                      })
+                    }}
+                  >
+                    {trips.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Desktop Navigation Tabs */}
-        <div className="hidden lg:flex items-center">
+        {/* Center: Desktop Navigation Tabs */}
+        <div className="hidden lg:flex items-center justify-center">
           <TopNavSegment
             activeTab={activeTab}
             onSelectTab={setActiveTab}
@@ -591,18 +611,68 @@ export default function App() {
           />
         </div>
 
-        {/* Right Status / Indicator */}
-        <div className="flex items-center gap-2">
-          {role === 'viewer' && (
-            <span className="rounded-full bg-[var(--mist)] px-2.5 py-0.5 text-xs text-[var(--stone)]">
-              只读
-            </span>
+        {/* Right: Desktop User Profile & Quick Actions */}
+        <div className="flex items-center justify-end gap-2 lg:min-w-[260px]">
+          {/* Quick Action: Backup (Desktop) */}
+          {activeTrip && (
+            <button
+              type="button"
+              onClick={() => setBackupOpen(true)}
+              aria-label="存档备份"
+              title="存档备份"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+            >
+              <Archive size={15} strokeWidth={1.9} />
+            </button>
           )}
-          {role === 'editor' && (
-            <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-0.5 text-xs text-[var(--sage)]">
-              协作中
-            </span>
+
+          {/* Quick Action: Share (Desktop) */}
+          {role === 'owner' && activeTrip && (
+            <button
+              type="button"
+              onClick={() => {
+                setShareOpen(true)
+                void refreshTrips().catch(() => undefined)
+              }}
+              aria-label="邀请协作分享"
+              title="邀请协作分享"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+            >
+              <Share2 size={15} strokeWidth={1.9} />
+            </button>
           )}
+
+          {/* User Account Capsule Button */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center gap-2 rounded-full border p-1 pl-1.5 pr-3 shadow-sm backdrop-blur-md transition-all hover:shadow active:scale-95 ${
+              activeTab === 'profile'
+                ? 'border-[var(--copper)]/40 bg-white'
+                : 'border-black/5 bg-white/70 hover:bg-white'
+            }`}
+            title="查看个人中心与偏好"
+          >
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
+              {email ? email.charAt(0).toUpperCase() : <User size={13} />}
+            </div>
+            <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
+              {email}
+            </span>
+            {role && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  role === 'owner'
+                    ? 'bg-[var(--copper)]/10 text-[var(--copper)]'
+                    : role === 'editor'
+                      ? 'bg-[var(--sage)]/15 text-[var(--sage)]'
+                      : 'bg-[var(--mist)] text-[var(--stone)]'
+                }`}
+              >
+                {role === 'owner' ? '拥有者' : role === 'editor' ? '协作' : '只读'}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
