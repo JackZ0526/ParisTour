@@ -17,7 +17,6 @@ import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIn
 import { ApiRequestMeter } from './shared/components/ApiRequestMeter'
 import { BackupDialog } from './features/cloud-sync/components/BackupDialog'
 import {
-  RecommendationPreferencesButton,
   RecommendationPreferencesDialog,
 } from './features/place/components/RecommendationPreferencesDialog'
 import { PlacePanel } from './features/place/components/PlacePanel'
@@ -737,48 +736,32 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('logistics')}
-                      className="inline-flex items-center gap-1 rounded-full border border-black/5 bg-white/80 px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
-                      title="前往出行与酒店设置"
-                    >
-                      <Luggage size={13} />
-                      <span>调整出行</span>
-                    </button>
-
-                    {!readOnly && (
-                      <>
-                        <RecommendationPreferencesButton
-                          onClick={() => setRecommendationPreferencesOpen(true)}
-                        />
-                        {itineraryReady &&
-                          (itineraryGenerated || itineraryIncrementalGenerating) && (
-                          <>
-                            {canRestoreDefault && (
-                              <button
-                                type="button"
-                                onClick={handleRestoreDefault}
-                                aria-label="恢复默认推荐"
-                                title="恢复默认推荐"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
-                              >
-                                <History size={15} strokeWidth={1.8} aria-hidden />
-                              </button>
-                            )}
+                    {!readOnly &&
+                      itineraryReady &&
+                      (itineraryGenerated || itineraryIncrementalGenerating) && (
+                        <>
+                          {canRestoreDefault && (
                             <button
                               type="button"
-                              onClick={handleResetAll}
-                              aria-label="重新生成全部"
-                              title="重新生成全部"
+                              onClick={handleRestoreDefault}
+                              aria-label="恢复默认推荐"
+                              title="恢复默认推荐"
                               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
                             >
-                              <Sparkles size={15} strokeWidth={1.8} aria-hidden />
+                              <History size={15} strokeWidth={1.8} aria-hidden />
                             </button>
-                          </>
-                        )}
-                      </>
-                    )}
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleResetAll}
+                            aria-label="重新生成全部"
+                            title="重新生成全部"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
+                          >
+                            <Sparkles size={15} strokeWidth={1.8} aria-hidden />
+                          </button>
+                        </>
+                      )}
                   </div>
                 </div>
               )}
