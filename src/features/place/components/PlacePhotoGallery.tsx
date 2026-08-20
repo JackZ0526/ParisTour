@@ -77,39 +77,37 @@ export function GalleryThumb({
       onClick={onSelect}
       whileTap={{ scale: 0.92 }}
       animate={{
-        scale: selected ? 1.05 : 0.98,
-        opacity: selected ? 1 : 0.55,
+        scale: selected ? 1.05 : 0.97,
       }}
       transition={{ type: 'spring', stiffness: 450, damping: 32 }}
       style={animateIn ? { animationDelay: `${enterDelayMs}ms` } : undefined}
-      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-xl outline-none transition-shadow ${
+      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-xl bg-[var(--mist)] outline-none transition-shadow ${
         selected
-          ? 'ring-2 ring-white ring-offset-2 ring-offset-black/20 shadow-md z-10'
-          : 'hover:opacity-85'
+          ? 'ring-2 ring-[var(--copper)] ring-offset-2 ring-offset-black/20 shadow-md z-10'
+          : 'hover:brightness-105'
       } ${animateIn ? 'place-gallery-thumb-enter' : ''}`}
     >
-      <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
-      {selected &&
-        (animateIn ? (
-          <span className="absolute inset-0 z-10 rounded-xl border-2 border-[var(--copper)] shadow-sm pointer-events-none" />
-        ) : (
-          <motion.span
-            layoutId="active-gallery-thumb-ring"
-            className="absolute inset-0 z-10 rounded-xl border-2 border-[var(--copper)] shadow-sm pointer-events-none"
-            transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
-          />
-        ))}
+      {!ready && (
+        <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
+      )}
+      <span
+        className={`pointer-events-none absolute inset-0 z-[2] transition-opacity duration-200 ${
+          selected ? 'opacity-0' : 'bg-black/20 opacity-100'
+        }`}
+        aria-hidden
+      />
       {url ? (
         <img
           ref={imgRef}
           src={url}
           alt=""
-          className={`relative h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-300 ${
+          className={`relative z-[1] h-full w-full object-cover select-none motion-safe:transition-opacity motion-safe:duration-300 ${
             ready ? 'opacity-100' : 'opacity-0'
           }`}
           referrerPolicy={photoReferrerPolicy(url)}
           onLoad={() => setReady(true)}
           onError={() => onError?.(url)}
+          draggable={false}
         />
       ) : null}
     </motion.button>
