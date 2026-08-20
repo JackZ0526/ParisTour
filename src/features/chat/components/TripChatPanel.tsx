@@ -1840,7 +1840,7 @@ export function TripChatPanel({
         animate={{
           width: open ? TRIP_CHAT_PANEL_WIDTH : 48,
           height: open ? 560 : 48,
-          backgroundColor: open ? '#fffcf7' : '#1c2420',
+          backgroundColor: open ? '#fffcf7' : 'rgba(255, 255, 255, 0.85)',
         }}
         transition={{
           width: { ...morphSpring, delay: open ? 0 : 0.18 },
@@ -1861,9 +1861,10 @@ export function TripChatPanel({
           transformOrigin: 'bottom right',
           maxHeight: 'calc(100vh - max(1.15rem, env(safe-area-inset-bottom)) - 5.5rem)',
           color: 'var(--ink)',
-          border: '1px solid rgba(255,255,255,0.7)',
-          boxShadow: 'var(--shadow)',
-          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.9)',
+          boxShadow:
+            '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
+          backdropFilter: 'blur(24px) saturate(180%)',
         }}
         className="fixed flex flex-col bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+4.85rem)] right-[max(1.25rem,env(safe-area-inset-right))] sm:bottom-5 sm:right-5"
       >
@@ -1875,9 +1876,14 @@ export function TripChatPanel({
             opacity: { duration: 0.18, delay: open ? 0 : 0.32, ease: 'easeOut' },
           }}
           aria-hidden={!open}
-          className="absolute inset-0 flex items-center justify-center text-[var(--paper)]"
+          className="absolute inset-0 flex items-center justify-center text-[var(--copper)]"
         >
-          <ChatBubbleIcon className="h-5 w-5" />
+          {/* Top specular reflection arc */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+          />
+          <ChatBubbleIcon className="h-5 w-5 text-[var(--copper)] drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]" />
         </motion.div>
 
         {/* Panel content layer — visible when open, fades in during the height-grow stage */}

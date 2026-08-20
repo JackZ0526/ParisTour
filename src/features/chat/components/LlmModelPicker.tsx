@@ -278,10 +278,11 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         maxHeight: 'calc(100vh - 2.5rem)',
         transformOrigin: 'bottom right',
         color: 'var(--ink)',
-        backgroundColor: 'var(--card)',
-        border: '1px solid var(--ink)/10',
-        boxShadow: 'var(--shadow)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        border: '1px solid rgba(255, 255, 255, 0.9)',
+        boxShadow:
+          '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
+        backdropFilter: 'blur(24px) saturate(180%)',
       }}
       className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
@@ -380,14 +381,19 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         style={{
           pointerEvents: 'none',
         }}
-        className="flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
+        className="relative flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
       >
-        <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
-        <span className="hidden whitespace-nowrap text-sm font-medium leading-none sm:inline">{chip}</span>
+        {/* Top specular reflection arc */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+        />
+        <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)] sm:h-4 sm:w-4" />
+        <span className="hidden whitespace-nowrap text-sm font-semibold leading-none text-zinc-800 sm:inline">{chip}</span>
         <ChevronDown
           aria-hidden
           strokeWidth={2}
-          className={`hidden h-3 w-3 shrink-0 text-[var(--stone)] transition duration-200 sm:block ${
+          className={`hidden h-3 w-3 shrink-0 text-zinc-500 transition duration-200 sm:block ${
             open ? 'rotate-180' : ''
           }`}
         />
