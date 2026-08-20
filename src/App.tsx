@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Archive, CalendarDays, History, LogOut, Luggage, Share2, Sparkles, Trash2 } from 'lucide-react'
-import { MobileActionMenu } from './features/auth/components/MobileActionMenu'
+import { CalendarDays, History, Luggage, Sparkles } from 'lucide-react'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
@@ -28,6 +27,7 @@ import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { BottomNavBar } from './features/navigation/components/BottomNavBar'
 import { TopNavSegment } from './features/navigation/components/TopNavSegment'
+import { ProfileTab } from './features/navigation/components/ProfileTab'
 import type { AppTab } from './features/navigation/types'
 const TripMap = React.lazy(() =>
   import('./features/map/components/TripMap').then((m) => ({ default: m.TripMap })),
@@ -566,11 +566,33 @@ export default function App() {
     <div className="mx-auto min-h-[100svh] max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(4.75rem,calc(env(safe-area-inset-top)+1.25rem))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
       <ApiRequestMeter />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
-          <span className="max-w-[11rem] truncate text-[var(--stone)] sm:max-w-[16rem]">
-            {email}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        {/* Brand Title */}
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--copper)]/15 text-base shadow-inner">
+            🇫🇷
           </span>
+          <div>
+            <h1 className="font-display text-base font-semibold leading-tight text-[var(--ink)] sm:text-lg">
+              Paris Tour
+            </h1>
+            <p className="text-[11px] text-[var(--stone)]">
+              {chineseDayCount(numberOfDays)}行程规划
+            </p>
+          </div>
+        </div>
+
+        {/* Desktop Navigation Tabs */}
+        <div className="hidden lg:flex items-center">
+          <TopNavSegment
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            itineraryReady={itineraryReady}
+          />
+        </div>
+
+        {/* Right Status / Indicator */}
+        <div className="flex items-center gap-2">
           {role === 'viewer' && (
             <span className="rounded-full bg-[var(--mist)] px-2.5 py-0.5 text-xs text-[var(--stone)]">
               只读
@@ -578,107 +600,9 @@ export default function App() {
           )}
           {role === 'editor' && (
             <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-0.5 text-xs text-[var(--sage)]">
-              可编辑共享
+              协作中
             </span>
           )}
-          {trips.length > 1 && (
-            <select
-              className="max-w-full truncate rounded-full border border-[var(--stone)]/30 bg-[var(--card)] px-3 py-1.5 text-sm sm:max-w-[min(100%,320px)]"
-              value={activeTrip?.id || ''}
-              onChange={(e) => {
-                void switchTrip(e.target.value).catch((err) => {
-                  window.alert(err instanceof Error ? err.message : '切换失败')
-                })
-              }}
-            >
-              {trips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Desktop Navigation Tabs */}
-        <div className="hidden lg:flex items-center">
-          <TopNavSegment
-            activeTab={activeTab}
-            onSelectTab={(tab) => {
-              if (tab === 'assistant') {
-                setActiveTab('assistant')
-              } else {
-                setActiveTab(tab)
-              }
-            }}
-            itineraryReady={itineraryReady}
-          />
-        </div>
-
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
-          {/* Mobile (< sm): morphing two-stage action menu. */}
-          <MobileActionMenu
-            hasActiveTrip={Boolean(activeTrip)}
-            canShare={role === 'owner' && Boolean(activeTrip)}
-            canClear={!readOnly}
-            onBackup={() => setBackupOpen(true)}
-            onShare={() => {
-              setShareOpen(true)
-              void refreshTrips().catch(() => undefined)
-            }}
-            onClearAll={handleClearAllTripState}
-            onSignOut={() => void signOut()}
-          />
-          {/* Desktop (≥ sm): inline action buttons as before. */}
-          <div className="hidden items-center gap-1.5 sm:flex sm:gap-2">
-            {activeTrip && (
-              <button
-                type="button"
-                onClick={() => setBackupOpen(true)}
-                aria-label="存档"
-                title="存档"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
-              >
-                <Archive size={17} strokeWidth={1.8} aria-hidden />
-              </button>
-            )}
-            {role === 'owner' && activeTrip && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShareOpen(true)
-                  void refreshTrips().catch(() => undefined)
-                }}
-                aria-label="分享"
-                title="分享"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
-              >
-                <Share2 size={17} strokeWidth={1.8} aria-hidden />
-              </button>
-            )}
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={handleClearAllTripState}
-                aria-label="清空全部"
-                title="清空全部"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
-              >
-                <Trash2 size={17} strokeWidth={1.8} aria-hidden />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                void signOut()
-              }}
-              aria-label="退出"
-              title="退出"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] focus-visible:border-[var(--sage)] focus-visible:text-[var(--sage)]"
-            >
-              <LogOut size={17} strokeWidth={1.8} aria-hidden />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1129,34 +1053,32 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === 'assistant' && (
-            <motion.div
-              key="tab-assistant"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="rounded-3xl border border-[var(--copper)]/20 bg-[var(--card)] p-4 sm:p-6 shadow-sm"
-            >
-              <div className="mb-4 flex items-center justify-between border-b border-[var(--mist)] pb-3">
-                <div>
-                  <h2 className="font-display text-xl sm:text-2xl text-[var(--ink)]">
-                    巴黎 AI 行程伴侣
-                  </h2>
-                  <p className="text-xs text-[var(--stone)]">
-                    可随时询问巴黎景点、餐厅预订、交通路线与当地旅行小贴士。
-                  </p>
-                </div>
-              </div>
-              <div className="min-h-[400px] flex flex-col items-center justify-center text-center p-8 space-y-4">
-                <div className="h-16 w-16 rounded-2xl bg-[var(--copper)]/10 text-[var(--copper)] flex items-center justify-center">
-                  <Sparkles size={32} />
-                </div>
-                <p className="text-sm text-[var(--stone)] max-w-sm">
-                  AI 行程伴侣支持随时唤起。点击下方按钮或右下角对话图标即可开始交流。
-                </p>
-              </div>
-            </motion.div>
+          {activeTab === 'profile' && (
+            <ProfileTab
+              email={email}
+              role={role}
+              onSignOut={() => void signOut()}
+              onOpenShare={
+                role === 'owner' && Boolean(activeTrip)
+                  ? () => {
+                      setShareOpen(true)
+                      void refreshTrips().catch(() => undefined)
+                    }
+                  : undefined
+              }
+              onOpenBackup={() => setBackupOpen(true)}
+              onOpenPreferences={() => setRecommendationPreferencesOpen(true)}
+              onClearAll={!readOnly ? handleClearAllTripState : undefined}
+              trips={trips}
+              activeTripId={activeTrip?.id}
+              onSwitchTrip={(tripId) => {
+                void switchTrip(tripId).catch((err) => {
+                  window.alert(err instanceof Error ? err.message : '切换失败')
+                })
+              }}
+              readOnly={readOnly}
+              recommendationPreferences={recommendationPreferences}
+            />
           )}
         </AnimatePresence>
 
@@ -1170,11 +1092,8 @@ export default function App() {
       {/* Mobile Native Bottom Navigation Bar */}
       <BottomNavBar
         activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab)
-        }}
+        onSelectTab={setActiveTab}
         itineraryReady={itineraryReady}
-        onOpenPreferences={() => setRecommendationPreferencesOpen(true)}
       />
 
       {!readOnly && (
@@ -1204,12 +1123,6 @@ export default function App() {
             reorderStop: handleReorderOnDay,
             setHotel,
             setHotelCandidates,
-          }}
-          forceOpen={activeTab === 'assistant'}
-          onClose={() => {
-            if (activeTab === 'assistant') {
-              setActiveTab('itinerary')
-            }
           }}
         />
       )}

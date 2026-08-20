@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { CalendarDays, Luggage, Sparkles } from 'lucide-react'
+import { CalendarDays, Luggage, User } from 'lucide-react'
 import type { AppTab } from '../types'
 
 export interface TopNavSegmentProps {
@@ -16,7 +16,7 @@ const TABS: Array<{
 }> = [
   { id: 'itinerary', label: '每日行程', Icon: CalendarDays },
   { id: 'logistics', label: '出行预订', Icon: Luggage },
-  { id: 'assistant', label: 'AI 助手', Icon: Sparkles },
+  { id: 'profile', label: '我的', Icon: User },
 ]
 
 export function TopNavSegment({
