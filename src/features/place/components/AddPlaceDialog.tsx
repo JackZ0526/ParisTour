@@ -1395,6 +1395,7 @@ export function AddPlaceDialog({
         showMap={false}
         detailsOverride={googleDetail?.details}
         overlayClassName="z-[2200]"
+        overlayZIndex={2200}
         onAdvisorFacts={(next) => {
           setAdvisorFactsKey(googleDetailKey)
           setAdvisorFacts(next)
