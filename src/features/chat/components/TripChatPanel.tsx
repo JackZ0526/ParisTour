@@ -1785,7 +1785,7 @@ export function TripChatPanel({
       {/* LlmModelPicker stays anchored above the chat FAB on mobile, left on desktop */}
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.5rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
+        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
           open ? 'pointer-events-none invisible opacity-0' : ''
         }`}
       >
@@ -1859,16 +1859,13 @@ export function TripChatPanel({
           overflow: 'hidden',
           zIndex: TRIP_CHAT_PANEL_Z,
           transformOrigin: 'bottom right',
+          maxHeight: 'calc(100vh - max(1.15rem, env(safe-area-inset-bottom)) - 5.5rem)',
           color: 'var(--ink)',
           border: '1px solid rgba(255,255,255,0.7)',
           boxShadow: 'var(--shadow)',
           backdropFilter: 'blur(8px)',
         }}
-        className={`fixed flex flex-col ${
-          open
-            ? 'bottom-[max(1.15rem,env(safe-area-inset-bottom))]'
-            : 'bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+4.85rem)]'
-        } right-[max(1.25rem,env(safe-area-inset-right))] sm:bottom-5 sm:right-5`}
+        className="fixed flex flex-col bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+4.85rem)] right-[max(1.25rem,env(safe-area-inset-right))] sm:bottom-5 sm:right-5"
       >
         {/* Icon layer — visible when closed, fades out during the width-grow stage */}
         <motion.div

@@ -937,9 +937,12 @@ export function HotelPicker({
   const [refreshPanel, setRefreshPanel] = useState<'choose' | 'prefer' | null>(null)
   const [preferText, setPreferText] = useState('')
   const [refreshHint, setRefreshHint] = useState<string | null>(null)
-  const [othersCollapsed, setOthersCollapsed] = useState(
-    () => Boolean(loadHotelCache()?.othersCollapsed),
-  )
+  const [othersCollapsed, setOthersCollapsed] = useState(() => {
+    if (isHotelSelected(selected)) return true
+    const cached = loadHotelCache()
+    if (cached && isHotelSelected(cached.selected)) return true
+    return Boolean(cached?.othersCollapsed)
+  })
   const [drag, setDrag] = useState<HotelDragSession | null>(null)
   const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
   const [dropping, setDropping] = useState(false)

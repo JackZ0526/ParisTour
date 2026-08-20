@@ -259,7 +259,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         position: 'fixed',
         bottom: isDesktop
           ? '1.25rem'
-          : 'calc(max(1.25rem, env(safe-area-inset-bottom)) + 3.5rem)',
+          : 'calc(max(1.15rem, env(safe-area-inset-bottom)) + 8.35rem)',
         right: isDesktop
           ? 'calc(max(1.25rem, env(safe-area-inset-right)) + 3.625rem)'
           : 'max(1.25rem, env(safe-area-inset-right))',
