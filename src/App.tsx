@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Archive, LogOut, Share2, Sparkles, Trash2, History } from 'lucide-react'
+import { Archive, CalendarDays, History, LogOut, Luggage, Share2, Sparkles, Trash2 } from 'lucide-react'
 import { MobileActionMenu } from './features/auth/components/MobileActionMenu'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
@@ -26,6 +26,9 @@ import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
 import { TripChatPanelLazy as TripChatPanel } from './features/chat/components/TripChatPanel.lazy'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
+import { BottomNavBar } from './features/navigation/components/BottomNavBar'
+import { TopNavSegment } from './features/navigation/components/TopNavSegment'
+import type { AppTab } from './features/navigation/types'
 const TripMap = React.lazy(() =>
   import('./features/map/components/TripMap').then((m) => ({ default: m.TripMap })),
 )
@@ -247,6 +250,7 @@ export default function App() {
     [dayIndex, setDayIndex, setSelectedPlaceId, setDayRegenError],
   )
   numberOfDaysRef.current = numberOfDays
+  const [activeTab, setActiveTab] = useState<AppTab>('itinerary')
   const routePrefetchPlan = useMemo(
     () =>
       days
@@ -595,6 +599,22 @@ export default function App() {
             </select>
           )}
         </div>
+
+        {/* Desktop Navigation Tabs */}
+        <div className="hidden lg:flex items-center">
+          <TopNavSegment
+            activeTab={activeTab}
+            onSelectTab={(tab) => {
+              if (tab === 'assistant') {
+                setActiveTab('assistant')
+              } else {
+                setActiveTab(tab)
+              }
+            }}
+            itineraryReady={itineraryReady}
+          />
+        </div>
+
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
           {/* Mobile (< sm): morphing two-stage action menu. */}
           <MobileActionMenu
@@ -682,427 +702,463 @@ export default function App() {
         />
       )}
 
-      <header className="relative overflow-hidden rounded-2xl border border-white/60 bg-[linear-gradient(135deg,rgba(28,36,32,0.92),rgba(74,99,86,0.88))] px-5 py-7 text-[var(--paper)] shadow-[var(--shadow)] sm:rounded-[28px] sm:px-10 sm:py-14">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-35"
-          style={{
-            backgroundImage:
-              'url(https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1600&q=60)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            mixBlendMode: 'luminosity',
-          }}
-        />
-        <div className="relative max-w-2xl animate-fade-up">
-          <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--gold)] sm:text-xs">
-            {hero.eyebrow}
-          </p>
-          <h1 className="font-display mt-2 text-[2rem] leading-[1.05] sm:text-5xl sm:leading-none md:text-6xl lg:text-7xl">
-            {hero.title}
-          </h1>
-          <p className="mt-3 max-w-lg text-sm text-[var(--paper)]/85 sm:mt-4 sm:text-base md:text-lg">
-            {hero.blurb}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs sm:mt-6 sm:text-sm">
-            {hero.tags.map((tag) => (
-              <span key={tag} className="rounded-full bg-white/10 px-3 py-1 backdrop-blur">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      <main className="mt-8 space-y-10 sm:mt-10 sm:space-y-12">
-        <TripDatesPanel
-          key={`dates-${panelResetKey}-${syncRenderKey}`}
-          value={tripDates}
-          onChange={setTripDates}
-          readOnly={readOnly}
-        />
-        <FlightPanel
-          key={`flights-${panelResetKey}-${syncRenderKey}`}
-          tripDates={tripDates}
-          destination={destination}
-          onFlightsChange={setFlights}
-          readOnly={readOnly}
-        />
-        <HotelPicker
-          key={`hotel-${panelResetKey}-${syncRenderKey}`}
-          selected={hotel}
-          candidates={hotelCandidates}
-          days={days}
-          onSelect={setHotel}
-          onCandidatesChange={setHotelCandidates}
-          readOnly={readOnly}
-          onDetailChange={setViewingHotelDetail}
-          openSelectedDetailToken={openHotelDetailToken}
-        />
-
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="font-display text-2xl sm:text-3xl">
-                {chineseDayCount(numberOfDays)}行程
-              </h2>
-              <p className="mt-1 text-sm text-[var(--stone)]">
-                {itineraryReady
-                  ? '可拖拽排序、增删地点；步行距离与当日标题会随调整自动更新。'
-                  : '先选好日期、往返航班和酒店，下方行程才会展开。'}
-              </p>
-              {datesReady && (
-                <p className="mt-1.5 text-sm text-[var(--copper)]">
-                  {dayNightLabel}
-                  {tripDates?.endDate && itineraryStartDate ? (
-                    <span className="text-[var(--stone)]">
-                      {' '}
-                      · {formatTripDayLabel(itineraryStartDate)} →{' '}
-                      {formatTripDayLabel(tripDates.endDate)}
-                    </span>
-                  ) : null}
-                </p>
-              )}
+      <main className="mt-4 space-y-6 sm:mt-6 sm:space-y-8">
+        <AnimatePresence mode="wait">
+          {activeTab === 'itinerary' && (
+            <motion.div
+              key="tab-itinerary"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-4"
+            >
+              {/* Top Quick Itinerary Summary Strip */}
               {itineraryReady && (
-                <div className="mt-2 text-sm text-[var(--ink)]/85">
-                  {itineraryStartLoading && !itineraryStart ? (
-                    <LoadingIndicator
-                      thinkingLabel="正在读取航班抵达时间…"
-                      generatingLabel="正在按航班日期确定行程开始日…"
-                      showDots
-                      size="sm"
-                      mode="thinking"
-                      task="itineraryStart"
-                    />
-                  ) : itineraryStartDate ? (
-                    <p>
-                      <span className="text-[var(--copper)]">
-                        行程起算 {formatTripDayLabel(itineraryStartDate)}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[var(--copper)]/20 bg-[var(--card)]/90 px-3.5 py-2.5 shadow-sm backdrop-blur-md">
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                    <span className="font-semibold text-[var(--copper)]">
+                      {chineseDayCount(numberOfDays)}行程
+                    </span>
+                    {datesReady && (
+                      <span className="text-[var(--stone)]">
+                        · {dayNightLabel}
+                        {tripDates?.endDate && itineraryStartDate ? (
+                          <span>
+                            {' '}({formatTripDayLabel(itineraryStartDate)} → {formatTripDayLabel(tripDates.endDate)})
+                          </span>
+                        ) : null}
                       </span>
-                      {itineraryStart?.reasonZh ? (
-                        <span className="text-[var(--stone)]">
-                          {' '}
-                          · {itineraryStart.reasonZh}
-                        </span>
-                      ) : itineraryStartLoading ? (
-                        <LoadingIndicator
-                          className="ml-1 align-middle"
-                          thinkingLabel="正在核对抵达时间…"
-                          generatingLabel="正在核对抵达时间…"
-                          showDots
-                          size="sm"
-                          mode="thinking"
-                          task="itineraryStart"
+                    )}
+                    {hotel?.name && (
+                      <span className="rounded-md bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--ink)] font-medium">
+                        🏨 {hotel.name}
+                      </span>
+                    )}
+                    {itineraryStartLoading && !itineraryStart ? (
+                      <span className="text-[var(--stone)] text-xs">（正在核对抵达时间…）</span>
+                    ) : itineraryStart?.reasonZh ? (
+                      <span className="text-[var(--stone)] text-xs">· {itineraryStart.reasonZh}</span>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('logistics')}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--stone)]/25 px-2.5 py-1 text-xs font-medium text-[var(--stone)] transition-colors hover:border-[var(--copper)] hover:text-[var(--copper)]"
+                      title="前往出行与酒店设置"
+                    >
+                      <Luggage size={13} />
+                      <span>调整出行</span>
+                    </button>
+
+                    {!readOnly && (
+                      <>
+                        <RecommendationPreferencesButton
+                          onClick={() => setRecommendationPreferencesOpen(true)}
                         />
-                      ) : null}
-                    </p>
-                  ) : null}
+                        {itineraryReady &&
+                          (itineraryGenerated || itineraryIncrementalGenerating) && (
+                          <>
+                            {canRestoreDefault && (
+                              <button
+                                type="button"
+                                onClick={handleRestoreDefault}
+                                aria-label="恢复默认推荐"
+                                title="恢复默认推荐"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+                              >
+                                <History size={15} strokeWidth={1.8} aria-hidden />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleResetAll}
+                              aria-label="重新生成全部"
+                              title="重新生成全部"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+                            >
+                              <Sparkles size={15} strokeWidth={1.8} aria-hidden />
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
-            {!readOnly && (
-              <div className="flex flex-wrap items-center gap-2">
-                <RecommendationPreferencesButton
-                  onClick={() => setRecommendationPreferencesOpen(true)}
-                />
-                {itineraryReady &&
-                  (itineraryGenerated || itineraryIncrementalGenerating) && (
-                  <>
-                {canRestoreDefault && (
-                  <button
-                    type="button"
-                    onClick={handleRestoreDefault}
-                    aria-label="恢复默认推荐"
-                    title="恢复默认推荐"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
-                  >
-                    <History size={17} strokeWidth={1.8} aria-hidden />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleResetAll}
-                  aria-label="重新生成全部"
-                  title="重新生成全部"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
-                >
-                  <Sparkles size={17} strokeWidth={1.8} aria-hidden />
-                </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
 
-          <div
-            className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${
-              itineraryReady ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-            }`}
-          >
-            <div className="min-h-0 overflow-hidden">
-              <div
-                className={`space-y-4 transition-[opacity,transform] duration-500 ease-in-out ${
-                  itineraryReady
-                    ? 'opacity-100'
-                    : 'pointer-events-none -translate-y-2 opacity-0'
-                }`}
-              >
-                {showItineraryLoading && (
-                  <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
-                    <LoadingIndicator
-                      variant="block"
-                      mode="thinking"
-                      task="itineraryGenerate"
-                      label={
-                        <span
-                          key={itineraryLoadingLineIndex}
-                          className="animate-fade-up inline-block max-w-md text-center"
-                        >
-                          {itineraryLoadingLine}
-                        </span>
-                      }
-                      showDots
-                      size="md"
-                    />
-                    <p className="mt-2 text-center text-xs text-[var(--stone)]">
-                      根据日期、航班与酒店生成完整多日行程，首次可能需要一小会儿。
-                    </p>
-                  </div>
-                )}
-
-                {showItineraryError && (
-                  <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-6 text-center">
-                    <p className="font-medium text-[var(--ink)]">行程生成失败</p>
-                    <p className="mt-1 whitespace-pre-line break-words text-left text-sm text-[var(--stone)] sm:text-center">
-                      {itineraryGenError}
-                    </p>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setItineraryGenError(null)
-                          void runFullItineraryGeneration()
-                        }}
-                        className="mt-4 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper)] hover:opacity-90"
-                      >
-                        再试一次
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {showItineraryPartialError && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-3">
-                    <div className="min-w-0 text-left">
-                      <p className="text-sm font-medium text-[var(--ink)]">
-                        后续天数生成中断
+              {itineraryReady ? (
+                <section className="space-y-4">
+                  {showItineraryLoading && (
+                    <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
+                      <LoadingIndicator
+                        variant="block"
+                        mode="thinking"
+                        task="itineraryGenerate"
+                        label={
+                          <span
+                            key={itineraryLoadingLineIndex}
+                            className="animate-fade-up inline-block max-w-md text-center"
+                          >
+                            {itineraryLoadingLine}
+                          </span>
+                        }
+                        showDots
+                        size="md"
+                      />
+                      <p className="mt-2 text-center text-xs text-[var(--stone)]">
+                        根据日期、航班与酒店生成完整多日行程，首次可能需要一小会儿。
                       </p>
-                      <p className="mt-0.5 whitespace-pre-line break-words text-xs text-[var(--stone)]">
+                    </div>
+                  )}
+
+                  {showItineraryError && (
+                    <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-6 text-center">
+                      <p className="font-medium text-[var(--ink)]">行程生成失败</p>
+                      <p className="mt-1 whitespace-pre-line break-words text-left text-sm text-[var(--stone)] sm:text-center">
                         {itineraryGenError}
                       </p>
-                    </div>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setItineraryGenError(null)
-                          void runFullItineraryGeneration({ resume: true })
-                        }}
-                        className="shrink-0 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] hover:opacity-90"
-                      >
-                        继续生成
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {showItineraryContent && (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {days.map((d, i) => {
-                          const cal = dateForTripDay(itineraryStartDate, d.day)
-                          return (
-                            <DayTabButton
-                              key={d.day}
-                              dayNumber={d.day}
-                              dateLabel={
-                                cal ? formatTripDayLabel(cal) : undefined
-                              }
-                              title={d.title}
-                              pending={isDayGenerationPending(d.day)}
-                              active={i === dayIndex}
-                              onSelect={() => handleSelectDay(i)}
-                            />
-                          )
-                        })}
-                      </div>
-
-                      <div
-                        className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
-                        role="tablist"
-                        aria-label="行程视图"
-                      >
-                        {/* iOS-style sliding pill: a single motion.span with
-                            `layoutId` that's always mounted inside the active
-                            tab. Framer Motion tracks its position when the
-                            active tab changes and tweens between buttons
-                            with the spring below. Pure black for max
-                            contrast against the white active label. The
-                            previous conditional-render approach had the
-                            pill being filled by the tablist's full width
-                            (`absolute inset-0` resolved against the wrong
-                            stacking context in some viewport widths), so the
-                            pill was effectively invisible. */}
+                      {!readOnly && (
                         <button
                           type="button"
-                          role="tab"
-                          aria-selected={mobileItineraryPane === 'timeline'}
-                          onClick={() => setMobileItineraryPane('timeline')}
-                          className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                          onClick={() => {
+                            setItineraryGenError(null)
+                            void runFullItineraryGeneration()
+                          }}
+                          className="mt-4 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper)] hover:opacity-90"
                         >
-                          {mobileItineraryPane === 'timeline' && (
-                            <motion.span
-                              layoutId="itinerary-pane-pill"
-                              className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
-                              animate={{
-                                scaleX: [1, 1.15, 0.95, 1],
-                                scaleY: [1, 0.88, 1.04, 1],
-                              }}
-                              transition={{
-                                layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                              }}
-                            />
-                          )}
-                          <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'text-white' : 'text-[var(--ink)]'}`}>
-                            时间线
-                          </span>
+                          再试一次
                         </button>
+                      )}
+                    </div>
+                  )}
+
+                  {showItineraryPartialError && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-3">
+                      <div className="min-w-0 text-left">
+                        <p className="text-sm font-medium text-[var(--ink)]">
+                          后续天数生成中断
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-line break-words text-xs text-[var(--stone)]">
+                          {itineraryGenError}
+                        </p>
+                      </div>
+                      {!readOnly && (
                         <button
                           type="button"
-                          role="tab"
-                          aria-selected={mobileItineraryPane === 'map'}
-                          onClick={() => setMobileItineraryPane('map')}
-                          className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                          onClick={() => {
+                            setItineraryGenError(null)
+                            void runFullItineraryGeneration({ resume: true })
+                          }}
+                          className="shrink-0 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] hover:opacity-90"
                         >
-                          {mobileItineraryPane === 'map' && (
-                            <motion.span
-                              layoutId="itinerary-pane-pill"
-                              className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
-                              animate={{
-                                scaleX: [1, 1.15, 0.95, 1],
-                                scaleY: [1, 0.88, 1.04, 1],
-                              }}
-                              transition={{
-                                layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                              }}
-                            />
-                          )}
-                          <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'text-white' : 'text-[var(--ink)]'}`}>
-                            地图
-                          </span>
+                          继续生成
                         </button>
-                      </div>
+                      )}
                     </div>
+                  )}
 
-                    <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                      <div
-                        className={
-                          mobileItineraryPane === 'timeline'
-                            ? 'block w-full min-w-0 max-w-full'
-                            : 'hidden lg:block lg:w-full lg:min-w-0 lg:max-w-full'
-                        }
-                      >
-                        <AnimatePresence mode="wait" custom={daySlideDirection} initial={false}>
-                          <motion.div
-                            key={`timeline-${day.day}-${hotel.id}`}
-                            custom={daySlideDirection}
-                            variants={timelineContainerVariants}
-                            initial="enter"
-                            animate="center"
-                            exit="exit"
-                            className="w-full min-w-0 max-w-full"
+                  {showItineraryContent && (
+                    <>
+                      <div className="space-y-2">
+                        <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          {days.map((d, i) => {
+                            const cal = dateForTripDay(itineraryStartDate, d.day)
+                            return (
+                              <DayTabButton
+                                key={d.day}
+                                dayNumber={d.day}
+                                dateLabel={
+                                  cal ? formatTripDayLabel(cal) : undefined
+                                }
+                                title={d.title}
+                                pending={isDayGenerationPending(d.day)}
+                                active={i === dayIndex}
+                                onSelect={() => handleSelectDay(i)}
+                              />
+                            )
+                          })}
+                        </div>
+
+                        <div
+                          className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
+                          role="tablist"
+                          aria-label="行程视图"
+                        >
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={mobileItineraryPane === 'timeline'}
+                            onClick={() => setMobileItineraryPane('timeline')}
+                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
                           >
-                            <DayTimeline
-                              day={day}
-                              hotel={hotel}
-                              direction={daySlideDirection}
-                              customPlaces={placesWithHotel}
-                              selectedPlaceId={selectedPlaceId}
-                              navPlan={navPlan}
-                              copyRefreshing={copyRefreshing}
-                              dayRegenerating={dayRegenerating}
-                              dayRegenError={dayRegenError}
-                              dayRestoring={dayRestoring}
-                              dayPending={dayPending}
-                              isLastDay={day.day === lastDayNum}
-                              onSelectPlace={handleSelectPlace}
-                              onReorder={handleReorder}
-                              onDelete={handleDelete}
-                              onAddCustom={handleAddCustom}
-                              onResetDay={() => {
-                                void handleResetDay(dayIndex)
-                              }}
-                              canRestoreDayDefault={canRestoreDayDefault}
-                              onRestoreDayDefault={() => {
-                                handleRestoreDayDefault(dayIndex)
-                              }}
-                              tripPlaceNames={tripPlaceNames}
-                              readOnly={readOnly}
-                              recommendationPreferences={recommendationPreferences}
-                            />
-                          </motion.div>
-                        </AnimatePresence>
+                            {mobileItineraryPane === 'timeline' && (
+                              <motion.span
+                                layoutId="itinerary-pane-pill"
+                                className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
+                                animate={{
+                                  scaleX: [1, 1.15, 0.95, 1],
+                                  scaleY: [1, 0.88, 1.04, 1],
+                                }}
+                                transition={{
+                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                }}
+                              />
+                            )}
+                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'text-white' : 'text-[var(--ink)]'}`}>
+                              时间线
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={mobileItineraryPane === 'map'}
+                            onClick={() => setMobileItineraryPane('map')}
+                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                          >
+                            {mobileItineraryPane === 'map' && (
+                              <motion.span
+                                layoutId="itinerary-pane-pill"
+                                className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
+                                animate={{
+                                  scaleX: [1, 1.15, 0.95, 1],
+                                  scaleY: [1, 0.88, 1.04, 1],
+                                }}
+                                transition={{
+                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                }}
+                              />
+                            )}
+                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'text-white' : 'text-[var(--ink)]'}`}>
+                              地图
+                            </span>
+                          </button>
+                        </div>
                       </div>
-                      <div
-                        className={`space-y-4 ${
-                          mobileItineraryPane === 'map'
-                            ? 'block'
-                            : 'hidden lg:block'
-                        }`}
-                      >
-                        <MapErrorBoundary>
-                          <React.Suspense fallback={<div className="flex h-[min(60vh,440px)] w-full items-center justify-center bg-[var(--mist)] text-sm text-[var(--stone)] md:h-[560px]">地图加载中…</div>}>
-                            <TripMap
-                              hotel={hotel}
-                              day={day}
-                              customPlaces={placesWithHotel}
-                              selectedPlaceId={selectedPlaceId}
-                              onSelectPlace={handleSelectPlace}
-                              onRouteCacheChanged={handleRouteCacheChanged}
-                            />
-                          </React.Suspense>
-                        </MapErrorBoundary>
-                        <PlacePanel
-                          key={`place-panel-${day.day}-${hotel.id}`}
-                          placeId={selectedPlaceId}
-                          customPlaces={placesWithHotel}
-                          day={day}
-                          hotel={hotel}
-                          days={days}
-                          onGoogleIdentityResolved={handleGoogleIdentityResolved}
-                          onClose={() => setSelectedPlaceId(null)}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
 
-          {!itineraryReady && (
-            <div className="rounded-2xl border border-dashed border-[var(--copper)]/35 bg-[var(--card)] px-4 py-5 text-center">
-              <p className="font-medium text-[var(--ink)]">还差几项才能看行程</p>
-              <p className="mt-1 text-sm text-[var(--stone)]">
-                请先完成：{missingForItinerary.join(' · ')}
-              </p>
-            </div>
+                      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                        <div
+                          className={
+                            mobileItineraryPane === 'timeline'
+                              ? 'block w-full min-w-0 max-w-full'
+                              : 'hidden lg:block lg:w-full lg:min-w-0 lg:max-w-full'
+                          }
+                        >
+                          <AnimatePresence mode="wait" custom={daySlideDirection} initial={false}>
+                            <motion.div
+                              key={`timeline-${day.day}-${hotel.id}`}
+                              custom={daySlideDirection}
+                              variants={timelineContainerVariants}
+                              initial="enter"
+                              animate="center"
+                              exit="exit"
+                              className="w-full min-w-0 max-w-full"
+                            >
+                              <DayTimeline
+                                day={day}
+                                hotel={hotel}
+                                direction={daySlideDirection}
+                                customPlaces={placesWithHotel}
+                                selectedPlaceId={selectedPlaceId}
+                                navPlan={navPlan}
+                                copyRefreshing={copyRefreshing}
+                                dayRegenerating={dayRegenerating}
+                                dayRegenError={dayRegenError}
+                                dayRestoring={dayRestoring}
+                                dayPending={dayPending}
+                                isLastDay={day.day === lastDayNum}
+                                onSelectPlace={handleSelectPlace}
+                                onReorder={handleReorder}
+                                onDelete={handleDelete}
+                                onAddCustom={handleAddCustom}
+                                onResetDay={() => {
+                                  void handleResetDay(dayIndex)
+                                }}
+                                canRestoreDayDefault={canRestoreDayDefault}
+                                onRestoreDayDefault={() => {
+                                  handleRestoreDayDefault(dayIndex)
+                                }}
+                                tripPlaceNames={tripPlaceNames}
+                                readOnly={readOnly}
+                                recommendationPreferences={recommendationPreferences}
+                              />
+                            </motion.div>
+                          </AnimatePresence>
+                        </div>
+                        <div
+                          className={`space-y-4 ${
+                            mobileItineraryPane === 'map'
+                              ? 'block'
+                              : 'hidden lg:block'
+                          }`}
+                        >
+                          <MapErrorBoundary>
+                            <React.Suspense fallback={<div className="flex h-[min(60vh,440px)] w-full items-center justify-center bg-[var(--mist)] text-sm text-[var(--stone)] md:h-[560px]">地图加载中…</div>}>
+                              <TripMap
+                                hotel={hotel}
+                                day={day}
+                                customPlaces={placesWithHotel}
+                                selectedPlaceId={selectedPlaceId}
+                                onSelectPlace={handleSelectPlace}
+                                onRouteCacheChanged={handleRouteCacheChanged}
+                              />
+                            </React.Suspense>
+                          </MapErrorBoundary>
+                          <PlacePanel
+                            key={`place-panel-${day.day}-${hotel.id}`}
+                            placeId={selectedPlaceId}
+                            customPlaces={placesWithHotel}
+                            day={day}
+                            hotel={hotel}
+                            days={days}
+                            onGoogleIdentityResolved={handleGoogleIdentityResolved}
+                            onClose={() => setSelectedPlaceId(null)}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </section>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[var(--copper)]/35 bg-[var(--card)] px-6 py-12 text-center space-y-4 shadow-sm">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--copper)]/10 text-[var(--copper)]">
+                    <Luggage size={28} />
+                  </div>
+                  <h3 className="font-display text-xl sm:text-2xl text-[var(--ink)]">
+                    还差几项才能查看完整多日行程
+                  </h3>
+                  <p className="max-w-md mx-auto text-sm text-[var(--stone)]">
+                    请先完成：{missingForItinerary.join(' · ')}。在「出行」Tab 中配置出发与结束日期并选定入住酒店，AI 即可为您量身规划巴黎深度游玩路线。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('logistics')}
+                    className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-6 py-2.5 text-sm font-medium text-[var(--paper)] shadow-md transition-all hover:opacity-90 active:scale-95"
+                  >
+                    <Luggage size={16} />
+                    <span>前往「出行」配置</span>
+                  </button>
+                </div>
+              )}
+            </motion.div>
           )}
-        </section>
+
+          {activeTab === 'logistics' && (
+            <motion.div
+              key="tab-logistics"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-8 sm:space-y-10"
+            >
+              <header className="relative overflow-hidden rounded-2xl border border-white/60 bg-[linear-gradient(135deg,rgba(28,36,32,0.92),rgba(74,99,86,0.88))] px-5 py-7 text-[var(--paper)] shadow-[var(--shadow)] sm:rounded-[28px] sm:px-10 sm:py-14">
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-35"
+                  style={{
+                    backgroundImage:
+                      'url(https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1600&q=60)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    mixBlendMode: 'luminosity',
+                  }}
+                />
+                <div className="relative max-w-2xl animate-fade-up">
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--gold)] sm:text-xs">
+                    {hero.eyebrow}
+                  </p>
+                  <h1 className="font-display mt-2 text-[2rem] leading-[1.05] sm:text-5xl sm:leading-none md:text-6xl lg:text-7xl">
+                    {hero.title}
+                  </h1>
+                  <p className="mt-3 max-w-lg text-sm text-[var(--paper)]/85 sm:mt-4 sm:text-base md:text-lg">
+                    {hero.blurb}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs sm:mt-6 sm:text-sm">
+                    {hero.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-white/10 px-3 py-1 backdrop-blur">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </header>
+
+              <TripDatesPanel
+                key={`dates-${panelResetKey}-${syncRenderKey}`}
+                value={tripDates}
+                onChange={setTripDates}
+                readOnly={readOnly}
+              />
+              <FlightPanel
+                key={`flights-${panelResetKey}-${syncRenderKey}`}
+                tripDates={tripDates}
+                destination={destination}
+                onFlightsChange={setFlights}
+                readOnly={readOnly}
+              />
+              <HotelPicker
+                key={`hotel-${panelResetKey}-${syncRenderKey}`}
+                selected={hotel}
+                candidates={hotelCandidates}
+                days={days}
+                onSelect={setHotel}
+                onCandidatesChange={setHotelCandidates}
+                readOnly={readOnly}
+                onDetailChange={setViewingHotelDetail}
+                openSelectedDetailToken={openHotelDetailToken}
+              />
+
+              {itineraryReady && (
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('itinerary')}
+                    className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-8 py-3 text-sm font-medium text-[var(--paper)] shadow-lg hover:opacity-90 active:scale-95"
+                  >
+                    <CalendarDays size={16} />
+                    <span>查看已生成的每日行程 →</span>
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'assistant' && (
+            <motion.div
+              key="tab-assistant"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="rounded-3xl border border-[var(--copper)]/20 bg-[var(--card)] p-4 sm:p-6 shadow-sm"
+            >
+              <div className="mb-4 flex items-center justify-between border-b border-[var(--mist)] pb-3">
+                <div>
+                  <h2 className="font-display text-xl sm:text-2xl text-[var(--ink)]">
+                    巴黎 AI 行程伴侣
+                  </h2>
+                  <p className="text-xs text-[var(--stone)]">
+                    可随时询问巴黎景点、餐厅预订、交通路线与当地旅行小贴士。
+                  </p>
+                </div>
+              </div>
+              <div className="min-h-[400px] flex flex-col items-center justify-center text-center p-8 space-y-4">
+                <div className="h-16 w-16 rounded-2xl bg-[var(--copper)]/10 text-[var(--copper)] flex items-center justify-center">
+                  <Sparkles size={32} />
+                </div>
+                <p className="text-sm text-[var(--stone)] max-w-sm">
+                  AI 行程伴侣支持随时唤起。点击下方按钮或右下角对话图标即可开始交流。
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <footer className="rounded-2xl border border-white/60 bg-[var(--card)] px-4 py-5 text-sm text-[var(--stone)]">
           <p>
@@ -1110,6 +1166,15 @@ export default function App() {
           </p>
         </footer>
       </main>
+
+      {/* Mobile Native Bottom Navigation Bar */}
+      <BottomNavBar
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab)
+        }}
+        itineraryReady={itineraryReady}
+      />
 
       {!readOnly && (
         <TripChatPanel
@@ -1138,6 +1203,12 @@ export default function App() {
             reorderStop: handleReorderOnDay,
             setHotel,
             setHotelCandidates,
+          }}
+          forceOpen={activeTab === 'assistant'}
+          onClose={() => {
+            if (activeTab === 'assistant') {
+              setActiveTab('itinerary')
+            }
           }}
         />
       )}

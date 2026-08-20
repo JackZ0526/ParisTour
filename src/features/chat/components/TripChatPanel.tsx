@@ -149,6 +149,8 @@ interface Props {
   /** Open PlacePanel / hotel detail the user is viewing (for 「这个怎么样」). */
   viewing?: TripChatViewingTarget | null
   handlers: TripChatHandlers
+  forceOpen?: boolean
+  onClose?: () => void
 }
 
 const SUGGESTIONS = [
@@ -174,8 +176,18 @@ export function TripChatPanel({
   returnFlight = null,
   viewing = null,
   handlers,
+  forceOpen,
+  onClose,
 }: Props) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = forceOpen ?? internalOpen
+  const setOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    const nextVal = typeof next === 'function' ? next(open) : next
+    setInternalOpen(nextVal)
+    if (!nextVal && onClose) {
+      onClose()
+    }
+  }
   useBodyScrollLock(open)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
