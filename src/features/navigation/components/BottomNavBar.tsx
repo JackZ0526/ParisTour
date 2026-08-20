@@ -31,7 +31,7 @@ export function BottomNavBar({
       {/* High-transparency Semi-transparent Frosted Glass Capsule with Specular Reflection */}
       <nav
         aria-label="主要导航"
-        className="relative flex h-[58px] items-center justify-around gap-1 overflow-hidden rounded-full border-[1.5px] border-white/90 bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1.5px_2px_0_rgba(255,255,255,1),inset_0_-1px_1.5px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
+        className="relative flex h-[58px] items-center justify-around gap-1 overflow-hidden rounded-full border border-white/90 bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
       >
         {/* Specular Light Reflection Highlights (顶部与底部玻璃反光弧光) */}
         <span
@@ -57,7 +57,7 @@ export function BottomNavBar({
               {isActive && (
                 <motion.div
                   layoutId="semi-translucent-active-pill"
-                  className="absolute inset-0 overflow-hidden rounded-full border-[1.5px] border-white/95 bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
+                  className="absolute inset-0 overflow-hidden rounded-full border border-white/95 bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
                   animate={{
                     scaleX: [1, 1.15, 0.95, 1],
                     scaleY: [1, 0.88, 1.04, 1],
