@@ -46,11 +46,14 @@ export function TopNavSegment({
               <motion.span
                 layoutId="light-top-nav-active-pill"
                 className="absolute inset-0 z-0 rounded-full border border-white/60 bg-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-md"
+                animate={{
+                  scaleX: [1, 1.15, 0.95, 1],
+                  scaleY: [1, 0.88, 1.04, 1],
+                }}
                 transition={{
-                  type: 'spring',
-                  stiffness: 480,
-                  damping: 32,
-                  mass: 0.65,
+                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                 }}
               />
             )}

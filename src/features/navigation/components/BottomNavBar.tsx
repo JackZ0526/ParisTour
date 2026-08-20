@@ -49,16 +49,19 @@ export function BottomNavBar({
                 whileTap={{ scale: 0.92 }}
                 className="relative flex h-[46px] flex-1 items-center justify-center rounded-full outline-none transition-colors"
               >
-                {/* Semi-transparent Active Frosted Pill */}
+                {/* Semi-transparent Active Frosted Pill with Jelly Stretch Physics (Identical to Timeline/Map Switcher) */}
                 {isActive && (
                   <motion.div
                     layoutId="semi-translucent-active-pill"
                     className="absolute inset-0 rounded-full border border-white/60 bg-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-md"
+                    animate={{
+                      scaleX: [1, 1.15, 0.95, 1],
+                      scaleY: [1, 0.88, 1.04, 1],
+                    }}
                     transition={{
-                      type: 'spring',
-                      stiffness: 480,
-                      damping: 32,
-                      mass: 0.65,
+                      layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                      scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                      scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                     }}
                   />
                 )}
