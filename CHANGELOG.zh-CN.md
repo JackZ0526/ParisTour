@@ -14,13 +14,131 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
-- 锁定 PWA 模式为竖屏，并禁用双指捏合缩放（iOS / Android 安装后的 app）。Android 由系统直接拒绝旋转；iOS 不遵守 manifest 的 `orientation`，所以加了一层柔和的全屏遮罩，提示用户把手机转回来，同时把背后内容模糊并冻结。
-
 ### 变更
 
 ### 修复
 
+## [0.7.0] - 2026-08-20
+
+### 新增
+
+- align global UI with unified liquid frosted glass design and polish navigation flow
+- lift chat bubble and model picker above bottom nav, and widen navigation bar
+- implement liquid flowing gradient border with realistic refractive light decay
+- refine border to ultra-fine hairline precision while preserving specular reflection
+- add realistic specular reflection highlights and prism sheen to navigation bar
+- enhance navigation bar white border and luminous glass rim highlight
+- open hotel details overlay in-place without navigating away from itinerary tab
+- unify global design system with light frosted glass cards, soft diffused shadows, and cohesive pill shapes
+- balance desktop header layout with quick tools and interactive user capsule
+- implement Profile Tab consolidating account, trip management, preferences, and reset actions
+- sync bottom nav and top segments slider animation with timeline/map dynamic stretch-and-squish spring physics
+- refine bottom nav to high-transparency semi-transparent frosted glass
+- update bottom nav and top segments to clean bright light frosted glass style
+- clean minimalist frosted glass for bottom nav and top segments
+- match iOS Liquid Glass reference with translucent tinted pill and quick action capsule
+- upgrade bottom nav to iOS 26 floating liquid glass style
+- implement Proposal 1 with native bottom navigation bar and multi-tab architecture
+- unify PlacePhotoGallery across AddPlaceDialog and GooglePlacePage with identical photo priority, drag gestures, and animations
+- upgrade PlaceGallery with iOS native drag gestures, slide transitions, and thumbnail auto-centering
+- fine-tune ApiRequestMeter expanded height to 438px for tight bottom padding
+- eliminate scrollbar in ApiRequestMeter and expand full details cleanly
+- complete comprehensive animation enhancements across timeline, map, hotel, flight, and system widgets
+- upgrade top-right mobile menu to two-stage morphing animation
+- synchronize status bar theme-color dynamically with modal backdrop
+- enable black-translucent status bar to sync backdrop seamlessly in safe-area
+- display X close button on desktop while retaining pull-down handle on mobile
+- add top pull-down handle indicator, remove X buttons, and match status bar backdrop color
+- synchronize modal backdrop opacity dynamically with sheet drag & dismissal animation
+- implement velocity-inherited spring physics for inertia-driven bottom sheet dismissal
+- add full-surface pull-down-to-dismiss drag gesture to all bottom sheets
+- iOS-style sliding pill via shared layoutId
+- same staged two-stage morph as chat panel
+- staged two-stage morph (width first, then height)
+- container transform FAB↔panel with iOS-style spring + tap squish
+- morph from button to popover via shared layoutId
+- add enter/exit animation to model picker popover
+- add enter/exit animation + outside-click close
+- lock to portrait + disable pinch zoom in standalone mode
+- 锁定 PWA 模式为竖屏，并禁用双指捏合缩放（iOS / Android 安装后的 app）。Android 由系统直接拒绝旋转；iOS 不遵守 manifest 的 `orientation`，所以加了一层柔和的全屏遮罩，提示用户把手机转回来，同时把背后内容模糊并冻结。
+
+### 变更
+
+- upgrade FAB and model picker to luminous frosted glass with specular highlight
+- clean(ui): remove redundant logistics and preferences buttons from itinerary summary strip
+- remove deprecated VITE_GOOGLE_MAPS_API_KEY from env and documentation
+- extract unified BottomSheet shell component to standardize modals
+- standardize backdrop fade animation and pointer-events layering across all bottom sheets
+- add fluid ink blob animation with stretch physics to day tab switcher
+- add velocity stretch and squash deformation to mobile sliding pill
+- unfold date range picker popover from trigger box
+- hide mobile timeline/map toggle tabs on desktop side-by-side view
+- fade in chip text after closing animation settles
+- center model picker chip content on desktop
+- drop debug data attributes
+- debug(llm-picker): expose model/label via data-debug attributes
+- drop the modal, make it a popover anchored to the trigger
+- share Checkbox component, apply to preferences dialog
+- switch TripChatPanel enter/exit to AnimatePresence (sheet-bottom)
+- phase-2 — switch CloudSave toast + ApiRequest details panel to AnimatePresence
+- phase-1 — switch 7 sheet/dialog to AnimatePresence
+- phase-0 foundation
+- exp(animations): pilot Framer Motion on place sheet + LLM slider
+- polish(place-detail): mirror exit duration with entrance (420ms) so open/close read as one motion
+- polish(place-detail): use same easeOutQuint for open and close so exit reads as a visible retraction
+- polish(place-detail): keep exit mirror shape but clamp y-handles to [0,1] (no overshoot on exit)
+- polish(place-detail): make exit curve the mathematical time-reverse of the entrance curve
+- polish(place-detail): use clean ease-in curve so exit velocity keeps accelerating to end
+- polish(place-detail): mirror sheet exit easing (slow start, accelerating away) to oppose entrance
+- record PWA portrait lock + zoom fix in Unreleased
+- note iOS form reset layer fix in Unreleased
 - iOS 表单元素的 reset 规则下放到 `@layer base`，让 Tailwind 的 `rounded-xl` 等工具类重新对 `<input>` / `<textarea>` / `<select>` 生效，表单字段跟着整体圆润设计走，不再被强制为方角。
+
+### 修复
+
+- remove radial gradient artifact from share dialog header to fix color seam
+- polish tab state and trip metadata UI
+- silence flight card mount expand animation on initial load and keep luminous frosted glass fab
+- eliminate unwanted mount bounce on day tabs and timeline/map switcher when switching pages
+- eliminate hotel animation replay on tab switch, fix button overlap, and anchor chat morph to button
+- enable clicking hotel stop on timeline and summary strip to view hotel details
+- unify RecommendationPreferencesButton style with matching frosted white circle
+- eliminate thumbnail gray flicker and unmount underlying shimmer after image load
+- ensure place detail preview modal layers above AddPlaceDialog with overlayZIndex 2200
+- remove erroneous safe area padding from GooglePlacePage bottom sheet header
+- adjust top safe area padding to balanced 78px clearance
+- increase top padding to 95px to fully clear iOS 90px status bar blur scrim
+- adjust top safe area padding and make itinerary day tabs flow statically
+- align webmanifest theme and background colors with app light theme
+- ensure dragY resets to 0 whenever bottom sheet opens
+- use layered motion architecture to eliminate overscroll bounce while preserving 420ms slide-up animation
+- restore bottom sheet slide-up entrance animation by decoupling Framer Motion drag from style overrides
+- eliminate backdrop exit delay, restore synchronous AnimatePresence coordination, and clean status bar styling
+- remove abrupt meta theme-color flip to ensure smooth hardware-accelerated status bar blend
+- reset sheet y on open, extend backdrop to status bar area, and sync theme-color
+- dynamically transform backdrop backgroundColor to avoid Framer Motion opacity property collision
+- use non-passive native touch listener to reliably prevent browser rubberband overscroll
+- implement directional touch arbiter to eliminate content overscroll rubberband on sheet pull
+- eliminate page jumping and repeated fade-up animations on dialog close
+- fix TypeScript easing tuple type in DateRangePicker
+- initialize useMediaQuery synchronously to eliminate initial expansion flash
+- replace grid-rows 0fr with AnimatePresence to fix mobile layout bug
+- fix mobile popover initial height and prevent animation scrollbars
+- claim clients on new SW so cache fixes reach installed PWAs
+- separate backdrop fade from sheet slide
+- remove paper tint, anchor pill stacking
+- reset panelEntered via timer to prevent stuck overflow:hidden
+- hold overflow:hidden through every height retarget; clamp panel width to viewport
+- suppress scrollbar during opening morph
+- stack above chat button on mobile
+- align FAB and panel position, dial back spring
+- move AnimatePresence inside the portal so the enter animation actually runs
+- restore native checkbox visibility
+- revert fill bar to CSS for frame-perfect drag tracking
+- replace fake-portrait rotation with 'rotate back' overlay
+- drive portrait lock via JS class toggle (Tailwind v4 Lightning CSS rejects display-mode media queries)
+- move iOS form reset into @layer base so Tailwind rounded utilities win
+
 
 ## [0.6.0] - 2026-08-17
 
@@ -191,7 +309,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...HEAD
+- [0.7.0]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...v0.7.0
 - [0.6.0]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...v0.6.0
 - [0.5.0]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...v0.5.0
 - [0.4.0]: https://github.com/JackZ0526/ParisTour/compare/v0.3.1...v0.4.0

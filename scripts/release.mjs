@@ -47,12 +47,13 @@ Usage: node scripts/release.mjs <patch|minor|major|X.Y.Z> [--dry-run] [--no-git]
 }
 
 function run(cmd, cmdArgs, opts = {}) {
-  return execFileSync(cmd, cmdArgs, {
+  const out = execFileSync(cmd, cmdArgs, {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: opts.stdio ?? ['ignore', 'pipe', 'pipe'],
     ...opts,
-  }).trim()
+  })
+  return typeof out === 'string' ? out.trim() : ''
 }
 
 function todayUTC() {
