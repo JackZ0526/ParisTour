@@ -454,9 +454,9 @@ begin
   end if;
 end $$;
 
--- Include full row (incl. large jsonb snapshot) in UPDATE payloads.
--- Without FULL, TOAST'd snapshot columns are often omitted from realtime events.
-alter table public.trips replica identity full;
+-- Use DEFAULT replica identity: Realtime WebSocket only sends primary key & metadata (id, updated_at).
+-- This prevents broadcasting massive JSONB snapshots over WebSocket egress.
+alter table public.trips replica identity default;
 
 -- ---------------------------------------------------------------------------
 -- Trip backups (server-side history — last N kept by app after each full save)

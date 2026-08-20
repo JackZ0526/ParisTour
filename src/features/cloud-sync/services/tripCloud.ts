@@ -1046,6 +1046,12 @@ export function subscribeTripRealtime(
         } | null
         if (!row?.id || row.id !== tripId) return
 
+        // Echo suppression: Ignore if updated_at is not newer than our local reconciled state.
+        const currentStamp = lastAppliedUpdatedAtByTrip.get(tripId)
+        if (row.updated_at && currentStamp && !isNewerUpdatedAt(row.updated_at, currentStamp)) {
+          return
+        }
+
         const seq = ++applySeq
         void (async () => {
           try {
