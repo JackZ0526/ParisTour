@@ -32,10 +32,10 @@ export function BottomNavBar({
       aria-label="悬浮导航栏"
       className="fixed bottom-[max(1.15rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[340px] select-none lg:hidden"
     >
-      {/* Light Frosted Glass Island */}
+      {/* High-transparency Semi-transparent Frosted Glass Capsule */}
       <nav
         aria-label="主要导航"
-        className="flex h-[58px] items-center justify-between gap-1 rounded-full border border-white/80 bg-white/85 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-2xl transition-colors"
+        className="flex h-[58px] items-center justify-between gap-1 rounded-full border border-white/50 bg-white/35 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
       >
         {/* Navigation Tabs */}
         <div className="flex flex-1 items-center justify-around gap-1">
@@ -49,11 +49,11 @@ export function BottomNavBar({
                 whileTap={{ scale: 0.92 }}
                 className="relative flex h-[46px] flex-1 items-center justify-center rounded-full outline-none transition-colors"
               >
-                {/* Light Crisp White Active Floating Pill */}
+                {/* Semi-transparent Active Frosted Pill */}
                 {isActive && (
                   <motion.div
-                    layoutId="light-frosted-active-pill"
-                    className="absolute inset-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                    layoutId="semi-translucent-active-pill"
+                    className="absolute inset-0 rounded-full border border-white/60 bg-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-md"
                     transition={{
                       type: 'spring',
                       stiffness: 480,
@@ -74,11 +74,11 @@ export function BottomNavBar({
                     >
                       <Icon
                         size={18}
-                        strokeWidth={isActive ? 2.3 : 1.8}
+                        strokeWidth={isActive ? 2.4 : 1.9}
                         className={
                           isActive
-                            ? 'text-[var(--copper)]'
-                            : 'text-zinc-400 transition-colors hover:text-zinc-700'
+                            ? 'text-[var(--copper)] drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]'
+                            : 'text-zinc-600 transition-colors hover:text-zinc-950'
                         }
                       />
                     </motion.div>
@@ -96,8 +96,8 @@ export function BottomNavBar({
                   <span
                     className={`text-[10.5px] tracking-tight transition-colors ${
                       isActive
-                        ? 'font-semibold text-[var(--copper)]'
-                        : 'font-medium text-zinc-400'
+                        ? 'font-bold text-[var(--copper)]'
+                        : 'font-medium text-zinc-600'
                     }`}
                   >
                     {label}
@@ -108,7 +108,7 @@ export function BottomNavBar({
           })}
         </div>
 
-        {/* Right Preferences Button (Light Frosted Circle) */}
+        {/* Right Preferences Button (Semi-transparent Circle) */}
         {onOpenPreferences && (
           <motion.button
             type="button"
@@ -116,9 +116,9 @@ export function BottomNavBar({
             whileTap={{ scale: 0.9 }}
             title="偏好设置"
             aria-label="偏好设置"
-            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full border border-black/[0.04] bg-white/70 text-zinc-500 shadow-sm transition-all hover:bg-white hover:text-zinc-800 active:bg-white"
+            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/30 text-zinc-700 shadow-sm backdrop-blur-md transition-all hover:bg-white/50 hover:text-zinc-950 active:bg-white/60"
           >
-            <SlidersHorizontal size={16} strokeWidth={1.9} />
+            <SlidersHorizontal size={16} strokeWidth={2} />
           </motion.button>
         )}
       </nav>
