@@ -18,7 +18,6 @@ import {
 } from '../services/placeAdvisorFacts'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from './GooglePlacePage'
-import { SELECTED_HOTEL_PLACE_ID } from '../../itinerary/utils/dayOrigin'
 
 interface Props {
   placeId: string | null
@@ -58,7 +57,7 @@ export function PlacePanel({
   const [advisorFactsPlaceId, setAdvisorFactsPlaceId] = useState<string | null>(null)
 
   const place = useMemo(() => {
-    if (!placeId || placeId === SELECTED_HOTEL_PLACE_ID) return null
+    if (!placeId) return null
     try {
       return getPlace(placeId, customPlaces)
     } catch {

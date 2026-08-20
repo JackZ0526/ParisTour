@@ -167,18 +167,11 @@ export default function App() {
   )
   const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
   const [activeTab, setActiveTab] = useState<AppTab>('itinerary')
-  const [openHotelDetailToken, setOpenHotelDetailToken] = useState(0)
   const handleSelectPlace = useCallback(
     (id: string) => {
-      if (id === SELECTED_HOTEL_PLACE_ID) {
-        setSelectedPlaceId(null)
-        setActiveTab('logistics')
-        setOpenHotelDetailToken((n) => n + 1)
-        return
-      }
       setSelectedPlaceId(id)
     },
-    [setSelectedPlaceId, setActiveTab],
+    [setSelectedPlaceId],
   )
   const handleRouteCacheChanged = useCallback(() => {
     notifyTripChanged()
@@ -726,10 +719,7 @@ export default function App() {
                     {hotel?.name && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setActiveTab('logistics')
-                          setOpenHotelDetailToken((n) => n + 1)
-                        }}
+                        onClick={() => handleSelectPlace(SELECTED_HOTEL_PLACE_ID)}
                         className="rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-black/[0.08] active:scale-95"
                         title="点击查看酒店详情"
                       >
@@ -1096,7 +1086,6 @@ export default function App() {
                 onCandidatesChange={setHotelCandidates}
                 readOnly={readOnly}
                 onDetailChange={setViewingHotelDetail}
-                openSelectedDetailToken={openHotelDetailToken}
               />
 
               {itineraryReady && (
