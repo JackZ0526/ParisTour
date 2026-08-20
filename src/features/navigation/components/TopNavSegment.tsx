@@ -29,8 +29,18 @@ export function TopNavSegment({
     <div
       role="tablist"
       aria-label="主要导航"
-      className={`inline-flex items-center rounded-full border-[1.5px] border-white/90 bg-white/40 p-1.5 shadow-[0_10px_32px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.95)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
+      className={`relative inline-flex items-center overflow-hidden rounded-full border-[1.5px] border-white/90 bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1.5px_2px_0_rgba(255,255,255,1),inset_0_-1px_1.5px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
     >
+      {/* Specular Light Reflection Highlights (顶部与底部玻璃反光弧光) */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-6 top-0 z-20 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-75"
+      />
+
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id
         return (
@@ -45,7 +55,7 @@ export function TopNavSegment({
             {isActive && (
               <motion.span
                 layoutId="light-top-nav-active-pill"
-                className="absolute inset-0 z-0 rounded-full border-[1.5px] border-white/95 bg-white/70 shadow-[0_2px_10px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-md"
+                className="absolute inset-0 overflow-hidden rounded-full border-[1.5px] border-white/95 bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
                 animate={{
                   scaleX: [1, 1.15, 0.95, 1],
                   scaleY: [1, 0.88, 1.04, 1],
@@ -55,7 +65,12 @@ export function TopNavSegment({
                   scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                   scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                 }}
-              />
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent"
+                />
+              </motion.span>
             )}
 
             <Icon
