@@ -68,14 +68,11 @@ export function DayTabButton({
         <motion.span
           layoutId="active-day-tab-ink"
           className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm"
-          animate={{
-            scaleX: [1, 1.15, 0.95, 1],
-            scaleY: [1, 0.88, 1.04, 1],
-          }}
           transition={{
-            layout: { type: 'spring', stiffness: 400, damping: 28, mass: 0.8 },
-            scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
-            scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
+            type: 'spring',
+            stiffness: 450,
+            damping: 32,
+            mass: 0.8,
           }}
         />
       )}
