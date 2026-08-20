@@ -61,7 +61,7 @@ function FlightCard({
   const status = meaningfulFlightStatus(info.status)
 
   return (
-    <article className="rounded-2xl border border-white/70 bg-[var(--card)] p-4 shadow-[var(--shadow)]">
+    <article className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--stone)]">{title}</p>
@@ -251,7 +251,7 @@ export function FlightPanel({
       </div>
 
       <div
-        className={`rounded-2xl border border-white/70 bg-[var(--card)] p-4 ${
+        className={`rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors ${
           readOnly ? 'pointer-events-none opacity-80' : ''
         }`}
       >

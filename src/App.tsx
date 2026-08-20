@@ -709,7 +709,7 @@ export default function App() {
             >
               {/* Top Quick Itinerary Summary Strip */}
               {itineraryReady && (
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[var(--copper)]/20 bg-[var(--card)]/90 px-3.5 py-2.5 shadow-sm backdrop-blur-md">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors">
                   <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                     <span className="font-semibold text-[var(--copper)]">
                       {chineseDayCount(numberOfDays)}行程
@@ -725,7 +725,7 @@ export default function App() {
                       </span>
                     )}
                     {hotel?.name && (
-                      <span className="rounded-md bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--ink)] font-medium">
+                      <span className="rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs text-[var(--ink)] font-medium">
                         🏨 {hotel.name}
                       </span>
                     )}
@@ -740,7 +740,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setActiveTab('logistics')}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--stone)]/25 px-2.5 py-1 text-xs font-medium text-[var(--stone)] transition-colors hover:border-[var(--copper)] hover:text-[var(--copper)]"
+                      className="inline-flex items-center gap-1 rounded-full border border-black/5 bg-white/80 px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
                       title="前往出行与酒店设置"
                     >
                       <Luggage size={13} />
@@ -761,7 +761,7 @@ export default function App() {
                                 onClick={handleRestoreDefault}
                                 aria-label="恢复默认推荐"
                                 title="恢复默认推荐"
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
                               >
                                 <History size={15} strokeWidth={1.8} aria-hidden />
                               </button>
@@ -771,7 +771,7 @@ export default function App() {
                               onClick={handleResetAll}
                               aria-label="重新生成全部"
                               title="重新生成全部"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
                             >
                               <Sparkles size={15} strokeWidth={1.8} aria-hidden />
                             </button>
@@ -877,7 +877,7 @@ export default function App() {
                         </div>
 
                         <div
-                          className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1 lg:hidden"
+                          className="relative flex gap-1 rounded-full border border-white/80 bg-white/70 p-1 shadow-sm backdrop-blur-xl lg:hidden"
                           role="tablist"
                           aria-label="行程视图"
                         >
@@ -886,12 +886,12 @@ export default function App() {
                             role="tab"
                             aria-selected={mobileItineraryPane === 'timeline'}
                             onClick={() => setMobileItineraryPane('timeline')}
-                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none"
                           >
                             {mobileItineraryPane === 'timeline' && (
                               <motion.span
                                 layoutId="itinerary-pane-pill"
-                                className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
+                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                                 animate={{
                                   scaleX: [1, 1.15, 0.95, 1],
                                   scaleY: [1, 0.88, 1.04, 1],
@@ -903,7 +903,7 @@ export default function App() {
                                 }}
                               />
                             )}
-                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'text-white' : 'text-[var(--ink)]'}`}>
+                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500'}`}>
                               时间线
                             </span>
                           </button>
@@ -912,12 +912,12 @@ export default function App() {
                             role="tab"
                             aria-selected={mobileItineraryPane === 'map'}
                             onClick={() => setMobileItineraryPane('map')}
-                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors"
+                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none"
                           >
                             {mobileItineraryPane === 'map' && (
                               <motion.span
                                 layoutId="itinerary-pane-pill"
-                                className="absolute inset-0 z-0 rounded-full bg-black shadow-sm"
+                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                                 animate={{
                                   scaleX: [1, 1.15, 0.95, 1],
                                   scaleY: [1, 0.88, 1.04, 1],
@@ -929,7 +929,7 @@ export default function App() {
                                 }}
                               />
                             )}
-                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'text-white' : 'text-[var(--ink)]'}`}>
+                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500'}`}>
                               地图
                             </span>
                           </button>
@@ -1152,7 +1152,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <footer className="rounded-2xl border border-white/60 bg-[var(--card)] px-4 py-5 text-sm text-[var(--stone)]">
+        <footer className="rounded-3xl border border-white/80 bg-white/60 px-5 py-4 text-xs text-zinc-500 shadow-sm backdrop-blur-xl transition-colors">
           <p>
             航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
           </p>

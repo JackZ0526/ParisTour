@@ -2197,12 +2197,12 @@ export function HotelPicker({
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                   ref={currentSlotRef}
-                  className={`group relative overflow-hidden rounded-2xl border text-left shadow-[var(--shadow)] ring-2 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                  className={`group relative overflow-hidden rounded-3xl border text-left shadow-[0_8px_30px_rgba(0,0,0,0.04)] ring-2 backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                     currentSlotDropReady
                       ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
                       : currentSlotHighlight
                         ? 'border-[var(--copper)] ring-[var(--copper)]/50 bg-[var(--copper)]/5'
-                        : 'border-[var(--copper)] ring-[var(--copper)]/30'
+                        : 'border-white/80 bg-white/80 ring-[var(--copper)]/30'
                   }`}
                 >
                   <div className="absolute right-2 top-2 z-10 flex gap-1.5">
@@ -2264,12 +2264,12 @@ export function HotelPicker({
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                   ref={currentSlotRef}
-                  className={`rounded-2xl border border-dashed p-4 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                  className={`rounded-3xl border border-dashed p-5 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                     currentSlotDropReady
                       ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
                       : currentSlotHighlight
                         ? 'border-[var(--copper)] bg-[var(--copper)]/10 ring-2 ring-[var(--copper)]/30'
-                        : 'border-[var(--copper)]/35 bg-[var(--card)]'
+                        : 'border-[var(--copper)]/35 bg-white/60'
                   }`}
                 >
                   <p className="font-medium text-[var(--ink)]">
@@ -2284,7 +2284,7 @@ export function HotelPicker({
               )}
             </AnimatePresence>
 
-            <div className="rounded-2xl border border-dashed border-[var(--stone)]/40 bg-[var(--card)] p-3">
+            <div className="rounded-3xl border border-dashed border-[var(--stone)]/30 bg-white/60 p-4 shadow-sm backdrop-blur-xl">
               <p className="text-xs text-[var(--copper)]">自定义</p>
               <p className="font-medium">输入我自己的酒店地址</p>
               <p className="mt-1 text-xs text-[var(--stone)]">
@@ -2362,10 +2362,10 @@ export function HotelPicker({
                       key={hotel.id}
                       transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
                       onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
-                      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-[var(--card)] text-left touch-none transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                      className={`group relative cursor-pointer overflow-hidden rounded-3xl border bg-white/75 backdrop-blur-xl text-left touch-none shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] ${
                         dragHotelId === hotel.id
                           ? 'pointer-events-none border-transparent opacity-0'
-                          : 'border-white/60 hover:border-[var(--gold)]'
+                          : 'border-white/80 hover:border-[var(--gold)]'
                       }`}
                     >
                       {hotel.source === 'custom' && (

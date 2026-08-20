@@ -61,7 +61,7 @@ export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
       </div>
 
       <div
-        className={`rounded-2xl border border-white/70 bg-[var(--card)] p-4 shadow-[var(--shadow)] ${
+        className={`rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors ${
           readOnly ? 'pointer-events-none opacity-80' : ''
         }`}
       >
