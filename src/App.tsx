@@ -1174,6 +1174,7 @@ export default function App() {
           setActiveTab(tab)
         }}
         itineraryReady={itineraryReady}
+        onOpenPreferences={() => setRecommendationPreferencesOpen(true)}
       />
 
       {!readOnly && (
