@@ -101,7 +101,7 @@ export function ApiRequestMeter() {
         initial={false}
         animate={{
           width: detailsOpen ? 370 : 30,
-          height: detailsOpen ? 418 : 148,
+          height: detailsOpen ? 468 : 148,
           borderRadius: detailsOpen ? 20 : 15,
         }}
         transition={{

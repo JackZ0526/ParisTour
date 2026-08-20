@@ -716,8 +716,7 @@ select {
   padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
