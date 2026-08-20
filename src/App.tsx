@@ -22,7 +22,7 @@ import { useTripDialogs } from './hooks/useTripDialogs'
 import { useTripSync } from './hooks/useTripSync'
 import { DayTimeline } from './features/itinerary/components/DayTimeline'
 import { DayTabButton } from './features/itinerary/components/DayTabButton'
-import { FlightPanel } from './features/flight/components/FlightPanel'
+import { LogisticsTravelSection } from './features/flight/components/LogisticsTravelSection'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
@@ -35,7 +35,6 @@ import { PlacePanel } from './features/place/components/PlacePanel'
 import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
 import { TripChatPanelLazy as TripChatPanel } from './features/chat/components/TripChatPanel.lazy'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
-import { TripDatesPanel } from './features/itinerary/components/TripDatesPanel'
 import { BottomNavBar } from './features/navigation/components/BottomNavBar'
 import { TopNavSegment } from './features/navigation/components/TopNavSegment'
 import { ProfileTab } from './features/navigation/components/ProfileTab'
@@ -62,6 +61,7 @@ import { clearLlmArtifacts } from './shared/services/llm/llmArtifactStore'
 import { clearAllRecommendCache } from './features/place/services/recommendCache'
 import {
   dateForTripDay,
+  daysBetween,
   formatTripDayLabel,
   loadTripDates,
   saveTripDates,
@@ -76,14 +76,17 @@ import {
   saveRecommendationPreferences,
 } from './features/place/services/recommendationPreferences'
 import {
-  buildHeroCopy,
   chineseDayCount,
+  destinationLabel,
   hasTripDates,
 } from './appHelpers'
+import { isHotelSelected } from './features/hotel/constants/hotels'
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
+  glassCardSurfaceClass,
 } from './shared/styles/glassCapsule'
+import { ConfirmDialog } from './shared/components/ConfirmDialog'
 
 const timelineContainerVariants = {
   enter: (_direction: number) => ({
@@ -285,6 +288,11 @@ export default function App() {
     },
     { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
   )
+
+  const [confirmRegenAllOpen, setConfirmRegenAllOpen] = useState(false)
+  const [confirmRestoreDefaultOpen, setConfirmRestoreDefaultOpen] = useState(false)
+  const [confirmClearAllOpen, setConfirmClearAllOpen] = useState(false)
+
   const handleSelectDay = useCallback(
     (nextDayIndex: number) => {
       if (nextDayIndex === dayIndex) return
@@ -443,10 +451,6 @@ export default function App() {
 
   // (itineraryReady + missingForItinerary are now provided by useItineraryGeneration.)
 
-  const hero = useMemo(
-    () => buildHeroCopy(destination, tripDates, hotel, days),
-    [destination, tripDates, hotel, days],
-  )
   /** Detail overlay for trip chat: PlacePanel selection wins over hotel popup. */
   const tripChatViewing = useMemo((): TripChatViewingTarget | null => {
     if (selectedPlaceId && selectedPlaceId !== SELECTED_HOTEL_PLACE_ID) {
@@ -549,17 +553,16 @@ export default function App() {
   const lastDayNum = numberOfDays
 
   function handleResetAll() {
-    handleRegenerateItinerary()
+    setConfirmRegenAllOpen(true)
   }
 
   /** Wipe dates / flights / hotel / itinerary (+ caches) back to a blank trip. */
   function handleClearAllTripState() {
     if (readOnly) return
-    const ok = window.confirm(
-      '清空日期、航班、酒店与行程，回到初始空状态？此操作不可撤销。',
-    )
-    if (!ok) return
+    setConfirmClearAllOpen(true)
+  }
 
+  function doClearAllTripState() {
     suppressCopyRef.current = true
     cancelInFlightGeneration()
     tripInputsHydratedRef.current = false
@@ -832,7 +835,7 @@ export default function App() {
                           {canRestoreDefault && (
                             <button
                               type="button"
-                              onClick={handleRestoreDefault}
+                              onClick={() => setConfirmRestoreDefaultOpen(true)}
                               aria-label="恢复默认推荐"
                               title="恢复默认推荐"
                               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
@@ -1119,46 +1122,83 @@ export default function App() {
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="space-y-8 sm:space-y-10"
             >
-              <header className="relative overflow-hidden rounded-2xl border border-white/60 bg-[linear-gradient(135deg,rgba(28,36,32,0.92),rgba(74,99,86,0.88))] px-5 py-7 text-[var(--paper)] shadow-[var(--shadow)] sm:rounded-[28px] sm:px-10 sm:py-14">
+              <header className={`relative overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-6 sm:p-8 shadow-sm transition-all`}>
                 <div
-                  className="pointer-events-none absolute inset-0 opacity-35"
+                  className="pointer-events-none absolute inset-0 opacity-10"
                   style={{
                     backgroundImage:
                       'url(https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1600&q=60)',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    mixBlendMode: 'luminosity',
                   }}
                 />
-                <div className="relative max-w-2xl animate-fade-up">
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--gold)] sm:text-xs">
-                    {hero.eyebrow}
+                <div className="relative max-w-3xl animate-fade-up">
+                  <p className="text-xs uppercase tracking-[0.22em] text-[var(--copper)] font-semibold">
+                    TRIP SETUP · 出行预订
                   </p>
-                  <h1 className="font-display mt-2 text-[2rem] leading-[1.05] sm:text-5xl sm:leading-none md:text-6xl lg:text-7xl">
-                    {hero.title}
+                  <h1 className="font-display mt-1.5 text-2xl leading-tight text-[var(--ink)] sm:text-3xl lg:text-4xl">
+                    {destinationLabel(destination)} · 出行与预订
                   </h1>
-                  <p className="mt-3 max-w-lg text-sm text-[var(--paper)]/85 sm:mt-4 sm:text-base md:text-lg">
-                    {hero.blurb}
+                  <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
+                    设置旅行起止日期、确认往返航班时刻并挑选心仪住宿。三项就绪后即可生成或浏览每日行程。
                   </p>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs sm:mt-6 sm:text-sm">
-                    {hero.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-white/10 px-3 py-1 backdrop-blur">
-                        {tag}
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                    <span
+                      className={`${glassCapsuleSurfaceClass} ${
+                        tripDates ? glassCapsuleToneClass.blue : glassCapsuleToneClass.neutral
+                      } px-3 py-1 text-xs ${tripDates ? 'text-sky-800 font-medium' : 'text-[var(--stone)]'}`}
+                    >
+                      {tripDates
+                        ? `📅 ${tripDates.startDate} → ${tripDates.endDate} (${daysBetween(tripDates.startDate, tripDates.endDate)}天)`
+                        : '📅 日期待选'}
+                    </span>
+                    <span
+                      className={`${glassCapsuleSurfaceClass} ${
+                        flights.outbound || flights.returnFlight
+                          ? glassCapsuleToneClass.violet
+                          : glassCapsuleToneClass.neutral
+                      } px-3 py-1 text-xs ${
+                        flights.outbound || flights.returnFlight
+                          ? 'text-purple-900 font-medium'
+                          : 'text-[var(--stone)]'
+                      }`}
+                    >
+                      {flights.outbound && flights.returnFlight
+                        ? `✈️ 航班已录入 (${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber})`
+                        : flights.outbound
+                          ? `✈️ 去程 ${flights.outbound.flightNumber}`
+                          : flights.returnFlight
+                            ? `✈️ 返程 ${flights.returnFlight.flightNumber}`
+                            : '✈️ 航班待查'}
+                    </span>
+                    <span
+                      className={`${glassCapsuleSurfaceClass} ${
+                        isHotelSelected(hotel)
+                          ? glassCapsuleToneClass.gold
+                          : glassCapsuleToneClass.neutral
+                      } px-3 py-1 text-xs ${
+                        isHotelSelected(hotel)
+                          ? 'text-amber-900 font-medium'
+                          : 'text-[var(--stone)]'
+                      }`}
+                    >
+                      {isHotelSelected(hotel) ? `🏨 住宿：${hotel.name}` : '🏨 住宿待定'}
+                    </span>
+                    {itineraryReady && (
+                      <span
+                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-3 py-1 text-xs text-[var(--sage)] font-semibold`}
+                      >
+                        ✓ 出行信息已就绪
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
               </header>
 
-              <TripDatesPanel
-                key={`dates-${panelResetKey}-${syncRenderKey}`}
-                value={tripDates}
-                onChange={setTripDates}
-                readOnly={readOnly}
-              />
-              <FlightPanel
-                key={`flights-${panelResetKey}-${syncRenderKey}`}
+              <LogisticsTravelSection
+                key={`travel-${panelResetKey}-${syncRenderKey}`}
                 tripDates={tripDates}
+                onTripDatesChange={setTripDates}
                 destination={destination}
                 onFlightsChange={setFlights}
                 readOnly={readOnly}
@@ -1179,10 +1219,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => handleSelectTab('itinerary')}
-                    className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-8 py-3 text-sm font-medium text-[var(--paper)] shadow-lg hover:opacity-90 active:scale-95"
+                    className={`${glassCapsuleSurfaceClass} border-[var(--copper)]/30 bg-white/90 text-[var(--ink)] shadow-md inline-flex items-center gap-2 px-8 py-3.5 text-sm font-medium hover:bg-white active:scale-95 transition-all`}
                   >
-                    <CalendarDays size={16} />
-                    <span>查看已生成的每日行程 →</span>
+                    <CalendarDays size={17} className="text-[var(--copper)]" />
+                    <span>查看已规划的每日行程 →</span>
                   </button>
                 </div>
               )}
@@ -1272,6 +1312,39 @@ export default function App() {
           setRecommendationPreferences(saved)
         }}
         onClose={() => setRecommendationPreferencesOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmRegenAllOpen}
+        onClose={() => setConfirmRegenAllOpen(false)}
+        onConfirm={handleRegenerateItinerary}
+        title="重新生成全部行程"
+        description="确定要重新生成全部天数的行程吗？当前自定义调整与已选景点将被新生成的行程替换。"
+        confirmText="重新生成"
+        tone="sage"
+        icon="refresh"
+      />
+
+      <ConfirmDialog
+        open={confirmRestoreDefaultOpen}
+        onClose={() => setConfirmRestoreDefaultOpen(false)}
+        onConfirm={handleRestoreDefault}
+        title="恢复全部默认行程"
+        description="确定将全部行程恢复为初始默认推荐吗？当前所做的个性化调整将被重置。"
+        confirmText="恢复默认"
+        tone="warning"
+        icon="history"
+      />
+
+      <ConfirmDialog
+        open={confirmClearAllOpen}
+        onClose={() => setConfirmClearAllOpen(false)}
+        onConfirm={doClearAllTripState}
+        title="清空当前行程全部数据"
+        description="确定清空日期、航班、酒店与行程，回到初始空状态？此操作不可撤销。"
+        confirmText="清空全部"
+        tone="danger"
+        icon="trash"
       />
     </div>
   )

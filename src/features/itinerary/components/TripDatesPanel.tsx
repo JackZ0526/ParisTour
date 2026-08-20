@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   daysBetween,
   formatTripDayLabel,
@@ -6,6 +6,12 @@ import {
   type TripDateRange,
 } from '../services/tripDates'
 import { DateRangePicker } from './DateRangePicker'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+  glassCardSurfaceClass,
+} from '../../../shared/styles/glassCapsule'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 
 interface Props {
   value: TripDateRange | null
@@ -14,6 +20,7 @@ interface Props {
 }
 
 export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
   const startDate = value?.startDate || ''
   const endDate = value?.endDate || ''
 
@@ -52,8 +59,8 @@ export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
         {value && !readOnly && (
           <button
             type="button"
-            onClick={clearDates}
-            className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)]"
+            onClick={() => setConfirmClearOpen(true)}
+            className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-red-700 active:scale-95`}
           >
             清空日期
           </button>
@@ -61,7 +68,7 @@ export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
       </div>
 
       <div
-        className={`rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors ${
+        className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 transition-colors ${
           readOnly ? 'pointer-events-none opacity-80' : ''
         }`}
       >
@@ -87,6 +94,17 @@ export function TripDatesPanel({ value, onChange, readOnly = false }: Props) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        onConfirm={clearDates}
+        title="清空旅行日期"
+        description="确定清空旅行起止日期吗？相关的行程天数与航班时间对齐将恢复默认。"
+        confirmText="清空日期"
+        tone="danger"
+        icon="trash"
+      />
     </section>
   )
 }

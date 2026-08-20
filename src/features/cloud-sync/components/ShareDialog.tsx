@@ -11,6 +11,7 @@ import {
 } from '../services/tripCloud'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 type Props = {
@@ -121,9 +122,11 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     }
   }
 
-  async function onRemove(shareId: string) {
-    const row = shares.find((s) => s.id === shareId)
-    if (row && !window.confirm(`确定移除 ${row.invitee_email} 的访问权限吗？`)) return
+  const [pendingRemoveShare, setPendingRemoveShare] = useState<TripShareRow | null>(null)
+
+  async function executeRemove() {
+    if (!pendingRemoveShare) return
+    const shareId = pendingRemoveShare.id
     setBusy(true)
     setError(null)
     setInfo(null)
@@ -134,6 +137,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       setError(err instanceof Error ? err.message : '移除成员失败')
     } finally {
       setBusy(false)
+      setPendingRemoveShare(null)
     }
   }
 
@@ -291,7 +295,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void onRemove(s.id)}
+                          onClick={() => setPendingRemoveShare(s)}
                           className="px-2 py-1.5 text-xs text-[var(--copper)] transition hover:underline disabled:opacity-50"
                         >
                           移除
@@ -305,6 +309,17 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
           </motion.div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingRemoveShare)}
+        onClose={() => setPendingRemoveShare(null)}
+        onConfirm={executeRemove}
+        title="移除协作者"
+        description={`确定移除「${pendingRemoveShare?.invitee_email || '该成员'}」对当前行程的协作权限吗？`}
+        confirmText="移除"
+        tone="danger"
+        icon="trash"
+      />
     </BottomSheet>
   )
 }

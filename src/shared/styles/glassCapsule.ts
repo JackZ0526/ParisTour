@@ -33,4 +33,4 @@ export const glassModalSurfaceClass =
 
 /** Shared floating dropdown / popover glass surface. */
 export const glassPopoverSurfaceClass =
-  "relative overflow-hidden rounded-2xl border border-white/90 bg-white/85 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+  "overflow-hidden rounded-2xl border border-white/90 bg-white/90 shadow-[0_16px_40px_rgba(0,0,0,0.14),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"

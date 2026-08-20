@@ -7,6 +7,7 @@ import {
 } from '../services/tripCloud'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import {
   glassCardSurfaceClass,
   glassModalSurfaceClass,
@@ -106,13 +107,11 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     }
   }, [open, tripId])
 
-  async function restore(backup: TripSnapshotBackup) {
-    if (restoringId) return
-    const ok = window.confirm(
-      `确定恢复此备份（${formatBackupTime(backup.createdAt)}）吗？\n当前未保存的临时改动将被覆盖。`,
-    )
-    if (!ok) return
+  const [pendingRestoreBackup, setPendingRestoreBackup] = useState<TripSnapshotBackup | null>(null)
 
+  async function executeRestore() {
+    if (!pendingRestoreBackup || restoringId) return
+    const backup = pendingRestoreBackup
     setRestoringId(backup.id)
     setError(null)
     try {
@@ -122,7 +121,14 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : '恢复存档失败')
       setRestoringId(null)
+    } finally {
+      setPendingRestoreBackup(null)
     }
+  }
+
+  function restore(backup: TripSnapshotBackup) {
+    if (restoringId) return
+    setPendingRestoreBackup(backup)
   }
 
   return (
@@ -230,6 +236,17 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
           )}
         </AnimatePresence>
       </motion.div>
+
+      <ConfirmDialog
+        open={Boolean(pendingRestoreBackup)}
+        onClose={() => setPendingRestoreBackup(null)}
+        onConfirm={executeRestore}
+        title="恢复云端存档"
+        description={`确定恢复此备份（${pendingRestoreBackup ? formatBackupTime(pendingRestoreBackup.createdAt) : ''}）吗？当前未保存的本地改动将被覆盖。`}
+        confirmText="恢复备份"
+        tone="warning"
+        icon="history"
+      />
     </BottomSheet>
   )
 }

@@ -8,6 +8,7 @@ import {
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import type { DestinationSuggestion } from '../../../shared/services/llm/llm'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 
 interface Props {
   value: string
@@ -20,6 +21,7 @@ export function DestinationPanel({ value, onChange }: Props) {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshBatch, setRefreshBatch] = useState(1)
   const [chipSource, setChipSource] = useState<'cache' | 'llm' | 'fallback' | null>(null)
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function DestinationPanel({ value, onChange }: Props) {
         {trimmed && (
           <button
             type="button"
-            onClick={clearDestination}
+            onClick={() => setConfirmClearOpen(true)}
             className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)]"
           >
             清空目的地
@@ -196,6 +198,17 @@ export function DestinationPanel({ value, onChange }: Props) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        onConfirm={clearDestination}
+        title="清空目的地"
+        description="确定清空当前选中的目的地吗？"
+        confirmText="清空"
+        tone="warning"
+        icon="alert"
+      />
     </section>
   )
 }

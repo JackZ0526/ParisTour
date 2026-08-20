@@ -3,7 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
 import { useReducedMotion } from '../../../shared/hooks/useReducedMotion'
-import { glassPopoverSurfaceClass } from '../../../shared/styles/glassCapsule'
+import {
+  glassPopoverSurfaceClass,
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 
 export interface DateRangeValue {
   startDate: string
@@ -207,17 +211,17 @@ export function DateRangePicker({
 
   const reduce = useReducedMotion()
   const popoverAnim = {
-    initial: { opacity: 0, scaleY: 0.78, scaleX: 0.95, y: -8 },
-    animate: { opacity: 1, scaleY: 1, scaleX: 1, y: 0 },
-    exit: { opacity: 0, scaleY: 0.82, scaleX: 0.95, y: -6 },
+    initial: { opacity: 0, y: -6 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -4 },
     transition: reduce
       ? { duration: 0.01 }
-      : { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const },
+      : { duration: 0.16, ease: [0.16, 1, 0.3, 1] as const },
   }
 
   const monthSlideVariants = {
     enter: (direction: number) => ({
-      x: direction > 0 ? 28 : -28,
+      x: direction > 0 ? 24 : -24,
       opacity: 0,
     }),
     center: {
@@ -225,13 +229,13 @@ export function DateRangePicker({
       opacity: 1,
     },
     exit: (direction: number) => ({
-      x: direction > 0 ? -28 : 28,
+      x: direction > 0 ? -24 : 24,
       opacity: 0,
     }),
   }
 
   return (
-    <div ref={rootRef} className="relative block text-sm">
+    <div ref={rootRef} className={`relative block text-sm ${open ? 'z-50' : 'z-30'}`}>
       {label && (
         <label htmlFor={id} className="text-[var(--stone)]">
           {label}
@@ -244,16 +248,16 @@ export function DateRangePicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={[
-          'mt-1 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2.5 text-left outline-none transition',
+          'mt-1 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/85 px-3.5 py-2.5 text-left outline-none transition backdrop-blur-md shadow-xs',
           open
-            ? 'border-[var(--sage)] shadow-[0_0_0_3px_rgba(74,99,86,0.12)]'
+            ? 'border-[var(--sage)] shadow-[0_0_0_3px_rgba(74,99,86,0.14)]'
             : 'border-[var(--mist)] hover:border-[var(--sage)]/60 focus:border-[var(--sage)]',
         ].join(' ')}
       >
-        <span className={hasCommitted ? 'text-[var(--ink)]' : 'text-[var(--stone)]'}>
+        <span className={hasCommitted ? 'text-[var(--ink)] font-medium' : 'text-[var(--stone)]'}>
           {displayText}
         </span>
-        <CalendarDays className="h-4 w-4 shrink-0 text-[var(--sage)]" strokeWidth={1.6} aria-hidden />
+        <CalendarDays className="h-4 w-4 shrink-0 text-[var(--copper)]" strokeWidth={1.75} aria-hidden />
       </button>
 
       <AnimatePresence>
@@ -265,116 +269,154 @@ export function DateRangePicker({
             animate={popoverAnim.animate}
             exit={popoverAnim.exit}
             transition={popoverAnim.transition}
-            style={{ transformOrigin: 'top left' }}
-            className={`absolute left-0 z-40 mt-2 w-[min(100%,20rem)] ${glassPopoverSurfaceClass} p-3`}
+            className={`absolute left-0 top-full z-[60] mt-2 w-[min(100%,21rem)] ${glassPopoverSurfaceClass} p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04)]`}
           >
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              aria-label="上一个月"
-              onClick={() => shiftMonth(-1)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--sage)] transition hover:bg-[var(--sage)]/10"
-            >
-              <ChevronLeft size={17} aria-hidden />
-            </button>
-            <p className="font-display text-lg tracking-wide text-[var(--ink)]">
-              {monthLabel(viewY, viewM)}
-            </p>
-            <button
-              type="button"
-              aria-label="下一个月"
-              onClick={() => shiftMonth(1)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--sage)] transition hover:bg-[var(--sage)]/10"
-            >
-              <ChevronRight size={17} aria-hidden />
-            </button>
-          </div>
-
-          <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-xs text-[var(--stone)]">
-            {WEEKDAYS.map((w) => (
-              <div key={w} className="py-1 font-medium">
-                {w}
-              </div>
-            ))}
-          </div>
-
-          <div className="relative overflow-hidden" style={{ minHeight: '190px' }}>
-            <AnimatePresence mode="popLayout" custom={monthSlideDirection} initial={false}>
-              <motion.div
-                key={`${viewY}-${viewM}`}
-                custom={monthSlideDirection}
-                variants={monthSlideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={
-                  reduce
-                    ? { duration: 0.01 }
-                    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-                }
-                className="grid grid-cols-7 gap-y-0.5"
-                onMouseLeave={() => setHoverIso(null)}
+            {/* Calendar Month Header */}
+            <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
+              <button
+                type="button"
+                aria-label="上一个月"
+                onClick={() => shiftMonth(-1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 bg-white/70 text-[var(--stone)] shadow-xs transition-colors hover:bg-white hover:text-[var(--ink)] active:scale-95"
               >
-                {cells.map((cell, i) => {
-                  if (!cell) {
-                    return <div key={`e-${i}`} className="aspect-square" />
+                <ChevronLeft size={15} aria-hidden />
+              </button>
+              <p className="font-display text-base font-semibold tracking-wide text-[var(--ink)]">
+                {monthLabel(viewY, viewM)}
+              </p>
+              <button
+                type="button"
+                aria-label="下一个月"
+                onClick={() => shiftMonth(1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 bg-white/70 text-[var(--stone)] shadow-xs transition-colors hover:bg-white hover:text-[var(--ink)] active:scale-95"
+              >
+                <ChevronRight size={15} aria-hidden />
+              </button>
+            </div>
+
+            {/* Weekdays Row */}
+            <div className="mb-1.5 grid grid-cols-7 text-center text-[11px] font-semibold text-[var(--stone)]">
+              {WEEKDAYS.map((w) => (
+                <div key={w} className="py-1">
+                  {w}
+                </div>
+              ))}
+            </div>
+
+            {/* Date Grid with Smooth Animated Height Container */}
+            <motion.div
+              layout
+              transition={
+                reduce
+                  ? { duration: 0.01 }
+                  : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
+              }
+              className="relative overflow-hidden"
+            >
+              <AnimatePresence mode="popLayout" custom={monthSlideDirection} initial={false}>
+                <motion.div
+                  key={`${viewY}-${viewM}`}
+                  custom={monthSlideDirection}
+                  variants={monthSlideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={
+                    reduce
+                      ? { duration: 0.01 }
+                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
                   }
-                  const { isStart, isEnd, inRange, isToday } = dayTone(cell.iso)
-                  const hasSpan = Boolean(rangeStart && rangeEnd && rangeStart !== rangeEnd)
-                  const railClass = !hasSpan
-                    ? ''
-                    : inRange
-                      ? 'bg-[var(--sage)]/12'
-                      : isStart
-                        ? 'rounded-l-xl bg-[var(--sage)]/12'
-                        : isEnd
-                          ? 'rounded-r-xl bg-[var(--sage)]/12'
-                          : ''
+                  className="grid grid-cols-7 gap-y-1"
+                  onMouseLeave={() => setHoverIso(null)}
+                >
+                  {cells.map((cell, i) => {
+                    if (!cell) {
+                      return <div key={`e-${i}`} className="aspect-square" />
+                    }
+                    const colIndex = i % 7
+                    const { isStart, isEnd, inRange, isToday } = dayTone(cell.iso)
+                    const hasSpan = Boolean(rangeStart && rangeEnd && rangeStart !== rangeEnd)
 
-                  return (
-                    <div
-                      key={cell.iso}
-                      className={['relative aspect-square', railClass].filter(Boolean).join(' ')}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => selectDay(cell.iso)}
-                        onMouseEnter={() => {
-                          if (pickingEnd) setHoverIso(cell.iso)
-                        }}
-                        className={[
-                          'relative z-[1] flex h-full w-full items-center justify-center rounded-xl text-sm transition outline-none',
-                          'hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
-                          isStart
-                            ? 'bg-[var(--copper)] font-medium text-[var(--paper)] hover:bg-[var(--copper)]'
-                            : isEnd
-                              ? 'bg-[var(--sage)] font-medium text-[var(--paper)] hover:bg-[var(--sage)]'
-                              : inRange
-                                ? 'text-[var(--ink)] hover:bg-[var(--sage)]/18'
-                                : isToday
-                                  ? 'font-medium text-[var(--sage)] ring-1 ring-[var(--sage)]/35'
-                                  : 'text-[var(--ink)]',
-                        ].join(' ')}
+                    return (
+                      <div
+                        key={cell.iso}
+                        className="relative aspect-square flex items-center justify-center"
                       >
-                        {cell.day}
-                      </button>
-                    </div>
-                  )
-                })}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+                        {/* Range Connector Ribbon Strip */}
+                        {hasSpan && (
+                          <>
+                            {isStart && (
+                              <div
+                                className="pointer-events-none absolute inset-y-1.5 left-1/2 right-0 bg-[#e7efe9]/90 z-0"
+                              />
+                            )}
+                            {isEnd && (
+                              <div
+                                className="pointer-events-none absolute inset-y-1.5 left-0 right-1/2 bg-[#e7efe9]/90 z-0"
+                              />
+                            )}
+                            {inRange && (
+                              <div
+                                className={`pointer-events-none absolute inset-y-1.5 inset-x-0 bg-[#e7efe9]/90 z-0 ${
+                                  colIndex === 0 ? 'rounded-l-full' : ''
+                                } ${colIndex === 6 ? 'rounded-r-full' : ''}`}
+                              />
+                            )}
+                          </>
+                        )}
 
-          <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[var(--stone)]">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-[var(--copper)]" />
-              出发
-              <span className="inline-block h-2 w-2 rounded-full bg-[var(--sage)]" />
-              返程
-            </span>
-            {hint && <span>{hint}</span>}
-          </div>
-        </motion.div>
+                        {/* Day Number Button */}
+                        <button
+                          type="button"
+                          onClick={() => selectDay(cell.iso)}
+                          onMouseEnter={() => {
+                            if (pickingEnd) setHoverIso(cell.iso)
+                          }}
+                          className={[
+                            'relative z-10 flex h-8 w-8 items-center justify-center rounded-full text-xs tabular-nums outline-none transition-colors duration-150',
+                            isStart
+                              ? 'bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(181,106,60,0.35)] ring-2 ring-white font-bold'
+                              : isEnd
+                                ? 'bg-[var(--sage)] text-white shadow-[0_2px_8px_rgba(74,99,86,0.35)] ring-2 ring-white font-bold'
+                                : inRange
+                                  ? 'text-[var(--ink)] font-semibold hover:bg-white/80'
+                                  : isToday
+                                    ? 'font-bold text-[var(--copper)] ring-1.5 ring-[var(--copper)]/50 bg-[var(--copper)]/8'
+                                    : 'text-[var(--ink)] font-medium hover:bg-black/5',
+                          ].join(' ')}
+                        >
+                          {cell.day}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </motion.div>
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Bottom Legend & Hint Footer */}
+            <motion.div
+              layout
+              transition={
+                reduce
+                  ? { duration: 0.01 }
+                  : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
+              }
+              className="mt-2.5 pt-2.5 border-t border-black/5 flex items-center justify-between gap-2 text-[11px] text-[var(--stone)] px-1"
+            >
+              <span className="inline-flex items-center gap-2">
+                <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--copper)] font-medium`}>
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--copper)]" />
+                  出发
+                </span>
+                <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--sage)] font-medium`}>
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
+                  返程
+                </span>
+              </span>
+              {hint && <span className="font-medium text-[var(--ink)]">{hint}</span>}
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

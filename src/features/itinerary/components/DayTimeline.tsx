@@ -60,6 +60,7 @@ import {
   type GoogleMapsTravelMode,
 } from '../../map/services/googleMapsDirectionsUrl'
 import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -582,6 +583,14 @@ export function DayTimeline({
   const [swapAnim, setSwapAnim] = useState<SwapAnim | null>(null)
   /** Pure reorder FLIP (assistant / any non-drag order change). */
   const [reorderFlip, setReorderFlip] = useState<ReorderFlip | null>(null)
+
+  const [confirmRegenDayOpen, setConfirmRegenDayOpen] = useState(false)
+  const [confirmRestoreDayOpen, setConfirmRestoreDayOpen] = useState(false)
+  const [pendingDeleteStop, setPendingDeleteStop] = useState<{
+    stopKey: string
+    liveIndex: number
+    name: string
+  } | null>(null)
 
   const dragRef = useRef<DragSession | null>(null)
   const pointerRef = useRef({ x: 0, y: 0 })
@@ -1526,7 +1535,7 @@ export function DayTimeline({
             {canRestoreDayDefault && onRestoreDayDefault && (
               <button
                 type="button"
-                onClick={onRestoreDayDefault}
+                onClick={() => setConfirmRestoreDayOpen(true)}
                 disabled={dayRegenerating || dayRestoring || dayPending}
                 title={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
                 aria-label={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
@@ -1538,7 +1547,7 @@ export function DayTimeline({
             )}
             <button
               type="button"
-              onClick={onResetDay}
+              onClick={() => setConfirmRegenDayOpen(true)}
               disabled={dayRegenerating || dayRestoring || dayPending}
               title={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
               aria-label={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
@@ -1903,7 +1912,11 @@ export function DayTimeline({
                   onClick={(e) => {
                     e.stopPropagation()
                     if (liveIndex == null) return
-                    requestDelete(stopKey, liveIndex)
+                    setPendingDeleteStop({
+                      stopKey,
+                      liveIndex,
+                      name: place.name,
+                    })
                   }}
                   className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/70 transition-colors hover:bg-red-500/10 hover:text-red-600 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                 >
@@ -2271,6 +2284,54 @@ export function DayTimeline({
             tripPlaceNames={tripPlaceNames}
             onClose={() => setAddOpen(false)}
             onAddCustom={handleAddCustomLocal}
+          />
+
+          <ConfirmDialog
+            open={confirmRegenDayOpen}
+            onClose={() => setConfirmRegenDayOpen(false)}
+            onConfirm={onResetDay}
+            title={`重新生成第 ${day.day} 天行程`}
+            description={`确定要重新生成第 ${day.day} 天（${day.title}）的行程吗？当天的排期与景点将被重新规划。`}
+            confirmText="重新生成"
+            tone="sage"
+            icon="refresh"
+          />
+
+          {onRestoreDayDefault && (
+            <ConfirmDialog
+              open={confirmRestoreDayOpen}
+              onClose={() => setConfirmRestoreDayOpen(false)}
+              onConfirm={onRestoreDayDefault}
+              title={`恢复第 ${day.day} 天默认推荐`}
+              description={`确定将第 ${day.day} 天（${day.title}）恢复为初始默认推荐吗？当天的个性化调整将被重置。`}
+              confirmText="恢复默认"
+              tone="warning"
+              icon="history"
+            />
+          )}
+
+          <ConfirmDialog
+            open={Boolean(pendingDeleteStop)}
+            onClose={() => setPendingDeleteStop(null)}
+            onConfirm={() => {
+              if (pendingDeleteStop) {
+                requestDelete(pendingDeleteStop.stopKey, pendingDeleteStop.liveIndex)
+                setPendingDeleteStop(null)
+              }
+            }}
+            title="删除地点"
+            description={
+              <span>
+                确定从第 {day.day} 天行程中删除{' '}
+                <strong className="font-semibold text-[var(--ink)]">
+                  「{pendingDeleteStop?.name || '此地点'}」
+                </strong>{' '}
+                吗？
+              </span>
+            }
+            confirmText="删除"
+            tone="danger"
+            icon="trash"
           />
         </>
       )}

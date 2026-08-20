@@ -35,6 +35,7 @@ import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/Load
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
+  glassCardSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 import {
   fetchBookingHotelFeaturedReviews,
@@ -89,6 +90,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { loadTripDates } from '../../itinerary/services/tripDates'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 
 interface Props {
   selected: SelectedHotel
@@ -2028,6 +2030,9 @@ export function HotelPicker({
   const dragHotelId = drag?.hotelId ?? null
   const dragging = Boolean(drag)
 
+  const [pendingDeleteHotel, setPendingDeleteHotel] = useState<HotelCandidate | null>(null)
+  const [pendingEliminateHotel, setPendingEliminateHotel] = useState<HotelCandidate | null>(null)
+
   /** 这个淘汰 / 删除：从列表移除 */
   function removeHotel(card: HotelCandidate) {
     const next = candidates.filter((c) => c.id !== card.id)
@@ -2050,7 +2055,7 @@ export function HotelPicker({
   function decideEliminate() {
     const card = popupCandidate
     if (!card || pendingCustom) return
-    removeHotel(card)
+    setPendingEliminateHotel(card)
   }
 
   const showEmpty = !candidates.length && !refreshing && !pendingCustom
@@ -2078,7 +2083,7 @@ export function HotelPicker({
               setRefreshPanel('choose')
             }}
             aria-busy={refreshing || undefined}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)] disabled:opacity-50"
+            className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--sage)] active:scale-95 disabled:opacity-50`}
           >
             {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
             {refreshing ? '推荐中…' : '换一批推荐'}
@@ -2087,12 +2092,12 @@ export function HotelPicker({
       </div>
 
       {refreshPanel && (
-        <div className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-colors">
+        <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 transition-all`}>
           {refreshPanel === 'choose' ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="font-medium">换一批推荐</p>
+                  <p className="font-medium text-base text-[var(--ink)]">换一批推荐</p>
                   <p className="mt-1 text-sm text-[var(--stone)]">
                     按你的喜好定制，或直接再换一批。
                   </p>
@@ -2106,15 +2111,15 @@ export function HotelPicker({
                   取消
                 </button>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   disabled={refreshing}
                   onClick={() => setRefreshPanel('prefer')}
-                  className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
+                  className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
                 >
-                  <p className="font-medium">说说我的喜好</p>
-                  <p className="mt-1 text-xs text-[var(--stone)]">
+                  <p className="font-medium text-[var(--ink)]">说说我的喜好</p>
+                  <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
                     填写区位、预算、氛围等要求后再推荐
                   </p>
                 </button>
@@ -2122,11 +2127,11 @@ export function HotelPicker({
                   type="button"
                   disabled={refreshing}
                   onClick={() => void runFreshRecommendations()}
-                  className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
+                  className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
                 >
-                  <p className="font-medium">交给命运</p>
-                  <p className="mt-1 text-xs text-[var(--stone)]">
-                    不设条件，随机再挑一批新酒店
+                  <p className="font-medium text-[var(--ink)]">直接再换一批</p>
+                  <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
+                    保留当前条件，重新生成一组推荐
                   </p>
                 </button>
               </div>
@@ -2135,7 +2140,7 @@ export function HotelPicker({
             <>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="font-medium">你的喜好与要求</p>
+                  <p className="font-medium text-base text-[var(--ink)]">你的喜好与要求</p>
                   <p className="mt-1 text-sm text-[var(--stone)]">
                     例如：左岸、地铁方便、中档、安静一点
                   </p>
@@ -2154,14 +2159,14 @@ export function HotelPicker({
                 onChange={(e) => setPreferText(e.target.value)}
                 rows={3}
                 placeholder="写下你对住宿的想法…"
-                className="mt-3 w-full resize-none rounded-xl border border-white/80 bg-white/70 p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] backdrop-blur-md"
+                className="mt-3 w-full resize-none rounded-2xl border border-white/80 bg-white/70 p-3.5 text-sm outline-none backdrop-blur-sm transition-all focus:border-[var(--copper)] focus:bg-white focus:shadow-sm"
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
                   disabled={refreshing}
                   onClick={() => setRefreshPanel(null)}
-                  className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm disabled:opacity-50"
+                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-4 py-2 text-xs text-[var(--stone)] transition-colors active:scale-95 disabled:opacity-50`}
                 >
                   取消
                 </button>
@@ -2170,7 +2175,7 @@ export function HotelPicker({
                   disabled={refreshing || !preferText.trim()}
                   onClick={() => void runFreshRecommendations(preferText)}
                   aria-busy={refreshing || undefined}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-50"
                 >
                   {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
                   {refreshing ? '推荐中…' : '按喜好推荐'}
@@ -2194,118 +2199,122 @@ export function HotelPicker({
         />
       )}
 
-      <div className="space-y-5">
-        <div className="space-y-2">
-          <h3 className="font-medium text-[var(--ink)]">当前选择的酒店</h3>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <AnimatePresence mode="wait">
-              {selectedCandidate ? (
-                <motion.div
-                  key={`selected-hotel-${selectedCandidate.id}`}
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  ref={currentSlotRef}
-                  className={`group relative overflow-hidden rounded-3xl border text-left shadow-[0_8px_30px_rgba(0,0,0,0.04)] ring-2 backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
-                    currentSlotDropReady
-                      ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
-                      : currentSlotHighlight
-                        ? 'border-[var(--copper)] ring-[var(--copper)]/50 bg-[var(--copper)]/5'
-                        : 'border-white/80 bg-white/80 ring-[var(--copper)]/30'
-                  }`}
-                >
-                  <div className="absolute right-2 top-2 z-10 flex gap-1.5">
-                    {selectedCandidate.source === 'custom' && (
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-[var(--stone)]">我的住宿</p>
+        <div className="mt-2 space-y-3">
+          <div className="grid gap-4 lg:grid-cols-12 items-stretch">
+            <div className="lg:col-span-7 xl:col-span-8 flex flex-col">
+              <AnimatePresence mode="wait">
+                {selectedCandidate ? (
+                  <motion.div
+                    key={`selected-hotel-${selectedCandidate.id}`}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    ref={currentSlotRef}
+                    className={`group relative flex-1 overflow-hidden rounded-3xl border text-left shadow-[0_8px_30px_rgba(0,0,0,0.04)] ring-2 backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                      currentSlotDropReady
+                        ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
+                        : currentSlotHighlight
+                          ? 'border-[var(--copper)] ring-[var(--copper)]/50 bg-[var(--copper)]/5'
+                          : 'border-white/80 bg-white/80 ring-[var(--copper)]/30'
+                    }`}
+                  >
+                    <div className="absolute right-2 top-2 z-10 flex gap-1.5">
+                      {selectedCandidate.source === 'custom' && (
+                        <button
+                          type="button"
+                          data-hotel-no-drag
+                          aria-label={`删除 ${selectedCandidate.name}`}
+                          title="删除自定义酒店"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setPendingDeleteHotel(selectedCandidate)
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
                       <button
                         type="button"
                         data-hotel-no-drag
-                        aria-label={`删除 ${selectedCandidate.name}`}
-                        title="删除自定义酒店"
+                        aria-label="取消当前选择"
+                        title="取消当前选择"
                         onClick={(e) => {
                           e.stopPropagation()
-                          removeHotel(selectedCandidate)
+                          clearCurrentSelection()
                         }}
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-[var(--copper)]"
                       >
-                        <TrashIcon />
+                        <UnselectIcon />
                       </button>
+                    </div>
+                    {currentSlotHighlight && (
+                      <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-[var(--sage)]/15">
+                        <span className="rounded-full bg-[var(--ink)]/80 px-3 py-1 text-sm text-[var(--paper)]">
+                          松开即可选择
+                        </span>
+                      </div>
                     )}
                     <button
                       type="button"
-                      data-hotel-no-drag
-                      aria-label="取消当前选择"
-                      title="取消当前选择"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        clearCurrentSelection()
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-[var(--copper)]"
+                      onClick={() => openHotelCard(selectedCandidate)}
+                      className="w-full text-left"
                     >
-                      <UnselectIcon />
+                      <HotelCardFace
+                        hotel={selectedCandidate}
+                        blurb={cardBlurbStream[selectedCandidate.id]}
+                        blurbLoading={
+                          needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
+                        }
+                      />
                     </button>
-                  </div>
-                  {currentSlotHighlight && (
-                    <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-[var(--sage)]/15">
-                      <span className="rounded-full bg-[var(--ink)]/80 px-3 py-1 text-sm text-[var(--paper)]">
-                        {currentSlotDropReady ? '松开以更换住宿' : '拖到此处更换'}
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => openHotelCard(selectedCandidate)}
-                    className="w-full text-left"
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="empty-hotel-slot"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    ref={currentSlotRef}
+                    className={`flex-1 flex flex-col justify-center rounded-3xl border border-dashed p-6 sm:p-8 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                      currentSlotDropReady
+                        ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
+                        : currentSlotHighlight
+                          ? 'border-[var(--copper)] bg-[var(--copper)]/10 ring-2 ring-[var(--copper)]/30'
+                          : 'border-[var(--copper)]/35 bg-white/60'
+                    }`}
                   >
-                    <HotelCardFace
-                      hotel={selectedCandidate}
-                      blurb={cardBlurbStream[selectedCandidate.id]}
-                      blurbLoading={
-                        needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
-                      }
-                    />
-                  </button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="empty-hotel-slot"
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  ref={currentSlotRef}
-                  className={`rounded-3xl border border-dashed p-5 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
-                    currentSlotDropReady
-                      ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
-                      : currentSlotHighlight
-                        ? 'border-[var(--copper)] bg-[var(--copper)]/10 ring-2 ring-[var(--copper)]/30'
-                        : 'border-[var(--copper)]/35 bg-white/60'
-                  }`}
-                >
-                  <p className="font-medium text-[var(--ink)]">
-                    {currentSlotHighlight ? '拖放到这里设为住宿' : '尚未选定住宿'}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--stone)]">
-                    {currentSlotHighlight
-                      ? '松开鼠标即可选择该酒店并开始行程安排。'
-                      : '可从下方拖拽酒店卡片到此处，或点开详情后选择「就住这儿了」。'}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    <p className="font-medium text-base text-[var(--ink)]">
+                      {currentSlotHighlight ? '拖放到这里设为住宿' : '尚未选定住宿'}
+                    </p>
+                    <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
+                      {currentSlotHighlight
+                        ? '松开鼠标即可选择该酒店并开始行程安排。'
+                        : '可从下方拖拽酒店卡片到此处，或点开详情后选择「就住这儿了」。'}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            <div className="rounded-3xl border border-dashed border-[var(--stone)]/30 bg-white/60 p-4 shadow-sm backdrop-blur-xl">
-              <p className="text-xs text-[var(--copper)]">自定义</p>
-              <p className="font-medium">输入我自己的酒店地址</p>
-              <p className="mt-1 text-xs text-[var(--stone)]">
-                生成后会打开详情页，再决定是否加入候选项
-              </p>
-              <div className="mt-3 flex flex-col gap-2">
+            <div className="lg:col-span-5 xl:col-span-4 rounded-3xl border border-dashed border-[var(--stone)]/30 bg-white/60 p-5 sm:p-6 shadow-sm backdrop-blur-xl flex flex-col justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--copper)] font-medium">自定义</p>
+                <p className="mt-1 font-medium text-base text-[var(--ink)]">输入我自己的酒店地址</p>
+                <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
+                  生成后会打开详情页，再决定是否加入候选项
+                </p>
+              </div>
+              <div className="mt-4 flex flex-col gap-2.5">
                 <input
                   value={customQuery}
                   onChange={(e) => setCustomQuery(e.target.value)}
                   placeholder="例如：25 Rue du Temple, 75004 Paris"
-                  className="w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
+                  className="w-full rounded-2xl border border-white/80 bg-white/70 px-3.5 py-2.5 text-sm outline-none backdrop-blur-sm transition-all focus:border-[var(--copper)] focus:bg-white focus:shadow-sm"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && customQuery.trim() && !loading) {
                       e.preventDefault()
@@ -2318,7 +2327,7 @@ export function HotelPicker({
                   disabled={loading || !customQuery.trim() || decidingCustom}
                   onClick={() => void applyCustom()}
                   aria-busy={loading || undefined}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2 text-sm text-[var(--paper)] disabled:opacity-50"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
                 >
                   {loading && <ButtonSpinner />}
                   {loading ? '生成卡片中…' : '生成酒店卡片'}
@@ -2341,7 +2350,7 @@ export function HotelPicker({
                 <button
                   type="button"
                   onClick={() => setOthersCollapsedAndPersist(!othersCollapsed)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/25 px-3 py-1.5 text-sm text-[var(--stone)] transition hover:border-[var(--sage)] hover:text-[var(--ink)]"
+                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
                 >
                   <ChevronIcon up={!othersCollapsed} />
                   {othersCollapsed
@@ -2386,7 +2395,7 @@ export function HotelPicker({
                           title="删除自定义酒店"
                           onClick={(e) => {
                             e.stopPropagation()
-                            removeHotel(hotel)
+                            setPendingDeleteHotel(hotel)
                           }}
                           className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
                         >
@@ -2567,6 +2576,54 @@ export function HotelPicker({
           ) : undefined
         }
         onClose={closeHotelPopup}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteHotel)}
+        onClose={() => setPendingDeleteHotel(null)}
+        onConfirm={() => {
+          if (pendingDeleteHotel) {
+            removeHotel(pendingDeleteHotel)
+            setPendingDeleteHotel(null)
+          }
+        }}
+        title="删除自定义酒店"
+        description={
+          <span>
+            确定删除自定义酒店{' '}
+            <strong className="font-semibold text-[var(--ink)]">
+              「{pendingDeleteHotel?.name || '此酒店'}」
+            </strong>{' '}
+            吗？
+          </span>
+        }
+        confirmText="删除"
+        tone="danger"
+        icon="trash"
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingEliminateHotel)}
+        onClose={() => setPendingEliminateHotel(null)}
+        onConfirm={() => {
+          if (pendingEliminateHotel) {
+            removeHotel(pendingEliminateHotel)
+            setPendingEliminateHotel(null)
+          }
+        }}
+        title="淘汰候选酒店"
+        description={
+          <span>
+            确定将{' '}
+            <strong className="font-semibold text-[var(--ink)]">
+              「{pendingEliminateHotel?.name || '此酒店'}」
+            </strong>{' '}
+            从候选列表中淘汰移除吗？
+          </span>
+        }
+        confirmText="淘汰移除"
+        tone="warning"
+        icon="alert"
       />
     </section>
   )
