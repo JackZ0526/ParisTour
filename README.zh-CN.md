@@ -71,17 +71,12 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- 浏览器（VITE_）---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_MAPS_API_KEY=  # 仅 Google Places 照片/embed；不加载行程地图
 # VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # 默认 DeepSeek 模型（或 deepseek-v4-pro）
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # 覆盖为 OpenAI 模型
 # VITE_LLM_ENABLED=true              # false 可隐藏 LLM 能力
 ```
 
-行程地图不再使用 Maps JavaScript API 或 Directions API。浏览器端 Google 密钥只用于 Google Places 照片/embed，请启用对应的 Places API，并加入这些 HTTP 引荐来源：
-
-- `http://127.0.0.1:5173/*`
-- `http://localhost:5173/*`
-- `https://paristour.vercel.app/*`
+行程地图使用 MapLibre GL 与 OpenStreetMap，路线规划由 openrouteservice（`OPENROUTESERVICE_API_KEY`）驱动。Google Places 地点搜索与照片均由服务端 `/api/google-places`（`GOOGLE_PLACES_API_KEY`）安全代理。
 
 本地若出现 Google Places 引荐来源错误，就是缺了上面某一条。道路连线需在 [HeiGIT](https://account.heigit.org/) 创建 openrouteservice 密钥，并仅保存为服务端变量 `OPENROUTESERVICE_API_KEY`。
 

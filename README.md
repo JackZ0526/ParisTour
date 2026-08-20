@@ -71,17 +71,12 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- Browser (VITE_) ---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_MAPS_API_KEY=  # Google Places photos/embed only; not used to load the itinerary map
 # VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # Default DeepSeek model (or deepseek-v4-pro)
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # Override default to an OpenAI model
 # VITE_LLM_ENABLED=true              # false hides LLM features
 ```
 
-The itinerary map does not use Maps JavaScript API or Directions API. The browser Google key is retained only for Google Places photos/embed; enable the matching Places API and add these HTTP referrers:
-
-- `http://127.0.0.1:5173/*`
-- `http://localhost:5173/*`
-- `https://paristour.vercel.app/*`
+The itinerary map uses MapLibre GL and OpenStreetMap, and road geometry is powered by openrouteservice (`OPENROUTESERVICE_API_KEY`). Google Places queries and photos are securely routed through server-side `/api/google-places` (`GOOGLE_PLACES_API_KEY`).
 
 A local Google Places referrer error usually means one of the above is missing. Create an openrouteservice key at [HeiGIT](https://account.heigit.org/) and store it only as the server-side `OPENROUTESERVICE_API_KEY`.
 
