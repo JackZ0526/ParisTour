@@ -7,7 +7,25 @@ import {
   type HTMLAttributeReferrerPolicy,
   type ReactNode,
 } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+
+const photoSlideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? '100%' : direction < 0 ? '-100%' : 0,
+    opacity: 0,
+    scale: 0.96,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    scale: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction < 0 ? '100%' : '-100%',
+    opacity: 0,
+    scale: 0.96,
+  }),
+}
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import {
   ChevronLeft,
@@ -329,20 +347,27 @@ function GalleryThumb({
       ref={buttonRef}
       type="button"
       onClick={onSelect}
-      whileTap={{ scale: 0.94 }}
+      whileTap={{ scale: 0.92 }}
+      animate={{
+        scale: selected ? 1.05 : 0.98,
+        opacity: selected ? 1 : 0.55,
+      }}
+      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
       style={animateIn ? { animationDelay: `${enterDelayMs}ms` } : undefined}
-      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-lg outline-none ${
-        animateIn ? 'place-gallery-thumb-enter' : ''
-      }`}
+      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-xl outline-none transition-shadow ${
+        selected
+          ? 'ring-2 ring-white ring-offset-2 ring-offset-black/20 shadow-md z-10'
+          : 'hover:opacity-85'
+      } ${animateIn ? 'place-gallery-thumb-enter' : ''}`}
     >
       <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
       {selected &&
         (animateIn ? (
-          <span className="absolute inset-0 z-10 rounded-lg border-2 border-[var(--copper)] shadow-sm pointer-events-none" />
+          <span className="absolute inset-0 z-10 rounded-xl border-2 border-[var(--copper)] shadow-sm pointer-events-none" />
         ) : (
           <motion.span
             layoutId="active-gallery-thumb-ring"
-            className="absolute inset-0 z-10 rounded-lg border-2 border-[var(--copper)] shadow-sm pointer-events-none"
+            className="absolute inset-0 z-10 rounded-xl border-2 border-[var(--copper)] shadow-sm pointer-events-none"
             transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
           />
         ))}
@@ -485,13 +510,10 @@ export function GooglePlacePage({
   const [llmZh, setLlmZh] = useState<string | null>(null)
   /** idle = not finished; loading = in flight; done = success or gave up */
   const [nameZhPhase, setNameZhPhase] = useState<'idle' | 'loading' | 'done'>('idle')
-  const swipeStartX = useRef<number | null>(null)
-  const swipeStartY = useRef<number | null>(null)
-  const swipeStartTime = useRef(0)
-  const swipeAxis = useRef<'h' | 'v' | null>(null)
+  const [photoDirection, setPhotoDirection] = useState(0)
+  const [isZoomed, setIsZoomed] = useState(false)
+  const lastTapTime = useRef(0)
   const heroRef = useRef<HTMLDivElement | null>(null)
-  const [swipeOffsetX, setSwipeOffsetX] = useState(0)
-  const [isDraggingHero, setIsDraggingHero] = useState(false)
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
   const thumbScrollReadyRef = useRef(false)
   const onDetailsResolvedRef = useRef(onDetailsResolved)
@@ -723,8 +745,10 @@ export function GooglePlacePage({
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 
   function stepPhoto(delta: number) {
+    setIsZoomed(false)
     if (delta < 0) {
       if (galleryLength < 2) return
+      setPhotoDirection(-1)
       setPhotoIndex((i) => (i - 1 + galleryLength) % galleryLength)
       return
     }
@@ -741,47 +765,15 @@ export function GooglePlacePage({
     }
 
     if (galleryLength < 2) return
+    setPhotoDirection(1)
     setPhotoIndex((i) => (i + 1) % galleryLength)
   }
 
-  function resetHeroDrag() {
-    swipeStartX.current = null
-    swipeStartY.current = null
-    swipeAxis.current = null
-    setIsDraggingHero(false)
-    setSwipeOffsetX(0)
-  }
-
-  function endHeroDrag(clientX: number, clientY: number, timeStamp: number) {
-    const startX = swipeStartX.current
-    const startY = swipeStartY.current
-    const axis = swipeAxis.current
-    swipeStartX.current = null
-    swipeStartY.current = null
-    swipeAxis.current = null
-    setIsDraggingHero(false)
-    setSwipeOffsetX(0)
-    if (
-      startX == null ||
-      startY == null ||
-      axis !== 'h' ||
-      !showGalleryNav ||
-      galleryLength < 2
-    ) {
-      return
-    }
-    const dx = clientX - startX
-    const dy = clientY - startY
-    const dt = Math.max(1, timeStamp - swipeStartTime.current)
-    const velocity = dx / dt // px / ms
-    const width = heroRef.current?.getBoundingClientRect().width || 1
-    const threshold = Math.max(24, width * 0.12)
-    const shouldAdvance =
-      Math.abs(dx) > threshold || Math.abs(velocity) > 0.25
-    if (!shouldAdvance) return
-    // Suppress unused-var warning while keeping diagnostics meaningful
-    void dy
-    stepPhoto(dx < 0 ? 1 : -1)
+  function selectPhoto(index: number) {
+    if (index === photoIndex) return
+    setIsZoomed(false)
+    setPhotoDirection(index > photoIndex ? 1 : -1)
+    setPhotoIndex(index)
   }
 
   const showGalleryNav =
@@ -1044,7 +1036,7 @@ export function GooglePlacePage({
       return
     }
     thumbRefs.current[photoIndex]?.scrollIntoView({
-      inline: 'nearest',
+      inline: 'center',
       block: 'nearest',
       behavior: 'smooth',
     })
@@ -1072,11 +1064,7 @@ export function GooglePlacePage({
 
   useEffect(() => {
     if (open) return
-    swipeStartX.current = null
-    swipeStartY.current = null
-    swipeAxis.current = null
-    setIsDraggingHero(false)
-    setSwipeOffsetX(0)
+    setIsZoomed(false)
   }, [open])
 
   useEffect(() => {
@@ -1693,49 +1681,6 @@ export function GooglePlacePage({
                 ref={heroRef}
                 className="relative h-[min(56vw,14rem)] overflow-hidden rounded-2xl bg-[var(--mist)] select-none [touch-action:pan-y] sm:h-72"
                 aria-busy={showPhotoShimmer || undefined}
-                onPointerDown={(e) => {
-                  if (!showGalleryNav) return
-                  if (e.pointerType === 'mouse' && e.button !== 0) return
-                  // Skip swipe on interactive children (nav buttons, attribution
-                  // links, etc.). Otherwise the pointer-capture would steal the
-                  // click meant for them.
-                  const target = e.target as HTMLElement | null
-                  if (target?.closest('button, a, [role="button"]')) return
-                  swipeStartX.current = e.clientX
-                  swipeStartY.current = e.clientY
-                  swipeStartTime.current = e.timeStamp
-                  swipeAxis.current = null
-                  try {
-                    e.currentTarget.setPointerCapture(e.pointerId)
-                  } catch {
-                    /* not capturable */
-                  }
-                }}
-                onPointerMove={(e) => {
-                  if (swipeStartX.current == null || swipeStartY.current == null) return
-                  if (!showGalleryNav) return
-                  const dx = e.clientX - swipeStartX.current
-                  const dy = e.clientY - swipeStartY.current
-                  if (swipeAxis.current == null) {
-                    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-                    swipeAxis.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
-                    if (swipeAxis.current !== 'h') {
-                      // Vertical intent — let ancestor scroll handle it.
-                      swipeStartX.current = null
-                      swipeStartY.current = null
-                      return
-                    }
-                    setIsDraggingHero(true)
-                  }
-                  if (swipeAxis.current !== 'h') return
-                  setSwipeOffsetX(dx)
-                }}
-                onPointerUp={(e) => {
-                  endHeroDrag(e.clientX, e.clientY, e.timeStamp)
-                }}
-                onPointerCancel={() => {
-                  resetHeroDrag()
-                }}
               >
                 <span
                   className={`absolute inset-0 z-[2] place-hero-shimmer motion-safe:transition-opacity motion-safe:duration-300 ${
@@ -1743,54 +1688,83 @@ export function GooglePlacePage({
                   }`}
                   aria-hidden
                 />
-                {displayPhoto ? (
-                  <>
-                    <img
-                      src={displayPhoto}
-                      alt=""
-                      aria-hidden
-                      className={`pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-2xl motion-safe:transition-opacity motion-safe:duration-300 ${
-                        heroReady ? 'opacity-80' : 'opacity-0'
-                      }`}
-                      style={{ transform: `translate3d(${swipeOffsetX}px, 0, 0)` }}
-                      referrerPolicy={photoReferrerPolicy(displayPhoto)}
-                      draggable={false}
-                      fetchPriority="low"
-                      decoding="async"
-                    />
-                    <span
-                      className={`pointer-events-none absolute inset-0 bg-white/25 motion-safe:transition-opacity motion-safe:duration-300 ${
-                        heroReady ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      aria-hidden
-                    />
-                    <img
-                      ref={heroImgRef}
-                      src={displayPhoto}
-                      alt={details?.name || name}
-                      className={`relative z-[1] h-full w-full object-contain ${
-                        isDraggingHero
-                          ? ''
-                          : 'motion-safe:transition-transform motion-safe:duration-200'
-                      } motion-safe:transition-opacity motion-safe:duration-300 ${
-                        heroReady ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      style={{ transform: `translate3d(${swipeOffsetX}px, 0, 0)` }}
-                      referrerPolicy={photoReferrerPolicy(displayPhoto)}
-                      draggable={false}
-                      fetchPriority="high"
-                      decoding="async"
-                      onLoad={() => setHeroReady(true)}
-                      onError={() =>
-                        setFailedPhotos((current) =>
-                          current.includes(displayPhoto)
-                            ? current
-                            : [...current, displayPhoto],
-                        )
-                      }
-                    />
-                  </>
-                ) : null}
+                <AnimatePresence initial={false} custom={photoDirection}>
+                  {displayPhoto ? (
+                    <motion.div
+                      key={displayPhoto}
+                      custom={photoDirection}
+                      variants={photoSlideVariants}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                      transition={{
+                        x: { type: 'spring', stiffness: 340, damping: 32, mass: 0.6 },
+                        opacity: { duration: 0.2 },
+                        scale: { duration: 0.2 },
+                      }}
+                      drag={showGalleryNav && galleryLength > 1 ? 'x' : false}
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0.22}
+                      dragDirectionLock
+                      onDragEnd={(_, { offset, velocity }) => {
+                        if (offset.x < -45 || velocity.x < -300) {
+                          stepPhoto(1)
+                        } else if (offset.x > 45 || velocity.x > 300) {
+                          stepPhoto(-1)
+                        }
+                      }}
+                      className="absolute inset-0 flex h-full w-full select-none items-center justify-center cursor-grab active:cursor-grabbing"
+                    >
+                      <img
+                        src={displayPhoto}
+                        alt=""
+                        aria-hidden
+                        className={`pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-2xl motion-safe:transition-opacity motion-safe:duration-300 ${
+                          heroReady ? 'opacity-80' : 'opacity-0'
+                        }`}
+                        referrerPolicy={photoReferrerPolicy(displayPhoto)}
+                        draggable={false}
+                      />
+                      <span
+                        className={`pointer-events-none absolute inset-0 bg-white/25 motion-safe:transition-opacity motion-safe:duration-300 ${
+                          heroReady ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        aria-hidden
+                      />
+                      <motion.img
+                        ref={heroImgRef}
+                        src={displayPhoto}
+                        alt={details?.name || name}
+                        animate={{ scale: isZoomed ? 2 : 1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        onDoubleClick={() => setIsZoomed((z) => !z)}
+                        onTouchEnd={(e) => {
+                          const now = Date.now()
+                          if (now - lastTapTime.current < 280) {
+                            e.preventDefault()
+                            setIsZoomed((z) => !z)
+                          }
+                          lastTapTime.current = now
+                        }}
+                        className={`relative z-[1] h-full w-full object-contain pointer-events-none select-none motion-safe:transition-opacity motion-safe:duration-300 ${
+                          heroReady ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        referrerPolicy={photoReferrerPolicy(displayPhoto)}
+                        draggable={false}
+                        fetchPriority="high"
+                        decoding="async"
+                        onLoad={() => setHeroReady(true)}
+                        onError={() =>
+                          setFailedPhotos((current) =>
+                            current.includes(displayPhoto)
+                              ? current
+                              : [...current, displayPhoto],
+                          )
+                        }
+                      />
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
                 {wikimediaPhoto && displayPhoto === wikimediaPhoto.url && heroReady && (
                   <a
                     href={wikimediaPhoto.sourcePage}
@@ -1821,7 +1795,7 @@ export function GooglePlacePage({
                       aria-label="上一张"
                       onClick={() => stepPhoto(-1)}
                       disabled={galleryLength < 2}
-                      className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-40"
+                      className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity hover:bg-black/65 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
                     >
                       <ChevronLeft size={16} strokeWidth={2.2} aria-hidden />
                     </button>
@@ -1830,12 +1804,22 @@ export function GooglePlacePage({
                       aria-label="下一张"
                       onClick={() => stepPhoto(1)}
                       disabled={bookingGalleryPhotosLoading}
-                      className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:opacity-60"
+                      className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity hover:bg-black/65 active:scale-95 disabled:opacity-60"
                     >
                       <ChevronRight size={16} strokeWidth={2.2} aria-hidden />
                     </button>
-                    <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/45 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
-                      {photoIndex + 1} / {galleryLength}
+                    <div className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-0.5 text-[11px] font-medium text-white shadow-sm backdrop-blur-md">
+                      <motion.span
+                        key={photoIndex}
+                        initial={{ opacity: 0.3, y: photoDirection >= 0 ? 3 : -3 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="tabular-nums font-semibold"
+                      >
+                        {photoIndex + 1}
+                      </motion.span>
+                      <span className="opacity-60">/</span>
+                      <span className="tabular-nums opacity-80">{galleryLength}</span>
                       {galleryVariant === 'booking' &&
                       !bookingPhotosFullyLoaded &&
                       onBookingGalleryAdvance
@@ -1853,7 +1837,7 @@ export function GooglePlacePage({
               <div className="min-h-0 overflow-hidden">
               {showThumbStrip ? (
                 <div
-                  className={`mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                  className={`mt-2 flex gap-2.5 overflow-x-auto px-1 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                     animateGalleryThumbs ? 'place-gallery-strip-enter' : ''
                   }`}
                 >
@@ -1864,7 +1848,7 @@ export function GooglePlacePage({
                         key={ref + i}
                         url={url}
                         selected={i === photoIndex}
-                        onSelect={() => setPhotoIndex(i)}
+                        onSelect={() => selectPhoto(i)}
                         animateIn={animateGalleryThumbs}
                         enterDelayMs={Math.min(i, 10) * 35}
                         onError={(failedUrl) =>
@@ -1903,7 +1887,7 @@ export function GooglePlacePage({
                       <GalleryThumb
                         url={displayPhoto}
                         selected
-                        onSelect={() => setPhotoIndex(0)}
+                        onSelect={() => selectPhoto(0)}
                         onError={(failedUrl) =>
                           setFailedPhotos((current) =>
                             current.includes(failedUrl)
