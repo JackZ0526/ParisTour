@@ -159,14 +159,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       ariaLabelledBy={titleId}
       className="flex max-h-[min(88vh,100dvh)] max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-2xl"
     >
-      <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-5 sm:px-6">
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-80"
-          style={{
-            background:
-              'radial-gradient(ellipse 70% 90% at 0% 0%, rgba(196,165,116,0.22), transparent 60%), radial-gradient(ellipse 50% 80% at 100% 0%, rgba(74,99,86,0.16), transparent 55%)',
-          }}
-        />
+      <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-2 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <h2 id={titleId} className="font-display text-2xl text-[var(--ink)]">
