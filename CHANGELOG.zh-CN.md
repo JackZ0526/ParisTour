@@ -22,122 +22,43 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
-- align global UI with unified liquid frosted glass design and polish navigation flow
-- lift chat bubble and model picker above bottom nav, and widen navigation bar
-- implement liquid flowing gradient border with realistic refractive light decay
-- refine border to ultra-fine hairline precision while preserving specular reflection
-- add realistic specular reflection highlights and prism sheen to navigation bar
-- enhance navigation bar white border and luminous glass rim highlight
-- open hotel details overlay in-place without navigating away from itinerary tab
-- unify global design system with light frosted glass cards, soft diffused shadows, and cohesive pill shapes
-- balance desktop header layout with quick tools and interactive user capsule
-- implement Profile Tab consolidating account, trip management, preferences, and reset actions
-- sync bottom nav and top segments slider animation with timeline/map dynamic stretch-and-squish spring physics
-- refine bottom nav to high-transparency semi-transparent frosted glass
-- update bottom nav and top segments to clean bright light frosted glass style
-- clean minimalist frosted glass for bottom nav and top segments
-- match iOS Liquid Glass reference with translucent tinted pill and quick action capsule
-- upgrade bottom nav to iOS 26 floating liquid glass style
-- implement Proposal 1 with native bottom navigation bar and multi-tab architecture
-- unify PlacePhotoGallery across AddPlaceDialog and GooglePlacePage with identical photo priority, drag gestures, and animations
-- upgrade PlaceGallery with iOS native drag gestures, slide transitions, and thumbnail auto-centering
-- fine-tune ApiRequestMeter expanded height to 438px for tight bottom padding
-- eliminate scrollbar in ApiRequestMeter and expand full details cleanly
-- complete comprehensive animation enhancements across timeline, map, hotel, flight, and system widgets
-- upgrade top-right mobile menu to two-stage morphing animation
-- synchronize status bar theme-color dynamically with modal backdrop
-- enable black-translucent status bar to sync backdrop seamlessly in safe-area
-- display X close button on desktop while retaining pull-down handle on mobile
-- add top pull-down handle indicator, remove X buttons, and match status bar backdrop color
-- synchronize modal backdrop opacity dynamically with sheet drag & dismissal animation
-- implement velocity-inherited spring physics for inertia-driven bottom sheet dismissal
-- add full-surface pull-down-to-dismiss drag gesture to all bottom sheets
-- iOS-style sliding pill via shared layoutId
-- same staged two-stage morph as chat panel
-- staged two-stage morph (width first, then height)
-- container transform FAB↔panel with iOS-style spring + tap squish
-- morph from button to popover via shared layoutId
-- add enter/exit animation to model picker popover
-- add enter/exit animation + outside-click close
-- lock to portrait + disable pinch zoom in standalone mode
-- 锁定 PWA 模式为竖屏，并禁用双指捏合缩放（iOS / Android 安装后的 app）。Android 由系统直接拒绝旋转；iOS 不遵守 manifest 的 `orientation`，所以加了一层柔和的全屏遮罩，提示用户把手机转回来，同时把背后内容模糊并冻结。
+- **全局流光毛玻璃设计系统（Liquid Frosted Glass）**：
+  - 统一建立 `glassCapsule.ts` 材质 Token 库，实现包括 `glassCardSurfaceClass`、`glassSageCardSurfaceClass`、`glassModalSurfaceClass`、`glassPopoverSurfaceClass` 与 `glassHandleSurfaceClass` 在内的流光毛玻璃质感。
+  - 全面升级全站弹窗与底部抽屉（备份、分享、偏好设置、添加地点、地点/酒店详情页）。
+  - 全面升级悬浮气泡选择器（日期、日期范围、时间选择器）。
+  - 地点/酒店详情页（`GooglePlacePage`）全面对齐流光毛玻璃规范，包含多色系评分与信息胶囊、透光评论卡片及保留鼠尾草浅绿调的行程顾问点评卡片。
+- **全新多 Tab 架构与原生浮动底部导航栏**：
+  - 重构主界面为多 Tab 架构，底部采用 iOS 质感浮动半透毛玻璃导航栏（**出行 · 行程 · 我的**）。
+  - 智能冷启动路由分流：首次打开/未配置行程时默认进入「出行」预订 Tab；已有行程时默认直接进入「行程」Tab。
+  - 顶部导航滑块与底栏指示器支持同频弹性形变与阻尼惯性动效。
+- **全新「我的」个人中心（Profile Tab）**：
+  - 统一整合当前登录账号状态、多行程创建与一键切换、云端备份与协作邀请、AI 行程偏好设置及数据重置管理。
+  - 统一右上角快捷账号胶囊外观，与全局导航风格完全对齐。
+- **全套 iOS 级物理动效与手势反馈**：
+  - **Framer Motion 弹性形变（Stretch-and-squish）**：应用于日程切换 Tab、行程/地图分段控制器及导航滑块。
+  - **双阶变形展开的行程助手（FAB）**：支持自底部悬浮按钮平滑向宽度与高度双向形变展开，并伴随按压挤压与触感回弹。
+  - **全屏手势下拉关闭（Pull-down-to-dismiss）**：所有 BottomSheet 抽屉支持触控速度继承的惯性下拉关闭，并配合无级平滑透明度衰减。
+  - **动态状态栏流光吸附**：PWA 模式下系统状态栏与遮罩层/弹窗颜色动态同步硬件加速混合。
+- **iOS 原生相册画廊与细节体验**：
+  - 地点画廊升级为原生滑动手势切换与缩略图自动居中，优化多图源加载优先级与流光预加载骨架。
+  - 锁定 PWA 模式为竖屏，并禁用双指捏合缩放（iOS / Android 安装后的 app）。Android 由系统直接拒绝旋转；iOS 不遵守 manifest 的 `orientation`，增加柔和全屏遮罩提示。
 
 ### 变更
 
-- upgrade FAB and model picker to luminous frosted glass with specular highlight
-- clean(ui): remove redundant logistics and preferences buttons from itinerary summary strip
-- remove deprecated VITE_GOOGLE_MAPS_API_KEY from env and documentation
-- extract unified BottomSheet shell component to standardize modals
-- standardize backdrop fade animation and pointer-events layering across all bottom sheets
-- add fluid ink blob animation with stretch physics to day tab switcher
-- add velocity stretch and squash deformation to mobile sliding pill
-- unfold date range picker popover from trigger box
-- hide mobile timeline/map toggle tabs on desktop side-by-side view
-- fade in chip text after closing animation settles
-- center model picker chip content on desktop
-- drop debug data attributes
-- debug(llm-picker): expose model/label via data-debug attributes
-- drop the modal, make it a popover anchored to the trigger
-- share Checkbox component, apply to preferences dialog
-- switch TripChatPanel enter/exit to AnimatePresence (sheet-bottom)
-- phase-2 — switch CloudSave toast + ApiRequest details panel to AnimatePresence
-- phase-1 — switch 7 sheet/dialog to AnimatePresence
-- phase-0 foundation
-- exp(animations): pilot Framer Motion on place sheet + LLM slider
-- polish(place-detail): mirror exit duration with entrance (420ms) so open/close read as one motion
-- polish(place-detail): use same easeOutQuint for open and close so exit reads as a visible retraction
-- polish(place-detail): keep exit mirror shape but clamp y-handles to [0,1] (no overshoot on exit)
-- polish(place-detail): make exit curve the mathematical time-reverse of the entrance curve
-- polish(place-detail): use clean ease-in curve so exit velocity keeps accelerating to end
-- polish(place-detail): mirror sheet exit easing (slow start, accelerating away) to oppose entrance
-- record PWA portrait lock + zoom fix in Unreleased
-- note iOS form reset layer fix in Unreleased
+- 移除多余的行程概览栏内嵌物流与偏好入口，统一收敛至多 Tab 导航与个人中心。
+- 提取统一的 `BottomSheet` 模态外壳组件，标准化全站所有弹层交互与触控手势。
+- 优化 API 请求计费面板（`ApiRequestMeter`）与模型选择器气泡的高级流光毛玻璃与弹窗高度适配。
 - iOS 表单元素的 reset 规则下放到 `@layer base`，让 Tailwind 的 `rounded-xl` 等工具类重新对 `<input>` / `<textarea>` / `<select>` 生效，表单字段跟着整体圆润设计走，不再被强制为方角。
 
 ### 修复
 
-- remove radial gradient artifact from share dialog header to fix color seam
-- polish tab state and trip metadata UI
-- silence flight card mount expand animation on initial load and keep luminous frosted glass fab
-- eliminate unwanted mount bounce on day tabs and timeline/map switcher when switching pages
-- eliminate hotel animation replay on tab switch, fix button overlap, and anchor chat morph to button
-- enable clicking hotel stop on timeline and summary strip to view hotel details
-- unify RecommendationPreferencesButton style with matching frosted white circle
-- eliminate thumbnail gray flicker and unmount underlying shimmer after image load
-- ensure place detail preview modal layers above AddPlaceDialog with overlayZIndex 2200
-- remove erroneous safe area padding from GooglePlacePage bottom sheet header
-- adjust top safe area padding to balanced 78px clearance
-- increase top padding to 95px to fully clear iOS 90px status bar blur scrim
-- adjust top safe area padding and make itinerary day tabs flow statically
-- align webmanifest theme and background colors with app light theme
-- ensure dragY resets to 0 whenever bottom sheet opens
-- use layered motion architecture to eliminate overscroll bounce while preserving 420ms slide-up animation
-- restore bottom sheet slide-up entrance animation by decoupling Framer Motion drag from style overrides
-- eliminate backdrop exit delay, restore synchronous AnimatePresence coordination, and clean status bar styling
-- remove abrupt meta theme-color flip to ensure smooth hardware-accelerated status bar blend
-- reset sheet y on open, extend backdrop to status bar area, and sync theme-color
-- dynamically transform backdrop backgroundColor to avoid Framer Motion opacity property collision
-- use non-passive native touch listener to reliably prevent browser rubberband overscroll
-- implement directional touch arbiter to eliminate content overscroll rubberband on sheet pull
-- eliminate page jumping and repeated fade-up animations on dialog close
-- fix TypeScript easing tuple type in DateRangePicker
-- initialize useMediaQuery synchronously to eliminate initial expansion flash
-- replace grid-rows 0fr with AnimatePresence to fix mobile layout bug
-- fix mobile popover initial height and prevent animation scrollbars
-- claim clients on new SW so cache fixes reach installed PWAs
-- separate backdrop fade from sheet slide
-- remove paper tint, anchor pill stacking
-- reset panelEntered via timer to prevent stuck overflow:hidden
-- hold overflow:hidden through every height retarget; clamp panel width to viewport
-- suppress scrollbar during opening morph
-- stack above chat button on mobile
-- align FAB and panel position, dial back spring
-- move AnimatePresence inside the portal so the enter animation actually runs
-- restore native checkbox visibility
-- revert fill bar to CSS for frame-perfect drag tracking
-- replace fake-portrait rotation with 'rotate back' overlay
-- drive portrait lock via JS class toggle (Tailwind v4 Lightning CSS rejects display-mode media queries)
-- move iOS form reset into @layer base so Tailwind rounded utilities win
+- 修复切换 Tab 时日期列表与地图切换指示块的意外挂载反弹。
+- 修复行程列表点击酒店项目与概览栏时可原地打开详情弹窗，无需跳转 Tab。
+- 修复地点详情画廊缩略图灰屏闪烁与占位流光卸载时机。
+- 修复顶部安全区距离（Safe Area Insets），适配 iOS 90px 状态栏毛玻璃遮罩。
+- 修复 BottomSheet 拖拽位移残留、多层手势冲突及浏览器默认弹性滚动的拦截问题。
+- 修复对话助手悬浮按钮在部分机型上的初始展开闪烁与滚动条溢出问题。
+- 修复分享弹窗顶部在暗色背景下的微弱径向渐变伪影。
 
 
 ## [0.6.0] - 2026-08-17
