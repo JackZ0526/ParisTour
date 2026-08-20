@@ -31,7 +31,7 @@ export function BottomNavBar({
       {/* High-transparency Semi-transparent Frosted Glass Capsule */}
       <nav
         aria-label="主要导航"
-        className="flex h-[58px] items-center justify-around gap-1 rounded-full border border-white/50 bg-white/35 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
+        className="flex h-[58px] items-center justify-around gap-1 rounded-full border-[1.5px] border-white/90 bg-white/40 p-1.5 shadow-[0_10px_32px_rgba(0,0,0,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.95)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
       >
         {TABS.map(({ id, label, Icon }) => {
           const isActive = activeTab === id
@@ -47,7 +47,7 @@ export function BottomNavBar({
               {isActive && (
                 <motion.div
                   layoutId="semi-translucent-active-pill"
-                  className="absolute inset-0 rounded-full border border-white/60 bg-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-md"
+                  className="absolute inset-0 rounded-full border-[1.5px] border-white/95 bg-white/70 shadow-[0_2px_10px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-md"
                   animate={{
                     scaleX: [1, 1.15, 0.95, 1],
                     scaleY: [1, 0.88, 1.04, 1],

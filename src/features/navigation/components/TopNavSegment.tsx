@@ -29,7 +29,7 @@ export function TopNavSegment({
     <div
       role="tablist"
       aria-label="主要导航"
-      className={`inline-flex items-center rounded-full border border-white/50 bg-white/35 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.06)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
+      className={`inline-flex items-center rounded-full border-[1.5px] border-white/90 bg-white/40 p-1.5 shadow-[0_10px_32px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.95)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
     >
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id
@@ -45,7 +45,7 @@ export function TopNavSegment({
             {isActive && (
               <motion.span
                 layoutId="light-top-nav-active-pill"
-                className="absolute inset-0 z-0 rounded-full border border-white/60 bg-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-md"
+                className="absolute inset-0 z-0 rounded-full border-[1.5px] border-white/95 bg-white/70 shadow-[0_2px_10px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-md"
                 animate={{
                   scaleX: [1, 1.15, 0.95, 1],
                   scaleY: [1, 0.88, 1.04, 1],
