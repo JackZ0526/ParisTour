@@ -29,7 +29,7 @@ export function TopNavSegment({
     <div
       role="tablist"
       aria-label="主要导航"
-      className={`inline-flex items-center rounded-full border border-black/5 bg-white/70 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.06)] backdrop-blur-2xl transition-colors dark:border-white/10 dark:bg-zinc-900/75 dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] ${className}`}
+      className={`inline-flex items-center rounded-full border border-white/80 bg-white/85 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] backdrop-blur-2xl transition-colors ${className}`}
     >
       {TABS.map(({ id, label, Icon }) => {
         const isActive = activeTab === id
@@ -44,8 +44,8 @@ export function TopNavSegment({
           >
             {isActive && (
               <motion.span
-                layoutId="top-nav-active-pill"
-                className="absolute inset-0 z-0 rounded-full bg-[var(--copper)]/12 dark:bg-[var(--copper)]/20"
+                layoutId="light-top-nav-active-pill"
+                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                 transition={{
                   type: 'spring',
                   stiffness: 480,
@@ -61,7 +61,7 @@ export function TopNavSegment({
               className={`relative z-10 transition-colors ${
                 isActive
                   ? 'text-[var(--copper)]'
-                  : 'text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200'
+                  : 'text-zinc-400 group-hover:text-zinc-700'
               }`}
             />
 
@@ -69,7 +69,7 @@ export function TopNavSegment({
               className={`relative z-10 transition-colors ${
                 isActive
                   ? 'font-semibold text-[var(--copper)]'
-                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-800'
               }`}
             >
               {label}

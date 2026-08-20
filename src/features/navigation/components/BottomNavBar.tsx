@@ -32,10 +32,10 @@ export function BottomNavBar({
       aria-label="悬浮导航栏"
       className="fixed bottom-[max(1.15rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[340px] select-none lg:hidden"
     >
-      {/* Clean Frosted Glass Capsule */}
+      {/* Light Frosted Glass Island */}
       <nav
         aria-label="主要导航"
-        className="flex h-[58px] items-center justify-between gap-1 rounded-full border border-black/5 bg-white/70 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-2xl transition-colors dark:border-white/10 dark:bg-zinc-900/75 dark:shadow-[0_12px_36px_rgba(0,0,0,0.4)]"
+        className="flex h-[58px] items-center justify-between gap-1 rounded-full border border-white/80 bg-white/85 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-2xl transition-colors"
       >
         {/* Navigation Tabs */}
         <div className="flex flex-1 items-center justify-around gap-1">
@@ -49,11 +49,11 @@ export function BottomNavBar({
                 whileTap={{ scale: 0.92 }}
                 className="relative flex h-[46px] flex-1 items-center justify-center rounded-full outline-none transition-colors"
               >
-                {/* Clean Translucent Active Pill */}
+                {/* Light Crisp White Active Floating Pill */}
                 {isActive && (
                   <motion.div
-                    layoutId="clean-frosted-active-pill"
-                    className="absolute inset-0 rounded-full bg-[var(--copper)]/12 dark:bg-[var(--copper)]/20"
+                    layoutId="light-frosted-active-pill"
+                    className="absolute inset-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                     transition={{
                       type: 'spring',
                       stiffness: 480,
@@ -68,7 +68,7 @@ export function BottomNavBar({
                   <div className="relative">
                     <motion.div
                       animate={{
-                        scale: isActive ? 1.05 : 1,
+                        scale: isActive ? 1.06 : 1,
                       }}
                       transition={{ type: 'spring', stiffness: 450, damping: 28 }}
                     >
@@ -78,12 +78,12 @@ export function BottomNavBar({
                         className={
                           isActive
                             ? 'text-[var(--copper)]'
-                            : 'text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            : 'text-zinc-400 transition-colors hover:text-zinc-700'
                         }
                       />
                     </motion.div>
 
-                    {/* Setup / Unread indicator dot */}
+                    {/* Setup indicator dot */}
                     {id === 'logistics' && !itineraryReady && (
                       <span className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--copper)]" />
                     )}
@@ -94,10 +94,10 @@ export function BottomNavBar({
                   </div>
 
                   <span
-                    className={`text-[10px] tracking-tight transition-colors ${
+                    className={`text-[10.5px] tracking-tight transition-colors ${
                       isActive
                         ? 'font-semibold text-[var(--copper)]'
-                        : 'font-medium text-zinc-500 dark:text-zinc-400'
+                        : 'font-medium text-zinc-400'
                     }`}
                   >
                     {label}
@@ -108,7 +108,7 @@ export function BottomNavBar({
           })}
         </div>
 
-        {/* Right Preferences Button */}
+        {/* Right Preferences Button (Light Frosted Circle) */}
         {onOpenPreferences && (
           <motion.button
             type="button"
@@ -116,7 +116,7 @@ export function BottomNavBar({
             whileTap={{ scale: 0.9 }}
             title="偏好设置"
             aria-label="偏好设置"
-            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-zinc-600 transition-colors hover:bg-black/[0.08] hover:text-zinc-900 active:bg-black/[0.12] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
+            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full border border-black/[0.04] bg-white/70 text-zinc-500 shadow-sm transition-all hover:bg-white hover:text-zinc-800 active:bg-white"
           >
             <SlidersHorizontal size={16} strokeWidth={1.9} />
           </motion.button>
