@@ -325,10 +325,10 @@ export function FlightPanel({
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       </div>
 
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {hasCards && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
+            initial={false}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{
@@ -338,7 +338,7 @@ export function FlightPanel({
             className="overflow-hidden"
           >
             <div className="grid gap-4 lg:grid-cols-2">
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence mode="popLayout" initial={false}>
                 {outbound && (
                   <motion.div
                     key={`flight-outbound-${outbound.flightNumber}`}
