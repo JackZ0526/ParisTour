@@ -61,14 +61,20 @@ const options: Array<{
   },
 ]
 
-export function RecommendationPreferencesButton({ onClick }: { onClick: () => void }) {
+export function RecommendationPreferencesButton({
+  onClick,
+  className = 'inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95',
+}: {
+  onClick: () => void
+  className?: string
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label="推荐偏好"
       title="推荐偏好"
-      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)]"
+      className={className}
     >
       <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} aria-hidden />
     </button>
