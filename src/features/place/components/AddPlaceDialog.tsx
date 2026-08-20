@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
@@ -41,6 +40,8 @@ import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { PlaceName } from './PlaceName'
+import { PlacePhotoGallery } from './PlacePhotoGallery'
+import type { PlaceInfoSource } from '../services/placeSource'
 import {
   fetchWikimediaPlacePhoto,
   type WikimediaPlacePhoto,
@@ -126,6 +127,7 @@ export function AddPlaceDialog({
   >({})
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
+  const [sourceByKey, setSourceByKey] = useState<Record<string, PlaceInfoSource | null>>({})
   const [wikimediaByKey, setWikimediaByKey] = useState<
     Record<string, WikimediaPlacePhoto>
   >({})
@@ -133,8 +135,6 @@ export function AddPlaceDialog({
   const [photoIndexByKey, setPhotoIndexByKey] = useState<Record<string, number>>({})
   const chromeRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
-  const photoSwipeStartX = useRef<number | null>(null)
-  const thumbRefsByKey = useRef<Record<string, (HTMLButtonElement | null)[]>>({})
   const recommendationsRef = useRef<PlaceRecommendation[]>([])
   const recBatchesRef = useRef<Record<RecommendPlaceType, number>>({
     attraction: 1,
@@ -146,16 +146,6 @@ export function AddPlaceDialog({
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
   const [tabsInteractive, setTabsInteractive] = useState(false)
-
-  const expandedPhotoIndex = expandedKey ? photoIndexByKey[expandedKey] || 0 : 0
-  useEffect(() => {
-    if (!expandedKey) return
-    thumbRefsByKey.current[expandedKey]?.[expandedPhotoIndex]?.scrollIntoView({
-      inline: 'nearest',
-      block: 'nearest',
-      behavior: 'smooth',
-    })
-  }, [expandedKey, expandedPhotoIndex])
 
   // Reset height and tab animation gate when the sheet closes so reopen doesn't tween from stale size or fly in.
   useLayoutEffect(() => {
@@ -556,17 +546,6 @@ export function AddPlaceDialog({
     return `${item.type}:${item.name}`
   }
 
-  function stepPhoto(key: string, photoCount: number, delta: number) {
-    if (photoCount < 2) return
-    setPhotoIndexByKey((prev) => {
-      const current = prev[key] || 0
-      return {
-        ...prev,
-        [key]: (current + delta + photoCount) % photoCount,
-      }
-    })
-  }
-
   async function ensureDetails(item: PlaceRecommendation) {
     const key = itemKey(item)
     if (detailsByKey[key] !== undefined) return detailsByKey[key]
@@ -583,6 +562,22 @@ export function AddPlaceDialog({
       const details = await fetchGooglePlaceDetails(query, undefined, {
         placeId: item.googlePlaceId,
       })
+
+      const isRestaurantOrCafe = item.type === 'restaurant' || item.type === 'cafe'
+
+      // 1. Tripadvisor photos for restaurant/cafe
+      let tripadvisorPhotos: string[] = []
+      if (isRestaurantOrCafe) {
+        tripadvisorPhotos = (
+          await fetchTripadvisorPlaceGallery({
+            name: details?.name || item.name,
+            nameLocal: details?.nameOriginal || item.nameLocal,
+            type: item.type,
+          }).catch(() => null)
+        )?.photos || []
+      }
+
+      // 2. Official Website photos
       const websitePhotos = (
         await fetchPlaceWebsitePhotosWithFallback({
           website: details?.website,
@@ -591,33 +586,53 @@ export function AddPlaceDialog({
           address: details?.address,
         }).catch(() => ({ photos: [] }))
       ).photos
-      const tripadvisorPhotos =
-        !websitePhotos.length && (item.type === 'restaurant' || item.type === 'cafe')
-          ? (
-              await fetchTripadvisorPlaceGallery({
-                name: details?.name || item.name,
-                nameLocal: details?.nameOriginal || item.nameLocal,
-                type: item.type,
-              }).catch(() => null)
-            )?.photos || []
-          : []
-      const displayPhotos = websitePhotos.length ? websitePhotos : tripadvisorPhotos
-      const detailsWithPhotos = details
+
+      // 3. Resolve source and photos using identical priority as GooglePlacePage
+      let displayPhotos: string[] = []
+      let source: PlaceInfoSource | null = null
+
+      if (isRestaurantOrCafe) {
+        if (tripadvisorPhotos.length) {
+          displayPhotos = tripadvisorPhotos
+          source = 'tripadvisor'
+        } else if (websitePhotos.length) {
+          displayPhotos = websitePhotos
+          source = 'website'
+        } else if (details?.photos?.length) {
+          displayPhotos = details.photos
+          source = 'google'
+        }
+      } else {
+        if (details?.photos?.length) {
+          displayPhotos = details.photos
+          source = 'google'
+        } else if (websitePhotos.length) {
+          displayPhotos = websitePhotos
+          source = 'website'
+        }
+      }
+
+      // 4. Wikimedia fallback for attractions
+      let wikimedia: WikimediaPlacePhoto | null = null
+      if (!displayPhotos.length && item.type === 'attraction' && details?.location) {
+        wikimedia = await fetchWikimediaPlacePhoto(
+          details.name || item.name,
+          details.location,
+        )
+        if (wikimedia?.url) {
+          displayPhotos = [wikimedia.url]
+          source = 'wikimedia'
+        }
+      }
+
+      const resolved = details
         ? { ...details, photos: displayPhotos }
         : details
-      const hasDisplayPhotos = Boolean(detailsWithPhotos?.photos?.length)
-      const wikimedia =
-        !hasDisplayPhotos && item.type === 'attraction' && detailsWithPhotos?.location
-          ? await fetchWikimediaPlacePhoto(
-              detailsWithPhotos.name || item.name,
-              detailsWithPhotos.location,
-            )
-          : null
-      const resolved =
-        detailsWithPhotos && wikimedia && !hasDisplayPhotos
-          ? { ...detailsWithPhotos, photos: [wikimedia.url] }
-          : detailsWithPhotos
+
       setDetailsByKey((prev) => ({ ...prev, [key]: resolved }))
+      if (source) {
+        setSourceByKey((prev) => ({ ...prev, [key]: source }))
+      }
       if (wikimedia) {
         setWikimediaByKey((prev) => ({ ...prev, [key]: wikimedia }))
       }
@@ -680,6 +695,18 @@ export function AddPlaceDialog({
         if (blurb) description = blurb
       }
 
+      const isRestaurantOrCafe = type === 'restaurant' || type === 'cafe'
+      let tripadvisorPhotos: string[] = []
+      if (isRestaurantOrCafe) {
+        tripadvisorPhotos = (
+          await fetchTripadvisorPlaceGallery({
+            name: details.name,
+            nameLocal: details.nameOriginal,
+            type,
+          }).catch(() => null)
+        )?.photos || []
+      }
+
       const websitePhotos = (
         await fetchPlaceWebsitePhotosWithFallback({
           website: details.website,
@@ -688,19 +715,16 @@ export function AddPlaceDialog({
           address: details.address,
         }).catch(() => ({ photos: [] }))
       ).photos
-      const tripadvisorPhotos =
-        !websitePhotos.length && (type === 'restaurant' || type === 'cafe')
-          ? (
-              await fetchTripadvisorPlaceGallery({
-                name: details.name,
-                nameLocal: details.nameOriginal,
-                type,
-              }).catch(() => null)
-            )?.photos || []
-          : []
-      const websitePhoto = websitePhotos[0] || tripadvisorPhotos[0] || null
+
+      let mainPhoto: string | null = null
+      if (isRestaurantOrCafe) {
+        mainPhoto = tripadvisorPhotos[0] || websitePhotos[0] || details.photos?.[0] || null
+      } else {
+        mainPhoto = details.photos?.[0] || websitePhotos[0] || null
+      }
+
       const wikimediaPhoto =
-        type === 'attraction' && !websitePhoto
+        type === 'attraction' && !mainPhoto
           ? await fetchWikimediaPlacePhoto(details.name, details.location)
           : null
 
@@ -719,7 +743,7 @@ export function AddPlaceDialog({
             ? `Google ★ ${details.rating.toFixed(1)}`
             : 'AI 推荐 / Google 地点',
         priceHint: details.priceLevel,
-        image: websitePhoto || wikimediaPhoto?.url || FALLBACK_IMAGE,
+        image: mainPhoto || wikimediaPhoto?.url || FALLBACK_IMAGE,
         location: details.location,
         googleMapsUrl: details.id
           ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -1055,13 +1079,11 @@ export function AddPlaceDialog({
                     const key = itemKey(item)
                     const expanded = expandedKey === key
                     const details = detailsByKey[key]
-                    const wikimedia = wikimediaByKey[key]
                     const loadingDetails = loadingDetailsKey === key
                     const busyBest = addingName === `${item.name}:best`
                     const busyEnd = addingName === `${item.name}:end`
                     const photos = details?.photos?.length ? details.photos : []
                     const photoIndex = photoIndexByKey[key] || 0
-                    const activePhoto = photos[photoIndex]
                     const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel)
 
                     return (
@@ -1121,106 +1143,21 @@ export function AddPlaceDialog({
                                     />
                                   ) : (
                                     <>
-                                      {activePhoto ? (
-                                        <div className="space-y-2">
-                                          <div
-                                            className="relative overflow-hidden rounded-xl select-none"
-                                            onPointerDown={(e) => {
-                                              if (photos.length < 2) return
-                                              photoSwipeStartX.current = e.clientX
-                                            }}
-                                            onPointerUp={(e) => {
-                                              if (
-                                                photoSwipeStartX.current == null ||
-                                                photos.length < 2
-                                              )
-                                                return
-                                              const dx = e.clientX - photoSwipeStartX.current
-                                              photoSwipeStartX.current = null
-                                              if (Math.abs(dx) < 40) return
-                                              stepPhoto(key, photos.length, dx < 0 ? 1 : -1)
-                                            }}
-                                            onPointerCancel={() => {
-                                              photoSwipeStartX.current = null
-                                            }}
-                                          >
-                                            <img
-                                              src={activePhoto}
-                                              alt={item.name}
-                                              className="h-44 w-full object-cover"
-                                              loading="lazy"
-                                              decoding="async"
-                                              referrerPolicy="no-referrer-when-downgrade"
-                                              draggable={false}
-                                            />
-                                            {wikimedia && activePhoto === wikimedia.url && (
-                                              <a
-                                                href={wikimedia.sourcePage}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="absolute bottom-2 left-2 max-w-[80%] truncate rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white"
-                                                title={wikimedia.attribution || 'Wikimedia Commons'}
-                                              >
-                                                图片：{wikimedia.attribution || 'Wikimedia Commons'}
-                                              </a>
-                                            )}
-                                            {photos.length > 1 && (
-                                              <>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => stepPhoto(key, photos.length, -1)}
-                                                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
-                                                  aria-label="上一张图片"
-                                                >
-                                                  <ChevronLeft size={16} />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => stepPhoto(key, photos.length, 1)}
-                                                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
-                                                  aria-label="下一张图片"
-                                                >
-                                                  <ChevronRight size={16} />
-                                                </button>
-                                                <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
-                                                  {photoIndex + 1}/{photos.length}
-                                                </span>
-                                              </>
-                                            )}
-                                          </div>
-
-                                          {photos.length > 1 && (
-                                            <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x]">
-                                              {photos.map((url, i) => (
-                                                <button
-                                                  key={url + i}
-                                                  ref={(el) => {
-                                                    if (!thumbRefsByKey.current[key]) {
-                                                      thumbRefsByKey.current[key] = []
-                                                    }
-                                                    thumbRefsByKey.current[key][i] = el
-                                                  }}
-                                                  type="button"
-                                                  onClick={() => setPhotoIndexByKey((prev) => ({ ...prev, [key]: i }))}
-                                                  className={`relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${
-                                                    i === photoIndex
-                                                      ? 'border-[var(--copper)]'
-                                                      : 'border-transparent'
-                                                  }`}
-                                                >
-                                                  <img
-                                                    src={url}
-                                                    alt=""
-                                                    className="h-full w-full object-cover"
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                    referrerPolicy="no-referrer-when-downgrade"
-                                                  />
-                                                </button>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
+                                      {photos.length > 0 ? (
+                                        <PlacePhotoGallery
+                                          photos={photos}
+                                          photoIndex={photoIndex}
+                                          onPhotoIndexChange={(nextIdx) =>
+                                            setPhotoIndexByKey((prev) => ({
+                                              ...prev,
+                                              [key]: nextIdx,
+                                            }))
+                                          }
+                                          alt={item.name}
+                                          photoSource={sourceByKey[key]}
+                                          wikimediaPhoto={wikimediaByKey[key]}
+                                          heightClass="h-44 sm:h-56"
+                                        />
                                       ) : null}
 
                                       <div className="flex flex-wrap gap-2 text-xs">

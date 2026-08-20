@@ -4,28 +4,14 @@ import {
   useMemo,
   useRef,
   useState,
-  type HTMLAttributeReferrerPolicy,
   type ReactNode,
 } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-
-const photoSlideVariants = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? '100%' : direction < 0 ? '-100%' : 0,
-    opacity: 0,
-    scale: 0.96,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-    scale: 1,
-  },
-  exit: (direction: number) => ({
-    x: direction < 0 ? '100%' : '-100%',
-    opacity: 0,
-    scale: 0.96,
-  }),
-}
+import {
+  GalleryThumb,
+  photoReferrerPolicy,
+  photoSlideVariants,
+} from './PlacePhotoGallery'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import {
   ChevronLeft,
@@ -274,9 +260,7 @@ function PlaceReviewsShimmer() {
   )
 }
 
-function photoReferrerPolicy(url: string): HTMLAttributeReferrerPolicy {
-  return /tripadvisor\.com/i.test(url) ? 'no-referrer-when-downgrade' : 'no-referrer'
-}
+
 
 function sourceFromPhotoUrl(url: string): PlaceInfoSource | null {
   const value = url.toLowerCase()
@@ -313,80 +297,7 @@ function resolvePhotoSource(input: {
   return sourceFromPhotoUrl(url)
 }
 
-function GalleryThumb({
-  url,
-  selected,
-  onSelect,
-  onError,
-  buttonRef,
-  animateIn = false,
-  enterDelayMs = 0,
-}: {
-  url?: string
-  selected: boolean
-  onSelect: () => void
-  onError: (url: string) => void
-  buttonRef: (el: HTMLButtonElement | null) => void
-  animateIn?: boolean
-  enterDelayMs?: number
-}) {
-  const [ready, setReady] = useState(false)
-  const imgRef = useRef<HTMLImageElement>(null)
-  const urlRef = useRef(url)
-  if (urlRef.current !== url) {
-    urlRef.current = url
-    setReady(false)
-  }
-  useLayoutEffect(() => {
-    const img = imgRef.current
-    if (img?.complete && img.naturalWidth > 0) setReady(true)
-  }, [url])
 
-  return (
-    <motion.button
-      ref={buttonRef}
-      type="button"
-      onClick={onSelect}
-      whileTap={{ scale: 0.92 }}
-      animate={{
-        scale: selected ? 1.05 : 0.98,
-        opacity: selected ? 1 : 0.55,
-      }}
-      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-      style={animateIn ? { animationDelay: `${enterDelayMs}ms` } : undefined}
-      className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-xl outline-none transition-shadow ${
-        selected
-          ? 'ring-2 ring-white ring-offset-2 ring-offset-black/20 shadow-md z-10'
-          : 'hover:opacity-85'
-      } ${animateIn ? 'place-gallery-thumb-enter' : ''}`}
-    >
-      <span className="absolute inset-0 day-tab-shimmer" aria-hidden />
-      {selected &&
-        (animateIn ? (
-          <span className="absolute inset-0 z-10 rounded-xl border-2 border-[var(--copper)] shadow-sm pointer-events-none" />
-        ) : (
-          <motion.span
-            layoutId="active-gallery-thumb-ring"
-            className="absolute inset-0 z-10 rounded-xl border-2 border-[var(--copper)] shadow-sm pointer-events-none"
-            transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
-          />
-        ))}
-      {url ? (
-        <img
-          ref={imgRef}
-          src={url}
-          alt=""
-          className={`relative h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-300 ${
-            ready ? 'opacity-100' : 'opacity-0'
-          }`}
-          referrerPolicy={photoReferrerPolicy(url)}
-          onLoad={() => setReady(true)}
-          onError={() => onError(url)}
-        />
-      ) : null}
-    </motion.button>
-  )
-}
 
 function LlmNarrativeSingleBody({
   reason,
