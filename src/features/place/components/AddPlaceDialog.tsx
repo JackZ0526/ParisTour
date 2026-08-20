@@ -39,6 +39,10 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 import { PlaceName } from './PlaceName'
 import { PlacePhotoGallery } from './PlacePhotoGallery'
 import type { PlaceInfoSource } from '../services/placeSource'
@@ -1161,11 +1165,11 @@ export function AddPlaceDialog({
                                       ) : null}
 
                                       <div className="flex flex-wrap gap-2 text-xs">
-                                        <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-[var(--sage)]">
+                                        <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-1 text-[var(--sage)]`}>
                                           {item.type}
                                         </span>
                                         {details?.rating != null && (
-                                          <span className="rounded-full bg-[var(--gold)]/25 px-2.5 py-1">
+                                          <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center px-2.5 py-1`}>
                                             ★ {details.rating.toFixed(1)}
                                             {details.userRatingCount != null
                                               ? `（${details.userRatingCount}）`
@@ -1173,7 +1177,7 @@ export function AddPlaceDialog({
                                           </span>
                                         )}
                                         {priceLevelLabel && (
-                                          <span className="rounded-full bg-[var(--mist)] px-2.5 py-1">
+                                          <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center px-2.5 py-1 text-[var(--stone)]`}>
                                             {priceLevelLabel}
                                           </span>
                                         )}

@@ -11,8 +11,13 @@ import {
   User,
 } from 'lucide-react'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 
 export interface ProfileTabProps {
+  onAnimationStart?: () => void
   email: string
   role?: 'owner' | 'editor' | 'viewer' | null
   onSignOut: () => void
@@ -28,6 +33,7 @@ export interface ProfileTabProps {
 }
 
 export function ProfileTab({
+  onAnimationStart,
   email,
   role,
   onSignOut,
@@ -50,6 +56,7 @@ export function ProfileTab({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
+      onAnimationStart={onAnimationStart}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="mx-auto max-w-2xl space-y-5 pb-10"
     >
@@ -67,12 +74,12 @@ export function ProfileTab({
             </div>
             <div className="mt-1 flex items-center gap-2">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                className={`${glassCapsuleSurfaceClass} inline-flex items-center px-2.5 py-0.5 text-xs font-medium ${
                   role === 'owner'
-                    ? 'bg-[var(--copper)]/10 text-[var(--copper)]'
+                    ? `${glassCapsuleToneClass.copper} text-[var(--copper)]`
                     : role === 'editor'
-                      ? 'bg-[var(--sage)]/15 text-[var(--sage)]'
-                      : 'bg-[var(--mist)] text-[var(--stone)]'
+                      ? `${glassCapsuleToneClass.sage} text-[var(--sage)]`
+                      : `${glassCapsuleToneClass.neutral} text-[var(--stone)]`
                 }`}
               >
                 {roleLabel}

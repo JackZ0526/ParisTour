@@ -81,6 +81,13 @@ import {
   peekWikimediaPlacePhoto,
   type WikimediaPlacePhoto,
 } from '../../map/services/wikimediaPlacePhotos'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
+
+const placeDetailCapsuleClass =
+  `${glassCapsuleSurfaceClass} inline-flex items-center gap-1.5 px-3 py-1`
 
 export interface LlmPlaceNarrative {
   intro?: string
@@ -232,7 +239,7 @@ function tripadvisorHasDetailContent(
 
 function PlaceChipShimmer({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--mist)] px-3 py-1 text-[var(--stone)]">
+    <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]`}>
       <span className="h-3 w-12 rounded-full day-tab-shimmer" aria-hidden />
       {label}
     </span>
@@ -1856,7 +1863,7 @@ export function GooglePlacePage({
             <div className="flex flex-wrap gap-2 text-sm">
             {cachedGoogleRating != null && (
               <span
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.gold}`}
                 title="生成行程时缓存的 Google 评分"
               >
                 <PlaceSourceMark source="google" />
@@ -1869,7 +1876,7 @@ export function GooglePlacePage({
             )}
             {displayRating != null && (
               <span
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1"
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage}`}
                 title="Tripadvisor 评分"
               >
                 <PlaceSourceMark source="tripadvisor" />
@@ -1884,23 +1891,29 @@ export function GooglePlacePage({
               <PlaceChipShimmer label="价格" />
             )}
             {priceLevelLabel && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{priceLevelLabel}</span>
+              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.blue} text-[var(--stone)]`}>
+                {priceLevelLabel}
+              </span>
             )}
             {tripadvisorLoading.cuisine && showTripadvisorChipShimmer && (
               <PlaceChipShimmer label="菜系" />
             )}
             {displayCuisine && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{displayCuisine}</span>
+              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} text-[var(--stone)]`}>
+                {displayCuisine}
+              </span>
             )}
             {displayPhone && (
-              <span className="rounded-full bg-[var(--mist)] px-3 py-1">{displayPhone}</span>
+              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.violet} text-[var(--stone)]`}>
+                {displayPhone}
+              </span>
             )}
             {displayWebsite && (
               <a
                 href={displayWebsite}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-full bg-[var(--mist)] px-3 py-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] underline-offset-2 transition-colors hover:bg-[#dce9df]/90 hover:underline`}
               >
                 官网
               </a>
@@ -1915,7 +1928,7 @@ export function GooglePlacePage({
                 href={googleMapsPlaceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="group inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--gold)]/25 px-3 py-1 text-sm text-[var(--stone)] transition-colors hover:text-[var(--sage)]"
+                className={`group ${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} max-w-full text-sm text-[var(--stone)] transition-colors hover:bg-[#f1ded0]/90 hover:text-[var(--sage)]`}
                 title="在 Google 地图中查看"
               >
                 <MapPin size={14} strokeWidth={1.9} className="shrink-0" aria-hidden />

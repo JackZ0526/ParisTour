@@ -8,6 +8,10 @@ import {
   type LlmBusyVisual,
   type LlmTaskKind,
 } from '../services/llm/llm'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../styles/glassCapsule'
 
 type Tone = 'sage' | 'copper' | 'ink' | 'paper'
 type Size = 'sm' | 'md'
@@ -289,7 +293,7 @@ export function LoadingIndicator({
         role="status"
         aria-live="polite"
         aria-busy="true"
-        className={`${pulseClass} inline-flex items-center ${s.gap} rounded-full bg-[var(--gold)]/20 px-2.5 py-1 ${s.text} text-[var(--ink)] ${className}`}
+        className={`${pulseClass} ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center ${s.gap} px-2.5 py-1 ${s.text} text-[var(--ink)] ${className}`}
       >
         {active && (
           <Orbit size={s.orbit} className={`shrink-0 text-[var(--copper)]`} />

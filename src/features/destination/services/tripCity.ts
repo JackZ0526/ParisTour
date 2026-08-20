@@ -3,6 +3,8 @@ import { loadDestination } from './destination'
 export interface TripCity {
   /** English name used in Tripadvisor / Maps queries. */
   nameEn: string
+  /** ISO 3166-1 alpha-2 country code used by destination-aware branding. */
+  countryCode?: string
   /** Tripadvisor geoId for seeded Paris listings. */
   tripadvisorGeoId?: string
   /** Extra location tokens that still count as this city. */
@@ -16,9 +18,29 @@ interface KnownCity extends TripCity {
 const KNOWN_CITIES: KnownCity[] = [
   {
     nameEn: 'Paris',
+    countryCode: 'FR',
     tripadvisorGeoId: '187147',
     regionPattern: /île-de-france|ile-de-france/i,
     aliases: ['paris', 'paris, france', 'paris france', '巴黎'],
+  },
+  { nameEn: 'Tokyo', countryCode: 'JP', aliases: ['tokyo', '东京', '東京'] },
+  { nameEn: 'Rome', countryCode: 'IT', aliases: ['rome', 'roma', '罗马', '羅馬'] },
+  {
+    nameEn: 'Barcelona',
+    countryCode: 'ES',
+    aliases: ['barcelona', '巴塞罗那', '巴塞隆納'],
+  },
+  {
+    nameEn: 'New York',
+    countryCode: 'US',
+    aliases: ['new york', 'new york city', 'nyc', '纽约', '紐約'],
+  },
+  { nameEn: 'London', countryCode: 'GB', aliases: ['london', '伦敦', '倫敦'] },
+  { nameEn: 'Kyoto', countryCode: 'JP', aliases: ['kyoto', '京都'] },
+  {
+    nameEn: 'Florence',
+    countryCode: 'IT',
+    aliases: ['florence', 'firenze', '佛罗伦萨', '佛羅倫斯'],
   },
 ]
 
@@ -52,6 +74,7 @@ export function tripCityFromDestination(destination?: string): TripCity {
       ) {
         return {
           nameEn: city.nameEn,
+          countryCode: city.countryCode,
           tripadvisorGeoId: city.tripadvisorGeoId,
           regionPattern: city.regionPattern,
         }
@@ -64,6 +87,7 @@ export function tripCityFromDestination(destination?: string): TripCity {
     if (known) {
       return {
         nameEn: known.nameEn,
+        countryCode: known.countryCode,
         tripadvisorGeoId: known.tripadvisorGeoId,
         regionPattern: known.regionPattern,
       }
@@ -73,8 +97,31 @@ export function tripCityFromDestination(destination?: string): TripCity {
   if (raw) return { nameEn: raw }
   return {
     nameEn: KNOWN_CITIES[0].nameEn,
+    countryCode: KNOWN_CITIES[0].countryCode,
     tripadvisorGeoId: KNOWN_CITIES[0].tripadvisorGeoId,
     regionPattern: KNOWN_CITIES[0].regionPattern,
+  }
+}
+
+function flagForCountryCode(countryCode?: string): string {
+  const code = countryCode?.trim().toUpperCase()
+  if (!code || !/^[A-Z]{2}$/.test(code)) return '🧭'
+  return String.fromCodePoint(
+    ...Array.from(code, (letter) => 0x1f1e6 + letter.charCodeAt(0) - 65),
+  )
+}
+
+export interface DestinationBrand {
+  flag: string
+  title: string
+}
+
+/** Header branding derived from the same destination value used by trip logic. */
+export function destinationBrandFromDestination(destination: string): DestinationBrand {
+  const city = tripCityFromDestination(destination)
+  return {
+    flag: flagForCountryCode(city.countryCode),
+    title: `${city.nameEn} Tour`,
   }
 }
 

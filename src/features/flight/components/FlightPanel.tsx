@@ -12,6 +12,10 @@ import type { TripDateRange } from '../../itinerary/services/tripDates'
 import type { FlightEndpoint, FlightInfo } from '../../../types'
 import { formatAirportLocalTime } from '../utils/flightTime'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 
 function emptyFlightSelection(): PersistedFlightSelection {
   return {
@@ -73,7 +77,7 @@ function FlightCard({
         {loading ? (
           <LoadingIndicator variant="badge" label="查询中…" size="sm" showDots />
         ) : (
-          <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-xs text-[var(--sage)]">
+          <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-1 text-xs text-[var(--sage)]`}>
             {flightSourceLabel(info.source)}
           </span>
         )}

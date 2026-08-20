@@ -47,6 +47,10 @@ import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { HouseIcon, PlaneIcon } from '../../map/components/markerIcons'
 import { PlaceName } from '../../place/components/PlaceName'
 import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
+import {
   googleMapsDirectionsUrl,
   googleMapsTravelModeLabel,
   inferGoogleMapsTravelMode,
@@ -117,6 +121,8 @@ const typeLabel: Record<string, string> = {
   hotel: '酒店',
 }
 
+const timelineCapsuleClass = `${glassCapsuleSurfaceClass} inline-flex items-center`
+
 function TrashIcon() {
   return <Trash2 size={16} strokeWidth={1.8} aria-hidden />
 }
@@ -173,7 +179,7 @@ const LEG_BODY_HEIGHT_EPS_PX = 1
 /** Origin cue (「从酒店」/「从机场」) — always a prefix chip, never free text or label-inline. */
 function LegOriginCue({ cue }: { cue: string }) {
   return (
-    <span className="timeline-leg-cue inline-flex items-center rounded-full border border-[var(--stone)]/20 bg-[var(--mist)]/80 px-2.5 py-1 text-xs text-[var(--stone)]">
+    <span className={`timeline-leg-cue ${timelineCapsuleClass} ${glassCapsuleToneClass.neutral} px-2.5 py-1 text-xs text-[var(--stone)]`}>
       {cue}
     </span>
   )
@@ -201,11 +207,11 @@ function LegConnector({
   const mode = leg?.displayMode
   const tone =
     mode === 'TRANSIT' || routeMode === 'transit'
-      ? 'border-sky-300/60 bg-sky-50 text-sky-900'
+      ? 'border-sky-300/60 bg-sky-50/75 text-sky-900'
       : mode === 'DRIVING'
         ? 'border-[var(--copper)]/40 bg-[var(--copper)]/10 text-[var(--copper)]'
         : routeMode === 'walking'
-          ? 'border-emerald-300/70 bg-emerald-50 text-emerald-900'
+          ? 'border-emerald-300/70 bg-emerald-50/75 text-emerald-900'
           : 'border-[var(--stone)]/25 bg-[var(--mist)]/70 text-[var(--stone)]'
 
   const lines = leg?.transitLines || []
@@ -374,7 +380,7 @@ function LegConnector({
                   {lines.map((line) => (
                     <span
                       key={line.label}
-                      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                      className={`${timelineCapsuleClass} gap-1.5 px-2.5 py-1 text-xs`}
                       style={{
                         borderColor: `${line.color || PATH_MODE_COLORS[line.mode]}66`,
                         backgroundColor: `${line.color || PATH_MODE_COLORS[line.mode]}18`,
@@ -388,7 +394,7 @@ function LegConnector({
                       {line.label}
                     </span>
                   ))}
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
+                  <span className={`${timelineCapsuleClass} px-2.5 py-1 text-xs ${tone}`}>
                     {leg?.durationText}
                     {leg?.distanceText ? ` · ${leg.distanceText}` : ''}
                     <span className="ml-1 opacity-60">· Google</span>
@@ -399,7 +405,7 @@ function LegConnector({
               chipRow(
                 routeUrl ? (
                   <a
-                    className={`timeline-route-link timeline-route-link--${routeMode || 'transit'} inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs`}
+                    className={`timeline-route-link timeline-route-link--${routeMode || 'transit'} ${timelineCapsuleClass} gap-1 px-2.5 py-1 text-xs`}
                     href={routeUrl}
                     target="_blank"
                     rel="noreferrer"
@@ -416,7 +422,7 @@ function LegConnector({
                     />
                   </a>
                 ) : (
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${tone}`}>
+                  <span className={`${timelineCapsuleClass} px-2.5 py-1 text-xs ${tone}`}>
                     {leg?.label || fallbackLabel || '查看地图导航'}
                   </span>
                 ),
@@ -1476,17 +1482,17 @@ export function DayTimeline({
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
-            <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-xs text-[var(--paper)]">
+            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.copper} px-2.5 py-1 text-xs text-[var(--copper)]`}>
               Day {day.day}
             </span>
-            <span className="rounded-full bg-[var(--sage)]/15 px-2.5 py-1 text-xs text-[var(--sage)]">
+            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.sage} px-2.5 py-1 text-xs text-[var(--sage)]`}>
               {dayPending ? (
                 <span className="inline-block h-3 w-16 rounded-full day-tab-shimmer" />
               ) : (
                 day.pace
               )}
             </span>
-            <span className="hidden rounded-full bg-[var(--mist)] px-2.5 py-1 text-xs text-[var(--stone)] sm:inline-flex">
+            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.neutral} hidden px-2.5 py-1 text-xs text-[var(--stone)] sm:inline-flex`}>
               {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
             </span>
             {copyRefreshing && !dayRegenerating && (
@@ -1836,7 +1842,7 @@ export function DayTimeline({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--stone)]">
+                    <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
                       {stop.time}
                     </span>
                     <span className="text-xs text-[var(--stone)]">
@@ -1853,12 +1859,12 @@ export function DayTimeline({
                   <p className="mt-1.5 text-sm text-[var(--stone)]">{stop.note}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
-                      <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                      <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
                         {travelChip}
                       </span>
                     )}
                     {stop.duration && (
-                      <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                      <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.violet} px-2 py-1`}>
                         {stop.duration}
                       </span>
                     )}
@@ -2019,7 +2025,7 @@ export function DayTimeline({
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--stone)]">
+                              <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
                                 {swapAnim.oldStop.time}
                               </span>
                               <span className="text-xs text-[var(--stone)]">
@@ -2169,7 +2175,7 @@ export function DayTimeline({
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-xs text-[var(--stone)]">
+                      <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
                         {stop.time}
                       </span>
                       <span className="text-xs text-[var(--stone)]">
@@ -2188,12 +2194,12 @@ export function DayTimeline({
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                       {travelChip && (
-                        <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                        <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
                           {travelChip}
                         </span>
                       )}
                       {stop.duration && (
-                        <span className="rounded-full bg-[var(--mist)] px-2 py-1">
+                        <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.violet} px-2 py-1`}>
                           {stop.duration}
                         </span>
                       )}

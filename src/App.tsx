@@ -1,6 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Archive, CalendarDays, History, Luggage, Share2, Sparkles, User } from 'lucide-react'
+import {
+  Archive,
+  CalendarDays,
+  History,
+  Hotel as HotelIcon,
+  Luggage,
+  MapPin,
+  Moon,
+  Plane,
+  Share2,
+  Sparkles,
+  User,
+} from 'lucide-react'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
 import { useItineraryGeneration } from './hooks/useItineraryGeneration'
@@ -38,6 +50,7 @@ import {
 import { getOrFetchMapRouteSegments } from './features/map/services/openRouteService'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import { PENDING_HOTEL } from './features/hotel/constants/hotels'
+import { destinationBrandFromDestination } from './features/destination/services/tripCity'
 import { getPlace } from './features/place/constants/places'
 import { SELECTED_HOTEL_PLACE_ID } from './features/itinerary/utils/dayOrigin'
 import { clearDayNavCache, useDayNav } from './features/itinerary/hooks/useDayNav'
@@ -50,7 +63,6 @@ import { clearAllRecommendCache } from './features/place/services/recommendCache
 import {
   dateForTripDay,
   formatTripDayLabel,
-  formatDayNightLabel,
   saveTripDates,
 } from './features/itinerary/services/tripDates'
 import {
@@ -66,6 +78,10 @@ import {
   buildHeroCopy,
   chineseDayCount,
 } from './appHelpers'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from './shared/styles/glassCapsule'
 
 const timelineContainerVariants = {
   enter: (_direction: number) => ({
@@ -88,6 +104,17 @@ const timelineContainerVariants = {
     },
   }),
 }
+
+const itinerarySummaryCapsuleClass =
+  `${glassCapsuleSurfaceClass} inline-flex h-7 shrink-0 items-center gap-1 px-2.5 text-xs`
+
+const itinerarySummaryCapsuleTone = {
+  destination: glassCapsuleToneClass.copper,
+  duration: glassCapsuleToneClass.sage,
+  dates: glassCapsuleToneClass.blue,
+  hotel: glassCapsuleToneClass.gold,
+  flights: glassCapsuleToneClass.violet,
+} as const
 
 export default function App() {
   const {
@@ -135,6 +162,7 @@ export default function App() {
   } = useTripCore()
   // Destination UI temporarily hidden — lock trip to Paris.
   const destination = '巴黎'
+  const destinationBrand = destinationBrandFromDestination(destination)
   const numberOfDaysRef = useRef(0)
   const {
     dayIndex,
@@ -167,6 +195,29 @@ export default function App() {
   )
   const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
   const [activeTab, setActiveTab] = useState<AppTab>('itinerary')
+  const tabScrollPositionsRef = useRef<Record<AppTab, number>>({
+    itinerary: 0,
+    logistics: 0,
+    profile: 0,
+  })
+  const handleSelectTab = useCallback(
+    (nextTab: AppTab) => {
+      if (nextTab === activeTab) return
+
+      tabScrollPositionsRef.current[activeTab] = window.scrollY
+      setActiveTab(nextTab)
+    },
+    [activeTab],
+  )
+  const restoreTabScroll = useCallback(
+    (tab: AppTab) => {
+      // AnimatePresence keeps the outgoing tab mounted briefly. Only restore
+      // once the incoming tab has mounted and its full height is measurable.
+      if (tab !== activeTab) return
+      window.scrollTo(0, tabScrollPositionsRef.current[tab])
+    },
+    [activeTab],
+  )
   const handleSelectPlace = useCallback(
     (id: string) => {
       setSelectedPlaceId(id)
@@ -177,9 +228,7 @@ export default function App() {
     notifyTripChanged()
   }, [notifyTripChanged])
   const {
-    itineraryStart,
     setItineraryStart,
-    itineraryStartLoading,
     setItineraryStartLoading,
     itineraryGenerated,
     setItineraryGenerated,
@@ -494,7 +543,6 @@ export default function App() {
   )
 
   const lastDayNum = numberOfDays
-  const dayNightLabel = formatDayNightLabel(numberOfDays)
 
   function handleResetAll() {
     handleRegenerateItinerary()
@@ -560,111 +608,133 @@ export default function App() {
       <ApiRequestMeter />
       <div className="mb-4 flex items-center justify-between gap-3">
         {/* Left: Brand Title & Trip Selector */}
-        <div className="flex items-center gap-3 lg:min-w-[260px]">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[var(--copper)]/15 text-lg shadow-inner">
-            🇫🇷
-          </span>
-          <div className="min-w-0">
-            <h1 className="font-display text-base font-semibold leading-tight text-[var(--ink)] sm:text-lg">
-              Paris Tour
-            </h1>
-            <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)]">
-              <span>{chineseDayCount(numberOfDays)}行程规划</span>
-              {trips.length > 1 && (
-                <>
-                  <span>·</span>
-                  <select
-                    className="max-w-[130px] truncate rounded border border-[var(--stone)]/20 bg-transparent text-[11px] text-[var(--ink)] outline-none hover:border-[var(--copper)]"
-                    value={activeTrip?.id || ''}
-                    onChange={(e) => {
-                      void switchTrip(e.target.value).catch((err) => {
-                        window.alert(err instanceof Error ? err.message : '切换失败')
-                      })
-                    }}
-                  >
-                    {trips.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-            </div>
-          </div>
+        <div className="lg:min-w-[260px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`header-brand-${activeTab}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center gap-3"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[var(--copper)]/15 text-lg shadow-inner">
+                {destinationBrand.flag}
+              </span>
+              <div className="min-w-0">
+                <h1 className="font-display text-base font-semibold leading-tight text-[var(--ink)] sm:text-lg">
+                  {destinationBrand.title}
+                </h1>
+                <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)]">
+                  <span>{chineseDayCount(numberOfDays)}行程规划</span>
+                  {trips.length > 1 && (
+                    <>
+                      <span>·</span>
+                      <select
+                        className="max-w-[130px] truncate rounded border border-[var(--stone)]/20 bg-transparent text-[11px] text-[var(--ink)] outline-none hover:border-[var(--copper)]"
+                        value={activeTrip?.id || ''}
+                        onChange={(e) => {
+                          void switchTrip(e.target.value).catch((err) => {
+                            window.alert(err instanceof Error ? err.message : '切换失败')
+                          })
+                        }}
+                      >
+                        {trips.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Center: Desktop Navigation Tabs */}
         <div className="hidden lg:flex items-center justify-center">
           <TopNavSegment
             activeTab={activeTab}
-            onSelectTab={setActiveTab}
+            onSelectTab={handleSelectTab}
             itineraryReady={itineraryReady}
           />
         </div>
 
         {/* Right: Desktop User Profile & Quick Actions */}
-        <div className="flex items-center justify-end gap-2 lg:min-w-[260px]">
-          {/* Quick Action: Backup (Desktop) */}
-          {activeTrip && (
-            <button
-              type="button"
-              onClick={() => setBackupOpen(true)}
-              aria-label="存档备份"
-              title="存档备份"
-              className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+        <div className="flex justify-end lg:min-w-[260px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`header-account-${activeTab}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center justify-end gap-2"
             >
-              <Archive size={15} strokeWidth={1.9} />
-            </button>
-          )}
+              {/* Quick Action: Backup (Desktop) */}
+              {activeTrip && (
+                <button
+                  type="button"
+                  onClick={() => setBackupOpen(true)}
+                  aria-label="存档备份"
+                  title="存档备份"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+                >
+                  <Archive size={15} strokeWidth={1.9} />
+                </button>
+              )}
 
-          {/* Quick Action: Share (Desktop) */}
-          {role === 'owner' && activeTrip && (
-            <button
-              type="button"
-              onClick={() => {
-                setShareOpen(true)
-                void refreshTrips().catch(() => undefined)
-              }}
-              aria-label="邀请协作分享"
-              title="邀请协作分享"
-              className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
-            >
-              <Share2 size={15} strokeWidth={1.9} />
-            </button>
-          )}
+              {/* Quick Action: Share (Desktop) */}
+              {role === 'owner' && activeTrip && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShareOpen(true)
+                    void refreshTrips().catch(() => undefined)
+                  }}
+                  aria-label="邀请协作分享"
+                  title="邀请协作分享"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+                >
+                  <Share2 size={15} strokeWidth={1.9} />
+                </button>
+              )}
 
-          {/* User Account Capsule Button */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className={`flex items-center gap-2 rounded-full border p-1 pl-1.5 pr-3 shadow-sm backdrop-blur-md transition-all hover:shadow active:scale-95 ${
-              activeTab === 'profile'
-                ? 'border-[var(--copper)]/40 bg-white'
-                : 'border-black/5 bg-white/70 hover:bg-white'
-            }`}
-            title="查看个人中心与偏好"
-          >
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
-              {email ? email.charAt(0).toUpperCase() : <User size={13} />}
-            </div>
-            <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
-              {email}
-            </span>
-            {role && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                  role === 'owner'
-                    ? 'bg-[var(--copper)]/10 text-[var(--copper)]'
-                    : role === 'editor'
-                      ? 'bg-[var(--sage)]/15 text-[var(--sage)]'
-                      : 'bg-[var(--mist)] text-[var(--stone)]'
+              {/* User Account Capsule Button */}
+              <button
+                type="button"
+                onClick={() => handleSelectTab('profile')}
+                className={`flex items-center gap-2 rounded-full border p-1 pl-1.5 pr-3 shadow-sm backdrop-blur-md transition-all hover:shadow active:scale-95 ${
+                  activeTab === 'profile'
+                    ? 'border-[var(--copper)]/40 bg-white'
+                    : 'border-black/5 bg-white/70 hover:bg-white'
                 }`}
+                title="查看个人中心与偏好"
               >
-                {role === 'owner' ? '拥有者' : role === 'editor' ? '协作' : '只读'}
-              </span>
-            )}
-          </button>
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
+                  {email ? email.charAt(0).toUpperCase() : <User size={13} />}
+                </div>
+                <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
+                  {email}
+                </span>
+                {role && (
+                  <span
+                    className={`${glassCapsuleSurfaceClass} inline-flex items-center px-2 py-0.5 text-[10px] font-medium ${
+                      role === 'owner'
+                        ? `${glassCapsuleToneClass.copper} text-[var(--copper)]`
+                        : role === 'editor'
+                          ? `${glassCapsuleToneClass.sage} text-[var(--sage)]`
+                          : `${glassCapsuleToneClass.neutral} text-[var(--stone)]`
+                    }`}
+                  >
+                    {role === 'owner' ? '拥有者' : role === 'editor' ? '协作' : '只读'}
+                  </span>
+                )}
+              </button>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
@@ -696,44 +766,65 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
+              onAnimationStart={() => restoreTabScroll('itinerary')}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="space-y-4"
             >
               {/* Top Quick Itinerary Summary Strip */}
               {itineraryReady && (
-                <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors">
-                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                    <span className="font-semibold text-[var(--copper)]">
-                      {chineseDayCount(numberOfDays)}行程
+                <div className="flex items-center justify-between gap-2.5 rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors sm:px-4 sm:py-3">
+                  <div
+                    className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    aria-label="行程摘要"
+                  >
+                    <span
+                      className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.destination} font-semibold text-[var(--copper)]`}
+                      title="旅行目的地"
+                    >
+                      <MapPin size={13} strokeWidth={2} aria-hidden />
+                      {destination}
                     </span>
-                    {datesReady && (
-                      <span className="text-[var(--stone)]">
-                        · {dayNightLabel}
-                        {tripDates?.endDate && itineraryStartDate ? (
-                          <span>
-                            {' '}({formatTripDayLabel(itineraryStartDate)} → {formatTripDayLabel(tripDates.endDate)})
-                          </span>
-                        ) : null}
+                    <span
+                      className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.duration} font-medium text-[var(--sage)]`}
+                      title="行程时长"
+                    >
+                      <Moon size={13} strokeWidth={2} aria-hidden />
+                      {numberOfDays}天{Math.max(0, numberOfDays - 1)}晚
+                    </span>
+                    {datesReady && tripDates?.startDate && tripDates.endDate && (
+                      <span
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.dates} font-medium text-[var(--stone)]`}
+                        title="旅行日期"
+                      >
+                        <CalendarDays size={13} strokeWidth={2} aria-hidden />
+                        {formatTripDayLabel(tripDates.startDate)}–{formatTripDayLabel(tripDates.endDate)}
                       </span>
                     )}
                     {hotel?.name && (
                       <button
                         type="button"
                         onClick={() => handleSelectPlace(SELECTED_HOTEL_PLACE_ID)}
-                        className="rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-black/[0.08] active:scale-95"
-                        title="点击查看酒店详情"
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.hotel} max-w-[12rem] font-medium text-[var(--stone)] transition-colors hover:bg-[#eee1c6]/90 active:scale-95`}
+                        title={`查看酒店详情：${hotel.name}`}
                       >
-                        🏨 {hotel.name}
+                        <HotelIcon size={13} className="shrink-0" strokeWidth={2} aria-hidden />
+                        <span className="truncate text-xs font-medium">{hotel.name}</span>
                       </button>
                     )}
-                    {itineraryStartLoading && !itineraryStart ? (
-                      <span className="text-[var(--stone)] text-xs">（正在核对抵达时间…）</span>
-                    ) : itineraryStart?.reasonZh ? (
-                      <span className="text-[var(--stone)] text-xs">· {itineraryStart.reasonZh}</span>
-                    ) : null}
+                    {(flights.outbound?.flightNumber || flights.returnFlight?.flightNumber) && (
+                      <span
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.flights} font-medium text-[var(--stone)]`}
+                        title="往返航班"
+                      >
+                        <Plane size={13} strokeWidth={2} aria-hidden />
+                        {flights.outbound?.flightNumber || '—'}
+                        <span className="text-[var(--stone)]" aria-hidden>⇄</span>
+                        {flights.returnFlight?.flightNumber || '—'}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {!readOnly &&
                       itineraryReady &&
                       (itineraryGenerated || itineraryIncrementalGenerating) && (
@@ -1007,7 +1098,7 @@ export default function App() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('logistics')}
+                    onClick={() => handleSelectTab('logistics')}
                     className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-6 py-2.5 text-sm font-medium text-[var(--paper)] shadow-md transition-all hover:opacity-90 active:scale-95"
                   >
                     <Luggage size={16} />
@@ -1024,6 +1115,7 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
+              onAnimationStart={() => restoreTabScroll('logistics')}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="space-y-8 sm:space-y-10"
             >
@@ -1086,7 +1178,7 @@ export default function App() {
                 <div className="flex justify-center pt-2">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('itinerary')}
+                    onClick={() => handleSelectTab('itinerary')}
                     className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-8 py-3 text-sm font-medium text-[var(--paper)] shadow-lg hover:opacity-90 active:scale-95"
                   >
                     <CalendarDays size={16} />
@@ -1099,6 +1191,7 @@ export default function App() {
 
           {activeTab === 'profile' && (
             <ProfileTab
+              onAnimationStart={() => restoreTabScroll('profile')}
               email={email}
               role={role}
               onSignOut={() => void signOut()}
@@ -1136,7 +1229,7 @@ export default function App() {
       {/* Mobile Native Bottom Navigation Bar */}
       <BottomNavBar
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         itineraryReady={itineraryReady}
       />
 

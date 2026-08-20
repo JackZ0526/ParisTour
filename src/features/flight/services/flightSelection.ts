@@ -12,6 +12,53 @@ export interface PersistedFlightSelection extends FlightSelection {
   returnInput: string
 }
 
+function areFlightEndpointsEqual(
+  left: FlightInfo['from'],
+  right: FlightInfo['from'],
+): boolean {
+  if (left === right) return true
+  if (!left || !right) return false
+  return (
+    left.code === right.code &&
+    left.name === right.name &&
+    left.city === right.city &&
+    left.terminal === right.terminal &&
+    left.scheduled === right.scheduled &&
+    left.actual === right.actual &&
+    left.timeZone === right.timeZone
+  )
+}
+
+function areFlightInfosEqual(
+  left: FlightInfo | null,
+  right: FlightInfo | null,
+): boolean {
+  if (left === right) return true
+  if (!left || !right) return false
+  return (
+    left.flightNumber === right.flightNumber &&
+    left.airline === right.airline &&
+    left.status === right.status &&
+    areFlightEndpointsEqual(left.from, right.from) &&
+    areFlightEndpointsEqual(left.to, right.to) &&
+    left.duration === right.duration &&
+    left.aircraft === right.aircraft &&
+    left.source === right.source &&
+    left.rawNote === right.rawNote
+  )
+}
+
+/** Ignore remount-created object identities when the selected flights are unchanged. */
+export function areFlightSelectionsEqual(
+  left: FlightSelection,
+  right: FlightSelection,
+): boolean {
+  return (
+    areFlightInfosEqual(left.outbound, right.outbound) &&
+    areFlightInfosEqual(left.returnFlight, right.returnFlight)
+  )
+}
+
 /** Both legs looked up successfully (non-null FlightInfo with a flight number). */
 export function areFlightsComplete(
   flights: FlightSelection | null | undefined,

@@ -4,6 +4,10 @@ import { looksChinese, translateTextsToChinese } from '../../chat/services/trans
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import { ShimmerLines } from '../../../shared/components/ShimmerLines'
 import { PlaceSourceMark } from './PlaceSourceMark'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 
 interface Props {
   reviews: GoogleReview[]
@@ -129,7 +133,7 @@ export function GoogleReviewsList({
                 {review.rating != null && <span>★ {review.rating}</span>}
                 {review.relativeTime && <span>{review.relativeTime}</span>}
                 {isTranslated && !showingOriginal && (
-                  <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[var(--ink)]">
+                  <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.blue} inline-flex items-center px-2 py-0.5 text-[var(--stone)]`}>
                     已翻译
                   </span>
                 )}

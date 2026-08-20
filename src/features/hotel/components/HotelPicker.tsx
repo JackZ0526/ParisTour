@@ -33,6 +33,10 @@ import { GooglePlacePhoto } from '../../place/components/GooglePlacePhoto'
 import { GoogleReviewsList } from '../../place/components/GoogleReviewsList'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
+import {
   fetchBookingHotelFeaturedReviews,
   fetchBookingHotelDetails,
   fetchBookingHotelPhotos,
@@ -164,12 +168,12 @@ function HotelCardFace({
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
             {hotel.isBest && (
-              <span className="rounded-full bg-[var(--copper)]/15 px-2 py-0.5 text-[10px] text-[var(--copper)]">
+              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center px-2 py-0.5 text-[10px] text-[var(--copper)]`}>
                 最优推荐
               </span>
             )}
             {hotel.source === 'custom' && (
-              <span className="rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--stone)]">
+              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center px-2 py-0.5 text-[10px] text-[var(--stone)]`}>
                 自定义
               </span>
             )}
@@ -2063,7 +2067,7 @@ export function HotelPicker({
           </p>
         </div>
           <div className="flex flex-wrap items-center gap-2">
-          <div className="rounded-full bg-[var(--sage)]/10 px-3 py-1 text-sm text-[var(--sage)]">
+          <div className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-3 py-1 text-sm text-[var(--sage)]`}>
             {isHotelSelected(selected) ? `当前：${selected.name}` : '当前：尚未选择'}
           </div>
           <button

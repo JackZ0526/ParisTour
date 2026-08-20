@@ -21,6 +21,7 @@
  */
 import { useCallback, useState } from 'react'
 import {
+  areFlightSelectionsEqual,
   areFlightsComplete,
   type FlightSelection,
 } from '../features/flight/services/flightSelection'
@@ -61,15 +62,11 @@ export function useTripCore(): UseTripCoreResult {
   )
   const [viewingHotelDetail, setViewingHotelDetail] = useState<HotelCandidate | null>(null)
 
-  // No-op when both legs match — keeps downstream effects (autosave /
-  // fingerprint gate / start resolve) from firing on identity updates
-  // the FlightPanel emits when only dates or hotel area change.
+  // FlightPanel reloads its localStorage seed whenever the logistics tab
+  // remounts. Compare values, not object identities, so that hydration is not
+  // mistaken for a user edit by autosave / fingerprint effects.
   const setFlights = useCallback((next: FlightSelection) => {
-    setFlightsState((prev) =>
-      prev.outbound === next.outbound && prev.returnFlight === next.returnFlight
-        ? prev
-        : next,
-    )
+    setFlightsState((prev) => (areFlightSelectionsEqual(prev, next) ? prev : next))
   }, [])
 
   const datesReady = hasTripDates(tripDates)

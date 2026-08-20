@@ -1,6 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
+import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 
 interface Props {
   value: string
@@ -124,7 +128,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 <p className="font-display text-base tracking-wide text-[var(--ink)]">
                   选择开始时间
                 </p>
-                <span className="rounded-full bg-[var(--sage)]/10 px-2.5 py-0.5 text-sm font-medium tabular-nums text-[var(--sage)]">
+                <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-0.5 text-sm font-medium tabular-nums text-[var(--sage)]`}>
                   {formatTime(draftHour, draftMinute)}
                 </span>
               </div>
