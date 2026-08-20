@@ -1782,11 +1782,10 @@ export function TripChatPanel({
           chat panel is open so the morphing card can take over the corner.
           Mobile: stacked above the chat button (column, 8px gap → bottom
           offset = 48px button + 8px gap = 56px = 3.5rem).
-          Desktop: row, to the LEFT of the chat button (10px gap → right
-          offset = 48px chat button + 10px gap = 58px = 3.625rem). */}
+      {/* LlmModelPicker stays anchored above the chat FAB on mobile, left on desktop */}
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))+3.5rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
+        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.5rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
           open ? 'pointer-events-none invisible opacity-0' : ''
         }`}
       >
@@ -1850,18 +1849,12 @@ export function TripChatPanel({
         }}
         onAnimationComplete={(definition) => {
           // Fires per-property; only the height run is the last to settle.
-          // Belt-and-braces with the timer above: if the callback fires
-          // first, panelEntered flips earlier and the inner column
-          // becomes scrollable mid-morph. The timer would still set it
-          // again to the same value 520ms later.
           if (definition === 'height') {
             setPanelEntered(open)
           }
         }}
         style={{
           position: 'fixed',
-          bottom: 'max(1.25rem, env(safe-area-inset-bottom))',
-          right: 'max(1.25rem, env(safe-area-inset-right))',
           borderRadius: 24,
           overflow: 'hidden',
           zIndex: TRIP_CHAT_PANEL_Z,
@@ -1871,7 +1864,11 @@ export function TripChatPanel({
           boxShadow: 'var(--shadow)',
           backdropFilter: 'blur(8px)',
         }}
-        className="fixed flex flex-col sm:bottom-5 sm:right-5"
+        className={`fixed flex flex-col ${
+          open
+            ? 'bottom-[max(1.15rem,env(safe-area-inset-bottom))]'
+            : 'bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+4.85rem)]'
+        } right-[max(1.25rem,env(safe-area-inset-right))] sm:bottom-5 sm:right-5`}
       >
         {/* Icon layer — visible when closed, fades out during the width-grow stage */}
         <motion.div

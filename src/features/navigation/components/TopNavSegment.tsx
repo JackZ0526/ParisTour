@@ -64,7 +64,7 @@ export function TopNavSegment({
             role="tab"
             aria-selected={isActive}
             onClick={() => onSelectTab(id)}
-            className="relative isolate flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors outline-none"
+            className="relative isolate flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-medium transition-colors outline-none"
           >
             {isActive && (
               <motion.span
