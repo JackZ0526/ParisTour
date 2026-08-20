@@ -63,6 +63,7 @@ import { clearAllRecommendCache } from './features/place/services/recommendCache
 import {
   dateForTripDay,
   formatTripDayLabel,
+  loadTripDates,
   saveTripDates,
 } from './features/itinerary/services/tripDates'
 import {
@@ -77,6 +78,7 @@ import {
 import {
   buildHeroCopy,
   chineseDayCount,
+  hasTripDates,
 } from './appHelpers'
 import {
   glassCapsuleSurfaceClass,
@@ -194,7 +196,9 @@ export default function App() {
     { numberOfDaysRef },
   )
   const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
-  const [activeTab, setActiveTab] = useState<AppTab>('itinerary')
+  const [activeTab, setActiveTab] = useState<AppTab>(() =>
+    hasTripDates(loadTripDates()) ? 'itinerary' : 'logistics',
+  )
   const tabScrollPositionsRef = useRef<Record<AppTab, number>>({
     itinerary: 0,
     logistics: 0,
@@ -680,7 +684,7 @@ export default function App() {
                   onClick={() => setBackupOpen(true)}
                   aria-label="存档备份"
                   title="存档备份"
-                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:text-zinc-900 hover:shadow active:scale-95 lg:inline-flex"
                 >
                   <Archive size={15} strokeWidth={1.9} />
                 </button>
@@ -696,7 +700,7 @@ export default function App() {
                   }}
                   aria-label="邀请协作分享"
                   title="邀请协作分享"
-                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/70 text-zinc-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-800 hover:shadow active:scale-95 lg:inline-flex"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:text-zinc-900 hover:shadow active:scale-95 lg:inline-flex"
                 >
                   <Share2 size={15} strokeWidth={1.9} />
                 </button>
@@ -706,11 +710,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleSelectTab('profile')}
-                className={`flex items-center gap-2 rounded-full border p-1 pl-1.5 pr-3 shadow-sm backdrop-blur-md transition-all hover:shadow active:scale-95 ${
-                  activeTab === 'profile'
-                    ? 'border-[var(--copper)]/40 bg-white'
-                    : 'border-black/5 bg-white/70 hover:bg-white'
-                }`}
+                className="flex items-center gap-2 rounded-full border border-white/80 bg-white/70 p-1 pl-1.5 pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95"
                 title="查看个人中心与偏好"
               >
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
@@ -858,7 +858,7 @@ export default function App() {
               {itineraryReady ? (
                 <section className="space-y-4">
                   {showItineraryLoading && (
-                    <div className="rounded-2xl border border-[var(--sage)]/25 bg-[var(--card)] px-4 py-8">
+                    <div className="rounded-2xl border border-white/80 bg-white/65 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl px-4 py-8">
                       <LoadingIndicator
                         variant="block"
                         mode="thinking"
@@ -881,7 +881,7 @@ export default function App() {
                   )}
 
                   {showItineraryError && (
-                    <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-6 text-center">
+                    <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-white/60 shadow-sm backdrop-blur-xl px-4 py-6 text-center">
                       <p className="font-medium text-[var(--ink)]">行程生成失败</p>
                       <p className="mt-1 whitespace-pre-line break-words text-left text-sm text-[var(--stone)] sm:text-center">
                         {itineraryGenError}
@@ -902,7 +902,7 @@ export default function App() {
                   )}
 
                   {showItineraryPartialError && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 bg-[var(--card)] px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 bg-white/60 shadow-sm backdrop-blur-xl px-4 py-3">
                       <div className="min-w-0 text-left">
                         <p className="text-sm font-medium text-[var(--ink)]">
                           后续天数生成中断
@@ -1086,7 +1086,7 @@ export default function App() {
                   )}
                 </section>
               ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--copper)]/35 bg-[var(--card)] px-6 py-12 text-center space-y-4 shadow-sm">
+                <div className="rounded-2xl border border-dashed border-[var(--copper)]/35 bg-white/60 px-6 py-12 text-center space-y-4 shadow-sm backdrop-blur-xl">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--copper)]/10 text-[var(--copper)]">
                     <Luggage size={28} />
                   </div>

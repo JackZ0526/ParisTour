@@ -49,6 +49,9 @@ import { PlaceName } from '../../place/components/PlaceName'
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
+  glassCardSurfaceClass,
+  glassCardActiveSurfaceClass,
+  glassHandleSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 import {
   googleMapsDirectionsUrl,
@@ -506,11 +509,11 @@ function TimelineStopCardSkeleton({ index }: { index: number }) {
     STOP_SKELETON_TITLE_WIDTHS[index % STOP_SKELETON_TITLE_WIDTHS.length]
   return (
     <div
-      className="flex items-start gap-2 rounded-2xl border border-white/70 bg-[var(--card)] p-2.5 sm:gap-3 sm:p-3"
+      className="flex items-start gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 sm:gap-3 sm:p-3 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl"
       aria-hidden
     >
-      <span className="mt-1 inline-flex h-7 w-7 shrink-0 rounded-md day-tab-shimmer" />
-      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 rounded-full day-tab-shimmer" />
+      <span className={`mt-1 inline-flex h-7 w-7 shrink-0 rounded-lg ${glassHandleSurfaceClass} day-tab-shimmer`} />
+      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 rounded-full day-tab-shimmer shadow-sm ring-1 ring-white/60" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="h-5 w-[4.5rem] rounded-full day-tab-shimmer" />
@@ -527,7 +530,7 @@ function TimelineStopCardSkeleton({ index }: { index: number }) {
           <span className="h-6 w-16 rounded-full day-tab-shimmer" />
         </div>
       </div>
-      <span className="hidden h-16 w-16 shrink-0 rounded-xl day-tab-shimmer sm:block" />
+      <span className="hidden h-16 w-16 shrink-0 rounded-xl day-tab-shimmer sm:block shadow-sm" />
       <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 rounded-full day-tab-shimmer" />
     </div>
   )
@@ -1478,7 +1481,7 @@ export function DayTimeline({
       <motion.div
         custom={direction}
         variants={timelineItemVariants}
-        className="w-full min-w-0 max-w-full rounded-2xl border border-white/70 bg-[var(--card)] p-3.5 sm:p-4 shadow-sm"
+        className="relative overflow-hidden w-full min-w-0 max-w-full rounded-2xl sm:rounded-3xl border border-white/80 bg-white/65 p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.05),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
@@ -1528,7 +1531,7 @@ export function DayTimeline({
                 title={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
                 aria-label={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
                 aria-busy={dayRestoring || dayPending || undefined}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white active:scale-95 disabled:cursor-wait disabled:opacity-60`}
               >
                 <RestoreDayIcon busy={dayRestoring} />
               </button>
@@ -1540,7 +1543,7 @@ export function DayTimeline({
               title={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
               aria-label={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
               aria-busy={dayRegenerating || dayPending || undefined}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stone)]/30 text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white active:scale-95 disabled:cursor-wait disabled:opacity-60`}
             >
               <RegenerateDayIcon busy={dayRegenerating} />
             </button>
@@ -1569,12 +1572,12 @@ export function DayTimeline({
           )}
         </p>
         {dayRegenError && (
-          <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-[var(--mist)]/40 px-3 py-2 text-left text-xs text-[var(--copper)]">
+          <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-red-50/60 px-3 py-2 text-left text-xs text-[var(--copper)] backdrop-blur-sm">
             {dayRegenError}
           </p>
         )}
         {(dayPending || dayRegenerating) && (
-          <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-[var(--mist)]/40 px-3 py-3">
+          <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-white/50 px-3 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-md">
             <LoadingIndicator
               variant="inline"
               thinkingLabel={
@@ -1600,8 +1603,8 @@ export function DayTimeline({
           </div>
         )}
         <div className="mt-3">
-          <p className="break-words rounded-xl bg-[var(--mist)]/50 px-3 py-2 text-xs sm:text-sm">
-            <span className="font-medium">路线导航：</span>
+          <p className="break-words rounded-xl border border-white/70 bg-white/50 px-3.5 py-2 text-xs sm:text-sm text-[var(--stone)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-md">
+            <span className="font-medium text-[var(--ink)]">路线导航：</span>
             点击每段交通，在 Google Maps 查看实时路线
           </p>
         </div>
@@ -1612,10 +1615,10 @@ export function DayTimeline({
         <motion.div
           custom={direction}
           variants={timelineItemVariants}
-          className="flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3"
+          className={`flex w-full min-w-0 max-w-full items-start gap-3 ${glassCardSurfaceClass} p-3`}
         >
           <span
-            className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+            className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
             title="机场"
             aria-label="机场"
           >
@@ -1764,9 +1767,9 @@ export function DayTimeline({
           }
 
           const cardInner = isReturnAirport ? (
-            <div className="flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
+            <div className={`flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl ${glassCardSurfaceClass} p-3`}>
               <span
-                className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
                 title="机场"
                 aria-label="机场"
               >
@@ -1781,13 +1784,13 @@ export function DayTimeline({
             <div
               className={`flex w-full min-w-0 max-w-full items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 transition-[border-color,box-shadow,background-color] duration-200 ${
                 active
-                  ? 'border-[var(--copper)] bg-white shadow-[var(--shadow)] ring-2 ring-[var(--copper)]/40 timeline-card-selected-highlight'
-                  : 'border-white/70 bg-[var(--card)]'
+                  ? glassCardActiveSurfaceClass
+                  : `${glassCardSurfaceClass} hover:bg-white/80 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]`
               }`}
             >
               {isFixedHotel ? (
                 <span
-                  className="mt-1 inline-flex h-7 w-7 select-none items-center justify-center rounded-md bg-[var(--mist)] text-[var(--stone)]"
+                  className={`mt-1 inline-flex h-7 w-7 select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-[var(--stone)]`}
                   title={pinTitle}
                   aria-label={pinTitle}
                 >
@@ -1797,7 +1800,7 @@ export function DayTimeline({
                 <span className="mt-1 inline-flex h-7 w-7" aria-hidden />
               ) : (
                 <span
-                  className="timeline-drag-handle mt-1 inline-flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-md bg-[var(--mist)] text-xs text-[var(--stone)] touch-none active:cursor-grabbing"
+                  className={`timeline-drag-handle mt-1 inline-flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-xs text-[var(--stone)] touch-none active:cursor-grabbing transition-colors hover:bg-white hover:text-[var(--ink)]`}
                   title="按住拖动排序"
                   aria-label="按住拖动排序"
                   onPointerDown={(e) => {
@@ -1813,7 +1816,7 @@ export function DayTimeline({
               )}
               {isHotelStop ? (
                 <span
-                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
                   title="酒店"
                   aria-label="酒店"
                 >
@@ -1821,14 +1824,14 @@ export function DayTimeline({
                 </span>
               ) : isAirportStop ? (
                 <span
-                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white"
+                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
                   title="机场"
                   aria-label="机场"
                 >
                   <PlaneIcon />
                 </span>
               ) : (
-                <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
+                <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white shadow-sm ring-1 ring-white/60">
                   {n}
                 </span>
               )}
@@ -1879,7 +1882,7 @@ export function DayTimeline({
                   type={place.type}
                   fallback={place.image}
                   alt={place.name}
-                  className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
+                  className="hidden h-16 w-16 shrink-0 rounded-xl sm:block shadow-sm ring-1 ring-black/5"
                   showBadge={false}
                 />
               </button>
@@ -1902,7 +1905,7 @@ export function DayTimeline({
                     if (liveIndex == null) return
                     requestDelete(stopKey, liveIndex)
                   }}
-                  className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] hover:bg-red-50 hover:text-red-700 disabled:pointer-events-none disabled:opacity-40"
+                  className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/70 transition-colors hover:bg-red-500/10 hover:text-red-600 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                 >
                   <TrashIcon />
                 </button>
@@ -2018,9 +2021,9 @@ export function DayTimeline({
                         data-timeline-card
                         className="w-full min-w-0 max-w-full rounded-2xl border border-transparent"
                       >
-                        <div className="flex w-full min-w-0 max-w-full items-start gap-2 rounded-2xl border border-white/70 bg-[var(--card)] p-2.5 sm:gap-3 sm:p-3">
+                        <div className={`flex w-full min-w-0 max-w-full items-start gap-2 rounded-2xl ${glassCardSurfaceClass} p-2.5 sm:gap-3 sm:p-3`}>
                           <span className="mt-1 inline-flex h-7 w-7" aria-hidden />
-                          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
+                          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white shadow-sm ring-1 ring-white/60">
                             {n}
                           </span>
                           <div className="min-w-0 flex-1">
@@ -2052,7 +2055,7 @@ export function DayTimeline({
                             type={oldSwapPlace.type}
                             fallback={oldSwapPlace.image}
                             alt={oldSwapPlace.name}
-                            className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
+                            className="hidden h-16 w-16 shrink-0 rounded-xl sm:block shadow-sm ring-1 ring-black/5"
                             showBadge={false}
                           />
                         </div>
@@ -2140,7 +2143,7 @@ export function DayTimeline({
             width: drag.width,
           }}
         >
-          <div className="timeline-drag-float-card rounded-2xl border border-white/80 bg-[var(--card)] ring-1 ring-[var(--ink)]/5">
+          <div className="timeline-drag-float-card relative overflow-hidden rounded-2xl border border-white/90 bg-white/85 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
             <div className="timeline-drag-float-content">
             {(() => {
               const stop = day.stops[drag.from]
@@ -2156,20 +2159,20 @@ export function DayTimeline({
               const travelChip =
                 travelChipFromLeg(legInbound) || stop.walkLevel || null
               return (
-                <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-[var(--card)] p-3">
-                  <span className="mt-1 inline-flex h-7 cursor-grabbing items-center justify-center rounded-md bg-[var(--mist)] px-2 text-xs text-[var(--stone)]">
+                <div className={`flex items-start gap-3 rounded-2xl ${glassCardSurfaceClass} p-3`}>
+                  <span className={`mt-1 inline-flex h-7 cursor-grabbing items-center justify-center rounded-lg ${glassHandleSurfaceClass} px-2 text-xs text-[var(--stone)]`}>
                     <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                   </span>
                   {isHotelStop ? (
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white">
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60">
                       <HouseIcon />
                     </span>
                   ) : isAirportStop ? (
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white">
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60">
                       <PlaneIcon />
                     </span>
                   ) : (
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white">
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white shadow-sm ring-1 ring-white/60">
                       {n}
                     </span>
                   )}
@@ -2214,7 +2217,7 @@ export function DayTimeline({
                     type={place.type}
                     fallback={place.image}
                     alt={place.name}
-                    className="hidden h-16 w-16 shrink-0 rounded-xl sm:block"
+                    className="hidden h-16 w-16 shrink-0 rounded-xl sm:block shadow-sm ring-1 ring-black/5"
                     showBadge={false}
                   />
                 </div>
@@ -2229,7 +2232,7 @@ export function DayTimeline({
         <motion.p
           custom={direction}
           variants={timelineItemVariants}
-          className="rounded-2xl border border-dashed border-[var(--stone)]/30 px-4 py-6 text-center text-sm text-[var(--stone)]"
+          className="rounded-2xl border border-dashed border-[var(--stone)]/30 bg-white/45 px-4 py-6 text-center text-sm text-[var(--stone)] backdrop-blur-md shadow-sm"
         >
           {readOnly ? '本日还没有地点。' : '本日还没有地点，点击下方添加。'}
         </motion.p>
@@ -2242,7 +2245,7 @@ export function DayTimeline({
               type="button"
               onClick={() => setAddOpen(true)}
               disabled={dayRestoring}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-4 py-3 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:cursor-wait disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-white/50 px-4 py-3 text-sm font-medium text-[var(--sage)] shadow-sm backdrop-blur-md transition-all hover:bg-white/80 hover:border-[var(--sage)] hover:shadow active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
               <Plus size={15} strokeWidth={2} aria-hidden />
               添加地点

@@ -61,7 +61,7 @@ export function ProfileTab({
       className="mx-auto max-w-2xl space-y-5 pb-10"
     >
       {/* 1. Account Profile Card */}
-      <div className="rounded-3xl border border-white/60 bg-[var(--card)]/90 p-5 shadow-sm backdrop-blur-md">
+      <div className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-colors">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--copper)]/15 text-[var(--copper)] shadow-inner">
             <User size={28} strokeWidth={2} />
@@ -90,7 +90,7 @@ export function ProfileTab({
           <button
             type="button"
             onClick={onSignOut}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200/80 bg-red-50/60 px-3.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100/80 active:scale-95 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200/80 bg-red-50/70 px-3.5 py-1.5 text-xs font-medium text-red-600 shadow-sm backdrop-blur-sm transition-colors hover:bg-red-100 active:scale-95 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400"
           >
             <LogOut size={13} strokeWidth={2} />
             <span>退出</span>
@@ -99,8 +99,8 @@ export function ProfileTab({
       </div>
 
       {/* 2. Trip Management Card */}
-      <div className="rounded-3xl border border-white/60 bg-[var(--card)]/90 p-5 shadow-sm backdrop-blur-md space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--mist)] pb-3">
+      <div className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-4 transition-colors">
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
             <MapPin size={16} className="text-[var(--copper)]" />
             <span>行程管理与多行程切换</span>
@@ -115,7 +115,7 @@ export function ProfileTab({
           <div className="space-y-1.5">
             <label className="text-xs text-[var(--stone)]">当前选中的行程</label>
             <select
-              className="w-full rounded-2xl border border-[var(--stone)]/25 bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--copper)]"
+              className="w-full rounded-2xl border border-white/80 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] shadow-[inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-md outline-none transition-colors focus:border-[var(--copper)]"
               value={activeTripId || ''}
               onChange={(e) => onSwitchTrip?.(e.target.value)}
             >
@@ -134,7 +134,7 @@ export function ProfileTab({
             <button
               type="button"
               onClick={onOpenShare}
-              className="flex items-center justify-between rounded-2xl border border-[var(--stone)]/20 bg-[var(--paper)] p-3.5 text-left transition-colors hover:border-[var(--copper)] hover:bg-[var(--mist)]/40"
+              className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow hover:border-white active:scale-[0.99]"
             >
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)]">
@@ -153,7 +153,7 @@ export function ProfileTab({
             <button
               type="button"
               onClick={onOpenBackup}
-              className="flex items-center justify-between rounded-2xl border border-[var(--stone)]/20 bg-[var(--paper)] p-3.5 text-left transition-colors hover:border-[var(--sage)] hover:bg-[var(--mist)]/40"
+              className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow hover:border-white active:scale-[0.99]"
             >
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--sage)]/15 text-[var(--sage)]">
@@ -171,8 +171,8 @@ export function ProfileTab({
       </div>
 
       {/* 3. AI Recommendation Preferences Card */}
-      <div className="rounded-3xl border border-white/60 bg-[var(--card)]/90 p-5 shadow-sm backdrop-blur-md space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--mist)] pb-3">
+      <div className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-4 transition-colors">
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
             <Sparkles size={16} className="text-[var(--copper)]" />
             <span>智能推荐偏好设置</span>
@@ -187,7 +187,7 @@ export function ProfileTab({
           </button>
         </div>
 
-        <div className="rounded-2xl border border-[var(--stone)]/15 bg-[var(--paper)] p-4 space-y-3">
+        <div className="rounded-2xl border border-white/80 bg-white/50 p-4 space-y-3 shadow-inner backdrop-blur-md">
           <div className="flex items-center justify-between">
             <span className="text-xs text-[var(--stone)]">每日出发时间</span>
             <span className="text-xs font-medium text-[var(--ink)]">
@@ -209,7 +209,7 @@ export function ProfileTab({
           <button
             type="button"
             onClick={onOpenPreferences}
-            className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--ink)] py-2.5 text-xs font-medium text-[var(--paper)] transition-all hover:opacity-90 active:scale-98"
+            className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--ink)] py-2.5 text-xs font-medium text-[var(--paper)] shadow-sm transition-all hover:opacity-90 active:scale-98"
           >
             <SlidersHorizontal size={14} />
             <span>打开偏好设置详细面板</span>
@@ -219,7 +219,7 @@ export function ProfileTab({
 
       {/* 4. Danger Zone Card */}
       {!readOnly && onClearAll && (
-        <div className="rounded-3xl border border-red-200/60 bg-[var(--card)]/90 p-5 shadow-sm backdrop-blur-md space-y-3 dark:border-red-900/30">
+        <div className="rounded-3xl border border-red-200/80 bg-red-50/40 p-5 shadow-[0_8px_30px_rgba(239,68,68,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
             <Trash2 size={16} />
             <span>重置与清空</span>
@@ -230,7 +230,7 @@ export function ProfileTab({
           <button
             type="button"
             onClick={onClearAll}
-            className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 active:scale-95 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"
+            className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50/80 px-4 py-2 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-100 active:scale-95 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"
           >
             <Trash2 size={14} />
             <span>清空当前行程全部数据</span>

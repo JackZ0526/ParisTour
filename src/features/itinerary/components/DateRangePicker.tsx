@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
 import { useReducedMotion } from '../../../shared/hooks/useReducedMotion'
+import { glassPopoverSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 export interface DateRangeValue {
   startDate: string
@@ -265,7 +266,7 @@ export function DateRangePicker({
             exit={popoverAnim.exit}
             transition={popoverAnim.transition}
             style={{ transformOrigin: 'top left' }}
-            className="absolute left-0 z-40 mt-2 w-[min(100%,20rem)] rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
+            className={`absolute left-0 z-40 mt-2 w-[min(100%,20rem)] ${glassPopoverSurfaceClass} p-3`}
           >
           <div className="mb-2 flex items-center justify-between gap-2">
             <button

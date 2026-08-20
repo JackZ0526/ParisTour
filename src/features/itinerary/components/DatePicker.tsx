@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
+import { glassPopoverSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 interface Props {
   value: string
@@ -156,7 +157,7 @@ export function DatePicker({
             animate={popover.animate}
             exit={popover.exit}
             transition={popover.transition}
-            className="absolute left-0 z-40 mt-2 w-[min(100%,20rem)] rounded-2xl border border-white/70 bg-[#fffcf7] p-3 shadow-[var(--shadow)]"
+            className={`absolute left-0 z-40 mt-2 w-[min(100%,20rem)] ${glassPopoverSurfaceClass} p-3`}
           >
           <div className="mb-2 flex items-center justify-between gap-2">
             <button

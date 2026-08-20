@@ -42,6 +42,8 @@ import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/Load
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
+  glassCardSurfaceClass,
+  glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 import { PlaceName } from './PlaceName'
 import { PlacePhotoGallery } from './PlacePhotoGallery'
@@ -934,7 +936,7 @@ export function AddPlaceDialog({
         onClose={onClose}
         overlayZIndex={2100}
         hideBackdrop={Boolean(googleDetail)}
-        className="flex max-h-[min(88dvh,88vh)] max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+        className={`flex max-h-[min(88dvh,88vh)] max-w-lg flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl`}
       >
         <div ref={chromeRef} className="shrink-0">
           <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
@@ -946,7 +948,7 @@ export function AddPlaceDialog({
 
           <div className="px-4 pt-3">
             <div
-              className="relative flex gap-1 rounded-full bg-[var(--mist)]/70 p-1"
+              className="relative flex gap-1 rounded-full border border-white/80 bg-white/50 p-1 shadow-sm backdrop-blur-md"
               role="tablist"
               aria-label="添加地点视图"
             >
@@ -1097,10 +1099,10 @@ export function AddPlaceDialog({
                         transition={{ layout: { duration: 0.24, ease: [0.22, 1, 0.36, 1] } }}
                       >
                         <div
-                          className={`overflow-hidden rounded-xl border bg-[var(--card)] transition-colors duration-200 ${
+                          className={`overflow-hidden rounded-2xl border transition-all duration-200 ${
                             expanded
-                              ? 'border-[var(--copper)] shadow-[var(--shadow)]'
-                              : 'border-white/70 hover:border-[var(--gold)]'
+                              ? 'border-[var(--copper)]/80 bg-white/90 shadow-[0_8px_32px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(255,255,255,1)] ring-2 ring-[var(--copper)]/35 backdrop-blur-2xl'
+                              : `${glassCardSurfaceClass} hover:bg-white/80 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]`
                           }`}
                         >
                           <button

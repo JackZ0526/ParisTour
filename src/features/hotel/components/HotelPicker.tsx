@@ -2087,7 +2087,7 @@ export function HotelPicker({
       </div>
 
       {refreshPanel && (
-        <div className="rounded-2xl border border-[var(--mist)] bg-[var(--card)] p-4 shadow-[var(--shadow)]">
+        <div className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-colors">
           {refreshPanel === 'choose' ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -2111,7 +2111,7 @@ export function HotelPicker({
                   type="button"
                   disabled={refreshing}
                   onClick={() => setRefreshPanel('prefer')}
-                  className="rounded-xl border border-[var(--mist)] bg-white/70 px-3 py-3 text-left transition hover:border-[var(--sage)] disabled:opacity-50"
+                  className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
                 >
                   <p className="font-medium">说说我的喜好</p>
                   <p className="mt-1 text-xs text-[var(--stone)]">
@@ -2122,7 +2122,7 @@ export function HotelPicker({
                   type="button"
                   disabled={refreshing}
                   onClick={() => void runFreshRecommendations()}
-                  className="rounded-xl border border-[var(--mist)] bg-white/70 px-3 py-3 text-left transition hover:border-[var(--copper)] disabled:opacity-50"
+                  className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
                 >
                   <p className="font-medium">交给命运</p>
                   <p className="mt-1 text-xs text-[var(--stone)]">
@@ -2154,7 +2154,7 @@ export function HotelPicker({
                 onChange={(e) => setPreferText(e.target.value)}
                 rows={3}
                 placeholder="写下你对住宿的想法…"
-                className="mt-3 w-full resize-none rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
+                className="mt-3 w-full resize-none rounded-xl border border-white/80 bg-white/70 p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] backdrop-blur-md"
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <button
@@ -2424,7 +2424,7 @@ export function HotelPicker({
             width: drag.width,
           }}
         >
-          <div className="timeline-drag-float-card overflow-hidden rounded-2xl border border-white/80 bg-[var(--card)] ring-1 ring-[var(--ink)]/5">
+          <div className="timeline-drag-float-card relative overflow-hidden rounded-3xl border border-white/90 bg-white/85 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
             <div className="timeline-drag-float-content group">
               {(() => {
                 const hotel =

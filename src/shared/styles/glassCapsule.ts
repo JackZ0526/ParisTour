@@ -10,3 +10,27 @@ export const glassCapsuleToneClass = {
   violet: 'border-[#b6accd]/70 bg-[#ede9f5]/75',
   neutral: 'border-white/80 bg-white/55',
 } as const
+
+/** Shared liquid frosted-glass card surface used by timeline cards & panels. */
+export const glassCardSurfaceClass =
+  "relative overflow-hidden rounded-2xl border border-white/80 bg-white/65 shadow-[0_4px_24px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+
+/** Shared liquid frosted-glass card surface with gentle sage-green tint. */
+export const glassSageCardSurfaceClass =
+  "relative overflow-hidden rounded-2xl border border-[#a8bcae]/65 bg-[#edf4ee]/75 shadow-[0_4px_24px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+
+/** Active / selected state for glass cards with warm copper-amber glow. */
+export const glassCardActiveSurfaceClass =
+  "relative overflow-hidden rounded-2xl border border-[var(--copper)]/80 bg-white/90 shadow-[0_8px_32px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(255,255,255,1)] ring-2 ring-[var(--copper)]/35 backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-[''] timeline-card-selected-highlight"
+
+/** Small handle / icon pill surface for drag handles and action buttons. */
+export const glassHandleSurfaceClass =
+  "border border-white/80 bg-white/70 shadow-[0_1px_4px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-md"
+
+/** Shared frosted-glass modal / sheet surface used by bottom sheets & dialogs. */
+export const glassModalSurfaceClass =
+  "relative overflow-hidden border border-white/90 bg-white/85 shadow-[0_20px_60px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+
+/** Shared floating dropdown / popover glass surface. */
+export const glassPopoverSurfaceClass =
+  "relative overflow-hidden rounded-2xl border border-white/90 bg-white/85 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"

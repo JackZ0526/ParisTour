@@ -13,6 +13,7 @@ import {
   photoSlideVariants,
 } from './PlacePhotoGallery'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
+import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 import {
   ChevronLeft,
   ChevronRight,
@@ -84,6 +85,8 @@ import {
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
+  glassHandleSurfaceClass,
+  glassSageCardSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 
 const placeDetailCapsuleClass =
@@ -256,10 +259,10 @@ function PlaceReviewsShimmer() {
       {Array.from({ length: 2 }, (_, index) => (
         <article
           key={index}
-          className="rounded-xl bg-white/70 px-3 py-2 text-sm"
+          className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-sm shadow-sm backdrop-blur-md"
           aria-hidden
         >
-          <span className="mb-2 block h-3 w-24 rounded-full day-tab-shimmer" />
+          <span className="mb-2 block h-3.5 w-24 rounded-full day-tab-shimmer" />
           <ShimmerLines lines={3} />
         </article>
       ))}
@@ -1532,7 +1535,7 @@ export function GooglePlacePage({
         'data-google-place-page': '1',
         'data-pending-place-confirm': footer ? '1' : undefined,
       }}
-      className="flex max-h-[min(75dvh,calc(100dvh-2rem))] max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-[var(--paper)] shadow-[var(--shadow)] sm:rounded-3xl"
+      className={`flex max-h-[min(75dvh,calc(100dvh-2rem))] max-w-3xl flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl`}
     >
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--mist)] px-4 py-3">
           <div className="min-w-0 pr-3">
@@ -1843,7 +1846,7 @@ export function GooglePlacePage({
                 type="button"
                 onClick={refreshTripadvisorPhotos}
                 disabled={tripadvisorPhotosRefreshing}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--mist)] px-3 py-1.5 text-xs font-medium text-[var(--stone)] transition-colors hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60"
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.neutral} text-xs font-medium text-[var(--stone)] transition-colors hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60`}
                 aria-label="重新获取图片"
                 title="清除失败缓存并重新获取图片"
               >
@@ -1953,9 +1956,9 @@ export function GooglePlacePage({
               displayNarrative.intro ||
               displayNarrative.reason ||
               displayNarrative.tripFit) && (
-              <div className="space-y-3 rounded-2xl border border-[var(--sage)]/25 bg-[var(--sage)]/8 px-4 py-3">
+              <div className={`space-y-3 rounded-2xl ${glassSageCardSurfaceClass} p-4`}>
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--sage)]">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--sage)] font-semibold">
                     {displayNarrative.labels?.title || '行程顾问点评'}
                   </p>
                   {displayNarrative.onRegenerate &&
@@ -1965,7 +1968,7 @@ export function GooglePlacePage({
                       displayNarrative.regenerating) && (
                       <button
                         type="button"
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--sage)]/30 bg-white/70 text-[var(--sage)] transition hover:bg-white disabled:opacity-60"
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--sage)] transition hover:bg-white hover:shadow-sm active:scale-95 disabled:opacity-60`}
                         disabled={Boolean(displayNarrative.loading || displayNarrative.regenerating)}
                         aria-label={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
                         title={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
@@ -2081,7 +2084,7 @@ export function GooglePlacePage({
                   <PlaceSourceMark source="google" showLabel={false} />
                   {reviewSourceLabel}
                 </p>
-                <div className="rounded-xl bg-white/70 px-3 py-2 text-sm">
+                <div className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-sm shadow-sm backdrop-blur-md">
                   <p className="leading-relaxed text-[var(--stone)]">
                     Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。
                   </p>
@@ -2103,7 +2106,7 @@ export function GooglePlacePage({
           {showMap && (
             <div>
               <p className="mb-2 text-sm font-medium">地图位置（本页嵌入）</p>
-              <div className="overflow-hidden rounded-xl border border-[var(--mist)]">
+              <div className="overflow-hidden rounded-2xl border border-white/80 shadow-sm">
                 <iframe
                   title={`${name} map`}
                   src={embedSrc}
@@ -2118,7 +2121,7 @@ export function GooglePlacePage({
         </div>
 
         {footer && (
-          <div className="shrink-0 border-t border-[var(--mist)] bg-[var(--paper)] px-4 py-3">
+          <div className="shrink-0 border-t border-white/80 bg-white/75 px-4 py-3 backdrop-blur-xl">
             {footer}
           </div>
         )}

@@ -13,8 +13,8 @@ const TABS: Array<{
   label: string
   Icon: typeof CalendarDays
 }> = [
-  { id: 'itinerary', label: '行程', Icon: CalendarDays },
   { id: 'logistics', label: '出行', Icon: Luggage },
+  { id: 'itinerary', label: '行程', Icon: CalendarDays },
   { id: 'profile', label: '我的', Icon: User },
 ]
 

@@ -8,6 +8,10 @@ import { Checkbox } from '../../../shared/components/Checkbox'
 import { TimePicker } from '../../itinerary/components/TimePicker'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import {
+  glassCardSurfaceClass,
+  glassModalSurfaceClass,
+} from '../../../shared/styles/glassCapsule'
 
 interface Props {
   open: boolean
@@ -99,9 +103,9 @@ export function RecommendationPreferencesDialog({
       onClose={onClose}
       overlayZIndex={2600}
       ariaLabelledBy="recommendation-preferences-title"
-      className="max-w-xl overflow-hidden rounded-t-3xl border border-white/70 bg-[var(--paper)] shadow-2xl sm:rounded-3xl"
+      className={`max-w-xl overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl`}
     >
-      <div className="flex items-start justify-between border-b border-[var(--mist)] px-5 py-4">
+      <div className="flex items-start justify-between border-b border-[var(--mist)] px-5 pb-4 pt-2 sm:px-6 sm:pt-5">
         <div>
           <h2 id="recommendation-preferences-title" className="font-serif text-2xl text-[var(--ink)]">
             推荐偏好
@@ -124,7 +128,7 @@ export function RecommendationPreferencesDialog({
           {options.map((option) => (
             <label
               key={option.key}
-              className="flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-[var(--mist)] bg-white/55 px-4 py-3"
+              className={`flex cursor-pointer items-start justify-between gap-4 rounded-2xl ${glassCardSurfaceClass} p-4 transition hover:bg-white/80`}
             >
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-[var(--ink)]">{option.label}</span>

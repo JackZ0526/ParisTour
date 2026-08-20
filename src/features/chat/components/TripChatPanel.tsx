@@ -235,7 +235,7 @@ export function TripChatPanel({
   // Spring for the FAB↔panel container transform. stiffness 350 / damping 30
   // gives just a hint of overshoot (iOS modal presentation feel) and settles
   // in ~320ms. Higher stiffness than the TimePicker morph because the
-  // aspect-ratio change (48×48 → 380×560) is much larger — too much bounce
+  // aspect-ratio change (48x48 → 380x560) is much larger — too much bounce
   // reads as "the button flew away" rather than "grew".
   const morphSpring = { type: 'spring' as const, stiffness: 350, damping: 30 }
   const workStepsRef = useRef<ChatWorkStep[]>([])
@@ -1810,8 +1810,8 @@ export function TripChatPanel({
       </AnimatePresence>
 
       {/*
-        The chat panel is a single element that morphs from a 48×48 black
-        FAB into a 380×560 floating card (clamped to viewport − 2.5rem
+        The chat panel is a single element that morphs from a 48x48 black
+        FAB into a 380x560 floating card (clamped to viewport − 2.5rem
         on narrow screens so it doesn't run off the left edge). Staged so:
         - opening: width 48→380 first, then height 48→560
         - closing: height 560→48 first, then width 380→48
@@ -1840,7 +1840,7 @@ export function TripChatPanel({
         animate={{
           width: open ? TRIP_CHAT_PANEL_WIDTH : 48,
           height: open ? 560 : 48,
-          backgroundColor: open ? '#fffcf7' : 'rgba(255, 255, 255, 0.85)',
+          backgroundColor: open ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.75)',
         }}
         transition={{
           width: { ...morphSpring, delay: open ? 0 : 0.18 },

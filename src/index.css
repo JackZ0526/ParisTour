@@ -1341,7 +1341,9 @@ body.timeline-dragging {
   isolation: isolate;
   overflow: hidden;
   border-radius: 1rem;
-  background: var(--card);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   /* height set inline — morph transitions height, then wipe runs */
 }
 

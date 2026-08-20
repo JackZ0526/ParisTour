@@ -74,8 +74,8 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10 sm:py-16">
-      <div className="animate-fade-up rounded-2xl border border-white/60 bg-[var(--card)] p-6 shadow-[var(--shadow)] sm:rounded-[28px] sm:p-10">
-        <p className="text-xs uppercase tracking-[0.28em] text-[var(--sage)]">Paris Tour</p>
+      <div className="animate-fade-up rounded-3xl border border-white/80 bg-white/75 p-6 shadow-[0_12px_40px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)] backdrop-blur-2xl sm:rounded-[32px] sm:p-10">
+        <p className="text-xs uppercase tracking-[0.28em] text-[var(--sage)] font-semibold">Paris Tour</p>
         <h1 className="font-display mt-2 text-3xl text-[var(--ink)] sm:text-4xl">邀请制登录</h1>
         <p className="mt-3 text-sm text-[var(--stone)]">
           需受邀邮箱才能注册与使用。登录后可打开你的行程，也可查看他人分享给你的行程。
@@ -87,13 +87,13 @@ export function LoginPage() {
           </p>
         )}
 
-        <div className="mt-6 flex gap-2 text-sm">
+        <div className="mt-6 inline-flex rounded-full border border-white/80 bg-white/50 p-1 shadow-sm backdrop-blur-md text-sm">
           <button
             type="button"
-            className={`rounded-full px-4 py-1.5 ${
+            className={`rounded-full px-5 py-1.5 font-medium transition ${
               mode === 'signin'
-                ? 'bg-[var(--sage)] text-white'
-                : 'border border-[var(--stone)]/30 text-[var(--stone)]'
+                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                : 'text-[var(--stone)] hover:text-[var(--ink)]'
             }`}
             onClick={() => {
               setMode('signin')
@@ -104,10 +104,10 @@ export function LoginPage() {
           </button>
           <button
             type="button"
-            className={`rounded-full px-4 py-1.5 ${
+            className={`rounded-full px-5 py-1.5 font-medium transition ${
               mode === 'signup'
-                ? 'bg-[var(--sage)] text-white'
-                : 'border border-[var(--stone)]/30 text-[var(--stone)]'
+                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                : 'text-[var(--stone)] hover:text-[var(--ink)]'
             }`}
             onClick={() => {
               setMode('signup')
@@ -130,7 +130,7 @@ export function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[var(--stone)]/25 bg-white/70 px-3 py-2 outline-none focus:border-[var(--sage)]"
+              className="mt-1 w-full rounded-xl border border-white/80 bg-white/70 px-3.5 py-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] backdrop-blur-md"
             />
           </label>
           <div className="block text-sm">

@@ -89,7 +89,7 @@ export function DestinationPanel({ value, onChange }: Props) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/70 bg-[var(--card)] p-4 shadow-[var(--shadow)]">
+      <div className="rounded-2xl sm:rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-colors">
         <label className="block text-sm">
           <span className="text-[var(--stone)]">目的地</span>
           <input

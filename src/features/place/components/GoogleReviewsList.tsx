@@ -127,7 +127,10 @@ export function GoogleReviewsList({
           const showItemShimmer = showShimmer && translating && !translated && !looksChinese(original)
 
           return (
-            <article key={`${original.slice(0, 24)}-${i}`} className="rounded-xl bg-white/70 px-3 py-2 text-sm">
+            <article
+              key={`${original.slice(0, 24)}-${i}`}
+              className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-sm shadow-sm backdrop-blur-md transition-all hover:bg-white/80"
+            >
               <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-[var(--stone)]">
                 {review.author && <span>{review.author}</span>}
                 {review.rating != null && <span>★ {review.rating}</span>}
