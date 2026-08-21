@@ -62,7 +62,11 @@ import type {
 } from '../../../types'
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
-import { glassBackdropSurfaceClass } from '../../../shared/styles/glassCapsule'
+import {
+  glassBackdropSurfaceClass,
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
+} from '../../../shared/styles/glassCapsule'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
@@ -1898,7 +1902,13 @@ export function TripChatPanel({
           aria-hidden={!open}
           className="absolute inset-0 flex flex-col"
         >
-          <div className="border-b border-[var(--mist)] px-4 py-3">
+          {/* Top Specular Streaming Reflection Line */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
+          />
+
+          <div className="border-b border-white/85 px-4 py-3 bg-white/40 backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="font-display text-xl leading-tight">行程助手</h3>
@@ -1922,20 +1932,26 @@ export function TripChatPanel({
               show a scrollbar as the panel expands. `panelEntered` flips
               true when the height animation settles, after which we want
               scrolling for long chat histories. */}
-          <div className={`min-h-0 flex-1 space-y-3 ${panelEntered ? 'overflow-y-auto' : 'overflow-y-hidden'} overscroll-contain px-3 py-3`}>
+          <div className={`min-h-0 flex-1 space-y-3 ${panelEntered ? 'overflow-y-auto' : 'overflow-y-hidden'} overscroll-contain px-3.5 py-3`}>
             {!history.some((t) => !t.hidden) && (
-              <div className="space-y-2">
-                <p className="text-sm text-[var(--stone)]">
+              <div className="space-y-2.5">
+                <p className="text-xs font-medium text-[var(--stone)]">
                   试试问我：介绍酒店、换一批住宿、介绍今天地点、加咖啡馆，或删改行程。
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {SUGGESTIONS.map((s) => (
+                  {SUGGESTIONS.map((s, idx) => (
                     <button
                       key={s}
                       type="button"
                       disabled={busy}
                       onClick={() => void submit(s)}
-                      className="rounded-full bg-[var(--mist)] px-2.5 py-1 text-left text-xs text-[var(--ink)] hover:bg-[var(--sage)]/20 disabled:opacity-50"
+                      className={`${glassCapsuleSurfaceClass} ${
+                        idx % 3 === 0
+                          ? glassCapsuleToneClass.copper
+                          : idx % 3 === 1
+                            ? glassCapsuleToneClass.sage
+                            : glassCapsuleToneClass.neutral
+                      } inline-flex items-center px-3 py-1.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer`}
                     >
                       {s}
                     </button>
@@ -2009,10 +2025,10 @@ export function TripChatPanel({
                     ) : null}
                     {showAnswerBubble ? (
                       <div
-                        className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                        className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                           turn.role === 'user'
-                            ? 'bg-[var(--ink)] text-[var(--paper)]'
-                            : 'bg-white/80 text-[var(--ink)]'
+                            ? 'bg-[var(--ink)] text-[var(--paper)] shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                            : 'border border-white/90 bg-white/75 shadow-[0_2px_12px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md text-[var(--ink)]'
                         }`}
                       >
                         {showThinking ? (
@@ -2058,7 +2074,7 @@ export function TripChatPanel({
           </div>
 
           <form
-            className="flex gap-2 border-t border-[var(--mist)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="flex items-center gap-2 border-t border-white/85 bg-white/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
             onSubmit={(e) => {
               e.preventDefault()
               void submit(input)
@@ -2073,14 +2089,14 @@ export function TripChatPanel({
               aria-busy={busy || undefined}
               enterKeyHint="send"
               autoComplete="off"
-              className="min-w-0 flex-1 rounded-full border border-[var(--ink)]/10 bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
+              className="min-w-0 flex-1 rounded-full border border-white/90 bg-white/80 px-3.5 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/70 shadow-[inset_0_1px_2.5px_rgba(0,0,0,0.04),0_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white focus:shadow-[0_0_0_2px_rgba(181,106,60,0.12),inset_0_1px_2px_rgba(0,0,0,0.02)]"
             />
             <button
               type="submit"
               disabled={busy || !input.trim() || !open}
               tabIndex={open ? undefined : -1}
               aria-busy={busy || undefined}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--sage)] px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] shadow-[0_3px_10px_rgba(0,0,0,0.18)] transition-all hover:bg-black active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               {busy ? (
                 <>
