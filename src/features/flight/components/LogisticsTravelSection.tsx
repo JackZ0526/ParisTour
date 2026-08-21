@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { lookupFlight, meaningfulFlightStatus } from '../services/flightLookup'
 import { purgeNonApiFlightCache } from '../services/flightCache'
 import {
@@ -89,6 +90,10 @@ export function LogisticsTravelSection({
   // Independent edit states
   const [editingOutbound, setEditingOutbound] = useState(false)
   const [editingInbound, setEditingInbound] = useState(false)
+  const [outboundCardHeight, setOutboundCardHeight] = useState<number | null>(null)
+  const [outboundEditorHeight, setOutboundEditorHeight] = useState<number | null>(null)
+  const [inboundCardHeight, setInboundCardHeight] = useState<number | null>(null)
+  const [inboundEditorHeight, setInboundEditorHeight] = useState<number | null>(null)
   const [confirmClearDatesOpen, setConfirmClearDatesOpen] = useState(false)
 
   const startDate = tripDates?.startDate || ''
@@ -290,8 +295,43 @@ export function LogisticsTravelSection({
                 {/* ========================================================================= */}
                 {/* 1. Outbound Ticket Card / Input Form                                      */}
                 {/* ========================================================================= */}
-                {outbound && !editingOutbound ? (
-                  <div className={`flex flex-col justify-between rounded-2xl ${glassSageCardSurfaceClass} p-4 sm:p-5 shadow-sm transition-all hover:border-[var(--sage)]/70`}>
+                <motion.div
+                  initial={false}
+                  animate={{
+                    height:
+                      outbound && !editingOutbound
+                        ? (outboundCardHeight ?? 256)
+                        : (outboundEditorHeight ?? 178),
+                  }}
+                  transition={{
+                    height: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  }}
+                  className={`relative sm:min-h-64 ${glassSageCardSurfaceClass} shadow-sm transition-[border-color,box-shadow] hover:border-[var(--sage)]/70`}
+                >
+                  {outbound && (
+                    <motion.div
+                      initial={false}
+                      animate={{ opacity: editingOutbound ? 0 : 1 }}
+                      transition={{
+                        opacity: {
+                          duration: 0.14,
+                          delay: editingOutbound ? 0 : 0.06,
+                          ease: 'easeOut',
+                        },
+                      }}
+                      aria-hidden={editingOutbound}
+                      inert={editingOutbound}
+                      ref={(node) => {
+                        if (!node) return
+                        const height = node.offsetHeight
+                        setOutboundCardHeight((current) =>
+                          current === height ? current : height,
+                        )
+                      }}
+                      className={`absolute inset-x-0 top-0 flex flex-col justify-between p-4 sm:p-5 ${
+                        editingOutbound ? 'pointer-events-none' : 'z-10'
+                      }`}
+                    >
                     <div>
                       {/* Outbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
@@ -381,16 +421,46 @@ export function LogisticsTravelSection({
                         {meaningfulFlightStatus(outbound.status) || '计划正常'}
                       </span>
                     </div>
-                  </div>
-                ) : (
-                  /* Outbound Input Form */
-                  <div className={`flex flex-col justify-between rounded-2xl border border-dashed border-[var(--sage)]/50 ${glassSageCardSurfaceClass} p-4 sm:p-5 shadow-sm`}>
+                    </motion.div>
+                  )}
+
+                  {/* Outbound Input Form */}
+                  <motion.div
+                    initial={false}
+                    animate={{ opacity: outbound && !editingOutbound ? 0 : 1 }}
+                    transition={{
+                      opacity: {
+                        duration: 0.14,
+                        delay: outbound && !editingOutbound ? 0 : 0.06,
+                        ease: 'easeOut',
+                      },
+                    }}
+                    aria-hidden={Boolean(outbound && !editingOutbound)}
+                    inert={Boolean(outbound && !editingOutbound)}
+                    ref={(node) => {
+                      if (!node) return
+                      const height = node.offsetHeight
+                      setOutboundEditorHeight((current) =>
+                        current === height ? current : height,
+                      )
+                    }}
+                    className={`absolute inset-x-0 top-0 flex flex-col justify-between p-4 sm:p-5 ${
+                      outbound && !editingOutbound ? 'pointer-events-none' : 'z-10'
+                    }`}
+                  >
                     <div>
                       <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sage)]">
-                          <PlaneTakeoff size={14} />
-                          <span>去程航班</span>
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sage)]">
+                            <PlaneTakeoff size={14} />
+                            <span>去程航班</span>
+                          </span>
+                          {outbound && (
+                            <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-2.5 py-0.5 text-[10px] font-medium text-[var(--sage)]`}>
+                              修改中
+                            </span>
+                          )}
+                        </div>
                         {outbound && (
                           <button
                             type="button"
@@ -407,11 +477,12 @@ export function LogisticsTravelSection({
                         {hasDates ? `按 ${startDate} 查询出发时刻` : '请先选定行程日期'}
                       </p>
 
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-4 flex gap-2">
                         <input
                           value={outboundInput}
                           onChange={(e) => setOutboundInput(e.target.value.toUpperCase())}
-                          className="w-full rounded-xl border border-white/80 bg-white/85 px-3 py-2 text-xs outline-none focus:border-[var(--copper)] focus:bg-white transition"
+                          aria-label="去程航班号"
+                          className="min-w-0 w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-[var(--sage)]/60 focus:bg-white/90 focus:shadow-[0_0_0_3px_rgba(91,113,98,0.09)]"
                           placeholder="去程航班号 例如 AF375"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && outboundInput.trim() && hasDates && busy === null) {
@@ -424,7 +495,8 @@ export function LogisticsTravelSection({
                           type="button"
                           disabled={busy !== null || !outboundInput.trim() || !hasDates}
                           onClick={() => query('outbound')}
-                          className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[var(--ink)] px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                          aria-busy={busy === 'outbound' || undefined}
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'outbound' && <ButtonSpinner />}
                           {busy === 'outbound' ? '查询中' : '查询'}
@@ -432,17 +504,52 @@ export function LogisticsTravelSection({
                       </div>
                     </div>
 
-                    <div className="pt-2 text-[10px] text-[var(--stone)]">
+                    <div className="pt-3 text-[11px] leading-relaxed text-[var(--stone)]">
                       支持主要航司航班号，自动解析起降时间
                     </div>
-                  </div>
-                )}
+                  </motion.div>
+                </motion.div>
 
                 {/* ========================================================================= */}
                 {/* 2. Inbound Ticket Card / Input Form                                       */}
                 {/* ========================================================================= */}
-                {inbound && !editingInbound ? (
-                  <div className={`flex flex-col justify-between rounded-2xl ${glassVioletCardSurfaceClass} p-4 sm:p-5 shadow-sm transition-all hover:border-purple-300`}>
+                <motion.div
+                  initial={false}
+                  animate={{
+                    height:
+                      inbound && !editingInbound
+                        ? (inboundCardHeight ?? 256)
+                        : (inboundEditorHeight ?? 178),
+                  }}
+                  transition={{
+                    height: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  }}
+                  className={`relative sm:min-h-64 ${glassVioletCardSurfaceClass} shadow-sm transition-[border-color,box-shadow] hover:border-purple-300`}
+                >
+                  {inbound && (
+                    <motion.div
+                      initial={false}
+                      animate={{ opacity: editingInbound ? 0 : 1 }}
+                      transition={{
+                        opacity: {
+                          duration: 0.14,
+                          delay: editingInbound ? 0 : 0.06,
+                          ease: 'easeOut',
+                        },
+                      }}
+                      aria-hidden={editingInbound}
+                      inert={editingInbound}
+                      ref={(node) => {
+                        if (!node) return
+                        const height = node.offsetHeight
+                        setInboundCardHeight((current) =>
+                          current === height ? current : height,
+                        )
+                      }}
+                      className={`absolute inset-x-0 top-0 flex flex-col justify-between p-4 sm:p-5 ${
+                        editingInbound ? 'pointer-events-none' : 'z-10'
+                      }`}
+                    >
                     <div>
                       {/* Inbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
@@ -532,16 +639,46 @@ export function LogisticsTravelSection({
                         {meaningfulFlightStatus(inbound.status) || '计划正常'}
                       </span>
                     </div>
-                  </div>
-                ) : (
-                  /* Inbound Input Form */
-                  <div className={`flex flex-col justify-between rounded-2xl border border-dashed border-purple-300 ${glassVioletCardSurfaceClass} p-4 sm:p-5 shadow-sm`}>
+                    </motion.div>
+                  )}
+
+                  {/* Inbound Input Form */}
+                  <motion.div
+                    initial={false}
+                    animate={{ opacity: inbound && !editingInbound ? 0 : 1 }}
+                    transition={{
+                      opacity: {
+                        duration: 0.14,
+                        delay: inbound && !editingInbound ? 0 : 0.06,
+                        ease: 'easeOut',
+                      },
+                    }}
+                    aria-hidden={Boolean(inbound && !editingInbound)}
+                    inert={Boolean(inbound && !editingInbound)}
+                    ref={(node) => {
+                      if (!node) return
+                      const height = node.offsetHeight
+                      setInboundEditorHeight((current) =>
+                        current === height ? current : height,
+                      )
+                    }}
+                    className={`absolute inset-x-0 top-0 flex flex-col justify-between p-4 sm:p-5 ${
+                      inbound && !editingInbound ? 'pointer-events-none' : 'z-10'
+                    }`}
+                  >
                     <div>
                       <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-900">
-                          <PlaneLanding size={14} />
-                          <span>返程航班</span>
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-900">
+                            <PlaneLanding size={14} />
+                            <span>返程航班</span>
+                          </span>
+                          {inbound && (
+                            <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[10px] font-medium text-purple-900`}>
+                              修改中
+                            </span>
+                          )}
+                        </div>
                         {inbound && (
                           <button
                             type="button"
@@ -558,11 +695,12 @@ export function LogisticsTravelSection({
                         {hasDates ? `按 ${endDate} 查询返程时刻` : '请先选定行程日期'}
                       </p>
 
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-4 flex gap-2">
                         <input
                           value={returnInput}
                           onChange={(e) => setReturnInput(e.target.value.toUpperCase())}
-                          className="w-full rounded-xl border border-white/80 bg-white/85 px-3 py-2 text-xs outline-none focus:border-[var(--copper)] focus:bg-white transition"
+                          aria-label="返程航班号"
+                          className="min-w-0 w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-purple-400/60 focus:bg-white/90 focus:shadow-[0_0_0_3px_rgba(109,78,150,0.08)]"
                           placeholder="返程航班号 例如 AF374"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && returnInput.trim() && hasDates && busy === null) {
@@ -575,7 +713,8 @@ export function LogisticsTravelSection({
                           type="button"
                           disabled={busy !== null || !returnInput.trim() || !hasDates}
                           onClick={() => query('return')}
-                          className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[var(--ink)] px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                          aria-busy={busy === 'return' || undefined}
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'return' && <ButtonSpinner />}
                           {busy === 'return' ? '查询中' : '查询'}
@@ -583,11 +722,11 @@ export function LogisticsTravelSection({
                       </div>
                     </div>
 
-                    <div className="pt-2 text-[10px] text-[var(--stone)]">
+                    <div className="pt-3 text-[11px] leading-relaxed text-[var(--stone)]">
                       支持主要航司航班号，自动解析起降时间
                     </div>
-                  </div>
-                )}
+                  </motion.div>
+                </motion.div>
               </div>
             </div>
           </div>
