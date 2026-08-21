@@ -797,9 +797,8 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.1875rem;
-  padding: 0.625rem 0.125rem;
+  justify-content: space-between;
+  padding: 0.65rem 0.125rem;
   box-sizing: border-box;
 }
 
@@ -808,20 +807,19 @@ select {
 .api-meter-rail-group-value {
   margin: 0;
   text-align: center;
+  line-height: 1;
 }
 
 .api-meter-rail-label {
   font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  line-height: 1;
   color: var(--stone);
 }
 
 .api-meter-rail-value {
   font-size: 13px;
   font-weight: 700;
-  line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -832,8 +830,8 @@ select {
   width: 100%;
   flex-direction: column;
   align-items: center;
-  gap: 0.375rem;
-  margin: 0.25rem 0 0;
+  gap: 0.34rem;
+  margin: 0;
   padding: 0;
   list-style: none;
 }

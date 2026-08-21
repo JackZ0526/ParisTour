@@ -335,7 +335,7 @@ export function ApiRequestMeter() {
             ? Math.min(PANEL_WIDTH, typeof window !== 'undefined' ? window.innerWidth - 20 : PANEL_WIDTH)
             : RAIL_WIDTH,
           height: detailsOpen ? PANEL_HEIGHT : RAIL_HEIGHT,
-          borderRadius: detailsOpen ? 20 : 16,
+          borderRadius: detailsOpen ? 20 : 17,
           scale: isDragging ? 1.06 : 1,
         }}
         transition={{
@@ -372,22 +372,21 @@ export function ApiRequestMeter() {
             className="pointer-events-none absolute inset-x-2 top-0 h-px rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent"
           />
 
-          <div className="flex flex-col items-center gap-0.5 pt-0.5">
+          <div className="flex flex-col items-center gap-0.5">
             <Activity size={10} strokeWidth={2.4} className="text-[var(--copper)]" />
             <p className="api-meter-rail-label">API</p>
+            <motion.p
+              key={snapshot.used}
+              initial={{ opacity: 0.4, scale: 1.15 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="api-meter-rail-value font-display"
+            >
+              {snapshot.used}
+            </motion.p>
           </div>
 
-          <motion.p
-            key={snapshot.used}
-            initial={{ opacity: 0.4, scale: 1.15 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            className="api-meter-rail-value font-display"
-          >
-            {snapshot.used}
-          </motion.p>
-
-          <div className="h-px w-3.5 bg-black/8 dark:bg-white/10 my-0.5" />
+          <div className="h-px w-3.5 bg-black/8 dark:bg-white/10" />
 
           <ul className="api-meter-rail-groups">
             {SUMMARY_GROUPS.map((group) => {
