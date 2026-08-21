@@ -122,6 +122,7 @@ export function ProfileTab({
   const { avatar } = useUserAvatar(email)
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
   const { themePreference, setThemePreference } = useTheme()
+  const [hasThemeInteracted, setHasThemeInteracted] = useState(false)
 
   const roleLabel =
     role === 'owner'
@@ -540,45 +541,65 @@ export function ProfileTab({
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 p-1 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
-          <button
-            type="button"
-            onClick={() => setThemePreference('light')}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
-              themePreference === 'light'
-                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-[var(--copper)] dark:text-white dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/10'
-            }`}
-          >
-            <Sun size={15} strokeWidth={2.2} className={themePreference === 'light' ? 'text-amber-600' : ''} />
-            <span>浅色日间</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setThemePreference('dark')}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
-              themePreference === 'dark'
-                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-[var(--copper)] dark:text-white dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/10'
-            }`}
-          >
-            <Moon size={15} strokeWidth={2.2} className={themePreference === 'dark' ? 'text-indigo-400 dark:text-amber-200' : ''} />
-            <span>深色午夜</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setThemePreference('system')}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
-              themePreference === 'system'
-                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-[var(--copper)] dark:text-white dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/10'
-            }`}
-          >
-            <Laptop size={15} strokeWidth={2.2} className={themePreference === 'system' ? 'text-[var(--copper)] dark:text-amber-200' : ''} />
-            <span>跟随系统</span>
-          </button>
+        <div className="relative grid grid-cols-3 gap-1 sm:gap-2 p-1 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+          {(
+            [
+              { id: 'light', label: '浅色日间', Icon: Sun, activeColor: 'text-amber-600 dark:text-amber-300' },
+              { id: 'dark', label: '深色午夜', Icon: Moon, activeColor: 'text-indigo-500 dark:text-amber-200' },
+              { id: 'system', label: '跟随系统', Icon: Laptop, activeColor: 'text-[var(--copper)] dark:text-amber-200' },
+            ] as const
+          ).map(({ id, label, Icon, activeColor }) => {
+            const isActive = themePreference === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setHasThemeInteracted(true)
+                  setThemePreference(id)
+                }}
+                className="relative isolate flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="theme-preference-pill"
+                    className="absolute inset-0 rounded-xl bg-white dark:bg-[var(--copper)] shadow-xs dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5 dark:ring-white/15"
+                    animate={
+                      hasThemeInteracted
+                        ? {
+                            scaleX: [1, 1.12, 0.96, 1],
+                            scaleY: [1, 0.9, 1.03, 1],
+                          }
+                        : undefined
+                    }
+                    transition={{
+                      layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                      scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                      scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                    }}
+                  />
+                )}
+                <Icon
+                  size={15}
+                  strokeWidth={2.2}
+                  className={`relative z-10 transition-colors ${
+                    isActive
+                      ? activeColor
+                      : 'text-[var(--stone)] dark:text-zinc-400'
+                  }`}
+                />
+                <span
+                  className={`relative z-10 transition-colors ${
+                    isActive
+                      ? 'text-[var(--ink)] dark:text-white font-bold'
+                      : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  {label}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
