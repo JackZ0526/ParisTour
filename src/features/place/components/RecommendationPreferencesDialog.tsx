@@ -130,7 +130,7 @@ export function RecommendationPreferencesButton({
 }
 
 const BASE_TAG_PILL =
-  'group inline-flex h-7 items-center px-2.5 text-xs font-medium leading-none rounded-full border transition-all cursor-pointer select-none'
+  'group inline-flex h-6 items-center px-2 text-[10.5px] font-medium leading-none rounded-full border transition-all cursor-pointer select-none tracking-tight'
 
 export function RecommendationPreferencesDialog({
   open,
@@ -268,10 +268,10 @@ export function RecommendationPreferencesDialog({
         </header>
 
         {/* Main Content Body */}
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           {/* 1. Departure Time Anchor */}
-          <section className="rounded-2xl border border-white/80 bg-white/50 p-4 shadow-sm backdrop-blur-md">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2.5">
+          <section className="rounded-2xl border border-white/80 bg-white/50 p-3.5 shadow-sm backdrop-blur-md">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2">
               <Clock size={14} className="text-[var(--copper)]" />
               <span>通常开始时间</span>
             </div>
@@ -291,7 +291,7 @@ export function RecommendationPreferencesDialog({
                 <span className="text-xs font-semibold text-[var(--ink)]">
                   已选偏好池
                 </span>
-                <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[var(--copper)]">
+                <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--copper)]">
                   {activeTags.length} 项生效
                 </span>
               </div>
@@ -308,18 +308,18 @@ export function RecommendationPreferencesDialog({
             </div>
 
             {/* Tag Pool Container Box */}
-            <div className="min-h-[108px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
+            <div className="min-h-[76px] rounded-2xl border border-white/85 bg-white/65 p-3 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
               {activeTags.length === 0 ? (
-                <div className="flex min-h-[80px] flex-col items-center justify-center text-center p-2">
-                  <p className="text-xs sm:text-sm font-medium text-[var(--stone)]">
+                <div className="flex min-h-[56px] flex-col items-center justify-center text-center p-1">
+                  <p className="text-xs font-medium text-[var(--stone)]">
                     偏好池暂为空白
                   </p>
-                  <p className="mt-1 text-[11px] text-[var(--stone)]/75">
+                  <p className="mt-0.5 text-[11px] text-[var(--stone)]/75">
                     点击下方候选标签加入，或输入补充要求让 AI 智能提炼汇入
                   </p>
                 </div>
               ) : (
-                <motion.div layout className="flex flex-wrap gap-2">
+                <motion.div layout className="flex flex-wrap gap-1.5">
                   <AnimatePresence>
                     {activeTags.map((tag) => {
                       const cleanTag = cleanTagText(tag)
@@ -337,7 +337,7 @@ export function RecommendationPreferencesDialog({
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
                           aria-label={`移除 ${cleanTag}`}
-                          className={`${BASE_TAG_PILL} relative isolate shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md ${theme.activePill}`}
+                          className={`${BASE_TAG_PILL} relative isolate shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-md ${theme.activePill}`}
                         >
                           <span className="truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
                         </motion.button>
@@ -350,15 +350,15 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
-          <section className="space-y-2.5">
+          <section className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[var(--stone)] flex items-center gap-1.5">
                 <Sparkles size={13} className="text-amber-600" />
-                <span>推荐偏好候选（点击即刻加入池中）</span>
+                <span>推荐偏好候选（点击加入池中）</span>
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {availablePresets.length > 0 ? (
                 availablePresets.map((preset) => {
                   const cleanPreset = cleanTagText(preset)
