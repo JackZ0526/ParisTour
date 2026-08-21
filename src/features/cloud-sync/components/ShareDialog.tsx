@@ -240,7 +240,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="请输入旅伴邮箱 partner@example.com"
+              placeholder="partner@example.com"
               className="w-full rounded-2xl border border-white/90 bg-white/85 pl-9 pr-3 py-2.5 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white backdrop-blur-md"
             />
           </div>
