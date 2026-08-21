@@ -541,7 +541,7 @@ export function ProfileTab({
           </span>
         </div>
 
-        <div className="relative grid grid-cols-3 gap-1 sm:gap-2 p-1 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+        <div className="relative grid grid-cols-3 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
           {(
             [
               { id: 'light', label: '浅色日间', Icon: Sun, activeColor: 'text-amber-600 dark:text-amber-300' },
@@ -563,7 +563,7 @@ export function ProfileTab({
                 {isActive && (
                   <motion.div
                     layoutId="theme-preference-pill"
-                    className="absolute inset-0 rounded-xl bg-white dark:bg-[var(--copper)] shadow-xs dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5 dark:ring-white/15"
+                    className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
                     animate={
                       hasThemeInteracted
                         ? {
@@ -577,7 +577,13 @@ export function ProfileTab({
                       scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
                       scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
                     }}
-                  />
+                  >
+                    {/* Top specular light reflection highlight */}
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
+                    />
+                  </motion.div>
                 )}
                 <Icon
                   size={15}

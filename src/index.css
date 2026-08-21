@@ -884,9 +884,17 @@ select {
 .api-meter-details-grid > li {
   border-radius: 0.75rem;
   padding: 0.5rem 0.625rem;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.88) 0%,
+    rgba(255, 252, 247, 0.72) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 6px 16px rgba(72, 58, 45, 0.1),
+    0 1px 3px rgba(72, 58, 45, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(110, 91, 74, 0.08);
   backdrop-filter: blur(8px);
 }
 
@@ -901,9 +909,16 @@ select {
 }
 
 .dark .api-meter-details-grid > li {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: none;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.065) 0%,
+    rgba(102, 139, 122, 0.045) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 7px 18px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.38);
 }
 
 .dark .api-meter-rail-group-value.is-active {
