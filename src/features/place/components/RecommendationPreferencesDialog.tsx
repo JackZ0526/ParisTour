@@ -22,6 +22,8 @@ import { TimePicker } from '../../itinerary/components/TimePicker'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import {
+  glassCapsuleSurfaceClass,
+  glassCapsuleToneClass,
   glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 
@@ -303,9 +305,9 @@ export function RecommendationPreferencesDialog({
                     onClick={clearAllTags}
                     title="清空偏好池"
                     aria-label="清空偏好池"
-                    className="group relative isolate flex h-6 w-6 items-center justify-center rounded-full border border-black/8 bg-white/75 text-[var(--stone)] shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-md transition-all hover:border-red-200 hover:bg-red-50/90 hover:text-red-600 hover:shadow-xs active:scale-90 cursor-pointer"
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40 cursor-pointer`}
                   >
-                    <Trash2 size={12.5} strokeWidth={1.8} />
+                    <Trash2 size={14} strokeWidth={1.8} aria-hidden />
                   </button>
                 )}
               </div>
