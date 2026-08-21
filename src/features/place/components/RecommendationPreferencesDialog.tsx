@@ -250,7 +250,7 @@ export function RecommendationPreferencesDialog({
         onClose={onClose}
         overlayZIndex={2600}
         ariaLabelledBy={titleId}
-        className={`flex max-h-[min(88vh,100dvh)] max-w-xl flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)]`}
+        className={`flex h-[88dvh] sm:h-[640px] max-h-[100dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)]`}
       >
         {/* Header Section */}
         <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
