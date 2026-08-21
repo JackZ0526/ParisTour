@@ -187,31 +187,34 @@ export function LogisticsTravelSection({
       {/* ========================================================================= */}
       <article className={`relative z-20 rounded-3xl ${glassCardSurfaceClass} !overflow-visible p-5 sm:p-7 shadow-[0_8px_32px_rgba(0,0,0,0.03)] transition-all`}>
         {/* Top Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-4 sm:pb-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--copper)]/15 to-[var(--gold)]/10 text-[var(--copper)] shadow-inner">
+        <div className="flex items-center justify-between border-b border-black/5 pb-3.5 sm:pb-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--copper)]/15 to-[var(--gold)]/10 text-[var(--copper)] shadow-inner">
               <Plane size={18} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-xl leading-tight text-[var(--ink)] sm:text-2xl">
                   日期与往返航班
                 </h2>
-                {hasDates && outbound && inbound && (
-                  <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-2.5 py-0.5 text-[11px] text-[var(--sage)] font-medium`}>
-                    已就绪
-                  </span>
-                )}
+                <span
+                  className={`${glassCapsuleSurfaceClass} ${
+                    hasDates && outbound && inbound
+                      ? glassCapsuleToneClass.sage
+                      : glassCapsuleToneClass.neutral
+                  } px-2.5 py-0.5 text-[11px] font-medium ${
+                    hasDates && outbound && inbound ? 'text-[var(--sage)]' : 'text-[var(--stone)]'
+                  }`}
+                >
+                  {hasDates && outbound && inbound ? '已就绪' : '待完善'}
+                </span>
               </div>
-              <p className="mt-0.5 text-xs text-[var(--stone)]">
-                选定行程起止日期，去程与返程航班可独立录入、修改与刷新
-              </p>
             </div>
           </div>
         </div>
 
         {/* Card Body: 2-Column Split (Left: Date 4 cols, Right: Flights 8 cols) */}
-        <div className="mt-5 grid gap-6 lg:grid-cols-12 lg:items-stretch">
+        <div className="mt-4 grid gap-6 lg:grid-cols-12 lg:items-stretch">
           {/* Left Column: Date & Duration (4/12) */}
           <div className="relative z-30 flex flex-col justify-between space-y-4 lg:col-span-4">
             <div>
