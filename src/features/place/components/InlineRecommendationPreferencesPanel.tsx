@@ -352,7 +352,7 @@ export function InlineRecommendationPreferencesPanel({
                     readOnly ? 'cursor-default opacity-50' : 'cursor-pointer'
                   }`}
                 >
-                  <span className="relative z-10">＋ {clean}</span>
+                  <span className="relative z-10">{clean}</span>
                 </button>
               )
             })
