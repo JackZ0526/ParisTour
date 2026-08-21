@@ -102,12 +102,12 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 opacity: { duration: 0.18, ease: 'easeOut' },
                 layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
               }}
-              className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-left outline-none transition-colors hover:border-[var(--sage)]/60 focus-visible:border-[var(--sage)] focus-visible:ring-2 focus-visible:ring-[var(--sage)]/25"
+              className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-left outline-none transition-colors hover:border-[var(--copper)]/60 focus-visible:border-[var(--copper)] focus-visible:ring-2 focus-visible:ring-[var(--copper)]/25 cursor-pointer"
             >
-              <span className="tabular-nums text-[var(--ink)]">{value}</span>
+              <span className="tabular-nums font-semibold text-sm text-[var(--ink)]">{value}</span>
               <Clock3
-                className="h-4 w-4 shrink-0 text-[var(--sage)]"
-                strokeWidth={1.6}
+                className="h-4 w-4 shrink-0 text-[var(--copper)]/80"
+                strokeWidth={1.8}
                 aria-hidden
               />
             </motion.button>
@@ -123,15 +123,22 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
               }}
               style={{ transformOrigin: 'top center' }}
-              className={`absolute inset-x-0 top-0 z-50 max-h-[min(70dvh,420px)] overflow-y-auto ${glassPopoverSurfaceClass} p-4 shadow-2xl`}
+              className={`absolute inset-x-0 top-0 z-50 max-h-[min(70dvh,420px)] overflow-y-auto ${glassPopoverSurfaceClass} p-3.5 sm:p-4 shadow-2xl`}
             >
-              <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)] pb-2">
-                <p className="font-display text-base tracking-wide text-[var(--ink)]">
-                  选择开始时间
-                </p>
-                <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-0.5 text-sm font-medium tabular-nums text-[var(--sage)]`}>
-                  {formatTime(draftHour, draftMinute)}
-                </span>
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)]/70 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center px-2.5 py-0.5 text-sm font-semibold tabular-nums text-[var(--copper)] shadow-2xs`}>
+                    {formatTime(draftHour, draftMinute)}
+                  </span>
+                  <span className="text-xs font-medium text-[var(--stone)]">
+                    {label ? `选择${label}` : '选择开始时间'}
+                  </span>
+                </div>
+                <Clock3
+                  className="h-4 w-4 shrink-0 text-[var(--copper)]/80"
+                  strokeWidth={1.8}
+                  aria-hidden
+                />
               </div>
 
               <div>
