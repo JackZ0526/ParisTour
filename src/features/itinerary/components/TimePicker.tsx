@@ -166,8 +166,8 @@ function TimeWheelColumn<T extends number>({
             style={{ height: `${ITEM_HEIGHT}px` }}
             className={`flex snap-center items-center justify-center text-center cursor-pointer transition-all duration-150 ${
               isSelected
-                ? 'text-lg sm:text-xl font-bold text-[var(--ink)] scale-105'
-                : 'text-sm font-medium text-[var(--stone)]/40 hover:text-[var(--stone)]/80 scale-90'
+                ? 'text-xl sm:text-2xl font-bold text-[var(--ink)] scale-105'
+                : 'text-sm sm:text-base font-semibold text-[var(--stone)]/75 hover:text-[var(--ink)] scale-90'
             }`}
           >
             <div className="w-[84px] flex items-center">
@@ -303,15 +303,15 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               <div className="relative my-1 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
                 {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
                 <div className="relative" style={{ height: `${WHEEL_HEIGHT}px` }}>
-                  {/* Dual Distinct 3D Frosted Glass Capsules (Framing ONLY the numbers) */}
+                  {/* Layer 1 (z-0): Dual Distinct 3D Frosted Glass Capsules Behind Text */}
                   <div
-                    className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 grid grid-cols-2 z-10"
+                    className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 grid grid-cols-2 z-0"
                     style={{ height: `${ITEM_HEIGHT}px` }}
                   >
                     {/* Hour Column: Capsule frames ONLY the digits, "点" is outside */}
                     <div className="flex items-center justify-center">
                       <div className="w-[84px] flex items-center">
-                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/80 shadow-[0_2px_8px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
+                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
                         <span className="ml-2 text-xs font-semibold text-[var(--copper)] select-none">
                           点
                         </span>
@@ -321,7 +321,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     {/* Minute Column: Capsule frames ONLY the digits, "分" is outside */}
                     <div className="flex items-center justify-center">
                       <div className="w-[84px] flex items-center">
-                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/80 shadow-[0_2px_8px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
+                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
                         <span className="ml-2 text-xs font-semibold text-[var(--copper)] select-none">
                           分
                         </span>
@@ -329,12 +329,8 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     </div>
                   </div>
 
-                  {/* Top & Bottom Depth Gradients for 3D Cylinder effect */}
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent z-20" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent z-20" />
-
-                  {/* Dual Scroll Columns */}
-                  <div className="relative z-0 grid grid-cols-2 items-center h-full">
+                  {/* Layer 2 (z-10): Dual Scroll Columns with High-Contrast Rich Text */}
+                  <div className="relative z-10 grid grid-cols-2 items-center h-full">
                     <TimeWheelColumn
                       items={HOURS}
                       value={draftHour}
@@ -348,6 +344,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                       ariaLabel="分钟滚轮选择"
                     />
                   </div>
+
+                  {/* Layer 3 (z-20): Top & Bottom Depth Gradients for 3D Cylinder effect */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent z-20" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent z-20" />
                 </div>
               </div>
 
