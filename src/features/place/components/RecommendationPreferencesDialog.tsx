@@ -299,10 +299,11 @@ export function RecommendationPreferencesDialog({
                 <button
                   type="button"
                   onClick={clearAllTags}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--stone)] hover:text-red-600 transition-colors cursor-pointer"
+                  title="清空偏好池"
+                  aria-label="清空偏好池"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--stone)] hover:bg-red-50 hover:text-red-600 transition-all active:scale-90 cursor-pointer"
                 >
-                  <Trash2 size={12} />
-                  <span>清空池子</span>
+                  <Trash2 size={13} strokeWidth={1.8} />
                 </button>
               )}
             </div>
