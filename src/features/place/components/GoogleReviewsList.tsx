@@ -129,7 +129,7 @@ export function GoogleReviewsList({
           return (
             <article
               key={`${original.slice(0, 24)}-${i}`}
-              className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-sm shadow-sm backdrop-blur-md transition-all hover:bg-white/80"
+              className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-3.5 text-sm shadow-sm backdrop-blur-md transition-all hover:bg-white/80 dark:hover:bg-[#1f2824]"
             >
               <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-[var(--stone)]">
                 {review.author && <span>{review.author}</span>}

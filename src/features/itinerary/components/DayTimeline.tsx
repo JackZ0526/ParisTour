@@ -1794,7 +1794,7 @@ export function DayTimeline({
               className={`flex w-full min-w-0 max-w-full items-start gap-2 rounded-2xl border p-2.5 sm:gap-3 sm:p-3 transition-[border-color,box-shadow,background-color] duration-200 ${
                 active
                   ? glassCardActiveSurfaceClass
-                  : `${glassCardSurfaceClass} hover:bg-white/80 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]`
+                  : `${glassCardSurfaceClass} hover:bg-white/80 dark:hover:bg-[#1f2824] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_8px_30px_rgba(0,0,0,0.45)]`
               }`}
             >
               {isFixedHotel ? (
@@ -1809,7 +1809,7 @@ export function DayTimeline({
                 <span className="mt-1 inline-flex h-7 w-7" aria-hidden />
               ) : (
                 <span
-                  className={`timeline-drag-handle mt-1 inline-flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-xs text-[var(--stone)] touch-none active:cursor-grabbing transition-colors hover:bg-white hover:text-[var(--ink)]`}
+                  className={`timeline-drag-handle mt-1 inline-flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-xs text-[var(--stone)] dark:text-zinc-300 touch-none active:cursor-grabbing transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)]`}
                   title="按住拖动排序"
                   aria-label="按住拖动排序"
                   onPointerDown={(e) => {
@@ -1918,7 +1918,7 @@ export function DayTimeline({
                       name: place.name,
                     })
                   }}
-                  className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40`}
+                  className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 dark:text-zinc-400 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white dark:hover:bg-white/10 hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40`}
                 >
                   <TrashIcon />
                 </button>

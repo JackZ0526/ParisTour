@@ -465,7 +465,7 @@ export function RecommendationPreferencesDialog({
                     <button
                       type="button"
                       onClick={handleDiscardExtracted}
-                      className="min-h-[34px] rounded-full border border-black/8 bg-white/70 px-3.5 py-1 text-xs font-medium text-[var(--stone)] shadow-2xs backdrop-blur-md transition-all hover:bg-white hover:text-[var(--ink)] active:scale-95 cursor-pointer"
+                      className="min-h-[34px] rounded-full border border-black/8 dark:border-white/10 bg-white/70 dark:bg-white/10 px-3.5 py-1 text-xs font-medium text-[var(--stone)] dark:text-zinc-300 shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95 cursor-pointer"
                     >
                       放弃
                     </button>
@@ -473,7 +473,7 @@ export function RecommendationPreferencesDialog({
                     <button
                       type="button"
                       onClick={handleAddToCandidatePool}
-                      className="min-h-[34px] rounded-full border border-black/10 bg-white/85 px-4 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white active:scale-95 cursor-pointer"
+                      className="min-h-[34px] rounded-full border border-black/10 dark:border-white/10 bg-white/85 dark:bg-white/15 px-4 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/25 active:scale-95 cursor-pointer"
                     >
                       加入候选池
                     </button>

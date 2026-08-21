@@ -1144,8 +1144,8 @@ export function AddPlaceDialog({
                         <div
                           className={`overflow-hidden rounded-2xl border transition-all duration-200 ${
                             expanded
-                              ? 'border-[var(--copper)]/80 bg-white/90 shadow-[0_8px_32px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(255,255,255,1)] ring-2 ring-[var(--copper)]/35 backdrop-blur-2xl'
-                              : `${glassCardSurfaceClass} hover:bg-white/80 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]`
+                              ? 'border-[var(--copper)]/80 bg-white/90 dark:bg-[#1f2824]/95 shadow-[0_8px_32px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_8px_32px_rgba(212,131,84,0.2)] ring-2 ring-[var(--copper)]/35 backdrop-blur-2xl'
+                              : `${glassCardSurfaceClass} hover:bg-white/80 dark:hover:bg-[#1f2824] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_8px_30px_rgba(0,0,0,0.45)]`
                           }`}
                         >
                           <button

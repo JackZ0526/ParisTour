@@ -1968,7 +1968,7 @@ export function GooglePlacePage({
                       displayNarrative.regenerating) && (
                       <button
                         type="button"
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--sage)] transition hover:bg-white hover:shadow-sm active:scale-95 disabled:opacity-60`}
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--sage)] transition hover:bg-white dark:hover:bg-white/15 hover:shadow-sm active:scale-95 disabled:opacity-60`}
                         disabled={Boolean(displayNarrative.loading || displayNarrative.regenerating)}
                         aria-label={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
                         title={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
