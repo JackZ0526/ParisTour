@@ -2024,10 +2024,10 @@ export function TripChatPanel({
                     ) : null}
                     {showAnswerBubble ? (
                       <div
-                        className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                        className={`px-3.5 py-2 text-sm leading-relaxed ${
                           turn.role === 'user'
-                            ? 'bg-[var(--ink)] text-[var(--paper)] shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
-                            : 'border border-white/90 bg-white/75 shadow-[0_2px_12px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md text-[var(--ink)]'
+                            ? 'rounded-2xl rounded-tr-xs border border-white/12 bg-[var(--ink)]/95 text-[var(--paper)] shadow-[0_3px_12px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22),inset_0_-1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm'
+                            : 'rounded-2xl rounded-tl-xs border border-white/90 bg-white/80 shadow-[0_2px_12px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md text-[var(--ink)]'
                         }`}
                       >
                         {showThinking ? (
@@ -2061,14 +2061,19 @@ export function TripChatPanel({
               })}
 
             {!!actionNotes.length && (
-              <ul className="space-y-1 rounded-xl bg-[var(--sage)]/10 px-3 py-2 text-xs text-[var(--sage)]">
+              <ul className="space-y-1 rounded-2xl border border-[var(--sage)]/30 bg-[var(--sage)]/12 px-3.5 py-2.5 text-xs text-[var(--sage)] shadow-2xs backdrop-blur-sm">
                 {actionNotes.map((n) => (
                   <li key={n}>· {n}</li>
                 ))}
               </ul>
             )}
 
-            {error && <p className="text-xs text-red-700">{error}</p>}
+            {error && (
+              <div className="flex items-start gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 p-3 text-xs leading-relaxed text-red-900 shadow-2xs backdrop-blur-md">
+                <span className="shrink-0 mt-0.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" />
+                <p className="min-w-0 flex-1">{error}</p>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
 
