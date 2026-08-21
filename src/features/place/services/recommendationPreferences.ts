@@ -58,6 +58,86 @@ export const DEFAULT_RECOMMENDATION_PREFERENCES: RecommendationPreferences = {
   extraNotes: '',
 }
 
+export interface TagTheme {
+  activePill: string
+  suggestedPill: string
+}
+
+export const COLOR_PALETTES: readonly TagTheme[] = [
+  {
+    // 0. Amber / Morning Cafe
+    activePill: 'bg-amber-500/22 border-amber-300/80 text-amber-950 hover:bg-amber-500/30',
+    suggestedPill: 'bg-amber-500/12 border-amber-300/60 text-amber-950/85 hover:bg-amber-500/22 hover:border-amber-400',
+  },
+  {
+    // 1. Terracotta / Dining & Meat
+    activePill: 'bg-orange-500/22 border-orange-300/80 text-orange-950 hover:bg-orange-500/30',
+    suggestedPill: 'bg-orange-500/12 border-orange-300/60 text-orange-950/85 hover:bg-orange-500/22 hover:border-orange-400',
+  },
+  {
+    // 2. Sage Botanical Green / Walking & Nature
+    activePill: 'bg-emerald-600/22 border-emerald-300/80 text-emerald-950 hover:bg-emerald-600/30',
+    suggestedPill: 'bg-emerald-600/12 border-emerald-300/60 text-emerald-950/85 hover:bg-emerald-600/22 hover:border-emerald-400',
+  },
+  {
+    // 3. Artsy Indigo / Gallery & Museum
+    activePill: 'bg-indigo-500/22 border-indigo-300/80 text-indigo-950 hover:bg-indigo-500/30',
+    suggestedPill: 'bg-indigo-500/12 border-indigo-300/60 text-indigo-950/85 hover:bg-indigo-500/22 hover:border-indigo-400',
+  },
+  {
+    // 4. Rose / French Bakery & Sweets
+    activePill: 'bg-rose-500/22 border-rose-300/80 text-rose-950 hover:bg-rose-500/30',
+    suggestedPill: 'bg-rose-500/12 border-rose-300/60 text-rose-950/85 hover:bg-rose-500/22 hover:border-rose-400',
+  },
+  {
+    // 5. Seine River Teal / Landmarks
+    activePill: 'bg-teal-600/22 border-teal-300/80 text-teal-950 hover:bg-teal-600/30',
+    suggestedPill: 'bg-teal-600/12 border-teal-300/60 text-teal-950/85 hover:bg-teal-600/22 hover:border-teal-400',
+  },
+  {
+    // 6. Sky Blue / Photo & Tower Night
+    activePill: 'bg-sky-500/22 border-sky-300/80 text-sky-950 hover:bg-sky-500/30',
+    suggestedPill: 'bg-sky-500/12 border-sky-300/60 text-sky-950/85 hover:bg-sky-500/22 hover:border-sky-400',
+  },
+  {
+    // 7. Fairy Purple / Disney & Kids
+    activePill: 'bg-purple-500/22 border-purple-300/80 text-purple-950 hover:bg-purple-500/30',
+    suggestedPill: 'bg-purple-500/12 border-purple-300/60 text-purple-950/85 hover:bg-purple-500/22 hover:border-purple-400',
+  },
+  {
+    // 8. Vintage Gold Ochre / Marais & Vintage Market
+    activePill: 'bg-amber-600/22 border-amber-300/80 text-amber-950 hover:bg-amber-600/30',
+    suggestedPill: 'bg-amber-600/12 border-amber-300/60 text-amber-950/85 hover:bg-amber-600/22 hover:border-amber-400',
+  },
+  {
+    // 9. Wine Burgundy / Seine Sunset Cruise
+    activePill: 'bg-red-500/22 border-red-300/80 text-red-950 hover:bg-red-500/30',
+    suggestedPill: 'bg-red-500/12 border-red-300/60 text-red-950/85 hover:bg-red-500/22 hover:border-red-400',
+  },
+]
+
+export const BASE_TAG_PILL =
+  "group relative isolate overflow-hidden inline-flex h-7.5 items-center px-3.5 text-xs font-semibold leading-none rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.65)] backdrop-blur-md backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-[1px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-[''] transition-all cursor-pointer select-none"
+
+export function getTagTheme(tag: string): TagTheme {
+  const t = cleanTagText(tag).toLowerCase()
+  if (t.includes('咖啡') || t.includes('早餐')) return COLOR_PALETTES[0]
+  if (t.includes('餐') || t.includes('吃') || t.includes('肉') || t.includes('面') || t.includes('生蚝') || t.includes('菜') || t.includes('美食')) return COLOR_PALETTES[1]
+  if (t.includes('步') || t.includes('慢') || t.includes('轻松') || t.includes('避开')) return COLOR_PALETTES[2]
+  if (t.includes('画') || t.includes('展') || t.includes('故居') || t.includes('文艺') || t.includes('艺术')) return COLOR_PALETTES[3]
+  if (t.includes('甜') || t.includes('烘焙') || t.includes('面包')) return COLOR_PALETTES[4]
+  if (t.includes('凯旋门') || t.includes('香街') || t.includes('地标')) return COLOR_PALETTES[5]
+  if (t.includes('照') || t.includes('出片') || t.includes('夜景') || t.includes('铁塔') || t.includes('摄影')) return COLOR_PALETTES[6]
+  if (t.includes('迪士尼') || t.includes('亲子') || t.includes('乐园') || t.includes('儿童')) return COLOR_PALETTES[7]
+  if (t.includes('市集') || t.includes('中古') || t.includes('买手') || t.includes('购物')) return COLOR_PALETTES[8]
+  if (t.includes('酒') || t.includes('船') || t.includes('塞纳河')) return COLOR_PALETTES[9]
+
+  let hash = 0
+  for (let i = 0; i < t.length; i++) hash = (hash << 5) - hash + t.charCodeAt(i)
+  const index = Math.abs(hash) % COLOR_PALETTES.length
+  return COLOR_PALETTES[index]
+}
+
 function normalizeTime(value: unknown): string {
   const text = String(value || '').trim()
   return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(text)

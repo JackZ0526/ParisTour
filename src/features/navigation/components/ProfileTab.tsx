@@ -5,23 +5,25 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
-  Coffee,
   Compass,
-  Footprints,
   Hotel,
   LogOut,
   MapPin,
+  MessageSquare,
   Plane,
   Share2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Tag,
   Timer,
   Trash2,
   Users,
 } from 'lucide-react'
 import {
+  BASE_TAG_PILL,
   cleanTagText,
+  getTagTheme,
   type RecommendationPreferences,
 } from '../../place/services/recommendationPreferences'
 import type { AccessibleTrip } from '../../cloud-sync'
@@ -407,9 +409,9 @@ export function ProfileTab({
           </div>
         </div>
 
-        {/* 3 Configured Preference Tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {/* Tile 1: Departure Time */}
+        {/* 2 Symmetrical Metrics: Departure Time & Active Preference Pool */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Metric 1: Departure Time */}
           <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)]">
               <Timer size={16} strokeWidth={2} />
@@ -422,49 +424,57 @@ export function ProfileTab({
             </div>
           </div>
 
-          {/* Tile 2: Morning Cafe */}
+          {/* Metric 2: Active Tag Pool Count */}
           <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
-              <Coffee size={16} strokeWidth={2} />
+              <Tag size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)]">晨间咖啡</p>
+              <p className="text-[10.5px] text-[var(--stone)]">生效偏好</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
-                {recommendationPreferences?.preferCafeStart ? '开启 (法式启程)' : '直接前往景点'}
-              </p>
-            </div>
-          </div>
-
-          {/* Tile 3: Walking Pace */}
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 text-[var(--sage)]">
-              <Footprints size={16} strokeWidth={2} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)]">探索节奏</p>
-              <p className="text-xs font-semibold text-[var(--ink)] truncate">
-                {recommendationPreferences?.preferLowWalking ? '轻松漫游 · 少步行' : '常规探索 · 深度游'}
+                {recommendationPreferences?.tags?.length
+                  ? `${recommendationPreferences.tags.length} 项标签生效`
+                  : '未设置标签'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Active Preference Tags Roll Preview */}
-        {recommendationPreferences?.tags && recommendationPreferences.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {recommendationPreferences.tags.slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center rounded-full border border-white/90 bg-white/70 px-2.5 py-0.5 text-[11px] font-medium text-[var(--ink)] shadow-2xs"
-              >
-                {cleanTagText(tag)}
-              </span>
-            ))}
-            {recommendationPreferences.tags.length > 4 && (
-              <span className="inline-flex items-center rounded-full border border-white/80 bg-white/50 px-2 py-0.5 text-[10.5px] font-medium text-[var(--stone)]">
-                +{recommendationPreferences.tags.length - 4} 项
+        {/* Active Preference Tags Roll Preview (Signature Frosted Glass Pills) */}
+        {recommendationPreferences?.tags && recommendationPreferences.tags.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            {recommendationPreferences.tags.slice(0, 5).map((tag) => {
+              const clean = cleanTagText(tag)
+              const theme = getTagTheme(clean)
+              return (
+                <span
+                  key={clean}
+                  className={`${BASE_TAG_PILL} cursor-default ${theme.activePill}`}
+                >
+                  <span className="relative z-10">{clean}</span>
+                </span>
+              )
+            })}
+            {recommendationPreferences.tags.length > 5 && (
+              <span className="inline-flex h-7.5 items-center rounded-full border border-black/8 bg-white/60 px-2.5 text-[11px] font-semibold text-[var(--stone)] shadow-2xs">
+                +{recommendationPreferences.tags.length - 5} 项
               </span>
             )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-black/10 bg-white/40 p-2.5 text-center text-xs text-[var(--stone)]">
+            暂未设置偏好标签，点击下方按钮定制专属巴黎路线偏好
+          </div>
+        )}
+
+        {/* Custom Requirements Note (If Present) */}
+        {recommendationPreferences?.extraNotes && (
+          <div className="flex items-start gap-2 rounded-2xl border border-white/80 bg-white/50 p-2.5 shadow-2xs backdrop-blur-md">
+            <MessageSquare size={13} className="mt-0.5 shrink-0 text-[var(--copper)]/80" />
+            <p className="text-xs text-[var(--stone)] leading-relaxed line-clamp-2">
+              <span className="font-medium text-[var(--ink)]">补充要求：</span>
+              {recommendationPreferences.extraNotes}
+            </p>
           </div>
         )}
 
@@ -472,7 +482,7 @@ export function ProfileTab({
         <button
           type="button"
           onClick={onOpenPreferences}
-          className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all hover:brightness-110 active:scale-[0.99]"
+          className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
         >
           <SlidersHorizontal size={14} />
           <span>打开偏好设置详细面板</span>
