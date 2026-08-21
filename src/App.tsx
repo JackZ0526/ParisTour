@@ -785,7 +785,7 @@ export default function App() {
               {itineraryReady && (
                 <div className="flex items-center justify-between gap-2.5 rounded-2xl border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/80 px-3 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors sm:px-4 sm:py-3">
                   <div
-                    className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,black_calc(100%-12px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_calc(100%-12px),transparent_100%)]"
+                    className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent_0,black_12px,black_calc(100%-12px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0,black_12px,black_calc(100%-12px),transparent_100%)]"
                     aria-label="行程摘要"
                   >
                     <span
