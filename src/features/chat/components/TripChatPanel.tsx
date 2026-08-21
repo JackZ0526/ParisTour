@@ -1941,23 +1941,9 @@ export function TripChatPanel({
 
           <div className="border-b border-white/85 px-4 py-3 bg-white/40 backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="font-display text-xl leading-tight text-[var(--ink)]">行程助手</h3>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  {/* Current Day Capsule */}
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 bg-[#f4f8f5]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
-                    第 {currentDay} 天
-                  </span>
-
-                  {/* Viewing Place Context Capsule */}
-                  {viewing && (
-                    <span className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full border border-[#d7a98a]/60 bg-[#f6e8de]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--copper)] shadow-2xs backdrop-blur-sm">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--copper)]" />
-                      <span className="truncate">正在看「{viewing.name}」</span>
-                    </span>
-                  )}
-
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-display text-xl leading-tight text-[var(--ink)]">行程助手</h3>
                   {/* Model & Thinking Status Capsule */}
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/90 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm">
                     <ModelBrandIcon
@@ -1974,6 +1960,21 @@ export function TripChatPanel({
                       </>
                     )}
                   </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {/* Current Day Capsule */}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 bg-[#f4f8f5]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
+                    第 {currentDay} 天
+                  </span>
+
+                  {/* Viewing Place Context Capsule */}
+                  {viewing && (
+                    <span className="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-full border border-[#d7a98a]/60 bg-[#f6e8de]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--copper)] shadow-2xs backdrop-blur-sm">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--copper)]" />
+                      <span className="truncate">正在看「{viewing.name}」</span>
+                    </span>
+                  )}
                 </div>
               </div>
               <CloseIconButton
