@@ -31,7 +31,6 @@ import {
   getTagTheme,
   type RecommendationPreferences,
 } from '../../place/services/recommendationPreferences'
-import { InlineRecommendationPreferencesPanel } from '../../place/components/InlineRecommendationPreferencesPanel'
 import type { AccessibleTrip } from '../../cloud-sync'
 import {
   getCloudSaveStatus,
@@ -62,7 +61,6 @@ export interface ProfileTabProps {
   onOpenShare?: () => void
   onOpenBackup?: () => void
   onOpenPreferences: () => void
-  onSavePreferences?: (value: RecommendationPreferences) => void
   onClearAll?: () => void
   trips?: AccessibleTrip[]
   activeTripId?: string
@@ -107,7 +105,6 @@ export function ProfileTab({
   onOpenShare,
   onOpenBackup,
   onOpenPreferences,
-  onSavePreferences,
   onClearAll,
   trips = [],
   activeTripId,
@@ -427,32 +424,25 @@ export function ProfileTab({
       </div>
 
       {/* ========================================================================= */}
-      {/* Row 2: AI Recommendation Preferences Console                              */}
-      {/* - Desktop: Fully Resident Inline Panel (No popup needed)                  */}
-      {/* - Mobile: Compact Preview Summary Card + Modal Trigger Button             */}
+      {/* Row 2: AI Recommendation Preferences Summary Card (Opens Popup Modal)    */}
       {/* ========================================================================= */}
-      {/* Desktop Inline Resident Panel */}
-      <div className="hidden lg:block">
-        <InlineRecommendationPreferencesPanel
-          value={recommendationPreferences}
-          onChange={onSavePreferences || (() => {})}
-          readOnly={readOnly}
-        />
-      </div>
-
-      {/* Mobile Compact Card */}
-      <div className="lg:hidden rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-4 transition-colors">
-        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-            <Sparkles size={16} className="text-[var(--copper)]" />
-            <span>AI 智能偏好配置</span>
+      <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-4 transition-colors`}>
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3.5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
+              <Sparkles size={16} className="text-[var(--copper)] shrink-0" />
+              <span>AI 智能偏好配置</span>
+            </div>
+            <p className="mt-0.5 text-xs text-[var(--stone)] leading-relaxed">
+              个性化行程偏好体系；这些倾向将直接引导 AI 生成专属巴黎路线与地点推荐。
+            </p>
           </div>
         </div>
 
         {/* 2 Symmetrical Metrics: Departure Time & Active Preference Pool */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           {/* Metric 1: Departure Time */}
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs backdrop-blur-sm">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)]">
               <Timer size={16} strokeWidth={2} />
             </div>
@@ -465,7 +455,7 @@ export function ProfileTab({
           </div>
 
           {/* Metric 2: Active Tag Pool Count */}
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs backdrop-blur-sm">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
               <Tag size={16} strokeWidth={2} />
             </div>
@@ -483,7 +473,7 @@ export function ProfileTab({
         {/* Active Preference Tags Roll Preview */}
         {recommendationPreferences?.tags && recommendationPreferences.tags.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            {recommendationPreferences.tags.slice(0, 5).map((tag) => {
+            {recommendationPreferences.tags.slice(0, 10).map((tag) => {
               const clean = cleanTagText(tag)
               const theme = getTagTheme(clean)
               return (
@@ -495,14 +485,14 @@ export function ProfileTab({
                 </span>
               )
             })}
-            {recommendationPreferences.tags.length > 5 && (
+            {recommendationPreferences.tags.length > 10 && (
               <span className="inline-flex h-7.5 items-center rounded-full border border-black/8 bg-white/60 px-2.5 text-[11px] font-semibold text-[var(--stone)] shadow-2xs">
-                +{recommendationPreferences.tags.length - 5} 项
+                +{recommendationPreferences.tags.length - 10} 项
               </span>
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-black/10 bg-white/40 p-2.5 text-center text-xs text-[var(--stone)]">
+          <div className="rounded-2xl border border-dashed border-black/10 bg-white/40 p-3 text-center text-xs text-[var(--stone)]">
             暂未设置偏好标签，点击下方按钮定制专属巴黎路线偏好
           </div>
         )}

@@ -1418,10 +1418,6 @@ export default function App() {
               }
               onOpenBackup={() => setBackupOpen(true)}
               onOpenPreferences={() => setRecommendationPreferencesOpen(true)}
-              onSavePreferences={(next) => {
-                const saved = saveRecommendationPreferences(next)
-                setRecommendationPreferences(saved)
-              }}
               onClearAll={!readOnly ? handleClearAllTripState : undefined}
               trips={trips}
               activeTripId={activeTrip?.id}
