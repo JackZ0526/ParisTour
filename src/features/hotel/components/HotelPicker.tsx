@@ -62,6 +62,7 @@ import {
   Building2,
   Check,
   ChevronDown,
+  CircleMinus,
   CircleParking,
   CigaretteOff,
   Coffee,
@@ -73,7 +74,6 @@ import {
   Luggage,
   MapPin,
   MessageSquareQuote,
-  Minus,
   PawPrint,
   Refrigerator,
   ShowerHead,
@@ -247,7 +247,7 @@ function TrashIcon() {
 }
 
 function UnselectIcon() {
-  return <Minus size={14} strokeWidth={2} aria-hidden />
+  return <CircleMinus size={14} strokeWidth={1.8} aria-hidden />
 }
 
 function ChevronIcon({ up }: { up?: boolean }) {
