@@ -62,7 +62,6 @@ import {
   Building2,
   Check,
   ChevronDown,
-  CircleMinus,
   CircleParking,
   CigaretteOff,
   Coffee,
@@ -89,7 +88,6 @@ import {
   Wifi,
   Wind,
   Wine,
-  X,
   type LucideIcon,
 } from 'lucide-react'
 import { loadTripDates } from '../../itinerary/services/tripDates'
