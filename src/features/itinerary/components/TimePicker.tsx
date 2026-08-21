@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type UIEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type UIEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
 
@@ -15,6 +15,8 @@ const MINUTES = Array.from({ length: 12 }, (_, index) => index * 5)
 const ITEM_HEIGHT = 38 // 38px per item height
 const VISIBLE_COUNT = 3 // 3 visible items in view window
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_COUNT // 114px
+const REPEAT_COUNT = 40 // 40 loops of items for seamless infinite wheel scrolling
+const MIDDLE_SET = 20 // Center loop offset
 
 function parseTime(value: string): { hour: number; minute: number } {
   const match = /^(\d{2}):(\d{2})$/.exec(value)
@@ -47,55 +49,95 @@ function TimeWheelColumn<T extends number>({
   const containerRef = useRef<HTMLDivElement>(null)
   const isScrollingRef = useRef(false)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const n = items.length
 
-  // Scroll to selected item on mount or when value changes externally
-  useEffect(() => {
-    const idx = items.indexOf(value)
-    if (idx >= 0 && containerRef.current && !isScrollingRef.current) {
-      containerRef.current.scrollTop = idx * ITEM_HEIGHT
+  // Construct infinite repeated item list for circular rolling
+  const repeatedItems = useMemo(() => {
+    const list: { item: T; repIdx: number }[] = []
+    for (let loop = 0; loop < REPEAT_COUNT; loop++) {
+      for (let i = 0; i < n; i++) {
+        const item = items[i]
+        if (item !== undefined) {
+          list.push({ item, repIdx: loop * n + i })
+        }
+      }
     }
-  }, [value, items])
+    return list
+  }, [items, n])
+
+  // Center scroll position on mount or when value changes externally
+  useEffect(() => {
+    const baseIdx = items.indexOf(value)
+    if (baseIdx >= 0 && containerRef.current && !isScrollingRef.current) {
+      const currentScroll = containerRef.current.scrollTop
+      const currentRepIdx = Math.round(currentScroll / ITEM_HEIGHT)
+      const currentBaseIdx = ((currentRepIdx % n) + n) % n
+
+      // Only reposition if different from current displayed base index
+      if (currentBaseIdx !== baseIdx || currentScroll === 0) {
+        const targetRepIdx = MIDDLE_SET * n + baseIdx
+        containerRef.current.scrollTop = targetRepIdx * ITEM_HEIGHT
+      }
+    }
+  }, [value, items, n])
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget
     isScrollingRef.current = true
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
 
-    const index = Math.round(target.scrollTop / ITEM_HEIGHT)
-    const clamped = Math.max(0, Math.min(index, items.length - 1))
-    const selected = items[clamped]
+    const rawIdx = Math.round(target.scrollTop / ITEM_HEIGHT)
+    const normalizedIdx = ((rawIdx % n) + n) % n
+    const selected = items[normalizedIdx]
     if (selected !== undefined && selected !== value) {
       onChange(selected)
     }
 
     scrollTimerRef.current = setTimeout(() => {
       isScrollingRef.current = false
+      // Silent reset to middle loop if user scrolled too far towards boundaries
+      if (containerRef.current && (rawIdx < n * 5 || rawIdx > n * (REPEAT_COUNT - 5))) {
+        const resetIdx = MIDDLE_SET * n + normalizedIdx
+        containerRef.current.scrollTop = resetIdx * ITEM_HEIGHT
+      }
     }, 150)
   }
 
-  const handleItemClick = (idx: number) => {
+  const handleItemClick = (repIdx: number, item: T) => {
     if (containerRef.current) {
       containerRef.current.scrollTo({
-        top: idx * ITEM_HEIGHT,
+        top: repIdx * ITEM_HEIGHT,
         behavior: 'smooth',
       })
     }
-    const selected = items[idx]
-    if (selected !== undefined) {
-      onChange(selected)
-    }
+    onChange(item)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const idx = items.indexOf(value)
+    if (!containerRef.current) return
+    const currentScroll = containerRef.current.scrollTop
+    const currentRepIdx = Math.round(currentScroll / ITEM_HEIGHT)
+
     if (e.key === 'ArrowUp') {
       e.preventDefault()
-      const prevIdx = Math.max(0, idx - 1)
-      handleItemClick(prevIdx)
+      const targetRepIdx = currentRepIdx - 1
+      containerRef.current.scrollTo({
+        top: targetRepIdx * ITEM_HEIGHT,
+        behavior: 'smooth',
+      })
+      const normIdx = ((targetRepIdx % n) + n) % n
+      const selected = items[normIdx]
+      if (selected !== undefined) onChange(selected)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      const nextIdx = Math.min(items.length - 1, idx + 1)
-      handleItemClick(nextIdx)
+      const targetRepIdx = currentRepIdx + 1
+      containerRef.current.scrollTo({
+        top: targetRepIdx * ITEM_HEIGHT,
+        behavior: 'smooth',
+      })
+      const normIdx = ((targetRepIdx % n) + n) % n
+      const selected = items[normIdx]
+      if (selected !== undefined) onChange(selected)
     }
   }
 
@@ -113,14 +155,14 @@ function TimeWheelColumn<T extends number>({
       {/* Top spacer (1 item height) to vertically center the first item in the lens */}
       <div style={{ height: `${ITEM_HEIGHT}px` }} aria-hidden />
 
-      {items.map((item, idx) => {
+      {repeatedItems.map(({ item, repIdx }) => {
         const isSelected = item === value
         return (
           <div
-            key={item}
+            key={repIdx}
             role="option"
             aria-selected={isSelected}
-            onClick={() => handleItemClick(idx)}
+            onClick={() => handleItemClick(repIdx, item)}
             style={{ height: `${ITEM_HEIGHT}px` }}
             className={`flex snap-center items-center justify-center text-center cursor-pointer transition-all duration-150 ${
               isSelected
