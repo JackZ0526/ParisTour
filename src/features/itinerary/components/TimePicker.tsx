@@ -123,7 +123,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
               }}
               style={{ transformOrigin: 'top center' }}
-              className={`absolute inset-x-0 top-0 z-30 max-h-[min(70dvh,420px)] overflow-y-auto ${glassPopoverSurfaceClass} p-4`}
+              className={`absolute inset-x-0 top-0 z-50 max-h-[min(70dvh,420px)] overflow-y-auto ${glassPopoverSurfaceClass} p-4 shadow-2xl`}
             >
               <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)] pb-2">
                 <p className="font-display text-base tracking-wide text-[var(--ink)]">

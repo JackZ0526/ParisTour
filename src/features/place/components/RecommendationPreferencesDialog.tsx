@@ -270,7 +270,7 @@ export function RecommendationPreferencesDialog({
         {/* Main Content Body */}
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           {/* 1. Departure Time Anchor */}
-          <section className="rounded-2xl border border-white/80 bg-white/50 p-3.5 shadow-sm backdrop-blur-md">
+          <section className="relative z-30 rounded-2xl border border-white/80 bg-white/50 p-3.5 shadow-sm backdrop-blur-md">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2">
               <Clock size={14} className="text-[var(--copper)]" />
               <span>通常开始时间</span>
@@ -284,7 +284,7 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 2. Active Preference Tag Pool (已生效偏好池) */}
-          <section className="space-y-2">
+          <section className="relative z-20 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Tag size={14} className="text-[var(--copper)]" />
