@@ -357,8 +357,8 @@ body.is-pwa.orientation-landscape::after {
   --timeline-ease-soft: var(--ease-tick);
   --timeline-leg-morph-ms: var(--dur-mid);
   --timeline-leg-fade-ms: var(--dur-pop);
-  --timeline-swap-wipe-ms: var(--dur-wipe);
-  --timeline-reorder-ms: var(--dur-slow);
+  --nav-capsule-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.22) 28%, rgba(255, 255, 255, 0.06) 55%, rgba(255, 255, 255, 0.75) 85%, rgba(255, 255, 255, 0.3) 100%);
+  --nav-pill-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.32) 35%, rgba(255, 255, 255, 0.1) 65%, rgba(255, 255, 255, 0.85) 100%);
   font-family: 'Outfit', system-ui, sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -381,6 +381,8 @@ body.is-pwa.orientation-landscape::after {
   --river: #7b9e9c;
   --card: rgba(24, 31, 28, 0.85);
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --nav-capsule-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 35%, rgba(255, 255, 255, 0.02) 65%, rgba(255, 255, 255, 0.12) 100%);
+  --nav-pill-border-gradient: linear-gradient(135deg, rgba(212, 131, 84, 0.42) 0%, rgba(255, 255, 255, 0.1) 35%, rgba(255, 255, 255, 0.03) 65%, rgba(212, 131, 84, 0.22) 100%);
   color-scheme: dark;
 }
 
