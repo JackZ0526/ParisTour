@@ -333,14 +333,14 @@ export function RecommendationPreferencesDialog({
                           key={cleanTag}
                           type="button"
                           layout="position"
-                          initial={{ opacity: 0, scale: 0.85 }}
+                          initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.75 }}
-                          whileTap={{ scale: 0.93 }}
+                          exit={{ opacity: 0 }}
+                          whileTap={{ scale: 0.96 }}
                           transition={{
-                            layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
-                            scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
-                            opacity: { duration: 0.16 },
+                            layout: { duration: 0.18, ease: 'easeOut' },
+                            opacity: { duration: 0.14 },
+                            scale: { duration: 0.14, ease: 'easeOut' },
                           }}
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
@@ -360,7 +360,7 @@ export function RecommendationPreferencesDialog({
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
           <motion.section
             layout="position"
-            transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             className="space-y-2.5"
           >
             <div className="flex items-center justify-between">
@@ -381,14 +381,14 @@ export function RecommendationPreferencesDialog({
                         key={cleanPreset}
                         type="button"
                         layout="position"
-                        initial={{ opacity: 0, scale: 0.85 }}
+                        initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.75 }}
-                        whileTap={{ scale: 0.93 }}
+                        exit={{ opacity: 0 }}
+                        whileTap={{ scale: 0.96 }}
                         transition={{
-                          layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
-                          scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
-                          opacity: { duration: 0.16 },
+                          layout: { duration: 0.18, ease: 'easeOut' },
+                          opacity: { duration: 0.14 },
+                          scale: { duration: 0.14, ease: 'easeOut' },
                         }}
                         onClick={() => addTag(cleanPreset)}
                         title={`点击加入：${cleanPreset}`}
