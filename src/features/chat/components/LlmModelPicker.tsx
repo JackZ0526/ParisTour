@@ -135,7 +135,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   // absolutely positioned, there's nothing in-flow for `height: 'auto'`
   // to measure against, so we duplicate the markup off-screen and let a
   // ResizeObserver feed the value back into the animate.height target.
-  const [popoverHeight, setPopoverHeight] = useState(260)
+  const [popoverHeight, setPopoverHeight] = useState(168)
   // Mobile: closed chip is a 48px circle. Desktop: closed chip is a pill
   // (auto width up to 15.5rem, 48px tall) — the morph widens the pill
   // before the popover content unfurls upward.
@@ -149,7 +149,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
     const update = () => {
       const hSentinel = sentinelRef.current?.offsetHeight || 0
       const hContent = contentRef.current?.offsetHeight || 0
-      const h = Math.max(hSentinel, hContent)
+      const h = hSentinel > 0 ? hSentinel : hContent
       if (h > 0) setPopoverHeight(h)
     }
     update()
@@ -528,10 +528,11 @@ function ThinkingControls({
           master on/off and auto/manual both move the top edge, never scale it. */}
       <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5`}>
         <motion.div
-          initial={false}
+          initial={{ gridTemplateRows: thinkingOn ? '1fr' : '0fr' }}
           animate={{
             gridTemplateRows: thinkingOn ? '1fr' : '0fr',
           }}
+          style={{ gridTemplateRows: thinkingOn ? '1fr' : '0fr' }}
           transition={
             measureOnly
               ? instantTransition
@@ -542,7 +543,7 @@ function ThinkingControls({
           className="grid"
         >
           <motion.div
-            initial={false}
+            initial={{ opacity: thinkingOn ? 1 : 0 }}
             animate={{ opacity: thinkingOn ? 1 : 0 }}
             transition={
               measureOnly
@@ -580,10 +581,11 @@ function ThinkingControls({
               </label>
 
               <motion.div
-                initial={false}
+                initial={{ gridTemplateRows: sliderExpanded ? '1fr' : '0fr' }}
                 animate={{
                   gridTemplateRows: sliderExpanded ? '1fr' : '0fr',
                 }}
+                style={{ gridTemplateRows: sliderExpanded ? '1fr' : '0fr' }}
                 transition={
                   measureOnly
                     ? instantTransition
@@ -594,7 +596,7 @@ function ThinkingControls({
                 className="grid"
               >
                 <motion.div
-                  initial={false}
+                  initial={{ opacity: sliderExpanded ? 1 : 0 }}
                   animate={{ opacity: sliderExpanded ? 1 : 0 }}
                   transition={
                     measureOnly
@@ -621,10 +623,11 @@ function ThinkingControls({
         </motion.div>
 
         <motion.div
-          initial={false}
+          initial={{ gridTemplateRows: thinkingOn ? '0fr' : '1fr' }}
           animate={{
             gridTemplateRows: thinkingOn ? '0fr' : '1fr',
           }}
+          style={{ gridTemplateRows: thinkingOn ? '0fr' : '1fr' }}
           transition={
             measureOnly
               ? instantTransition
@@ -635,7 +638,7 @@ function ThinkingControls({
           className="grid"
         >
           <motion.div
-            initial={false}
+            initial={{ opacity: thinkingOn ? 0 : 1 }}
             animate={{ opacity: thinkingOn ? 0 : 1 }}
             transition={
               measureOnly
@@ -1086,15 +1089,16 @@ function ModelSettingsPanel({
 
         <motion.div
           id={optionsId}
-          initial={false}
+          initial={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
           animate={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+          style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
           transition={measureOnly ? instantTransition : { gridTemplateRows: heightTransition }}
           inert={!expanded || undefined}
           aria-hidden={!expanded}
           className="grid"
         >
           <motion.div
-            initial={false}
+            initial={{ opacity: expanded ? 1 : 0 }}
             animate={{ opacity: expanded ? 1 : 0 }}
             transition={
               measureOnly
