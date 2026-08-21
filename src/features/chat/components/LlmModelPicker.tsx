@@ -56,7 +56,7 @@ const DESKTOP_POPOVER_WIDTH = 280
 const POPOVER_CONTENT_WIDTH = 'calc(min(calc(100vw - 2.5rem), 17.5rem) - 2px)'
 
 const GLASS_INNER_CARD_CLASS =
-  'relative overflow-hidden rounded-2xl border border-white/90 bg-[#fbf7f3]/85 shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1.5px_rgba(255,255,255,0.7)] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95'
+  'relative overflow-hidden rounded-2xl border border-white/90 dark:border-white/10 bg-[#fbf7f3]/85 dark:bg-[#18201c]/85 shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1.5px_rgba(255,255,255,0.7)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent before:opacity-95'
 
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() =>
@@ -343,14 +343,9 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           // 2.5rem = 40px headroom (20px top + 20px bottom margins).
           maxHeight: 'calc(100vh - 2.5rem)',
           transformOrigin: 'bottom right',
-          color: 'var(--ink)',
-          backgroundColor: 'rgba(255, 255, 255, 0.85)',
-          border: '1px solid rgba(255, 255, 255, 0.9)',
-          boxShadow:
-            '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
           backdropFilter: 'blur(24px) saturate(180%)',
         }}
-        className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+        className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border border-white/90 dark:border-white/10 bg-white/85 dark:bg-[#151c18]/90 text-[var(--ink)] shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1.5px_0_rgba(255,255,255,1)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6),inset_0_1px_1.5px_0_rgba(255,255,255,0.1)] ${className}`}
       >
         {/* Visible chip content -- in-flow when closed */}
         <motion.div
@@ -370,14 +365,14 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           {/* Top specular reflection arc */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+            className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-95"
           />
           <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)] sm:h-4 sm:w-4" />
-          <span className="hidden whitespace-nowrap text-sm font-semibold leading-none text-zinc-800 sm:inline">{chip}</span>
+          <span className="hidden whitespace-nowrap text-sm font-semibold leading-none text-zinc-800 dark:text-zinc-200 sm:inline">{chip}</span>
           <ChevronDown
             aria-hidden
             strokeWidth={2}
-            className={`hidden h-3 w-3 shrink-0 text-zinc-500 transition duration-200 sm:block ${
+            className={`hidden h-3 w-3 shrink-0 text-zinc-500 dark:text-zinc-400 transition duration-200 sm:block ${
               open ? 'rotate-180' : ''
             }`}
           />
@@ -632,10 +627,10 @@ function PillSwitch({
         setHasToggled(true)
         onCheckedChange(!checked)
       }}
-      className={`relative h-[1.65rem] w-[2.85rem] shrink-0 rounded-full border border-white/90 p-0.5 transition-colors duration-250 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md disabled:opacity-50 cursor-pointer ${
+      className={`relative h-[1.65rem] w-[2.85rem] shrink-0 rounded-full border border-white/90 dark:border-white/15 p-0.5 transition-colors duration-250 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.4)] backdrop-blur-md disabled:opacity-50 cursor-pointer ${
         checked
           ? 'bg-[var(--sage)]'
-          : 'bg-[var(--ink)]/16'
+          : 'bg-[var(--ink)]/16 dark:bg-white/10'
       }`}
     >
       <motion.span
@@ -993,7 +988,7 @@ function ModelSettingsPanel({
       }
 
   return (
-    <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
+    <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 dark:border-white/10 pt-3`}>
       <SectionHeader>模型</SectionHeader>
       <div className={GLASS_INNER_CARD_CLASS}>
         <button
@@ -1002,7 +997,7 @@ function ModelSettingsPanel({
           aria-controls={optionsId}
           disabled={disabled}
           onClick={onToggle}
-          className="relative flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-white/55 disabled:opacity-50 cursor-pointer"
+          className="relative flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-white/55 dark:hover:bg-white/10 disabled:opacity-50 cursor-pointer"
         >
           <ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />
           <span className="min-w-0 flex-1">{getOpenAIModelShortLabel(model)}</span>
@@ -1034,7 +1029,7 @@ function ModelSettingsPanel({
             }}
             className="min-h-0 overflow-hidden"
           >
-            <div className="border-t border-white/85 pb-1">
+            <div className="border-t border-white/85 dark:border-white/10 pb-1">
               <ModelGroup label="DeepSeek">
                 {DEEPSEEK_MODEL_OPTIONS.map((option) => (
                   <ModelOption
@@ -1079,7 +1074,7 @@ function ModelGroup({
   withTopDivider?: boolean
 }) {
   return (
-    <div className={`py-1 ${withTopDivider ? 'border-t border-white/80 mt-1 pt-1.5' : ''}`}>
+    <div className={`py-1 ${withTopDivider ? 'border-t border-white/80 dark:border-white/10 mt-1 pt-1.5' : ''}`}>
       <p className="px-3.5 py-1 text-[10px] font-semibold tracking-wider text-[var(--stone)] uppercase">
         {label}
       </p>
@@ -1113,8 +1108,8 @@ function ModelOption({
         onClick={onSelect}
         className={`group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.98] ${
           selected
-            ? 'border border-white/90 bg-white/85 shadow-[0_1px_5px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-sm'
-            : 'border border-transparent hover:border-white/70 hover:bg-white/50'
+            ? 'border border-white/90 dark:border-white/15 bg-white/85 dark:bg-white/10 shadow-[0_1px_5px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_1px_5px_rgba(0,0,0,0.3)] backdrop-blur-sm'
+            : 'border border-transparent hover:border-white/70 dark:hover:border-white/15 hover:bg-white/50 dark:hover:bg-white/5'
         } disabled:opacity-50 cursor-pointer`}
       >
         <span
@@ -1122,7 +1117,7 @@ function ModelOption({
           className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-150 ${
             selected
               ? 'border-[var(--sage)] bg-[var(--sage)] text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
-              : 'border-[var(--ink)]/20 bg-white/40 group-hover:border-[var(--ink)]/35'
+              : 'border-[var(--ink)]/20 dark:border-white/20 bg-white/40 dark:bg-white/5 group-hover:border-[var(--ink)]/35 dark:group-hover:border-white/40'
           }`}
         >
           {selected && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
