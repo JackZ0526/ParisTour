@@ -242,9 +242,9 @@ export function ProfileTab({
               </button>
             </div>
 
-            {/* Trip Summary Metric Cards (Quick Stats Strip) */}
+            {/* Trip Summary Metric Cards (2x2 Grid) */}
             {tripStats && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-black/5">
+              <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-black/5">
                 <div className="flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-2xs backdrop-blur-sm">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)]">
                     <CalendarDays size={14} strokeWidth={2.2} />
