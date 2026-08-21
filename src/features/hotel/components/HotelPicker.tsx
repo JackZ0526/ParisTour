@@ -2196,7 +2196,7 @@ export function HotelPicker({
                         ? '!border-[var(--sage)] ring-[var(--sage)]/40 !bg-[var(--sage)]/10'
                         : currentSlotHighlight
                           ? '!border-[var(--copper)] ring-[var(--copper)]/45 !bg-[var(--copper)]/5'
-                          : 'ring-[#d4bd91]/25'
+                          : 'ring-[#d4bd91]/25 dark:ring-white/10'
                     }`}
                   >
                     <div className="absolute right-2 top-2 z-10 flex gap-1.5">
@@ -2210,7 +2210,7 @@ export function HotelPicker({
                             e.stopPropagation()
                             setPendingDeleteHotel(selectedCandidate)
                           }}
-                          className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} flex h-8 w-8 items-center justify-center text-[var(--stone)] transition-colors hover:text-red-700 active:scale-95`}
+                          className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} flex h-8 w-8 items-center justify-center text-[var(--stone)] dark:text-zinc-300 transition-colors hover:text-red-700 dark:hover:text-red-400 active:scale-95`}
                         >
                           <TrashIcon />
                         </button>
@@ -2224,7 +2224,7 @@ export function HotelPicker({
                           e.stopPropagation()
                           clearCurrentSelection()
                         }}
-                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} flex h-8 w-8 items-center justify-center text-[var(--stone)] transition-colors hover:text-[var(--copper)] active:scale-95`}
+                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} flex h-8 w-8 items-center justify-center text-[var(--stone)] dark:text-zinc-300 transition-colors hover:text-[var(--copper)] dark:hover:text-[var(--copper)] active:scale-95`}
                       >
                         <UnselectIcon />
                       </button>
@@ -2538,7 +2538,7 @@ export function HotelPicker({
                             e.stopPropagation()
                             setPendingDeleteHotel(hotel)
                           }}
-                          className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} !absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center text-[var(--stone)] transition-colors hover:text-red-700 active:scale-95`}
+                          className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} !absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center text-[var(--stone)] dark:text-zinc-300 transition-colors hover:text-red-700 dark:hover:text-red-400 active:scale-95`}
                         >
                           <TrashIcon />
                         </button>
