@@ -94,6 +94,42 @@ import {
 
 const NO_ACTION_APPLIED_NOTE = '行程未改动，请再说一下你想要的调整。'
 const DETAIL_CONFIRM_MISSING_NOTE = '行程未改动：请在详情页确认是否加入。'
+
+function getModelBrandTheme(modelId: string) {
+  if (isDeepSeekModel(modelId)) {
+    return {
+      capsule: 'border-[#bed0fd]/75 bg-[#eff4ff]/85 text-[#2554eb]',
+      dot: 'text-[#2554eb]/35',
+      subtext: 'text-[#2554eb]/80',
+    }
+  }
+  if (/^gpt-/i.test(modelId)) {
+    return {
+      capsule: 'border-[#a7e8d0]/75 bg-[#eef9f5]/85 text-[#0c7a5f]',
+      dot: 'text-[#0c7a5f]/35',
+      subtext: 'text-[#0c7a5f]/80',
+    }
+  }
+  if (/^claude/i.test(modelId)) {
+    return {
+      capsule: 'border-[#fed7aa]/75 bg-[#fff7ed]/85 text-[#c25e3e]',
+      dot: 'text-[#c25e3e]/35',
+      subtext: 'text-[#c25e3e]/80',
+    }
+  }
+  if (/^gemini/i.test(modelId)) {
+    return {
+      capsule: 'border-[#c7d2fe]/75 bg-[#eef2ff]/85 text-[#4f46e5]',
+      dot: 'text-[#4f46e5]/35',
+      subtext: 'text-[#4f46e5]/80',
+    }
+  }
+  return {
+    capsule: 'border-white/90 bg-white/80 text-[var(--ink)]',
+    dot: 'text-zinc-300',
+    subtext: 'text-[var(--stone)]',
+  }
+}
 const TRIP_CHAT_BACKDROP_Z = 2040
 const TRIP_CHAT_PANEL_Z = 2045
 // Panel width target: 23.75rem (380px) on wide viewports, but never
@@ -1960,21 +1996,28 @@ export function TripChatPanel({
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-display text-xl leading-tight text-[var(--ink)]">行程助手</h3>
                   {/* Model & Thinking Status Capsule */}
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/90 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm">
-                    <ModelBrandIcon
-                      deepseek={isDeepSeekModel(model)}
-                      className="h-3 w-3 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    />
-                    <span>{getOpenAIModelShortLabel(model)}</span>
-                    {supportsThinkingControls(model) && thinkingMode !== 'off' && (
-                      <>
-                        <span className="text-zinc-300">·</span>
-                        <span className="text-[var(--stone)]">
-                          思考{getThinkingModeLabel(thinkingMode)}
-                        </span>
-                      </>
-                    )}
-                  </span>
+                  {(() => {
+                    const brandTheme = getModelBrandTheme(model)
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium shadow-2xs backdrop-blur-sm transition-colors duration-200 ${brandTheme.capsule}`}
+                      >
+                        <ModelBrandIcon
+                          deepseek={isDeepSeekModel(model)}
+                          className="h-3 w-3 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                        />
+                        <span>{getOpenAIModelShortLabel(model)}</span>
+                        {supportsThinkingControls(model) && thinkingMode !== 'off' && (
+                          <>
+                            <span className={brandTheme.dot}>·</span>
+                            <span className={brandTheme.subtext}>
+                              思考{getThinkingModeLabel(thinkingMode)}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {/* Current Day Capsule */}
