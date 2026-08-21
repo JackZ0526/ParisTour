@@ -1422,6 +1422,13 @@ export default function App() {
               }}
               readOnly={readOnly}
               recommendationPreferences={recommendationPreferences}
+              tripStats={{
+                daysCount: days.length,
+                placesCount: days.reduce((acc, d) => acc + (d.stops?.length || 0), 0),
+                hotelReady: isHotelSelected(hotel),
+                flightsReady: Boolean(flights.outbound && flights.returnFlight),
+                datesReady: Boolean(tripDates?.startDate && tripDates?.endDate),
+              }}
             />
           )}
         </AnimatePresence>
