@@ -10,11 +10,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import type { AccessibleTrip } from '../services/tripCloud'
-import {
-  glassCapsuleSurfaceClass,
-  glassCapsuleToneClass,
-  glassModalSurfaceClass,
-} from '../../../shared/styles/glassCapsule'
+import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 export interface TripSelectorCapsuleProps {
   trips: AccessibleTrip[]
@@ -114,24 +110,8 @@ export function TripSelectorCapsule({
       : `来自 ${activeTrip.ownerName || '他人'}`
     : '行程空间'
 
-  const roleTone =
-    activeTrip?.role === 'owner'
-      ? glassCapsuleToneClass.copper
-      : activeTrip?.role === 'editor'
-        ? glassCapsuleToneClass.sage
-        : glassCapsuleToneClass.neutral
-
-  const roleText =
-    activeTrip?.role === 'owner'
-      ? activeTrip.isPrimary
-        ? '主'
-        : '拥有者'
-      : activeTrip?.role === 'editor'
-        ? '协作'
-        : '只读'
-
   return (
-    <div className={`relative inline-flex shrink-0 ${className}`}>
+    <div className={`relative inline-flex shrink-0 items-center ${className}`}>
       {/* Trigger Capsule Button */}
       <button
         ref={buttonRef}
@@ -141,46 +121,39 @@ export function TripSelectorCapsule({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={`当前行程：${displayTitle}，点击切换`}
-        className={`group relative isolate inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/80 bg-white/70 px-2.5 py-0.5 text-xs font-medium text-[var(--ink)] shadow-sm backdrop-blur-md transition-all duration-200 ${
+        className={`group relative isolate inline-flex h-[22px] shrink-0 items-center gap-1 rounded-full border border-white/80 bg-white/70 px-2 text-[11px] font-medium text-[var(--ink)] shadow-xs backdrop-blur-md transition-all duration-200 ${
           canSwitch
             ? 'cursor-pointer hover:bg-white/95 hover:shadow hover:border-white active:scale-95'
             : 'cursor-default opacity-90'
-        } ${isOpen ? 'ring-2 ring-[var(--copper)]/30 bg-white' : ''}`}
+        } ${isOpen ? 'ring-1.5 ring-[var(--copper)]/40 bg-white' : ''}`}
       >
         {/* Subtle Specular Top Highlight */}
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent"
+          className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-80"
         />
 
         {/* Icon & Source indicator */}
-        <span className="flex shrink-0 items-center text-[var(--copper)]">
+        <span className="flex shrink-0 items-center">
           {switchingId ? (
-            <Loader2 size={12} className="animate-spin text-[var(--copper)]" />
+            <Loader2 size={11} className="animate-spin text-[var(--copper)]" />
           ) : isShared ? (
-            <Users size={12} strokeWidth={2} className="text-[var(--sage)]" />
+            <Users size={11} strokeWidth={2.2} className="text-[var(--sage)]" />
           ) : (
-            <Sparkles size={11} strokeWidth={2} className="text-[var(--copper)]" />
+            <Sparkles size={10.5} strokeWidth={2.2} className="text-[var(--copper)]" />
           )}
         </span>
 
         {/* Title / Owner Handle */}
-        <span className="max-w-[110px] truncate text-[11px] font-medium tracking-tight text-[var(--ink)] sm:max-w-[150px]">
+        <span className="max-w-[120px] truncate text-[11px] font-medium leading-none text-[var(--ink)] sm:max-w-[160px]">
           {displayTitle}
-        </span>
-
-        {/* Micro Role Pill */}
-        <span
-          className={`${glassCapsuleSurfaceClass} ${roleTone} inline-flex shrink-0 items-center px-1.5 py-0.2 text-[9.5px] font-semibold leading-tight`}
-        >
-          {roleText}
         </span>
 
         {/* Dropdown Chevron */}
         {canSwitch && (
           <ChevronDown
-            size={11}
-            strokeWidth={2.2}
+            size={10.5}
+            strokeWidth={2.4}
             className={`shrink-0 text-[var(--stone)] transition-transform duration-200 ${
               isOpen ? 'rotate-180 text-[var(--ink)]' : 'group-hover:text-[var(--ink)]'
             }`}

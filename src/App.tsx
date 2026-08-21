@@ -706,18 +706,30 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleSelectTab('profile')}
-                className="flex items-center gap-2 rounded-full border border-white/80 bg-white/70 p-1 pl-1.5 pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95"
+                className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95"
                 title="查看个人中心与偏好"
               >
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
+                <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
                   {email ? email.charAt(0).toUpperCase() : <User size={13} />}
+                  {/* Micro role dot indicator on mobile */}
+                  {role && (
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white sm:hidden ${
+                        role === 'owner'
+                          ? 'bg-[var(--copper)]'
+                          : role === 'editor'
+                            ? 'bg-[var(--sage)]'
+                            : 'bg-zinc-400'
+                      }`}
+                    />
+                  )}
                 </div>
                 <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
                   {email}
                 </span>
                 {role && (
                   <span
-                    className={`${glassCapsuleSurfaceClass} inline-flex items-center px-2 py-0.5 text-[10px] font-medium ${
+                    className={`hidden sm:inline-flex ${glassCapsuleSurfaceClass} items-center px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${
                       role === 'owner'
                         ? `${glassCapsuleToneClass.copper} text-[var(--copper)]`
                         : role === 'editor'
