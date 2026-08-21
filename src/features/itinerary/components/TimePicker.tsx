@@ -170,9 +170,7 @@ function TimeWheelColumn<T extends number>({
                 : 'text-sm sm:text-base font-semibold text-[var(--stone)]/75 hover:text-[var(--ink)] scale-90'
             }`}
           >
-            <div className="w-[84px] flex items-center">
-              <span className="w-[58px] text-center tabular-nums font-mono leading-none">{formatItem(item)}</span>
-            </div>
+            <span className="tabular-nums font-mono leading-none">{formatItem(item)}</span>
           </div>
         )
       })}
@@ -303,30 +301,25 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               <div className="relative my-1 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
                 {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
                 <div className="relative" style={{ height: `${WHEEL_HEIGHT}px` }}>
-                  {/* Layer 1 (z-0): Dual Distinct 3D Frosted Glass Capsules Behind Text */}
+                  {/* Layer 1 (z-0): Dual Distinct 3D Frosted Glass Capsules */}
                   <div
                     className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 grid grid-cols-2 z-0"
                     style={{ height: `${ITEM_HEIGHT}px` }}
                   >
-                    {/* Hour Column: Capsule frames ONLY the digits, "点" is outside */}
+                    {/* Hour Column Capsule */}
                     <div className="flex items-center justify-center">
-                      <div className="w-[84px] flex items-center">
-                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
-                        <span className="ml-2 text-xs font-semibold text-[var(--copper)] select-none">
-                          点
-                        </span>
-                      </div>
+                      <div className="relative w-[64px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
                     </div>
 
-                    {/* Minute Column: Capsule frames ONLY the digits, "分" is outside */}
+                    {/* Minute Column Capsule */}
                     <div className="flex items-center justify-center">
-                      <div className="w-[84px] flex items-center">
-                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
-                        <span className="ml-2 text-xs font-semibold text-[var(--copper)] select-none">
-                          分
-                        </span>
-                      </div>
+                      <div className="relative w-[64px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
                     </div>
+                  </div>
+
+                  {/* Center Static Colon ':' */}
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold text-[var(--copper)]/90 select-none z-10 leading-none">
+                    :
                   </div>
 
                   {/* Layer 2 (z-10): Dual Scroll Columns with High-Contrast Rich Text */}
