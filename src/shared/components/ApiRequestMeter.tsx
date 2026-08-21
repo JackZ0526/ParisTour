@@ -42,7 +42,7 @@ const MIN_TOP = 64
 const RAIL_WIDTH = 30
 const RAIL_HEIGHT = 148
 const PANEL_WIDTH = 370
-const PANEL_HEIGHT = 438
+const PANEL_HEIGHT = 446
 
 export interface ApiMeterPosition {
   side: 'left' | 'right'
