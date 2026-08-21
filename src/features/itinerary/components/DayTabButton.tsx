@@ -1,8 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 
-export type DayTabTheme = 'glass-copper' | 'copper-gradient' | 'ink'
-
 type DayTabButtonProps = {
   dayNumber: number
   dateLabel?: string
@@ -10,14 +8,13 @@ type DayTabButtonProps = {
   pending: boolean
   active: boolean
   hasInteracted?: boolean
-  theme?: DayTabTheme
   onSelect: () => void
 }
 
 /**
  * Day switcher tab that animates width/height when content swaps from
  * shimmer skeleton → real title (cubic ease-out, not linear).
- * Features a fluid shared "ink blob" that glides between active days.
+ * Features a fluid shared copper-amber pill that glides between active days.
  */
 export function DayTabButton({
   dayNumber,
@@ -26,7 +23,6 @@ export function DayTabButton({
   pending,
   active,
   hasInteracted,
-  theme = 'glass-copper',
   onSelect,
 }: DayTabButtonProps) {
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -59,34 +55,7 @@ export function DayTabButton({
 
   const dateLine = `D${dayNumber}${dateLabel ? ` · ${dateLabel}` : ''}`
 
-  const activePillClass =
-    theme === 'glass-copper'
-      ? 'absolute inset-0 z-0 rounded-full border border-white bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-md'
-      : theme === 'copper-gradient'
-        ? 'absolute inset-0 z-0 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] shadow-[0_4px_16px_rgba(179,107,60,0.32),inset_0_1px_1.5px_rgba(255,255,255,0.45)] border border-[#c47c4d]/50'
-        : 'absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]'
-
-  const dateTextColor = active
-    ? theme === 'glass-copper'
-      ? 'text-[var(--copper)] font-bold'
-      : theme === 'copper-gradient'
-        ? 'text-white font-bold'
-        : 'text-[var(--paper)] font-bold'
-    : 'text-[var(--ink)]/85 font-medium'
-
-  const subtitleTextColor = active
-    ? theme === 'glass-copper'
-      ? 'text-[var(--ink)] font-medium'
-      : theme === 'copper-gradient'
-        ? 'text-white/90 font-medium'
-        : 'text-[var(--paper)]/85'
-    : 'text-[var(--stone)]'
-
-  const shimmerClass = active
-    ? theme === 'glass-copper'
-      ? 'day-tab-shimmer'
-      : 'day-tab-shimmer-on-ink'
-    : 'day-tab-shimmer'
+  const shimmerClass = active ? 'day-tab-shimmer-on-ink' : 'day-tab-shimmer'
 
   return (
     <button
@@ -99,13 +68,13 @@ export function DayTabButton({
       className={`day-tab-button relative isolate snap-start shrink-0 rounded-full px-3.5 py-2 text-sm outline-none transition-all duration-200 sm:px-4 ${
         active
           ? ''
-          : 'border border-white/70 bg-white/60 shadow-xs hover:border-white hover:bg-white/85 hover:shadow'
+          : 'border border-white/75 bg-white/65 shadow-xs hover:border-white hover:bg-white/85 hover:shadow-sm'
       }`}
     >
       {active && (
         <motion.span
           layoutId="active-day-tab-ink"
-          className={activePillClass}
+          className="absolute inset-0 z-0 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] shadow-[0_3px_12px_rgba(179,107,60,0.26),inset_0_1px_1.5px_rgba(255,255,255,0.45)] border border-[#c47c4d]/50 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white/70 before:to-transparent before:content-['']"
           animate={
             hasInteracted
               ? {
@@ -123,8 +92,18 @@ export function DayTabButton({
       )}
 
       <span className="relative z-10 block w-max max-w-none transition-colors duration-200">
-        <span className={`block leading-tight ${dateTextColor}`}>{dateLine}</span>
-        <span className={`mt-0.5 block text-[11px] leading-[1.25] ${subtitleTextColor}`}>
+        <span
+          className={`block leading-tight ${
+            active ? 'font-bold text-white' : 'font-semibold text-[var(--ink)]/85'
+          }`}
+        >
+          {dateLine}
+        </span>
+        <span
+          className={`mt-0.5 block text-[11px] leading-[1.25] ${
+            active ? 'font-medium text-white/95' : 'text-[var(--stone)]'
+          }`}
+        >
           {pending && !streamingTitle ? (
             <span
               aria-hidden
