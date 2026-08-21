@@ -789,25 +789,25 @@ export default function App() {
                     aria-label="行程摘要"
                   >
                     <span
-                      className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.destination} font-semibold text-[var(--copper)]`}
+                      className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.destination} font-semibold text-[var(--copper)] dark:text-zinc-200`}
                       title="旅行目的地"
                     >
-                      <MapPin size={13} strokeWidth={2} aria-hidden />
+                      <MapPin size={13} strokeWidth={2} className="text-[var(--copper)]" aria-hidden />
                       {destination}
                     </span>
                     <span
-                      className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.duration} font-medium text-[var(--sage)]`}
+                      className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.duration} font-medium text-[var(--sage)] dark:text-zinc-200`}
                       title="行程时长"
                     >
-                      <Moon size={13} strokeWidth={2} aria-hidden />
+                      <Moon size={13} strokeWidth={2} className="text-[var(--sage)]" aria-hidden />
                       {numberOfDays}天{Math.max(0, numberOfDays - 1)}晚
                     </span>
                     {datesReady && tripDates?.startDate && tripDates.endDate && (
                       <span
-                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.dates} font-medium text-[var(--stone)] dark:text-sky-300`}
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.dates} font-medium text-[var(--stone)] dark:text-zinc-200`}
                         title="旅行日期"
                       >
-                        <CalendarDays size={13} strokeWidth={2} aria-hidden />
+                        <CalendarDays size={13} strokeWidth={2} className="text-[var(--stone)] dark:text-[#7bb5ff]" aria-hidden />
                         {formatTripDayLabel(tripDates.startDate)}–{formatTripDayLabel(tripDates.endDate)}
                       </span>
                     )}
@@ -815,21 +815,21 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleSelectPlace(SELECTED_HOTEL_PLACE_ID)}
-                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.hotel} max-w-[12rem] font-medium text-[var(--stone)] dark:text-amber-200 transition-colors hover:bg-[#eee1c6]/90 dark:hover:bg-[#deb881]/25 active:scale-95`}
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.hotel} max-w-[12rem] font-medium text-[var(--stone)] dark:text-zinc-200 transition-colors hover:bg-[#eee1c6]/90 dark:hover:bg-white/10 active:scale-95`}
                         title={`查看酒店详情：${hotel.name}`}
                       >
-                        <HotelIcon size={13} className="shrink-0" strokeWidth={2} aria-hidden />
+                        <HotelIcon size={13} className="shrink-0 text-[var(--stone)] dark:text-[#deb881]" strokeWidth={2} aria-hidden />
                         <span className="truncate text-xs font-medium">{hotel.name}</span>
                       </button>
                     )}
                     {(flights.outbound?.flightNumber || flights.returnFlight?.flightNumber) && (
                       <span
-                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.flights} font-medium text-[var(--stone)] dark:text-purple-300`}
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.flights} font-medium text-[var(--stone)] dark:text-zinc-200`}
                         title="往返航班"
                       >
-                        <Plane size={13} strokeWidth={2} aria-hidden />
+                        <Plane size={13} strokeWidth={2} className="text-[var(--stone)] dark:text-[#a89bc5]" aria-hidden />
                         {flights.outbound?.flightNumber || '—'}
-                        <span className="text-[var(--stone)]" aria-hidden>⇄</span>
+                        <span className="text-[var(--stone)] dark:text-zinc-400" aria-hidden>⇄</span>
                         {flights.returnFlight?.flightNumber || '—'}
                       </span>
                     )}
