@@ -111,6 +111,13 @@ export function BottomSheet({
                 )}
                 {children}
               </motion.div>
+
+              {/* Mobile Overscroll Bleed Skirt: Prevents dark backdrop from leaking when rubber-band pulling up */}
+              <motion.div
+                style={{ y: dragY }}
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-[400px] inset-x-0 h-[400px] bg-white/95 backdrop-blur-2xl sm:hidden"
+              />
             </motion.div>
           </div>
         </>
