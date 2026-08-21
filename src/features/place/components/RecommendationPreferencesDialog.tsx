@@ -40,53 +40,53 @@ interface TagTheme {
 const COLOR_PALETTES: readonly TagTheme[] = [
   {
     // 0. Amber / Morning Cafe
-    activePill: 'bg-amber-100/95 border-amber-300/90 text-amber-950 shadow-2xs hover:bg-amber-200/90',
-    suggestedPill: 'bg-amber-50/90 border-amber-200/80 text-amber-950/80 hover:bg-amber-100 hover:text-amber-950 hover:border-amber-300',
+    activePill: 'bg-amber-500/22 border-amber-300/80 text-amber-950 hover:bg-amber-500/30',
+    suggestedPill: 'bg-amber-500/12 border-amber-300/60 text-amber-950/85 hover:bg-amber-500/22 hover:border-amber-400',
   },
   {
     // 1. Terracotta / Dining & Meat
-    activePill: 'bg-orange-100/95 border-orange-300/90 text-orange-950 shadow-2xs hover:bg-orange-200/90',
-    suggestedPill: 'bg-orange-50/90 border-orange-200/80 text-orange-950/80 hover:bg-orange-100 hover:text-orange-950 hover:border-orange-300',
+    activePill: 'bg-orange-500/22 border-orange-300/80 text-orange-950 hover:bg-orange-500/30',
+    suggestedPill: 'bg-orange-500/12 border-orange-300/60 text-orange-950/85 hover:bg-orange-500/22 hover:border-orange-400',
   },
   {
     // 2. Sage Botanical Green / Walking & Nature
-    activePill: 'bg-emerald-100/95 border-emerald-300/90 text-emerald-950 shadow-2xs hover:bg-emerald-200/90',
-    suggestedPill: 'bg-emerald-50/90 border-emerald-200/80 text-emerald-950/80 hover:bg-emerald-100 hover:text-emerald-950 hover:border-emerald-300',
+    activePill: 'bg-emerald-600/22 border-emerald-300/80 text-emerald-950 hover:bg-emerald-600/30',
+    suggestedPill: 'bg-emerald-600/12 border-emerald-300/60 text-emerald-950/85 hover:bg-emerald-600/22 hover:border-emerald-400',
   },
   {
     // 3. Artsy Indigo / Gallery & Museum
-    activePill: 'bg-indigo-100/95 border-indigo-300/90 text-indigo-950 shadow-2xs hover:bg-indigo-200/90',
-    suggestedPill: 'bg-indigo-50/90 border-indigo-200/80 text-indigo-950/80 hover:bg-indigo-100 hover:text-indigo-950 hover:border-indigo-300',
+    activePill: 'bg-indigo-500/22 border-indigo-300/80 text-indigo-950 hover:bg-indigo-500/30',
+    suggestedPill: 'bg-indigo-500/12 border-indigo-300/60 text-indigo-950/85 hover:bg-indigo-500/22 hover:border-indigo-400',
   },
   {
     // 4. Rose / French Bakery & Sweets
-    activePill: 'bg-rose-100/95 border-rose-300/90 text-rose-950 shadow-2xs hover:bg-rose-200/90',
-    suggestedPill: 'bg-rose-50/90 border-rose-200/80 text-rose-950/80 hover:bg-rose-100 hover:text-rose-950 hover:border-rose-300',
+    activePill: 'bg-rose-500/22 border-rose-300/80 text-rose-950 hover:bg-rose-500/30',
+    suggestedPill: 'bg-rose-500/12 border-rose-300/60 text-rose-950/85 hover:bg-rose-500/22 hover:border-rose-400',
   },
   {
     // 5. Seine River Teal / Landmarks
-    activePill: 'bg-teal-100/95 border-teal-300/90 text-teal-950 shadow-2xs hover:bg-teal-200/90',
-    suggestedPill: 'bg-teal-50/90 border-teal-200/80 text-teal-950/80 hover:bg-teal-100 hover:text-teal-950 hover:border-teal-300',
+    activePill: 'bg-teal-600/22 border-teal-300/80 text-teal-950 hover:bg-teal-600/30',
+    suggestedPill: 'bg-teal-600/12 border-teal-300/60 text-teal-950/85 hover:bg-teal-600/22 hover:border-teal-400',
   },
   {
     // 6. Sky Blue / Photo & Tower Night
-    activePill: 'bg-sky-100/95 border-sky-300/90 text-sky-950 shadow-2xs hover:bg-sky-200/90',
-    suggestedPill: 'bg-sky-50/90 border-sky-200/80 text-sky-950/80 hover:bg-sky-100 hover:text-sky-950 hover:border-sky-300',
+    activePill: 'bg-sky-500/22 border-sky-300/80 text-sky-950 hover:bg-sky-500/30',
+    suggestedPill: 'bg-sky-500/12 border-sky-300/60 text-sky-950/85 hover:bg-sky-500/22 hover:border-sky-400',
   },
   {
     // 7. Fairy Purple / Disney & Kids
-    activePill: 'bg-purple-100/95 border-purple-300/90 text-purple-950 shadow-2xs hover:bg-purple-200/90',
-    suggestedPill: 'bg-purple-50/90 border-purple-200/80 text-purple-950/80 hover:bg-purple-100 hover:text-purple-950 hover:border-purple-300',
+    activePill: 'bg-purple-500/22 border-purple-300/80 text-purple-950 hover:bg-purple-500/30',
+    suggestedPill: 'bg-purple-500/12 border-purple-300/60 text-purple-950/85 hover:bg-purple-500/22 hover:border-purple-400',
   },
   {
     // 8. Vintage Gold Ochre / Marais & Vintage Market
-    activePill: 'bg-amber-100/95 border-amber-300/90 text-amber-950 shadow-2xs hover:bg-amber-200/90',
-    suggestedPill: 'bg-amber-50/90 border-amber-200/80 text-amber-950/80 hover:bg-amber-100 hover:text-amber-950 hover:border-amber-300',
+    activePill: 'bg-amber-600/22 border-amber-300/80 text-amber-950 hover:bg-amber-600/30',
+    suggestedPill: 'bg-amber-600/12 border-amber-300/60 text-amber-950/85 hover:bg-amber-600/22 hover:border-amber-400',
   },
   {
     // 9. Wine Burgundy / Seine Sunset Cruise
-    activePill: 'bg-red-100/95 border-red-300/90 text-red-950 shadow-2xs hover:bg-red-200/90',
-    suggestedPill: 'bg-red-50/90 border-red-200/80 text-red-950/80 hover:bg-red-100 hover:text-red-950 hover:border-red-300',
+    activePill: 'bg-red-500/22 border-red-300/80 text-red-950 hover:bg-red-500/30',
+    suggestedPill: 'bg-red-500/12 border-red-300/60 text-red-950/85 hover:bg-red-500/22 hover:border-red-400',
   },
 ]
 
@@ -130,7 +130,7 @@ export function RecommendationPreferencesButton({
 }
 
 const BASE_TAG_PILL =
-  'group inline-flex h-7.5 items-center px-3.5 text-xs font-semibold leading-none rounded-full border transition-all cursor-pointer select-none'
+  "group relative isolate overflow-hidden inline-flex h-7.5 items-center px-3.5 text-xs font-semibold leading-none rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.65)] backdrop-blur-md backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-[1px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-[''] transition-all cursor-pointer select-none"
 
 export function RecommendationPreferencesDialog({
   open,
@@ -337,9 +337,9 @@ export function RecommendationPreferencesDialog({
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
                           aria-label={`移除 ${cleanTag}`}
-                          className={`${BASE_TAG_PILL} relative isolate backdrop-blur-md ${theme.activePill}`}
+                          className={`${BASE_TAG_PILL} ${theme.activePill}`}
                         >
-                          <span className="truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
+                          <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
                         </motion.button>
                       )
                     })}
@@ -370,9 +370,9 @@ export function RecommendationPreferencesDialog({
                       onClick={() => addTag(cleanPreset)}
                       title={`点击加入：${cleanPreset}`}
                       aria-label={`加入 ${cleanPreset}`}
-                      className={`${BASE_TAG_PILL} backdrop-blur-xs ${theme.suggestedPill}`}
+                      className={`${BASE_TAG_PILL} ${theme.suggestedPill}`}
                     >
-                      <span>{cleanPreset}</span>
+                      <span className="relative z-10">{cleanPreset}</span>
                     </button>
                   )
                 })
@@ -531,9 +531,9 @@ export function RecommendationPreferencesDialog({
                         return (
                           <span
                             key={clean}
-                            className={`${BASE_TAG_PILL} shadow-2xs ${theme.activePill}`}
+                            className={`${BASE_TAG_PILL} ${theme.activePill}`}
                           >
-                            {clean}
+                            <span className="relative z-10">{clean}</span>
                           </span>
                         )
                       })}
