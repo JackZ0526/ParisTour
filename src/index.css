@@ -620,17 +620,8 @@ select {
 
 .api-meter {
   --api-meter-rail: 1.85rem;
-  position: fixed;
-  z-index: 1900;
-  left: 0;
-  top: max(6.75rem, calc(env(safe-area-inset-top) + 5.5rem));
-}
-
-@media (min-width: 1024px) {
-  .api-meter {
-    top: 36%;
-    transform: none;
-  }
+  touch-action: none;
+  user-select: none;
 }
 
 .api-meter-shell {

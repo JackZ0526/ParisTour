@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
@@ -35,8 +35,65 @@ const RAIL_LABELS: Record<string, string> = {
   llm: 'LLM',
 }
 
-const OPEN_DELAY_MS = 420
+const OPEN_DELAY_MS = 380
 const CLOSE_DELAY_MS = 240
+const STORAGE_KEY = 'paristour_api_meter_pos_v1'
+const MIN_TOP = 64
+const RAIL_WIDTH = 30
+const RAIL_HEIGHT = 148
+const PANEL_WIDTH = 370
+const PANEL_HEIGHT = 438
+
+export interface ApiMeterPosition {
+  side: 'left' | 'right'
+  top: number
+}
+
+function getStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage
+  } catch {
+    // Ignore
+  }
+  return null
+}
+
+export function getInitialApiMeterPosition(): ApiMeterPosition {
+  const storage = getStorage()
+  if (!storage) return { side: 'left', top: 240 }
+  try {
+    const saved = storage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved) as Partial<ApiMeterPosition>
+      if ((parsed.side === 'left' || parsed.side === 'right') && typeof parsed.top === 'number') {
+        const viewportHeight = typeof window !== 'undefined' && window.innerHeight ? window.innerHeight : 800
+        const maxTop = Math.max(MIN_TOP, viewportHeight - RAIL_HEIGHT - 20)
+        return {
+          side: parsed.side,
+          top: Math.min(Math.max(MIN_TOP, parsed.top), maxTop),
+        }
+      }
+    }
+  } catch {
+    // Ignore storage parse errors
+  }
+  const viewportHeight = typeof window !== 'undefined' && window.innerHeight ? window.innerHeight : 800
+  return {
+    side: 'left',
+    top: Math.max(MIN_TOP, Math.round(viewportHeight * 0.35)),
+  }
+}
+
+export function saveApiMeterPosition(pos: ApiMeterPosition) {
+  const storage = getStorage()
+  if (!storage) return
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(pos))
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 const morphSpring = {
   type: 'spring' as const,
@@ -46,12 +103,24 @@ const morphSpring = {
 }
 
 export function ApiRequestMeter() {
+  const rootRef = useRef<HTMLElement | null>(null)
   const openTimer = useRef<number | null>(null)
   const closeTimer = useRef<number | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [snapshot, setSnapshot] = useState<ApiRequestMeterSnapshot>(() =>
     getApiRequestMeterSnapshot(),
   )
+  const [position, setPosition] = useState<ApiMeterPosition>(() => getInitialApiMeterPosition())
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragLive, setDragLive] = useState<{ x: number; y: number } | null>(null)
+
+  const dragStartRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    startTop: number
+    moved: boolean
+  } | null>(null)
 
   useEffect(() => {
     return subscribeApiRequestMeter(() => {
@@ -66,7 +135,37 @@ export function ApiRequestMeter() {
     }
   }, [])
 
-  function scheduleDetailsOpen() {
+  // Keep inside viewport when window is resized
+  useEffect(() => {
+    function handleResize() {
+      setPosition((prev) => {
+        const maxTop = Math.max(MIN_TOP, window.innerHeight - RAIL_HEIGHT - 20)
+        if (prev.top > maxTop) {
+          const next = { ...prev, top: maxTop }
+          saveApiMeterPosition(next)
+          return next
+        }
+        return prev
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Close details on tap outside when open on mobile
+  useEffect(() => {
+    if (!detailsOpen) return
+    function onPointerDownOutside(e: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setDetailsOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDownOutside)
+    return () => document.removeEventListener('pointerdown', onPointerDownOutside)
+  }, [detailsOpen])
+
+  const scheduleDetailsOpen = useCallback(() => {
+    if (isDragging || dragStartRef.current?.moved) return
     if (closeTimer.current) {
       window.clearTimeout(closeTimer.current)
       closeTimer.current = null
@@ -76,9 +175,9 @@ export function ApiRequestMeter() {
       openTimer.current = null
       setDetailsOpen(true)
     }, OPEN_DELAY_MS)
-  }
+  }, [detailsOpen, isDragging])
 
-  function scheduleDetailsClose() {
+  const scheduleDetailsClose = useCallback(() => {
     if (openTimer.current) {
       window.clearTimeout(openTimer.current)
       openTimer.current = null
@@ -88,28 +187,157 @@ export function ApiRequestMeter() {
       closeTimer.current = null
       setDetailsOpen(false)
     }, CLOSE_DELAY_MS)
+  }, [detailsOpen])
+
+  function handlePointerDown(e: React.PointerEvent) {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    dragStartRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTop: position.top,
+      moved: false,
+    }
+    try {
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    } catch {
+      // Ignore capture errors on unsupported nodes
+    }
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    if (!dragStartRef.current || dragStartRef.current.pointerId !== e.pointerId) return
+    const dx = e.clientX - dragStartRef.current.startX
+    const dy = e.clientY - dragStartRef.current.startY
+
+    if (!dragStartRef.current.moved && Math.hypot(dx, dy) > 5) {
+      dragStartRef.current.moved = true
+      setIsDragging(true)
+      setDetailsOpen(false)
+      if (openTimer.current) {
+        window.clearTimeout(openTimer.current)
+        openTimer.current = null
+      }
+    }
+
+    if (dragStartRef.current.moved) {
+      const maxTop = Math.max(MIN_TOP, window.innerHeight - RAIL_HEIGHT - 20)
+      const clampedY = Math.min(Math.max(MIN_TOP, dragStartRef.current.startTop + dy), maxTop)
+      setDragLive({
+        x: e.clientX,
+        y: clampedY,
+      })
+    }
+  }
+
+  function handlePointerUp(e: React.PointerEvent) {
+    if (!dragStartRef.current || dragStartRef.current.pointerId !== e.pointerId) return
+    const wasMoved = dragStartRef.current.moved
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {
+      // Ignore
+    }
+
+    if (wasMoved) {
+      const nextSide: 'left' | 'right' = e.clientX > window.innerWidth / 2 ? 'right' : 'left'
+      const maxTop = Math.max(MIN_TOP, window.innerHeight - RAIL_HEIGHT - 20)
+      const nextTop = Math.min(
+        Math.max(MIN_TOP, dragStartRef.current.startTop + (e.clientY - dragStartRef.current.startY)),
+        maxTop,
+      )
+      const nextPos: ApiMeterPosition = { side: nextSide, top: nextTop }
+      setPosition(nextPos)
+      saveApiMeterPosition(nextPos)
+    } else {
+      // Click or tap without drag: toggle details on mobile / click
+      if (e.pointerType === 'touch') {
+        setDetailsOpen((prev) => !prev)
+      }
+    }
+
+    dragStartRef.current = null
+    setIsDragging(false)
+    setDragLive(null)
+  }
+
+  function handlePointerCancel(e: React.PointerEvent) {
+    if (dragStartRef.current && dragStartRef.current.pointerId === e.pointerId) {
+      try {
+        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+      } catch {
+        // Ignore
+      }
+      dragStartRef.current = null
+      setIsDragging(false)
+      setDragLive(null)
+    }
   }
 
   if (typeof document === 'undefined') return null
 
+  // Compute live positioning
+  const currentTop = dragLive ? dragLive.y : position.top
+  const currentSide = position.side
+  const isRight = currentSide === 'right'
+
+  const containerStyle: React.CSSProperties = isDragging && dragLive
+    ? {
+        position: 'fixed',
+        zIndex: 1900,
+        top: `${dragLive.y}px`,
+        left: `${Math.min(Math.max(8, dragLive.x - RAIL_WIDTH / 2), window.innerWidth - RAIL_WIDTH - 8)}px`,
+        right: 'auto',
+        touchAction: 'none',
+        cursor: 'grabbing',
+        userSelect: 'none',
+      }
+    : {
+        position: 'fixed',
+        zIndex: 1900,
+        top: `${currentTop}px`,
+        ...(isRight ? { right: 0, left: 'auto' } : { left: 0, right: 'auto' }),
+        touchAction: 'none',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        userSelect: 'none',
+        transition: isDragging ? 'none' : 'top 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+      }
+
   return createPortal(
-    <aside className="api-meter" aria-label="今日 API 请求次数">
+    <aside
+      ref={rootRef}
+      className="api-meter"
+      aria-label="今日 API 请求次数"
+      style={containerStyle}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+    >
       <motion.div
         className="api-meter-shell"
         onMouseEnter={scheduleDetailsOpen}
         onMouseLeave={scheduleDetailsClose}
         initial={false}
         animate={{
-          width: detailsOpen ? 370 : 30,
-          height: detailsOpen ? 438 : 148,
+          width: detailsOpen
+            ? Math.min(PANEL_WIDTH, typeof window !== 'undefined' ? window.innerWidth - 20 : PANEL_WIDTH)
+            : RAIL_WIDTH,
+          height: detailsOpen ? PANEL_HEIGHT : RAIL_HEIGHT,
           borderRadius: detailsOpen ? 20 : 15,
+          scale: isDragging ? 1.06 : 1,
         }}
         transition={{
           width: { ...morphSpring, delay: detailsOpen ? 0 : 0.16 },
           height: { ...morphSpring, delay: detailsOpen ? 0.16 : 0 },
           borderRadius: { duration: 0.2 },
+          scale: { duration: 0.15 },
         }}
-        style={{ transformOrigin: 'top left' }}
+        style={{
+          transformOrigin: isRight ? 'top right' : 'top left',
+          marginLeft: isRight ? 0 : 'max(0.45rem, env(safe-area-inset-left))',
+          marginRight: isRight ? 'max(0.45rem, env(safe-area-inset-right))' : 0,
+        }}
       >
         {/* Layer 1: Compact Rail — visible when closed, fades out when opening */}
         <motion.div

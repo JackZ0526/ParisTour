@@ -142,4 +142,29 @@ describe('API request meter', () => {
     expect('google-place-details' in snapshot.byKind).toBe(false)
     expect('google-place-photo' in snapshot.byKind).toBe(false)
   })
+
+  it('correctly persists and restores api meter position in localStorage', async () => {
+    const store = new Map<string, string>()
+    const storageMock = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, val: string) => {
+        store.set(key, val)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+      clear: () => store.clear(),
+      length: 0,
+      key: () => null,
+    }
+    vi.stubGlobal('localStorage', storageMock)
+
+    const { getInitialApiMeterPosition, saveApiMeterPosition } = await import(
+      '../shared/components/ApiRequestMeter'
+    )
+    saveApiMeterPosition({ side: 'right', top: 320 })
+    const restored = getInitialApiMeterPosition()
+    expect(restored.side).toBe('right')
+    expect(restored.top).toBe(320)
+  })
 })
