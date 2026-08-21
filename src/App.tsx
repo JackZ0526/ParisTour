@@ -120,6 +120,10 @@ const timelineContainerVariants = {
 const itinerarySummaryCapsuleClass =
   `${glassCapsuleSurfaceClass} inline-flex h-7 shrink-0 items-center gap-1 px-2.5 text-xs`
 
+// The day rail has 6px inline padding and snap-start tabs. Browsers may settle
+// the first snap point at scrollLeft ≈ 6, which must still count as the start.
+const DAY_RAIL_LEFT_FADE_THRESHOLD_PX = 7
+
 const itinerarySummaryCapsuleTone = {
   destination: glassCapsuleToneClass.copper,
   duration: glassCapsuleToneClass.sage,
@@ -952,7 +956,9 @@ export default function App() {
                             dayRailHasLeftOverflow ? 'has-left-overflow' : ''
                           }`}
                           onScroll={(event) => {
-                            setDayRailHasLeftOverflow(event.currentTarget.scrollLeft > 1)
+                            setDayRailHasLeftOverflow(
+                              event.currentTarget.scrollLeft > DAY_RAIL_LEFT_FADE_THRESHOLD_PX,
+                            )
                           }}
                         >
                           {days.map((d, i) => {
