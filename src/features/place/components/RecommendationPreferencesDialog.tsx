@@ -219,7 +219,7 @@ export function RecommendationPreferencesDialog({
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.82, opacity: 0 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.7 }}
-                      className="group relative isolate inline-flex items-center gap-1.5 rounded-full border border-white/95 bg-white/90 pl-3 pr-1.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md transition-all hover:bg-white hover:shadow-xs"
+                      className="group relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border border-white/95 bg-white/90 pl-3 pr-1.5 text-xs font-medium text-[var(--ink)] shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md transition-all hover:bg-white hover:shadow-xs"
                     >
                       <span className="truncate max-w-[240px] sm:max-w-none">{tag}</span>
                       <button
@@ -254,13 +254,13 @@ export function RecommendationPreferencesDialog({
                   key={preset}
                   type="button"
                   onClick={() => addTag(preset)}
-                  className="group inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--copper)]/35 bg-white/45 hover:bg-white/95 hover:border-[var(--copper)] hover:shadow-2xs px-3 py-1.5 text-xs font-medium text-[var(--ink)]/85 backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
+                  className="group inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed border-[var(--copper)]/35 bg-white/50 hover:bg-white/95 hover:border-[var(--copper)] hover:shadow-2xs pl-3 pr-2 text-xs font-medium text-[var(--ink)]/85 backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
                 >
                   <span>{preset}</span>
                   <Plus
-                    size={13}
+                    size={12}
                     strokeWidth={2.4}
-                    className="text-[var(--copper)] transition-transform group-hover:rotate-90"
+                    className="text-[var(--copper)] transition-transform group-hover:rotate-90 shrink-0"
                   />
                 </button>
               ))
