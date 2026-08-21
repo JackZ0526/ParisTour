@@ -140,11 +140,11 @@ export function ProfileTab({
       className="mx-auto max-w-2xl lg:max-w-5xl space-y-4 lg:space-y-6"
     >
       {/* ========================================================================= */}
-      {/* Row 1: Side-by-Side on Desktop (Identity & Health Left + Trip Mgmt Right) */}
+      {/* Row 1: Side-by-Side on Desktop (2:1 Ratio - Left 8 Cols / Right 4 Cols)   */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 items-stretch">
-        {/* Left Column: Account Profile & Trip Health Stats Card */}
-        <div className={`relative flex flex-col justify-between overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)]`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-stretch">
+        {/* Left Column (2/3 width on Desktop): Account Profile & Trip Health Stats */}
+        <div className={`lg:col-span-8 relative flex flex-col justify-between overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)]`}>
           {/* Subtle Paris background watermark */}
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.03] grayscale"
@@ -297,8 +297,8 @@ export function ProfileTab({
           </div>
         </div>
 
-        {/* Right Column: Trip Management & Collaboration Card */}
-        <div className={`flex flex-col justify-between rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-4`}>
+        {/* Right Column (1/3 width on Desktop): Trip Management & Collaboration Card */}
+        <div className={`lg:col-span-4 flex flex-col justify-between rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-4`}>
           <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
               <Compass size={16} className="text-[var(--copper)]" />
@@ -383,8 +383,8 @@ export function ProfileTab({
             </div>
           )}
 
-          {/* Trip Action Buttons */}
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {/* Trip Action Buttons (Vertically Stacked) */}
+          <div className="grid grid-cols-1 gap-2.5">
             {onOpenShare && role === 'owner' && (
               <button
                 type="button"
