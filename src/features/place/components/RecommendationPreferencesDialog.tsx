@@ -338,9 +338,9 @@ export function RecommendationPreferencesDialog({
                           exit={{ opacity: 0, scale: 0.75 }}
                           whileTap={{ scale: 0.93 }}
                           transition={{
-                            layout: { type: 'spring', stiffness: 360, damping: 28, mass: 0.75 },
-                            scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
-                            opacity: { duration: 0.18 },
+                            layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
+                            scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
+                            opacity: { duration: 0.16 },
                           }}
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
@@ -386,9 +386,9 @@ export function RecommendationPreferencesDialog({
                         exit={{ opacity: 0, scale: 0.75 }}
                         whileTap={{ scale: 0.93 }}
                         transition={{
-                          layout: { type: 'spring', stiffness: 360, damping: 28, mass: 0.75 },
-                          scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
-                          opacity: { duration: 0.18 },
+                          layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
+                          scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
+                          opacity: { duration: 0.16 },
                         }}
                         onClick={() => addTag(cleanPreset)}
                         title={`点击加入：${cleanPreset}`}
