@@ -966,8 +966,16 @@ export function AddPlaceDialog({
                   (tabsInteractive ? (
                     <motion.span
                       layoutId="add-place-main-tab-pill"
-                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm"
-                      transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                      animate={{
+                        scaleX: [1, 1.16, 0.95, 1],
+                        scaleY: [1, 0.88, 1.03, 1],
+                      }}
+                      transition={{
+                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                        scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                        scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                      }}
                     />
                   ) : (
                     <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm" />
@@ -994,8 +1002,16 @@ export function AddPlaceDialog({
                   (tabsInteractive ? (
                     <motion.span
                       layoutId="add-place-main-tab-pill"
-                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm"
-                      transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                      animate={{
+                        scaleX: [1, 1.16, 0.95, 1],
+                        scaleY: [1, 0.88, 1.03, 1],
+                      }}
+                      transition={{
+                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                        scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                        scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                      }}
                     />
                   ) : (
                     <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm" />
@@ -1046,8 +1062,16 @@ export function AddPlaceDialog({
                         (tabsInteractive ? (
                           <motion.span
                             layoutId="add-place-category-pill"
-                            className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm"
-                            transition={{ layout: { type: 'spring', stiffness: 500, damping: 45, mass: 0.8 } }}
+                            className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-[0_2px_8px_rgba(99,136,112,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.25)]"
+                            animate={{
+                              scaleX: [1, 1.14, 0.96, 1],
+                              scaleY: [1, 0.88, 1.03, 1],
+                            }}
+                            transition={{
+                              layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                              scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                              scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                            }}
                           />
                         ) : (
                           <span className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm" />
