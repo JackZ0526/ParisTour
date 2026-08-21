@@ -45,5 +45,5 @@ export const glassPopoverSurfaceClass =
 
 /** Shared lightweight micro-blur backdrop overlay class for dialogs, bottom sheets, and drawers. */
 export const glassBackdropSurfaceClass =
-  'bg-black/16 backdrop-blur-[2px] transition-opacity'
+  'bg-black/16 backdrop-blur-[2px] transform-gpu will-change-[opacity]'
 

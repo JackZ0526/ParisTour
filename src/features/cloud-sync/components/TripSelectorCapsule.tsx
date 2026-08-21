@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users,
@@ -162,23 +163,29 @@ export function TripSelectorCapsule({
       </button>
 
       {/* Floating Popover Overlay */}
-      <AnimatePresence>
-        {isOpen && popoverPos && (
-          <div className="fixed inset-0 z-50 overflow-hidden">
-            {/* Click-outside backdrop */}
-            <div
-              className={`absolute inset-0 ${glassBackdropSurfaceClass}`}
-              onClick={() => setIsOpen(false)}
-            />
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {isOpen && popoverPos && (
+              <div className="fixed inset-0 z-50 overflow-hidden pointer-events-auto">
+                {/* Click-outside backdrop with smooth fade */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  className={`absolute inset-0 ${glassBackdropSurfaceClass}`}
+                  onClick={() => setIsOpen(false)}
+                />
 
-            {/* Popover Card */}
-            <motion.div
-              style={{
-                position: 'fixed',
-                top: popoverPos.top,
-                left: popoverPos.left,
-                width: 'min(300px, calc(100vw - 32px))',
-              }}
+                {/* Popover Card */}
+                <motion.div
+                  style={{
+                    position: 'fixed',
+                    top: popoverPos.top,
+                    left: popoverPos.left,
+                    width: 'min(300px, calc(100vw - 32px))',
+                  }}
               initial={{ opacity: 0, y: -6, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.96 }}
@@ -307,7 +314,9 @@ export function TripSelectorCapsule({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
-  </div>
+    </AnimatePresence>,
+    document.body,
+  )}
+</div>
 )
 }
