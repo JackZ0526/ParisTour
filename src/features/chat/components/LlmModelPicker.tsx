@@ -8,9 +8,10 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { Checkbox } from '../../../shared/components/Checkbox'
+import { glassBackdropSurfaceClass } from '../../../shared/styles/glassCapsule'
 import {
   DEEPSEEK_MODEL_OPTIONS,
   getActiveLlmLabel,
@@ -237,66 +238,81 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   }
 
   return (
-    <motion.div
-      ref={rootRef}
-      id={popoverId}
-      role={open ? 'dialog' : 'button'}
-      tabIndex={open ? -1 : 0}
-      aria-haspopup={!open ? 'dialog' : undefined}
-      aria-expanded={open}
-      aria-label={open ? '模型与思考设置' : fullLabel}
-      title={!open ? fullLabel : undefined}
-      onClick={open ? undefined : () => setOpen(true)}
-      onKeyDown={
-        open
-          ? undefined
-          : (event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                setOpen(true)
+    <>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="llm-picker-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className={`fixed inset-0 z-[2040] ${glassBackdropSurfaceClass}`}
+            onClick={() => setOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        ref={rootRef}
+        id={popoverId}
+        role={open ? 'dialog' : 'button'}
+        tabIndex={open ? -1 : 0}
+        aria-haspopup={!open ? 'dialog' : undefined}
+        aria-expanded={open}
+        aria-label={open ? '模型与思考设置' : fullLabel}
+        title={!open ? fullLabel : undefined}
+        onClick={open ? undefined : () => setOpen(true)}
+        onKeyDown={
+          open
+            ? undefined
+            : (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setOpen(true)
+                }
               }
-            }
-      }
-      whileTap={open ? undefined : { scale: 0.96 }}
-      initial={false}
-      animate={{
-        width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
-        height: open ? popoverHeight : 48,
-      }}
-      transition={{
-        // Width keeps the spring feel (chip → pill morph has a touch of
-        // overshoot). Height uses a smooth tween (no spring overshoot on
-        // internal content re-targets). The opening morph stages width
-        // first then height (0.18s delay) so the chip "expands then
-        // grows"; everything else animates both at once.
-        width: { ...MORPH_SPRING, delay: open ? 0 : 0.18 },
-        height: {
-          duration: panelIsCollapsing ? 0.36 : 0.32,
-          ease: panelIsCollapsing
-            ? [0.4, 0, 0.2, 1]
-            : [0.22, 1, 0.36, 1],
-          delay: justOpened ? 0.18 : 0,
-        },
-      }}
-      onAnimationComplete={() => {
-        setHeightAnimating(false)
-        panelHeightDirectionRef.current = 'idle'
-      }}
-      style={{
-        // Anchored to the viewport (not a 0x0 relative wrapper) so the
-        // desktop pill actually has room to size itself. Responsive
-        // bottom/right mirror the outer FAB container offsets so the
-        // picker sits in the same corner on mobile (above chat) and
-        // desktop (left of chat).
-        position: 'fixed',
-        bottom: isDesktop
-          ? '1.25rem'
-          : 'calc(max(1.15rem, env(safe-area-inset-bottom)) + 8.35rem)',
-        right: isDesktop
-          ? 'calc(max(1.25rem, env(safe-area-inset-right)) + 3.625rem)'
-          : 'max(1.25rem, env(safe-area-inset-right))',
-        zIndex: 1,
-        borderRadius: 24,
+        }
+        whileTap={open ? undefined : { scale: 0.96 }}
+        initial={false}
+        animate={{
+          width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
+          height: open ? popoverHeight : 48,
+        }}
+        transition={{
+          // Width keeps the spring feel (chip → pill morph has a touch of
+          // overshoot). Height uses a smooth tween (no spring overshoot on
+          // internal content re-targets). The opening morph stages width
+          // first then height (0.18s delay) so the chip "expands then
+          // grows"; everything else animates both at once.
+          width: { ...MORPH_SPRING, delay: open ? 0 : 0.18 },
+          height: {
+            duration: panelIsCollapsing ? 0.36 : 0.32,
+            ease: panelIsCollapsing
+              ? [0.4, 0, 0.2, 1]
+              : [0.22, 1, 0.36, 1],
+            delay: justOpened ? 0.18 : 0,
+          },
+        }}
+        onAnimationComplete={() => {
+          setHeightAnimating(false)
+          panelHeightDirectionRef.current = 'idle'
+        }}
+        style={{
+          // Anchored to the viewport (not a 0x0 relative wrapper) so the
+          // desktop pill actually has room to size itself. Responsive
+          // bottom/right mirror the outer FAB container offsets so the
+          // picker sits in the same corner on mobile (above chat) and
+          // desktop (left of chat).
+          position: 'fixed',
+          bottom: isDesktop
+            ? '1.25rem'
+            : 'calc(max(1.15rem, env(safe-area-inset-bottom)) + 8.35rem)',
+          right: isDesktop
+            ? 'calc(max(1.25rem, env(safe-area-inset-right)) + 3.625rem)'
+            : 'max(1.25rem, env(safe-area-inset-right))',
+          zIndex: open ? 2050 : 1,
+          borderRadius: 24,
         // overflow: hidden while closed or while the height is animating (opening morph,
         // internal re-target from panel switch / thinking toggle, closing
         // morph) — the popover content can be taller than the in-flight
@@ -439,7 +455,8 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         </div>
       </motion.div>
     </motion.div>
-  )
+  </>
+)
 }
 
 function ThinkingControls({
