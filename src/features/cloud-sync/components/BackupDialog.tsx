@@ -196,16 +196,16 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                   return (
                     <article
                       key={backup.id}
-                      className={`flex items-center justify-between gap-3 rounded-2xl border border-white/85 bg-white/60 p-3 shadow-[0_2px_12px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-all hover:bg-white/80 ${
-                        isLatest ? 'border-[var(--copper)]/30 bg-white/75' : ''
+                      className={`flex items-center justify-between gap-3 rounded-2xl border border-white/85 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 shadow-[0_2px_12px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-xl transition-all hover:bg-white/80 dark:hover:bg-white/10 ${
+                        isLatest ? 'border-[var(--copper)]/30 dark:border-[var(--copper)]/40 bg-white/75 dark:bg-[var(--copper)]/10' : ''
                       }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <div
                           className={`flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-xl transition-colors ${
                             isLatest
-                              ? 'border border-[var(--copper)]/20 bg-[#f6e8de]/75 text-[var(--copper)]'
-                              : 'border border-[#a8bcae]/25 bg-[#e7efe9]/70 text-[#557864]'
+                              ? 'border border-[var(--copper)]/20 dark:border-[var(--copper)]/40 bg-[#f6e8de]/75 dark:bg-[var(--copper)]/15 text-[var(--copper)]'
+                              : 'border border-[#a8bcae]/25 dark:border-[#668b7a]/30 bg-[#e7efe9]/70 dark:bg-[#668b7a]/15 text-[#557864] dark:text-[#88b3a0]'
                           }`}
                         >
                           {isLatest ? (
@@ -220,15 +220,15 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                               {isLatest ? '最新快照' : `快照 #${backups.length - index}`}
                             </span>
                             {isLatest && (
-                              <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-1.5 py-0.2 text-[9.5px] font-semibold text-[var(--copper)]">
+                              <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 dark:border-[var(--copper)]/40 bg-[var(--copper)]/10 dark:bg-[var(--copper)]/20 px-1.5 py-0.2 text-[9.5px] font-semibold text-[var(--copper)]">
                                 当前
                               </span>
                             )}
-                            <span className="text-[11px] text-[var(--stone)] truncate">
+                            <span className="text-[11px] text-[var(--stone)] dark:text-zinc-400 truncate">
                               · {formatBackupTime(backup.createdAt)}
                             </span>
                           </div>
-                          <p className="mt-0.5 truncate text-[11px] sm:text-xs text-[var(--stone)]/85">
+                          <p className="mt-0.5 truncate text-[11px] sm:text-xs text-[var(--stone)]/85 dark:text-zinc-300">
                             {backupSummary(backup)}
                           </p>
                         </div>
@@ -242,7 +242,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                           aria-label="恢复此版本"
                           aria-busy={isRestoringThis || undefined}
                           title={isRestoringThis ? '正在恢复…' : '恢复此版本'}
-                          className="group relative isolate flex h-8.5 w-8.5 items-center justify-center rounded-full border border-white/90 bg-white/80 text-[var(--stone)] shadow-2xs backdrop-blur-md transition-all hover:border-[var(--copper)]/40 hover:bg-white hover:text-[var(--copper)] hover:shadow-xs active:scale-95 disabled:opacity-40 cursor-pointer"
+                          className="group relative isolate flex h-8.5 w-8.5 items-center justify-center rounded-full border border-white/90 dark:border-white/10 bg-white/80 dark:bg-white/10 text-[var(--stone)] dark:text-zinc-300 shadow-2xs backdrop-blur-md transition-all hover:border-[var(--copper)]/40 dark:hover:border-[var(--copper)]/50 hover:bg-white dark:hover:bg-[var(--copper)]/20 hover:text-[var(--copper)] dark:hover:text-[var(--copper)] hover:shadow-xs active:scale-95 disabled:opacity-40 cursor-pointer"
                         >
                           {isRestoringThis ? (
                             <LoaderCircle
