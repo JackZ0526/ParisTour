@@ -492,22 +492,22 @@ export function ProfileTab({
               )
             })}
             {recommendationPreferences.tags.length > 10 && (
-              <span className="inline-flex h-7.5 items-center rounded-full border border-black/8 bg-white/60 px-2.5 text-[11px] font-semibold text-[var(--stone)] shadow-2xs">
+              <span className="inline-flex h-7.5 items-center rounded-full border border-black/8 dark:border-white/10 bg-white/60 dark:bg-white/10 px-2.5 text-[11px] font-semibold text-[var(--stone)] dark:text-zinc-300 shadow-2xs">
                 +{recommendationPreferences.tags.length - 10} 项
               </span>
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-black/10 bg-white/40 p-3 text-center text-xs text-[var(--stone)]">
+          <div className="rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-3 text-center text-xs text-[var(--stone)] dark:text-zinc-400">
             暂未设置偏好标签，点击下方按钮定制专属巴黎路线偏好
           </div>
         )}
 
         {/* Custom Requirements Note (If Present) */}
         {recommendationPreferences?.extraNotes && (
-          <div className="flex items-start gap-2 rounded-2xl border border-white/80 bg-white/50 p-2.5 shadow-2xs backdrop-blur-md">
+          <div className="flex items-start gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/50 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-md">
             <MessageSquare size={13} className="mt-0.5 shrink-0 text-[var(--copper)]/80" />
-            <p className="text-xs text-[var(--stone)] leading-relaxed line-clamp-2">
+            <p className="text-xs text-[var(--stone)] dark:text-zinc-300 leading-relaxed line-clamp-2">
               <span className="font-medium text-[var(--ink)]">补充要求：</span>
               {recommendationPreferences.extraNotes}
             </p>

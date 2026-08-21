@@ -892,7 +892,7 @@ export default function App() {
                   )}
 
                   {showItineraryError && (
-                    <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 bg-white/60 shadow-sm backdrop-blur-xl px-4 py-6 text-center">
+                    <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 dark:border-[var(--copper)]/30 bg-white/60 dark:bg-[#18201c]/80 shadow-sm dark:shadow-none backdrop-blur-xl px-4 py-6 text-center">
                       <p className="font-medium text-[var(--ink)]">行程生成失败</p>
                       <p className="mt-1 whitespace-pre-line break-words text-left text-sm text-[var(--stone)] sm:text-center">
                         {itineraryGenError}
@@ -913,7 +913,7 @@ export default function App() {
                   )}
 
                   {showItineraryPartialError && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 bg-white/60 shadow-sm backdrop-blur-xl px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 dark:border-[var(--copper)]/30 bg-white/60 dark:bg-[#18201c]/80 shadow-sm dark:shadow-none backdrop-blur-xl px-4 py-3">
                       <div className="min-w-0 text-left">
                         <p className="text-sm font-medium text-[var(--ink)]">
                           后续天数生成中断

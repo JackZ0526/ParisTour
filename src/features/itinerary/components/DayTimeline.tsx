@@ -2245,7 +2245,7 @@ export function DayTimeline({
         <motion.p
           custom={direction}
           variants={timelineItemVariants}
-          className="rounded-2xl border border-dashed border-[var(--stone)]/30 bg-white/45 px-4 py-6 text-center text-sm text-[var(--stone)] backdrop-blur-md shadow-sm"
+          className="rounded-2xl border border-dashed border-[var(--stone)]/30 dark:border-white/10 bg-white/45 dark:bg-white/5 px-4 py-6 text-center text-sm text-[var(--stone)] dark:text-zinc-400 backdrop-blur-md shadow-sm dark:shadow-none"
         >
           {readOnly ? '本日还没有地点。' : '本日还没有地点，点击下方添加。'}
         </motion.p>
@@ -2258,7 +2258,7 @@ export function DayTimeline({
               type="button"
               onClick={() => setAddOpen(true)}
               disabled={dayRestoring}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 bg-white/50 px-4 py-3 text-sm font-medium text-[var(--sage)] shadow-sm backdrop-blur-md transition-all hover:bg-white/80 hover:border-[var(--sage)] hover:shadow active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 dark:border-[var(--sage)]/40 bg-white/50 dark:bg-[#18201c]/70 px-4 py-3 text-sm font-medium text-[var(--sage)] dark:text-emerald-300 shadow-sm dark:shadow-none backdrop-blur-md transition-all hover:bg-white/80 dark:hover:bg-[#222d27] hover:border-[var(--sage)] dark:hover:border-[var(--sage)] hover:shadow active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
               <Plus size={15} strokeWidth={2} aria-hidden />
               添加地点

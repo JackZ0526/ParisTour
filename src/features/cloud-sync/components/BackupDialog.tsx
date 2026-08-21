@@ -272,7 +272,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="rounded-2xl border border-dashed border-[var(--copper)]/25 bg-white/40 px-4 py-8 text-center backdrop-blur-sm space-y-2"
+                className="rounded-2xl border border-dashed border-[var(--copper)]/25 dark:border-white/10 bg-white/40 dark:bg-white/5 px-4 py-8 text-center backdrop-blur-sm space-y-2"
               >
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
                   <Archive size={20} strokeWidth={1.8} />
