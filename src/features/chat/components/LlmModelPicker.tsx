@@ -124,18 +124,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const [panel, setPanel] = useState<Panel>('root')
   // The model list grows nicely with the popover's strong ease-out, but the
   // same curve removes too much height too early on the return trip. Keep the
-  // navigation direction latched until that height animation completes so
-  // the ResizeObserver re-render cannot accidentally swap its transition.
+  // navigation direction latched until that height animation completes.
   const panelHeightDirectionRef = useRef<'idle' | 'expand' | 'collapse'>('idle')
   const rootRef = useRef<HTMLDivElement>(null)
-  const sentinelRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
-  // Sentinel measures the popover's natural height. With all real layers
-  // absolutely positioned, there's nothing in-flow for `height: 'auto'`
-  // to measure against, so we duplicate the markup off-screen and let a
-  // ResizeObserver feed the value back into the animate.height target.
-  const [popoverHeight, setPopoverHeight] = useState(168)
   // Mobile: closed chip is a 48px circle. Desktop: closed chip is a pill
   // (auto width up to 15.5rem, 48px tall) — the morph widens the pill
   // before the popover content unfurls upward.
@@ -143,54 +135,17 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const canThink = supportsThinkingControls(model)
   const deepseek = isDeepSeekModel(model)
 
-  // Track the popover's natural height. Re-measures when `open`, `panel`,
-  // `model`, or `thinkingMode` change.
-  useLayoutEffect(() => {
-    const update = () => {
-      const hSentinel = sentinelRef.current?.offsetHeight || 0
-      const hContent = contentRef.current?.offsetHeight || 0
-      const h = hSentinel > 0 ? hSentinel : hContent
-      if (h > 0) setPopoverHeight(h)
-    }
-    update()
-    const observer = new ResizeObserver(update)
-    if (sentinelRef.current) observer.observe(sentinelRef.current)
-    if (contentRef.current) observer.observe(contentRef.current)
-    return () => observer.disconnect()
-  }, [open, panel, model, thinkingMode])
-
   // Track whether we're currently in the chip→popover opening morph so
   // the height animation can be delayed (width-first → height-second, the
   // iOS Reminders staged feel). Internal content changes (panel swap,
   // thinking toggle) don't want that delay — the user expects immediate
   // motion when they click something, not a "wait then grow" lag.
-  //
-  // `heightAnimating` is `true` while the motion.div's height is in
-  // flight (opening morph, internal re-targets from panel switch /
-  // thinking toggle, closing morph). It's exposed as state because the
-  // rendered `overflow` value depends on it: the popover content can be
-  // taller than the in-flight height mid-morph, and `overflow: auto`
-  // would briefly show a scrollbar. We keep `overflow: hidden` while
-  // the height is animating, then flip to `'hidden auto'` so the panel
-  // can scroll if it ever exceeds maxHeight.
-  //
-  // The previous-open ref is updated in useLayoutEffect (not in render)
-  // because React 18 strict mode invokes the render function twice; an
-  // in-render mutation would leak from call #1 into call #2 and make
-  // `justOpened` false on the second (committed) call, dropping the
-  // height delay. useLayoutEffect runs after both render calls, so
-  // both see the same value.
   const prevOpenRef = useRef(open)
   const justOpened = open && !prevOpenRef.current
   useLayoutEffect(() => {
     prevOpenRef.current = open
   }, [open])
   const [heightAnimating, setHeightAnimating] = useState(false)
-  // Mark animating synchronously with any state change that re-targets
-  // height: `open` flipping (opening morph), `open` flipping back
-  // (closing morph), or panel / model / thinkingMode changing while
-  // open (internal re-target). The `onAnimationComplete` callback
-  // on the motion.div flips it back.
   useLayoutEffect(() => {
     setHeightAnimating(true)
   }, [open, panel, model, thinkingMode])
@@ -243,48 +198,6 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 
   return (
     <>
-      {/* Sentinel -- off-screen, unclipped, non-interactive copy of the popover content.
-          Placed OUTSIDE the transformed/filtered motion.div container so WebKit on iOS Safari
-          measures the true, unclipped natural height. */}
-      <div
-        ref={sentinelRef}
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          left: '-9999px',
-          top: 0,
-          width: 'min(calc(100vw - 2.5rem), 17.5rem)',
-          pointerEvents: 'none',
-          visibility: 'hidden',
-          zIndex: -1,
-        }}
-      >
-        <div className="p-3.5">
-          {canThink ? (
-            <ThinkingControls mode={thinkingMode} disabled={disabled} measureOnly />
-          ) : (
-            <div>
-              <SectionHeader>思考</SectionHeader>
-              <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
-                <p className="text-xs leading-snug text-[var(--stone)]">
-                  当前模型不支持思考强度设置
-                </p>
-              </div>
-            </div>
-          )}
-
-          <ModelSettingsPanel
-            model={model}
-            disabled={disabled}
-            expanded={panel === 'model'}
-            measureOnly
-            canThink={canThink}
-            onToggle={toggleModelPanel}
-            onSelect={selectModelAndCollapse}
-          />
-        </div>
-      </div>
-
       <AnimatePresence>
         {open && (
           <motion.div
@@ -333,7 +246,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         initial={false}
         animate={{
           width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
-          height: open ? popoverHeight : 48,
+          height: open ? 'auto' : 48,
         }}
         transition={{
           // Width keeps the spring feel (chip → pill morph has a touch of
@@ -369,13 +282,6 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             : 'max(1.25rem, env(safe-area-inset-right))',
           zIndex: open ? 2050 : 1,
           borderRadius: 24,
-          // overflow: hidden while closed or while the height is animating (opening morph,
-          // internal re-target from panel switch / thinking toggle, closing
-          // morph) — the popover content can be taller than the in-flight
-          // motion.div, so 'auto' would briefly show a scrollbar. Once
-          // the height run settles (onAnimationComplete), we switch to
-          // 'hidden auto' so the panel can scroll if the sentinel-reported
-          // height ever exceeds maxHeight.
           overflow: !open || heightAnimating ? 'hidden' : 'hidden auto',
           // Cap the popover so it never extends past the top of the viewport.
           // 2.5rem = 40px headroom (20px top + 20px bottom margins).
@@ -390,11 +296,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         }}
         className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
       >
-        {/* Visible chip content -- fills the motion.div.
-            `pointer-events: none` always: this layer is purely visual; the
-            outer motion.div owns the click handler, and when the popover is
-            open this overlay would otherwise swallow clicks meant for the
-            model/thinking controls underneath. */}
+        {/* Visible chip content -- in-flow when closed */}
         <motion.div
           initial={false}
           animate={{ opacity: open ? 0 : 1 }}
@@ -404,8 +306,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           aria-hidden={!open}
           style={{
             pointerEvents: 'none',
+            position: open ? 'absolute' : 'relative',
+            inset: open ? 0 : undefined,
           }}
-          className="relative flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
+          className="flex h-12 w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
         >
           {/* Top specular reflection arc */}
           <span
@@ -423,9 +327,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           />
         </motion.div>
 
-        {/* Visible popover content -- absolute overlay, fills the motion.div.
-            Thinking and model controls stay in one bottom-anchored layout;
-            their inner cards expand upward and move the content above them. */}
+        {/* Visible popover content -- in-flow when open */}
         <motion.div
           initial={false}
           animate={{ opacity: open ? 1 : 0 }}
@@ -434,8 +336,12 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           }}
           inert={!open || undefined}
           aria-hidden={!open}
-          style={{ position: 'absolute', inset: 0 }}
-          className="flex flex-col overflow-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{
+            position: open ? 'relative' : 'absolute',
+            inset: open ? undefined : 0,
+            pointerEvents: open ? 'auto' : 'none',
+          }}
+          className="flex flex-col p-3.5"
         >
           {/* Top Specular Streaming Reflection Line */}
           <span
@@ -443,7 +349,6 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
           />
 
-          <div ref={contentRef} className="absolute inset-x-0 bottom-0 p-3.5">
           {canThink ? (
             <ThinkingControls mode={thinkingMode} disabled={disabled} />
           ) : (
@@ -465,11 +370,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             onToggle={toggleModelPanel}
             onSelect={selectModelAndCollapse}
           />
-        </div>
+        </motion.div>
       </motion.div>
-    </motion.div>
-  </>
-)
+    </>
+  )
 }
 
 function ThinkingControls({
