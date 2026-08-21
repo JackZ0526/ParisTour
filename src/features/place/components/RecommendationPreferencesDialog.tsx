@@ -270,7 +270,7 @@ export function RecommendationPreferencesDialog({
         {/* Main Content Body */}
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           {/* 1. Departure Time Anchor */}
-          <section className="relative z-30 rounded-2xl border border-white/80 bg-white/50 p-3.5 shadow-sm backdrop-blur-md">
+          <section className="relative z-30 rounded-3xl border border-white/80 bg-white/65 p-3.5 sm:p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2">
               <Clock size={14} className="text-[var(--copper)]" />
               <span>通常开始时间</span>
@@ -343,11 +343,14 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
-          <section className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[var(--stone)] flex items-center gap-1.5">
-                <Sparkles size={13} className="text-amber-600" />
-                <span>推荐偏好候选（点击加入池中）</span>
+          <section className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
+              <span className="flex items-center gap-1.5">
+                <Sparkles size={14} className="text-[var(--copper)]" />
+                <span>推荐偏好候选</span>
+              </span>
+              <span className="text-[10.5px] font-normal text-[var(--stone)]">
+                点击加入偏好池
               </span>
             </div>
 
@@ -378,7 +381,7 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 4. Natural Language Smart Input Extractor (自然语言提取) */}
-          <section className="rounded-2xl border border-white/80 bg-white/55 p-4 shadow-sm backdrop-blur-md space-y-2.5">
+          <section className="rounded-3xl border border-white/80 bg-white/65 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-2.5">
             <label className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Wand2 size={14} className="text-[var(--copper)]" />
