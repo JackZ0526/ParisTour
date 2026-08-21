@@ -310,10 +310,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         Seamlessly holds the persistent top anchor bar, expanding the hour/minute wheel selector below.
       */}
       <div
-        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent ${
+        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent border-[#d7a98a]/70 bg-[#f6ebe2]/85 backdrop-blur-xl backdrop-saturate-[180%] ${
           open
-            ? 'border-white/90 bg-white/95 shadow-[0_12px_32px_rgba(181,106,60,0.12),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1.5px_rgba(255,255,255,0.6)] backdrop-blur-xl'
-            : 'border-[#d7a98a]/70 bg-[#f6ebe2]/85 shadow-[0_4px_14px_rgba(181,106,60,0.14),0_1px_3px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7),inset_0_-1px_2px_rgba(181,106,60,0.12)] backdrop-blur-xl backdrop-saturate-[180%] hover:bg-[#f3e3d6]/95 hover:border-[#c59272]'
+            ? 'shadow-[0_16px_36px_rgba(181,106,60,0.18),0_2px_6px_rgba(0,0,0,0.04),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7),inset_0_-1px_2px_rgba(181,106,60,0.12)]'
+            : 'shadow-[0_4px_14px_rgba(181,106,60,0.14),0_1px_3px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7),inset_0_-1px_2px_rgba(181,106,60,0.12)] hover:bg-[#f3e3d6]/95 hover:border-[#c59272]'
         }`}
       >
         {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
@@ -372,7 +372,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="overflow-hidden"
             >
-              <div className="border-t border-[var(--mist)]/70 px-3.5 pb-3.5 pt-2">
+              <div className="border-t border-[#d7a98a]/40 px-3.5 pb-3.5 pt-2">
                 {/* iOS Wheel Body */}
                 <div className="relative my-1 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
                   {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
@@ -421,18 +421,18 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-2.5 flex justify-end gap-2 border-t border-[var(--mist)]/70 pt-2.5">
+                <div className="mt-2.5 flex justify-end gap-2 border-t border-[#d7a98a]/40 pt-2.5">
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="rounded-full border border-black/10 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[var(--stone)] transition hover:bg-white hover:text-[var(--ink)] shadow-2xs active:scale-95 cursor-pointer"
+                    className="rounded-full border border-[#d7a98a]/50 bg-white/80 px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-[0_1px_4px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-sm transition hover:bg-white hover:border-[#d7a98a]/80 active:scale-95 cursor-pointer"
                   >
                     取消
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirm}
-                    className="rounded-full bg-[var(--ink)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] transition hover:bg-black shadow-[0_3px_10px_rgba(0,0,0,0.15)] active:scale-95 cursor-pointer"
+                    className="rounded-full bg-[var(--ink)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] transition hover:bg-black shadow-[0_3px_10px_rgba(0,0,0,0.18)] active:scale-95 cursor-pointer"
                   >
                     完成
                   </button>
