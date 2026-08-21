@@ -10,7 +10,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import type { AccessibleTrip } from '../services/tripCloud'
-import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
+import { glassBackdropSurfaceClass, glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 export interface TripSelectorCapsuleProps {
   trips: AccessibleTrip[]
@@ -167,7 +167,7 @@ export function TripSelectorCapsule({
           <div className="fixed inset-0 z-50 overflow-hidden">
             {/* Click-outside backdrop */}
             <div
-              className="absolute inset-0 bg-black/10 backdrop-blur-[1px] transition-opacity"
+              className={`absolute inset-0 ${glassBackdropSurfaceClass}`}
               onClick={() => setIsOpen(false)}
             />
 

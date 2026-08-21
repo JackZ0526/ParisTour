@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 import { useEnterExit } from '../hooks/useEnterExit'
 import { useSheetDragDismiss } from '../hooks/useSheetDragDismiss'
+import { glassBackdropSurfaceClass } from '../styles/glassCapsule'
 
 export interface BottomSheetProps {
   open: boolean
@@ -72,7 +73,7 @@ export function BottomSheet({
             exit={backdrop.exit}
             transition={backdrop.transition}
             style={{ zIndex: overlayZIndex }}
-            className={`fixed inset-0 cursor-default bg-black/45 ${
+            className={`fixed inset-0 cursor-default ${glassBackdropSurfaceClass} ${
               hideBackdrop ? 'pointer-events-none invisible' : ''
             } ${overlayClassName}`}
             onClick={() => {

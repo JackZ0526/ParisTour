@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, History, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 import { useEnterExit } from '../hooks/useEnterExit'
-import { glassModalSurfaceClass } from '../styles/glassCapsule'
+import { glassBackdropSurfaceClass, glassModalSurfaceClass } from '../styles/glassCapsule'
 
 export interface ConfirmDialogProps {
   open: boolean
@@ -113,7 +113,7 @@ export function ConfirmDialog({
             exit={backdrop.exit}
             transition={backdrop.transition}
             style={{ zIndex: 2100 }}
-            className="fixed inset-0 bg-black/45 backdrop-blur-xs"
+            className={`fixed inset-0 ${glassBackdropSurfaceClass}`}
             onClick={() => {
               if (!busy) onClose()
             }}

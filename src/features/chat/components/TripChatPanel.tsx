@@ -62,6 +62,7 @@ import type {
 } from '../../../types'
 import { useLlmBusyMode } from '../hooks/useOpenAIModel'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { glassBackdropSurfaceClass } from '../../../shared/styles/glassCapsule'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
@@ -1802,7 +1803,7 @@ export function TripChatPanel({
             animate={backdrop.animate}
             exit={backdrop.exit}
             transition={backdrop.transition}
-            className="fixed inset-0 bg-black/45 sm:hidden"
+            className={`fixed inset-0 sm:hidden ${glassBackdropSurfaceClass}`}
             style={{ zIndex: TRIP_CHAT_BACKDROP_Z }}
             onClick={() => setOpen(false)}
           />
