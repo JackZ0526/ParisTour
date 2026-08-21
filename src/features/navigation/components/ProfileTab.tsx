@@ -122,7 +122,7 @@ export function ProfileTab({
       exit={{ opacity: 0, y: -10 }}
       onAnimationStart={onAnimationStart}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto max-w-2xl space-y-5 pb-10"
+      className="mx-auto max-w-2xl space-y-4"
     >
       {/* ========================================================================= */}
       {/* 1. Account Profile & Trip Health Card                                     */}
@@ -490,7 +490,7 @@ export function ProfileTab({
       )}
 
       {/* System Footer Info Note */}
-      <div className="text-center pt-2 text-[11px] text-[var(--stone)]/60 space-y-1">
+      <div className="text-center pt-1 text-[11px] text-[var(--stone)]/60 space-y-0.5 -mb-2">
         <p>Paris Tour v0.7.0 · Supabase 端到端加密安全同步</p>
         <p>Made with ❤️ for Paris Explorers</p>
       </div>
