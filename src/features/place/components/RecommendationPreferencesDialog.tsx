@@ -130,7 +130,7 @@ export function RecommendationPreferencesButton({
 }
 
 const BASE_TAG_PILL =
-  'group inline-flex h-7.5 items-center px-3 text-[11.5px] font-medium leading-none rounded-full border transition-all cursor-pointer select-none'
+  'group inline-flex h-7 items-center px-2.5 text-xs font-medium leading-none rounded-full border transition-all cursor-pointer select-none'
 
 export function RecommendationPreferencesDialog({
   open,
@@ -288,10 +288,10 @@ export function RecommendationPreferencesDialog({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Tag size={14} className="text-[var(--copper)]" />
-                <span className="text-xs sm:text-sm font-semibold text-[var(--ink)]">
+                <span className="text-xs font-semibold text-[var(--ink)]">
                   已选偏好池
                 </span>
-                <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.2 text-[10px] font-semibold text-[var(--copper)]">
+                <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[var(--copper)]">
                   {activeTags.length} 项生效
                 </span>
               </div>
