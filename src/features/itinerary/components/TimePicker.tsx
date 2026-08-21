@@ -310,10 +310,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         Seamlessly holds the persistent top anchor bar, expanding the hour/minute wheel selector below.
       */}
       <div
-        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent border-[#d7a98a]/70 bg-[#f6ebe2]/85 backdrop-blur-xl backdrop-saturate-[180%] ${
+        className={`relative overflow-hidden rounded-2xl border border-white/90 bg-[#fbf7f3]/90 backdrop-blur-xl backdrop-saturate-[180%] transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent ${
           open
-            ? 'shadow-[0_16px_36px_rgba(181,106,60,0.18),0_2px_6px_rgba(0,0,0,0.04),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7),inset_0_-1px_2px_rgba(181,106,60,0.12)]'
-            : 'shadow-[0_4px_14px_rgba(181,106,60,0.14),0_1px_3px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7),inset_0_-1px_2px_rgba(181,106,60,0.12)] hover:bg-[#f3e3d6]/95 hover:border-[#c59272]'
+            ? 'shadow-[0_16px_36px_rgba(0,0,0,0.06),0_2px_8px_rgba(181,106,60,0.06),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7)]'
+            : 'shadow-[0_3px_10px_rgba(0,0,0,0.04),0_1px_3px_rgba(181,106,60,0.04),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7)] hover:bg-[#f8f1ec]/95 hover:border-white'
         }`}
       >
         {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
@@ -372,9 +372,9 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="overflow-hidden"
             >
-              <div className="border-t border-[#d7a98a]/40 px-3.5 pb-3.5 pt-2">
+              <div className="border-t border-white/90 px-3.5 pb-3.5 pt-2">
                 {/* iOS Wheel Body */}
-                <div className="relative my-1 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
+                <div className="relative my-1 overflow-hidden rounded-2xl border border-white/90 bg-white/60 p-2 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
                   {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
                   <div className="relative" style={{ height: `${WHEEL_HEIGHT}px` }}>
                     {/* Layer 1 (z-0): Dual Distinct 3D Frosted Glass Capsules */}
@@ -421,11 +421,11 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-2.5 flex justify-end gap-2 border-t border-[#d7a98a]/40 pt-2.5">
+                <div className="mt-2.5 flex justify-end gap-2 border-t border-white/90 pt-2.5">
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="rounded-full border border-[#d7a98a]/50 bg-white/80 px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-[0_1px_4px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-sm transition hover:bg-white hover:border-[#d7a98a]/80 active:scale-95 cursor-pointer"
+                    className="rounded-full border border-white/90 bg-white/75 px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm transition hover:bg-white active:scale-95 cursor-pointer"
                   >
                     取消
                   </button>
