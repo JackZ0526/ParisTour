@@ -8,8 +8,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Check, ChevronDown } from 'lucide-react'
 import { Checkbox } from '../../../shared/components/Checkbox'
 import {
   DEEPSEEK_MODEL_OPTIONS,
@@ -104,19 +104,26 @@ function useMediaQuery(query: string): boolean {
  * would briefly show a scrollbar while the content is taller than
  * the in-flight motion.div.
  *
- * Panel swap (root ↔ model sub-panel) is wrapped in `AnimatePresence`
- * with a quick cross-fade so the content swap feels intentional rather
- * than instantaneous.
+ * The model list expands inside its own frosted card. Like the thinking
+ * controls, that card owns its grid-row height animation while the outer
+ * shell follows the sentinel's final measurement with matching timing.
  *
- * ThinkingControls' L2 (auto checkbox + slider) and the "skip notice"
- * both use the same `grid-rows-[1fr] ↔ [0fr]` 300ms ease-out pattern,
- * so toggling thinking off collapses L2 and expands the skip notice in
- * lockstep — the total popover height changes monotonically.
+ * The thinking card owns both auto ↔ manual and on ↔ off height changes.
+ * Its bottom edge stays pinned above the model section, so revealing content
+ * grows the card upward and naturally pushes the thinking header with it.
+ * The sentinel skips those transitions and reports the final height
+ * immediately; the outer shell then follows with the same timing instead of
+ * adding a second, competing layout animation.
  */
 export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const { model, setModel, thinkingMode } = useLlmSettings()
   const [open, setOpen] = useState(false)
   const [panel, setPanel] = useState<Panel>('root')
+  // The model list grows nicely with the popover's strong ease-out, but the
+  // same curve removes too much height too early on the return trip. Keep the
+  // navigation direction latched until that height animation completes so
+  // the ResizeObserver re-render cannot accidentally swap its transition.
+  const panelHeightDirectionRef = useRef<'idle' | 'expand' | 'collapse'>('idle')
   const rootRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
@@ -185,6 +192,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 
   useEffect(() => {
     if (!open) {
+      panelHeightDirectionRef.current = 'idle'
       setPanel('root')
       return
     }
@@ -193,7 +201,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (panel !== 'root') setPanel('root')
+        if (panel !== 'root') {
+          panelHeightDirectionRef.current = 'collapse'
+          setPanel('root')
+        }
         else setOpen(false)
       }
     }
@@ -209,6 +220,21 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 
   const chip = getOpenAIModelShortLabel(model)
   const fullLabel = getActiveLlmLabel(model)
+  const panelIsCollapsing = panelHeightDirectionRef.current === 'collapse'
+
+  const navigatePanel = (nextPanel: Panel) => {
+    panelHeightDirectionRef.current = nextPanel === 'model' ? 'expand' : 'collapse'
+    setPanel(nextPanel)
+  }
+
+  const toggleModelPanel = () => {
+    navigatePanel(panel === 'model' ? 'root' : 'model')
+  }
+
+  const selectModelAndCollapse = (nextModel: string) => {
+    setModel(nextModel)
+    navigatePanel('root')
+  }
 
   return (
     <motion.div
@@ -245,13 +271,16 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         // grows"; everything else animates both at once.
         width: { ...MORPH_SPRING, delay: open ? 0 : 0.18 },
         height: {
-          duration: 0.32,
-          ease: [0.22, 1, 0.36, 1],
+          duration: panelIsCollapsing ? 0.36 : 0.32,
+          ease: panelIsCollapsing
+            ? [0.4, 0, 0.2, 1]
+            : [0.22, 1, 0.36, 1],
           delay: justOpened ? 0.18 : 0,
         },
       }}
       onAnimationComplete={() => {
         setHeightAnimating(false)
+        panelHeightDirectionRef.current = 'idle'
       }}
       style={{
         // Anchored to the viewport (not a 0x0 relative wrapper) so the
@@ -306,67 +335,30 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           zIndex: -1,
         }}
       >
-        {panel === 'root' ? (
-          <div className="p-3.5">
-            {canThink ? (
-              <ThinkingControls mode={thinkingMode} disabled={disabled} />
-            ) : (
-              <div>
-                <SectionHeader>思考</SectionHeader>
-                <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
-                  <p className="text-xs leading-snug text-[var(--stone)]">
-                    当前模型不支持思考强度设置
-                  </p>
-                </div>
+        <div className="p-3.5">
+          {canThink ? (
+            <ThinkingControls mode={thinkingMode} disabled={disabled} measureOnly />
+          ) : (
+            <div>
+              <SectionHeader>思考</SectionHeader>
+              <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
+                <p className="text-xs leading-snug text-[var(--stone)]">
+                  当前模型不支持思考强度设置
+                </p>
               </div>
-            )}
-
-            <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
-              <SectionHeader>模型</SectionHeader>
-              <SettingsRow
-                label={getOpenAIModelShortLabel(model)}
-                icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
-                disabled={disabled}
-                onClick={() => setPanel('model')}
-              />
             </div>
-          </div>
-        ) : (
-          <SubPanel title="模型" onBack={() => setPanel('root')}>
-            <ModelGroup label="DeepSeek">
-              {DEEPSEEK_MODEL_OPTIONS.map((m) => (
-                <ModelOption
-                  key={m.id}
-                  label={m.shortLabel}
-                  detail={m.label}
-                  selected={m.id === model}
-                  disabled={disabled}
-                  icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
-                  onSelect={() => {
-                    setModel(m.id)
-                    setPanel('root')
-                  }}
-                />
-              ))}
-            </ModelGroup>
-            <ModelGroup label="OpenAI">
-              {OPENAI_ONLY_MODEL_OPTIONS.map((m) => (
-                <ModelOption
-                  key={m.id}
-                  label={m.shortLabel}
-                  detail={m.label}
-                  selected={m.id === model}
-                  disabled={disabled}
-                  icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
-                  onSelect={() => {
-                    setModel(m.id)
-                    setPanel('root')
-                  }}
-                />
-              ))}
-            </ModelGroup>
-          </SubPanel>
-        )}
+          )}
+
+          <ModelSettingsPanel
+            model={model}
+            disabled={disabled}
+            expanded={panel === 'model'}
+            measureOnly
+            canThink={canThink}
+            onToggle={toggleModelPanel}
+            onSelect={selectModelAndCollapse}
+          />
+        </div>
       </div>
 
       {/* Visible chip content -- fills the motion.div.
@@ -403,9 +395,8 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
       </motion.div>
 
       {/* Visible popover content -- absolute overlay, fills the motion.div.
-          The panel swap (root ↔ model sub-panel) is wrapped in
-          `AnimatePresence` with mode="popLayout" so the content cross-fades
-          while the motion.div animates to its new measured height. */}
+          Thinking and model controls stay in one bottom-anchored layout;
+          their inner cards expand upward and move the content above them. */}
       <motion.div
         initial={false}
         animate={{ opacity: open ? 1 : 0 }}
@@ -423,84 +414,29 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
         />
 
-        <AnimatePresence mode="popLayout" initial={false}>
-          {panel === 'root' ? (
-            <motion.div
-              key="root"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="absolute inset-x-0 bottom-0 p-3.5"
-            >
-              {canThink ? (
-                <ThinkingControls mode={thinkingMode} disabled={disabled} />
-              ) : (
-                <div>
-                  <SectionHeader>思考</SectionHeader>
-                  <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
-                    <p className="text-xs leading-snug text-[var(--stone)]">
-                      当前模型不支持思考强度设置
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
-                <SectionHeader>模型</SectionHeader>
-                <SettingsRow
-                  label={getOpenAIModelShortLabel(model)}
-                  icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
-                  disabled={disabled}
-                  onClick={() => setPanel('model')}
-                />
-              </div>
-            </motion.div>
+        <div className="absolute inset-x-0 bottom-0 p-3.5">
+          {canThink ? (
+            <ThinkingControls mode={thinkingMode} disabled={disabled} />
           ) : (
-            <motion.div
-              key="model"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              <SubPanel title="模型" onBack={() => setPanel('root')}>
-                <ModelGroup label="DeepSeek">
-                  {DEEPSEEK_MODEL_OPTIONS.map((m) => (
-                    <ModelOption
-                      key={m.id}
-                      label={m.shortLabel}
-                      detail={m.label}
-                      selected={m.id === model}
-                      disabled={disabled}
-                      icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
-                      onSelect={() => {
-                        setModel(m.id)
-                        setPanel('root')
-                      }}
-                    />
-                  ))}
-                </ModelGroup>
-                <ModelGroup label="OpenAI">
-                  {OPENAI_ONLY_MODEL_OPTIONS.map((m) => (
-                    <ModelOption
-                      key={m.id}
-                      label={m.shortLabel}
-                      detail={m.label}
-                      selected={m.id === model}
-                      disabled={disabled}
-                      icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
-                      onSelect={() => {
-                        setModel(m.id)
-                        setPanel('root')
-                      }}
-                    />
-                  ))}
-                </ModelGroup>
-              </SubPanel>
-            </motion.div>
+            <div>
+              <SectionHeader>思考</SectionHeader>
+              <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
+                <p className="text-xs leading-snug text-[var(--stone)]">
+                  当前模型不支持思考强度设置
+                </p>
+              </div>
+            </div>
           )}
-        </AnimatePresence>
+
+          <ModelSettingsPanel
+            model={model}
+            disabled={disabled}
+            expanded={panel === 'model'}
+            canThink={canThink}
+            onToggle={toggleModelPanel}
+            onSelect={selectModelAndCollapse}
+          />
+        </div>
       </motion.div>
     </motion.div>
   )
@@ -509,14 +445,27 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 function ThinkingControls({
   mode,
   disabled,
+  measureOnly = false,
 }: {
   mode: ThinkingMode
   disabled?: boolean
+  measureOnly?: boolean
 }) {
   const autoCheckboxId = useId()
   const thinkingOn = mode !== 'off'
   const autoOn = mode === 'auto'
   const autoDisabled = disabled || !thinkingOn
+  // Preserve the active mode while the master switch is off. This keeps the
+  // hidden slider at its previous intrinsic height, so the master transition
+  // only has one changing dimension: the thinking-card content row itself.
+  const lastActiveModeRef = useRef<Exclude<ThinkingMode, 'off'>>(
+    mode === 'off' ? 'auto' : mode,
+  )
+  const preservedActiveMode = thinkingOn ? mode : lastActiveModeRef.current
+  const sliderExpanded = preservedActiveMode !== 'auto'
+  useLayoutEffect(() => {
+    if (mode !== 'off') lastActiveModeRef.current = mode
+  }, [mode])
   const sliderValue: ThinkingEffortUi = isLockedThinkingMode(mode)
     ? mode
     : getThinkingEffort()
@@ -530,11 +479,12 @@ function ThinkingControls({
     duration: 0.32,
     ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
   }
+  const instantTransition = { duration: 0 }
 
   return (
     <div className="flex flex-col justify-end">
       {/* L1: section header + master capsule — same weight as 「模型」 */}
-      <motion.div layout="position" transition={layoutTransition} className="flex items-center gap-3 px-1">
+      <div className="flex items-center gap-3 px-1">
         <p className="min-w-0 flex-1 text-sm font-semibold text-[var(--ink)]">思考</p>
         <PillSwitch
           checked={thinkingOn}
@@ -542,26 +492,40 @@ function ThinkingControls({
           ariaLabel="开启思考"
           onCheckedChange={setThinkingEnabled}
         />
-      </motion.div>
+      </div>
 
-      {/* L2: nested under 思考 — 自动 checkbox (child) + 低/中/高 when custom */}
-      <AnimatePresence initial={false}>
-        {thinkingOn && (
+      {/* L2: one bottom-anchored card. Its two content rows trade height so
+          master on/off and auto/manual both move the top edge, never scale it. */}
+      <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5`}>
+        <motion.div
+          initial={false}
+          animate={{
+            gridTemplateRows: thinkingOn ? '1fr' : '0fr',
+          }}
+          transition={
+            measureOnly
+              ? instantTransition
+              : { gridTemplateRows: layoutTransition }
+          }
+          inert={!thinkingOn || undefined}
+          aria-hidden={!thinkingOn}
+          className="grid"
+        >
           <motion.div
-            key="thinking-on"
-            layout
-            initial={{ opacity: 0, scaleY: 0.8 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            exit={{ opacity: 0, scaleY: 0.8 }}
-            transition={layoutTransition}
-            style={{ transformOrigin: 'bottom' }}
+            initial={false}
+            animate={{ opacity: thinkingOn ? 1 : 0 }}
+            transition={
+              measureOnly
+                ? instantTransition
+                : {
+                    duration: thinkingOn ? 0.18 : 0.12,
+                    delay: thinkingOn ? 0.1 : 0,
+                    ease: 'easeOut',
+                  }
+            }
+            className="min-h-0 overflow-hidden"
           >
-            <motion.div
-              layout
-              transition={layoutTransition}
-              style={{ transformOrigin: 'bottom' }}
-              className={`${GLASS_INNER_CARD_CLASS} mt-2.5 p-2.5`}
-            >
+            <div className="p-2.5">
               <label
                 htmlFor={autoCheckboxId}
                 className={`flex items-start gap-2.5 ${
@@ -585,43 +549,76 @@ function ThinkingControls({
                 </span>
               </label>
 
-              <AnimatePresence initial={false}>
-                {!autoOn && (
-                  <motion.div
-                    key="slider"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 6 }}
-                    transition={{ duration: 0.24, delay: 0.06, ease: 'easeOut' }}
-                  >
-                    <div className="pt-2">
-                      <ThinkingIntensitySlider
-                        value={sliderValue}
-                        disabled={disabled || !thinkingOn || autoOn}
-                        onChange={setThinkingEffort}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
+              <motion.div
+                initial={false}
+                animate={{
+                  gridTemplateRows: sliderExpanded ? '1fr' : '0fr',
+                }}
+                transition={
+                  measureOnly
+                    ? instantTransition
+                    : { gridTemplateRows: layoutTransition }
+                }
+                inert={!sliderExpanded || undefined}
+                aria-hidden={!sliderExpanded}
+                className="grid"
+              >
+                <motion.div
+                  initial={false}
+                  animate={{ opacity: sliderExpanded ? 1 : 0 }}
+                  transition={
+                    measureOnly
+                      ? instantTransition
+                      : {
+                          duration: sliderExpanded ? 0.18 : 0.12,
+                          delay: sliderExpanded ? 0.1 : 0,
+                          ease: 'easeOut',
+                        }
+                  }
+                  className="min-h-0 overflow-hidden"
+                >
+                  <div className="pt-2">
+                    <ThinkingIntensitySlider
+                      value={sliderValue}
+                      disabled={disabled || !thinkingOn || !sliderExpanded}
+                      onChange={setThinkingEffort}
+                    />
+                  </div>
+                </motion.div>
+              </motion.div>
+            </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
 
-      {/* Skip notice */}
-      <AnimatePresence initial={false}>
-        {!thinkingOn && (
+        <motion.div
+          initial={false}
+          animate={{
+            gridTemplateRows: thinkingOn ? '0fr' : '1fr',
+          }}
+          transition={
+            measureOnly
+              ? instantTransition
+              : { gridTemplateRows: layoutTransition }
+          }
+          inert={thinkingOn || undefined}
+          aria-hidden={thinkingOn}
+          className="grid"
+        >
           <motion.div
-            key="thinking-off"
-            layout
-            initial={{ opacity: 0, scaleY: 0.8 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            exit={{ opacity: 0, scaleY: 0.8 }}
-            transition={layoutTransition}
-            style={{ transformOrigin: 'bottom' }}
+            initial={false}
+            animate={{ opacity: thinkingOn ? 0 : 1 }}
+            transition={
+              measureOnly
+                ? instantTransition
+                : {
+                    duration: thinkingOn ? 0.12 : 0.18,
+                    delay: thinkingOn ? 0 : 0.1,
+                    ease: 'easeOut',
+                  }
+            }
+            className="min-h-0 overflow-hidden"
           >
-            <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5 flex items-center gap-2 px-3 py-2`}>
+            <div className="flex items-center gap-2 px-3 py-2">
               <span
                 aria-hidden
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/60"
@@ -631,8 +628,8 @@ function ThinkingControls({
               </p>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      </div>
 
       <span className="sr-only">当前模式 {mode}</span>
     </div>
@@ -990,6 +987,116 @@ function ModelBrandIcon({
     />
   )
 }
+function ModelSettingsPanel({
+  model,
+  disabled,
+  expanded,
+  measureOnly = false,
+  canThink,
+  onToggle,
+  onSelect,
+}: {
+  model: string
+  disabled?: boolean
+  expanded: boolean
+  measureOnly?: boolean
+  canThink: boolean
+  onToggle: () => void
+  onSelect: (model: string) => void
+}) {
+  const optionsId = useId()
+  const deepseek = isDeepSeekModel(model)
+  const instantTransition = { duration: 0 }
+  const heightTransition = expanded
+    ? {
+        duration: 0.32,
+        ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+      }
+    : {
+        duration: 0.36,
+        ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
+      }
+
+  return (
+    <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
+      <SectionHeader>模型</SectionHeader>
+      <div className={GLASS_INNER_CARD_CLASS}>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={optionsId}
+          disabled={disabled}
+          onClick={onToggle}
+          className="relative flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-white/55 disabled:opacity-50 cursor-pointer"
+        >
+          <ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />
+          <span className="min-w-0 flex-1">{getOpenAIModelShortLabel(model)}</span>
+          <ChevronDown
+            aria-hidden
+            className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)] transition-transform duration-200 ${
+              expanded ? 'rotate-180' : ''
+            }`}
+            strokeWidth={2}
+          />
+        </button>
+
+        <motion.div
+          id={optionsId}
+          initial={false}
+          animate={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+          transition={measureOnly ? instantTransition : { gridTemplateRows: heightTransition }}
+          inert={!expanded || undefined}
+          aria-hidden={!expanded}
+          className="grid"
+        >
+          <motion.div
+            initial={false}
+            animate={{ opacity: expanded ? 1 : 0 }}
+            transition={
+              measureOnly
+                ? instantTransition
+                : {
+                    duration: expanded ? 0.18 : 0.12,
+                    delay: expanded ? 0.08 : 0,
+                    ease: 'easeOut',
+                  }
+            }
+            className="min-h-0 overflow-hidden"
+          >
+            <div className="border-t border-white/85 pb-1">
+              <ModelGroup label="DeepSeek">
+                {DEEPSEEK_MODEL_OPTIONS.map((option) => (
+                  <ModelOption
+                    key={option.id}
+                    label={option.shortLabel}
+                    detail={option.label}
+                    selected={option.id === model}
+                    disabled={disabled}
+                    icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
+                    onSelect={() => onSelect(option.id)}
+                  />
+                ))}
+              </ModelGroup>
+              <ModelGroup label="OpenAI">
+                {OPENAI_ONLY_MODEL_OPTIONS.map((option) => (
+                  <ModelOption
+                    key={option.id}
+                    label={option.shortLabel}
+                    detail={option.label}
+                    selected={option.id === model}
+                    disabled={disabled}
+                    icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
+                    onSelect={() => onSelect(option.id)}
+                  />
+                ))}
+              </ModelGroup>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
 
 function ModelGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -1052,62 +1159,5 @@ function ModelOption({
         </span>
       </button>
     </li>
-  )
-}
-
-function SettingsRow({
-  label,
-  value,
-  icon,
-  disabled,
-  onClick,
-}: {
-  label: string
-  value?: string
-  icon?: ReactNode
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`${GLASS_INNER_CARD_CLASS} flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] transition-all hover:bg-white/95 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05),inset_0_1.5px_2px_rgba(255,255,255,1)] active:scale-98 disabled:opacity-50 cursor-pointer`}
-    >
-      {icon}
-      <span className="min-w-0 flex-1">{label}</span>
-      {value ? (
-        <span className="max-w-[7rem] truncate text-xs font-normal text-[var(--stone)]">{value}</span>
-      ) : null}
-      <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-[var(--stone)]" strokeWidth={2} />
-    </button>
-  )
-}
-
-function SubPanel({
-  title,
-  onBack,
-  children,
-}: {
-  title: string
-  onBack: () => void
-  children: ReactNode
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-1 border-b border-white/85 bg-white/40 px-2 py-2 backdrop-blur-md">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="返回"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink)] transition hover:bg-white/80 cursor-pointer"
-        >
-          <ChevronLeft aria-hidden className="h-4 w-4" strokeWidth={2} />
-        </button>
-        <p className="text-sm font-semibold text-[var(--ink)]">{title}</p>
-      </div>
-      {children}
-    </div>
   )
 }
