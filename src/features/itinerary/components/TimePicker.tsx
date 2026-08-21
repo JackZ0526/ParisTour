@@ -217,13 +217,13 @@ function TimeWheelColumn<T extends number>({
             aria-selected={isSelected}
             onClick={() => handleItemClick(repIdx, item)}
             style={{ height: `${ITEM_HEIGHT}px` }}
-            className={`flex snap-center items-center justify-center text-center cursor-pointer transition-all duration-150 ${
+            className={`flex snap-center items-center justify-center text-center cursor-pointer text-xl tabular-nums tracking-normal leading-none transition-all duration-200 ease-out ${
               isSelected
-                ? 'text-xl sm:text-2xl font-bold text-[var(--ink)] scale-105'
-                : 'text-sm sm:text-base font-semibold text-[var(--stone)]/75 hover:text-[var(--ink)] scale-90'
+                ? 'font-bold text-[var(--ink)] scale-100 opacity-100'
+                : 'font-normal text-[var(--stone)]/60 scale-[0.82] opacity-60 hover:text-[var(--ink)] hover:opacity-85'
             }`}
           >
-            <span className="tabular-nums tracking-normal leading-none">{formatItem(item)}</span>
+            {formatItem(item)}
           </div>
         )
       })}
