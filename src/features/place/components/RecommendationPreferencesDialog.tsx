@@ -40,53 +40,53 @@ interface TagTheme {
 const COLOR_PALETTES: readonly TagTheme[] = [
   {
     // 0. Amber / Morning Cafe
-    activePill: 'bg-amber-500/18 border-amber-300/80 text-amber-950 shadow-2xs hover:bg-amber-500/25',
-    suggestedPill: 'bg-amber-500/8 border-amber-200/70 hover:bg-amber-500/18 hover:border-amber-300 text-amber-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-amber-100/95 border-amber-300/90 text-amber-950 shadow-2xs hover:bg-amber-200/90',
+    suggestedPill: 'bg-amber-50/90 border-amber-200/80 text-amber-950/80 hover:bg-amber-100 hover:text-amber-950 hover:border-amber-300',
   },
   {
     // 1. Terracotta / Dining & Meat
-    activePill: 'bg-orange-500/18 border-orange-300/80 text-orange-950 shadow-2xs hover:bg-orange-500/25',
-    suggestedPill: 'bg-orange-500/8 border-orange-200/70 hover:bg-orange-500/18 hover:border-orange-300 text-orange-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-orange-100/95 border-orange-300/90 text-orange-950 shadow-2xs hover:bg-orange-200/90',
+    suggestedPill: 'bg-orange-50/90 border-orange-200/80 text-orange-950/80 hover:bg-orange-100 hover:text-orange-950 hover:border-orange-300',
   },
   {
     // 2. Sage Botanical Green / Walking & Nature
-    activePill: 'bg-emerald-600/18 border-emerald-300/80 text-emerald-950 shadow-2xs hover:bg-emerald-600/25',
-    suggestedPill: 'bg-emerald-600/8 border-emerald-200/70 hover:bg-emerald-600/18 hover:border-emerald-300 text-emerald-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-emerald-100/95 border-emerald-300/90 text-emerald-950 shadow-2xs hover:bg-emerald-200/90',
+    suggestedPill: 'bg-emerald-50/90 border-emerald-200/80 text-emerald-950/80 hover:bg-emerald-100 hover:text-emerald-950 hover:border-emerald-300',
   },
   {
     // 3. Artsy Indigo / Gallery & Museum
-    activePill: 'bg-indigo-500/18 border-indigo-300/80 text-indigo-950 shadow-2xs hover:bg-indigo-500/25',
-    suggestedPill: 'bg-indigo-500/8 border-indigo-200/70 hover:bg-indigo-500/18 hover:border-indigo-300 text-indigo-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-indigo-100/95 border-indigo-300/90 text-indigo-950 shadow-2xs hover:bg-indigo-200/90',
+    suggestedPill: 'bg-indigo-50/90 border-indigo-200/80 text-indigo-950/80 hover:bg-indigo-100 hover:text-indigo-950 hover:border-indigo-300',
   },
   {
     // 4. Rose / French Bakery & Sweets
-    activePill: 'bg-rose-500/18 border-rose-300/80 text-rose-950 shadow-2xs hover:bg-rose-500/25',
-    suggestedPill: 'bg-rose-500/8 border-rose-200/70 hover:bg-rose-500/18 hover:border-rose-300 text-rose-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-rose-100/95 border-rose-300/90 text-rose-950 shadow-2xs hover:bg-rose-200/90',
+    suggestedPill: 'bg-rose-50/90 border-rose-200/80 text-rose-950/80 hover:bg-rose-100 hover:text-rose-950 hover:border-rose-300',
   },
   {
     // 5. Seine River Teal / Landmarks
-    activePill: 'bg-teal-600/18 border-teal-300/80 text-teal-950 shadow-2xs hover:bg-teal-600/25',
-    suggestedPill: 'bg-teal-600/8 border-teal-200/70 hover:bg-teal-600/18 hover:border-teal-300 text-teal-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-teal-100/95 border-teal-300/90 text-teal-950 shadow-2xs hover:bg-teal-200/90',
+    suggestedPill: 'bg-teal-50/90 border-teal-200/80 text-teal-950/80 hover:bg-teal-100 hover:text-teal-950 hover:border-teal-300',
   },
   {
     // 6. Sky Blue / Photo & Tower Night
-    activePill: 'bg-sky-500/18 border-sky-300/80 text-sky-950 shadow-2xs hover:bg-sky-500/25',
-    suggestedPill: 'bg-sky-500/8 border-sky-200/70 hover:bg-sky-500/18 hover:border-sky-300 text-sky-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-sky-100/95 border-sky-300/90 text-sky-950 shadow-2xs hover:bg-sky-200/90',
+    suggestedPill: 'bg-sky-50/90 border-sky-200/80 text-sky-950/80 hover:bg-sky-100 hover:text-sky-950 hover:border-sky-300',
   },
   {
     // 7. Fairy Purple / Disney & Kids
-    activePill: 'bg-purple-500/18 border-purple-300/80 text-purple-950 shadow-2xs hover:bg-purple-500/25',
-    suggestedPill: 'bg-purple-500/8 border-purple-200/70 hover:bg-purple-500/18 hover:border-purple-300 text-purple-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-purple-100/95 border-purple-300/90 text-purple-950 shadow-2xs hover:bg-purple-200/90',
+    suggestedPill: 'bg-purple-50/90 border-purple-200/80 text-purple-950/80 hover:bg-purple-100 hover:text-purple-950 hover:border-purple-300',
   },
   {
     // 8. Vintage Gold Ochre / Marais & Vintage Market
-    activePill: 'bg-amber-600/18 border-amber-300/80 text-amber-950 shadow-2xs hover:bg-amber-600/25',
-    suggestedPill: 'bg-amber-600/8 border-amber-200/70 hover:bg-amber-600/18 hover:border-amber-300 text-amber-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-amber-100/95 border-amber-300/90 text-amber-950 shadow-2xs hover:bg-amber-200/90',
+    suggestedPill: 'bg-amber-50/90 border-amber-200/80 text-amber-950/80 hover:bg-amber-100 hover:text-amber-950 hover:border-amber-300',
   },
   {
     // 9. Wine Burgundy / Seine Sunset Cruise
-    activePill: 'bg-red-500/18 border-red-300/80 text-red-950 shadow-2xs hover:bg-red-500/25',
-    suggestedPill: 'bg-red-500/8 border-red-200/70 hover:bg-red-500/18 hover:border-red-300 text-red-950 opacity-80 hover:opacity-100',
+    activePill: 'bg-red-100/95 border-red-300/90 text-red-950 shadow-2xs hover:bg-red-200/90',
+    suggestedPill: 'bg-red-50/90 border-red-200/80 text-red-950/80 hover:bg-red-100 hover:text-red-950 hover:border-red-300',
   },
 ]
 
@@ -130,7 +130,7 @@ export function RecommendationPreferencesButton({
 }
 
 const BASE_TAG_PILL =
-  'group inline-flex h-6 items-center px-2 text-[10.5px] font-medium leading-none rounded-full border transition-all cursor-pointer select-none tracking-tight'
+  'group inline-flex h-7.5 items-center px-3.5 text-xs font-semibold leading-none rounded-full border transition-all cursor-pointer select-none'
 
 export function RecommendationPreferencesDialog({
   open,
@@ -308,9 +308,9 @@ export function RecommendationPreferencesDialog({
             </div>
 
             {/* Tag Pool Container Box */}
-            <div className="min-h-[76px] rounded-2xl border border-white/85 bg-white/65 p-3 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
+            <div className="min-h-[88px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
               {activeTags.length === 0 ? (
-                <div className="flex min-h-[56px] flex-col items-center justify-center text-center p-1">
+                <div className="flex min-h-[64px] flex-col items-center justify-center text-center p-1">
                   <p className="text-xs font-medium text-[var(--stone)]">
                     偏好池暂为空白
                   </p>
@@ -319,7 +319,7 @@ export function RecommendationPreferencesDialog({
                   </p>
                 </div>
               ) : (
-                <motion.div layout className="flex flex-wrap gap-1.5">
+                <motion.div layout className="flex flex-wrap gap-2">
                   <AnimatePresence>
                     {activeTags.map((tag) => {
                       const cleanTag = cleanTagText(tag)
@@ -337,7 +337,7 @@ export function RecommendationPreferencesDialog({
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
                           aria-label={`移除 ${cleanTag}`}
-                          className={`${BASE_TAG_PILL} relative isolate shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-md ${theme.activePill}`}
+                          className={`${BASE_TAG_PILL} relative isolate backdrop-blur-md ${theme.activePill}`}
                         >
                           <span className="truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
                         </motion.button>
@@ -350,7 +350,7 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
-          <section className="space-y-2">
+          <section className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[var(--stone)] flex items-center gap-1.5">
                 <Sparkles size={13} className="text-amber-600" />
@@ -358,7 +358,7 @@ export function RecommendationPreferencesDialog({
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {availablePresets.length > 0 ? (
                 availablePresets.map((preset) => {
                   const cleanPreset = cleanTagText(preset)
