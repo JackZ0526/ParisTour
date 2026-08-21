@@ -2673,48 +2673,43 @@ export function HotelPicker({
           (decidingCustom ||
             !isHotelSelected(selected) ||
             popupCandidate.id !== selected.id) ? (
-            <div className="space-y-2">
-              <p className="text-sm text-[var(--stone)]">
-                {decidingCustom ? '要把这家酒店加入候选项吗？' : '如何处理这家酒店？'}
-              </p>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={decideStayHere}
-                  className="rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)]"
-                >
-                  就住这儿了
-                </button>
-                <button
-                  type="button"
-                  onClick={decideConsider}
-                  className="rounded-xl border border-[var(--sage)] bg-[var(--sage)]/10 px-3 py-2.5 text-sm text-[var(--sage)]"
-                >
-                  考虑考虑
-                </button>
+            <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-between pt-1">
+              <div className="flex items-center gap-2">
                 {decidingCustom ? (
                   <button
                     type="button"
                     onClick={dismissPendingCustom}
-                    className="rounded-xl border border-[var(--stone)]/30 px-3 py-2.5 text-sm text-[var(--stone)]"
+                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 flex-1 sm:flex-none`}
                   >
-                    还是算了
+                    放弃
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={decideEliminate}
-                    className="rounded-xl border border-red-300/70 bg-red-50 px-3 py-2.5 text-sm text-red-700"
+                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-red-700 hover:bg-red-50/70 active:scale-95 flex-1 sm:flex-none`}
                   >
-                    这个淘汰
+                    <Trash2 size={13} strokeWidth={1.8} className="shrink-0" />
+                    移出候选
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={decideConsider}
+                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 flex-1 sm:flex-none`}
+                >
+                  {decidingCustom ? '仅加入候选' : '保留备选'}
+                </button>
               </div>
-              <p className="text-[11px] text-[var(--stone)]">
-                {decidingCustom
-                  ? '「就住这儿了」会选中并收起其他卡片；「考虑考虑」仅加入列表；「还是算了」不添加。'
-                  : '「就住这儿了」设为当前住宿并收起其他卡片；「考虑考虑」保留但不改选择；「这个淘汰」从列表删除。'}
-              </p>
+
+              <button
+                type="button"
+                onClick={decideStayHere}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--ink)]/90 bg-[var(--ink)] px-5 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] transition-all hover:bg-[var(--ink)]/95 active:scale-95 w-full sm:w-auto"
+              >
+                <Bed size={15} strokeWidth={2} className="shrink-0 text-[var(--gold)]" />
+                设为当前住宿
+              </button>
             </div>
           ) : undefined
         }
