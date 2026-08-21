@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Archive,
   CalendarDays,
+  Check,
+  ChevronRight,
   History,
   Hotel as HotelIcon,
   Luggage,
@@ -259,7 +261,6 @@ export default function App() {
     itineraryStartDate,
     numberOfDays,
     itineraryReady,
-    missingForItinerary,
     canRestoreDefault,
     canRestoreDayDefault,
     isDayGenerationPending,
@@ -1106,24 +1107,154 @@ export default function App() {
                   )}
                 </section>
               ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--copper)]/35 bg-white/60 px-6 py-12 text-center space-y-4 shadow-sm backdrop-blur-xl">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--copper)]/10 text-[var(--copper)]">
-                    <Luggage size={28} />
+                <div className={`relative overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-6 sm:p-10 text-center shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)]`}>
+                  {/* Subtle decorative background watermark */}
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.035] grayscale"
+                    style={{
+                      backgroundImage:
+                        'url(https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1600&q=60)',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  />
+
+                  <div className="relative mx-auto max-w-lg space-y-5">
+                    {/* Top Editorial Category Badge */}
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)]">
+                      <Sparkles size={12} strokeWidth={2.2} />
+                      <span>ITINERARY READINESS · 行程就绪准备</span>
+                    </div>
+
+                    {/* Central 3D Frosted Icon Badge */}
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
+                      <Luggage size={30} strokeWidth={1.9} />
+                    </div>
+
+                    {/* Typography */}
+                    <div className="space-y-1.5">
+                      <h3 className="font-display text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-tight">
+                        还差几项即可生成完整多日行程
+                      </h3>
+                      <p className="text-xs sm:text-sm text-[var(--stone)] leading-relaxed max-w-md mx-auto">
+                        配置旅行日期、往返航班与心仪酒店后，AI 将为您智能规划每日景点动线、合理串联交通与就餐建议。
+                      </p>
+                    </div>
+
+                    {/* Interactive 3-Step Readiness Matrix */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-left">
+                      {/* Step 1: Dates */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab('logistics')}
+                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                          datesReady
+                            ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
+                            : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm">📅</span>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">旅行日期</p>
+                            <p className="text-[10.5px] text-[var(--stone)] truncate">
+                              {datesReady ? `${tripDates?.startDate?.slice(5)} → ${tripDates?.endDate?.slice(5)}` : '待选定起止'}
+                            </p>
+                          </div>
+                        </div>
+                        {datesReady ? (
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                            <Check size={11} strokeWidth={3} />
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
+                            待办
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Step 2: Flights */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab('logistics')}
+                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                          flights.outbound && flights.returnFlight
+                            ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
+                            : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm">✈️</span>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">往返航班</p>
+                            <p className="text-[10.5px] text-[var(--stone)] truncate">
+                              {flights.outbound && flights.returnFlight
+                                ? `${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber}`
+                                : flights.outbound
+                                  ? `已填去程`
+                                  : '待确认时刻'}
+                            </p>
+                          </div>
+                        </div>
+                        {flights.outbound && flights.returnFlight ? (
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                            <Check size={11} strokeWidth={3} />
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
+                            待办
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Step 3: Hotel */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab('logistics')}
+                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                          isHotelSelected(hotel)
+                            ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
+                            : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm">🏨</span>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">入住酒店</p>
+                            <p className="text-[10.5px] text-[var(--stone)] truncate">
+                              {isHotelSelected(hotel) ? hotel.name : '待挑选住宿'}
+                            </p>
+                          </div>
+                        </div>
+                        {isHotelSelected(hotel) ? (
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                            <Check size={11} strokeWidth={3} />
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
+                            待办
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Primary CTA Button: French Copper-Amber Gradient */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab('logistics')}
+                        className="group relative isolate inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all duration-200 hover:brightness-105 hover:shadow-[0_8px_24px_rgba(179,107,60,0.36)] active:scale-95"
+                      >
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute inset-x-3 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent"
+                        />
+                        <Luggage size={16} strokeWidth={2.2} />
+                        <span>前往「出行」一键完善</span>
+                        <ChevronRight size={15} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="font-display text-xl sm:text-2xl text-[var(--ink)]">
-                    还差几项才能查看完整多日行程
-                  </h3>
-                  <p className="max-w-md mx-auto text-sm text-[var(--stone)]">
-                    请先完成：{missingForItinerary.join(' · ')}。在「出行」Tab 中配置出发与结束日期并选定入住酒店，AI 即可为您量身规划巴黎深度游玩路线。
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectTab('logistics')}
-                    className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-6 py-2.5 text-sm font-medium text-[var(--paper)] shadow-md transition-all hover:opacity-90 active:scale-95"
-                  >
-                    <Luggage size={16} />
-                    <span>前往「出行」配置</span>
-                  </button>
                 </div>
               )}
             </motion.div>
