@@ -1077,7 +1077,7 @@ function ModelSettingsPanel({
                   />
                 ))}
               </ModelGroup>
-              <ModelGroup label="OpenAI">
+              <ModelGroup label="OpenAI" withTopDivider>
                 {OPENAI_ONLY_MODEL_OPTIONS.map((option) => (
                   <ModelOption
                     key={option.id}
@@ -1098,13 +1098,21 @@ function ModelSettingsPanel({
   )
 }
 
-function ModelGroup({ label, children }: { label: string; children: ReactNode }) {
+function ModelGroup({
+  label,
+  children,
+  withTopDivider = false,
+}: {
+  label: string
+  children: ReactNode
+  withTopDivider?: boolean
+}) {
   return (
-    <div className="py-1">
-      <p className="px-3.5 py-1 text-[10px] font-medium tracking-wide text-[var(--stone)] uppercase">
+    <div className={`py-1 ${withTopDivider ? 'border-t border-white/80 mt-1 pt-1.5' : ''}`}>
+      <p className="px-3.5 py-1 text-[10px] font-semibold tracking-wider text-[var(--stone)] uppercase">
         {label}
       </p>
-      <ul role="listbox" aria-label={label}>
+      <ul role="listbox" aria-label={label} className="space-y-0.5 px-1.5">
         {children}
       </ul>
     </div>
@@ -1132,28 +1140,28 @@ function ModelOption({
         type="button"
         disabled={disabled}
         onClick={onSelect}
-        className={`flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm transition ${
+        className={`group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.98] ${
           selected
-            ? 'bg-[var(--sage)]/12 font-medium text-[var(--sage)]'
-            : 'text-[var(--ink)] hover:bg-[var(--mist)]/55'
-        } disabled:opacity-50`}
+            ? 'border border-white/90 bg-white/85 shadow-[0_1px_5px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-sm'
+            : 'border border-transparent hover:border-white/70 hover:bg-white/50'
+        } disabled:opacity-50 cursor-pointer`}
       >
         <span
           aria-hidden
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-150 ${
             selected
-              ? 'border-[var(--sage)] bg-[var(--sage)] text-white'
-              : 'border-[var(--ink)]/20'
+              ? 'border-[var(--sage)] bg-[var(--sage)] text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
+              : 'border-[var(--ink)]/20 bg-white/40 group-hover:border-[var(--ink)]/35'
           }`}
         >
-          {selected && (
-            <Check className="h-2.5 w-2.5" strokeWidth={2} />
-          )}
+          {selected && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
         </span>
-        {icon && <span className="shrink-0 opacity-80">{icon}</span>}
-        <span className="min-w-0">
-          <span className="block truncate">{label}</span>
-          <span className="block truncate text-[11px] font-normal text-[var(--stone)]">
+        {icon && <span className="shrink-0 transition-transform group-hover:scale-105">{icon}</span>}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold leading-tight text-[var(--ink)]">
+            {label}
+          </span>
+          <span className="mt-0.5 block truncate text-[11px] font-normal leading-tight text-[var(--stone)]">
             {detail}
           </span>
         </span>
