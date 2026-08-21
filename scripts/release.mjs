@@ -17,8 +17,9 @@
  * changelog version / root). Conventional Commits preferred; otherwise
  * subjects are bucketed by simple heuristics.
  *
- * ZH file: Chinese section headers + same bullets as EN (no translation API).
- * Polish Chinese bullets manually after the release if needed.
+ * ZH file: curated Chinese bullets from CHANGELOG.zh-CN.md's Unreleased block.
+ * A release with commits is rejected when those Chinese notes are missing, so
+ * the localized changelog can never silently fall back to English.
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -224,15 +225,9 @@ function renderEnSection(version, date, buckets, blurb) {
   return lines.join('\n').trimEnd() + '\n'
 }
 
-function renderZhSection(version, date, buckets, { mirrorEn = false } = {}) {
+function renderZhSection(version, date, buckets) {
   const headerMap = { Added: '新增', Changed: '变更', Fixed: '修复' }
   const lines = [`## [${version}] - ${date}`, '']
-  if (mirrorEn) {
-    lines.push(
-      '> 自动生成：下列条目与英文版相同，可随后润色中文。',
-      '',
-    )
-  }
   for (const name of ['Added', 'Changed', 'Fixed']) {
     const items = buckets[name]
     if (!items.length) continue
@@ -241,7 +236,7 @@ function renderZhSection(version, date, buckets, { mirrorEn = false } = {}) {
     lines.push('')
   }
   if (!buckets.Added.length && !buckets.Changed.length && !buckets.Fixed.length) {
-    lines.push('### 变更', '', '- Maintenance release (no categorized commit subjects).', '')
+    lines.push('### 变更', '', '- 维护版本（没有可分类的提交记录）。', '')
   }
   return lines.join('\n').trimEnd() + '\n'
 }
@@ -365,13 +360,19 @@ function main() {
     groupCommits(subjects),
     parseUnreleasedBuckets(enExisting),
   )
-  const bucketsZhFromFile = parseUnreleasedBuckets(zhExisting)
-  const bucketsZh =
-    bucketsZhFromFile.Added.length ||
-    bucketsZhFromFile.Changed.length ||
-    bucketsZhFromFile.Fixed.length
-      ? mergeBuckets(groupCommits(subjects), bucketsZhFromFile)
-      : bucketsEn
+  const bucketsZh = parseUnreleasedBuckets(zhExisting)
+  const hasZhNotes =
+    bucketsZh.Added.length || bucketsZh.Changed.length || bucketsZh.Fixed.length
+
+  if (subjects.length && !hasZhNotes) {
+    console.error(
+      'CHANGELOG.zh-CN.md 的 Unreleased 区域缺少中文条目，已中止发版。',
+    )
+    console.error(
+      '请先在“新增 / 变更 / 修复”下整理中文发布摘要，再重新执行 release 命令。',
+    )
+    process.exit(1)
+  }
 
   const date = todayUTC()
 
@@ -384,15 +385,11 @@ function main() {
     `EN bullets: A=${bucketsEn.Added.length} C=${bucketsEn.Changed.length} F=${bucketsEn.Fixed.length}`,
   )
 
-  const zhMirrorEn = bucketsZh === bucketsEn
-
   if (dryRun) {
     console.log('\n--- EN section preview ---\n')
     console.log(renderEnSection(nextVersion, date, bucketsEn))
     console.log('--- ZH section preview ---\n')
-    console.log(
-      renderZhSection(nextVersion, date, bucketsZh, { mirrorEn: zhMirrorEn }),
-    )
+    console.log(renderZhSection(nextVersion, date, bucketsZh))
     console.log('(dry-run: no files written, no git)')
     return
   }
@@ -408,9 +405,7 @@ function main() {
   }
 
   const enSection = renderEnSection(nextVersion, date, bucketsEn)
-  const zhSection = renderZhSection(nextVersion, date, bucketsZh, {
-    mirrorEn: zhMirrorEn,
-  })
+  const zhSection = renderZhSection(nextVersion, date, bucketsZh)
 
   en = insertVersionAfterUnreleased(en, enSection, 'en')
   zh = insertVersionAfterUnreleased(zh, zhSection, 'zh')

@@ -98,7 +98,7 @@ On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + all
 
 Version history lives in [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md).
 
-1. Land your feature commits on `main` (Conventional Commits help: `feat:`, `fix:`, …). Optional: keep draft notes under `## [Unreleased]` in both changelogs.
+1. Land your feature commits on `main` (Conventional Commits help: `feat:`, `fix:`, …). Before releasing, add a curated Chinese summary under `## [Unreleased]` in `CHANGELOG.zh-CN.md`; the release command stops if it is missing.
 2. One-time baseline (if no `v*` tags exist yet):
 
 ```bash
@@ -115,17 +115,17 @@ npm run release:patch   # or release:minor / release:major
 git push origin HEAD && git push origin vX.Y.Z
 ```
 
-4. Pushing `v*` runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which opens a GitHub Release whose body is that version’s section from `CHANGELOG.md`.
+4. Pushing `v*` runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which opens a bilingual GitHub Release from the matching sections in both changelogs.
 
 **What gets auto-generated**
 
 | Artifact | Source |
 |----------|--------|
 | `CHANGELOG.md` section | Commit subjects since previous `v*` tag (`feat`→Added, `fix`→Fixed, else Changed) **plus** any `Unreleased` bullets |
-| `CHANGELOG.zh-CN.md` section | Chinese headings; ZH `Unreleased` bullets if present, otherwise same bullets as EN (no translation API) |
+| `CHANGELOG.zh-CN.md` section | Curated Chinese bullets promoted from its required `Unreleased` section; never falls back to English |
 | `package.json` `version` | Semver bump |
 | git tag `vX.Y.Z` | Annotated tag on the release commit |
-| GitHub Release | Workflow copies that version’s EN changelog section |
+| GitHub Release | Workflow combines that version’s English and Chinese changelog sections |
 
 ## Project structure (overview)
 
