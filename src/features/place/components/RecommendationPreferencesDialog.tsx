@@ -498,30 +498,33 @@ export function RecommendationPreferencesDialog({
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="extracted-dialog-title"
-                  initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                  initial={{ opacity: 0, scale: 0.93, y: 14 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.92, y: 16 }}
+                  exit={{ opacity: 0, scale: 0.93, y: 8 }}
                   transition={{ type: 'spring', stiffness: 450, damping: 30 }}
                   className={`relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-3xl ${glassModalSurfaceClass} p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.22),inset_0_1px_2px_rgba(255,255,255,1)]`}
                 >
                   {/* Header */}
-                  <div className="flex items-start gap-3.5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-700 shadow-2xs">
-                      <Sparkles size={20} strokeWidth={2.2} />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300/60 bg-amber-500/12 text-amber-700 shadow-2xs backdrop-blur-md">
+                        <Sparkles size={17} strokeWidth={2.2} />
+                      </div>
+                      <div className="min-w-0 pt-0.5">
+                        <h3 id="extracted-dialog-title" className="font-display text-base sm:text-lg font-semibold text-[var(--ink)] tracking-tight">
+                          AI 智能提炼完成
+                        </h3>
+                        <p className="mt-0.5 text-xs text-[var(--stone)] leading-relaxed">
+                          已为您提炼出以下偏好标签：
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 id="extracted-dialog-title" className="font-display text-lg font-semibold text-[var(--ink)]">
-                        AI 智能提炼完成
-                      </h3>
-                      <p className="mt-0.5 text-xs text-[var(--stone)] leading-relaxed">
-                        已根据您的输入提炼出以下偏好标签，请选择处理方式：
-                      </p>
-                    </div>
+                    <CloseIconButton onClick={handleDiscardExtracted} />
                   </div>
 
-                  {/* Extracted Tags Display */}
-                  <div className="my-4 rounded-2xl border border-white/85 bg-white/70 p-3.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
-                    <div className="flex flex-wrap gap-2">
+                  {/* Extracted Tags Display Box */}
+                  <div className="my-4 rounded-2xl border border-white/85 bg-white/70 p-3 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
+                    <div className="flex flex-wrap gap-1.5">
                       {extractedResult.map((tag) => {
                         const clean = cleanTagText(tag)
                         const theme = getTagTheme(clean)
@@ -537,32 +540,31 @@ export function RecommendationPreferencesDialog({
                     </div>
                   </div>
 
-                  {/* 3 Action Buttons */}
-                  <div className="flex flex-col gap-2 pt-1">
+                  {/* Standardized ParisTour Horizontal Action Capsules */}
+                  <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
                     <button
                       type="button"
-                      onClick={handleAddToActivePool}
-                      className="group relative isolate inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#b36b3c] to-[#9a542b] py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer"
+                      onClick={handleDiscardExtracted}
+                      className="min-h-[34px] rounded-full border border-black/8 bg-white/70 px-3.5 py-1 text-xs font-medium text-[var(--stone)] shadow-2xs backdrop-blur-md transition-all hover:bg-white hover:text-[var(--ink)] active:scale-95 cursor-pointer"
                     >
-                      <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent" />
-                      <Sparkles size={14} className="text-amber-200" />
-                      <span>加入偏好池（直接生效）</span>
+                      放弃
                     </button>
 
                     <button
                       type="button"
                       onClick={handleAddToCandidatePool}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white/80 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[var(--ink)] shadow-2xs hover:bg-white transition-all active:scale-[0.98] cursor-pointer"
+                      className="min-h-[34px] rounded-full border border-black/10 bg-white/85 px-4 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white active:scale-95 cursor-pointer"
                     >
-                      <span>加入候选池（稍后自选）</span>
+                      加入候选池
                     </button>
 
                     <button
                       type="button"
-                      onClick={handleDiscardExtracted}
-                      className="inline-flex w-full items-center justify-center py-2 text-xs font-medium text-[var(--stone)] hover:text-red-600 transition-colors cursor-pointer"
+                      onClick={handleAddToActivePool}
+                      className="group relative isolate inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[var(--ink)] px-4.5 py-1 text-xs font-semibold text-[var(--paper)] shadow-[0_4px_14px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] transition-all hover:bg-black active:scale-95 cursor-pointer"
                     >
-                      放弃这些标签
+                      <Sparkles size={12} className="text-amber-300" />
+                      <span>加入已选池</span>
                     </button>
                   </div>
                 </motion.div>
