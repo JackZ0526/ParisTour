@@ -18,6 +18,214 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.8.0] - 2026-08-21
+
+> 自动生成：下列条目与英文版相同，可随后润色中文。
+
+### 新增
+
+- reveal left fades after scrolling
+- sync preference to user profile
+- default to system preference
+- improve dark mode depth and contrast
+- add spring sliding jelly animation to appearance theme selector in ProfileTab
+- complete midnight paris styling across navigation, dialogs, calendar, and cards
+- establish Midnight Paris dark mode infrastructure, theme store, and appearance selector
+- layout Row 1 side-by-side (Identity & Trip Mgmt) and Row 2 resident AI preferences on desktop
+- streamline avatar modal to photo-only and align with ParisTour design system
+- implement personalized avatar customization system
+- theme model status capsule with provider brand colors
+- position model capsule beside assistant title in header
+- transform header subtitle metadata into 3D glass capsules
+- upgrade user/assistant chat bubbles and error banner with 3D obsidian/frosted glass styling
+- lock background scrolling and interactions when LlmModelPicker is open
+- add full-screen frosted glass backdrop blur overlay to LlmModelPicker
+- upgrade PillSwitch with Framer Motion spring dynamics, jelly squash-and-stretch, and tactile feedback
+- replace redundant brand subtitles with practical model capability descriptions
+- upgrade ModelOption and ModelGroup with 3D frosted glass capsule rows and high-contrast typography
+- make thinking container smoothly grow upwards anchored to its bottom edge
+- upgrade inner containers in LlmModelPicker with 3D frosted glass relief and French alabaster cream base
+- upgrade LLM Model & Thinking Popover UI to match 3D liquid frosted glass system
+- apply strict semantic category tone mapping to suggestion pills
+- upgrade TripChatPanel UI to match global 3D liquid frosted glass design system
+- make API request meter draggable to left/right edges with local caching and adaptive expansion
+- upgrade logout button to 3D frosted glass French Rosé capsule
+- remove brown border outlines and replace with pure white frosted glass borders
+- unify expanded state with identical 3D frosted glass stereoscopic depth and warm copper accents
+- strengthen 3D frosted glass stereoscopic depth and warm copper elevation in collapsed state
+- upgrade collapsed state with 3D frosted glass depth and subtle warm tint
+- add discrete 1-notch mouse wheel stepping on desktop and magnetic inertia snapping on mobile
+- replace 点/分 with central colon between dual 3D glass numeric capsules
+- frame only numbers in dual 3D frosted glass capsules with static 点 and 分 outside
+- split time selector into dual 3D frosted glass capsules and eliminate blur halo
+- pin static 点 and 分 labels inside central selection lens
+- make TimeWheelColumn an infinite circular looping wheel
+- upgrade TimePicker to iOS Alarm-style dual scrolling wheel with 3D frosted glass anchor
+- make TimePicker top bar a persistent in-place morphing anchor
+- align expanded TimePicker time display with collapsed anchor on the left
+- synchronize AI preferences preview card with unified tag pool system
+- add silky-smooth cubic-bezier layout transition for downward extension
+- add shrink-fade exit and smooth layout refill to candidate pool
+- add decision modal after AI preference extraction
+- simplify tag interaction to one-tap add and one-tap remove without plus/cross icons
+- refactor recommendation preferences with interactive tag pool and AI NLP tag extraction
+- upgrade BackupDialog with French editorial luxury styling
+- upgrade ShareDialog with framer-motion sliding pill animation and luxury French editorial UI
+- optimize Profile tab with French luxury editorial UI, live sync green dot, and trip metrics
+- upgrade auth verification & trip loading screens to French Editorial aesthetic
+- add interactive comparison switcher for DayTabButton styles
+- upgrade incomplete itinerary empty state to French Editorial readiness card
+- upgrade shared trip switcher to French Editorial liquid glass capsule
+- implement interactive-triggered squash & stretch across all segmented sliders
+- unify velocity squash & stretch physics across all segmented sliders
+- add fluid velocity squash & stretch deformation to segmented sliders
+- add spring layoutId sliding pill animation to login/register segment
+- redesign hotel detail modal decision footer
+- implement mobile long-press drag and smooth touch scrolling
+- polish hotel picker and custom accommodation styling
+- unify hotel booking section
+- disable Supabase cloud sync on localhost to save bandwidth
+- add universal ConfirmDialog, revamp logistics tab & polish date picker
+
+### 变更
+
+- soften mobile left edge fades
+- mirror summary rail edge fade
+- mirror day rail edge fade
+- strengthen selector card depth
+- add 3D micro-crystalline frosted glass and specular highlights to Theme Selector
+- align API request meter rail and details panel with French Editorial micro-glass design
+- restore popup modal dialog for AI preference settings across desktop and mobile
+- layout(preferences): align time and active pool on left, candidate pool top-right, and AI extractor bottom-right
+- layout(preferences): restructure panel into 5:7 dual-column flow to provide seamless TimePicker expansion runway
+- layout(profile): arrange 4 trip health stats in 2x2 grid in account card
+- layout(profile): adjust desktop Row 1 cards to 2:1 ratio and stack action buttons vertically
+- remove plus sign prefix from candidate tag pills
+- arrange cards with top full-width banner and bottom 2-column grid on desktop
+- hide close button on mobile in avatar modal, retain on desktop only
+- remove bottom footer bar from avatar modal and enable responsive close button
+- tint assistant response bubble with soft sage porcelain
+- enhance disabled send button contrast and grey pill contour
+- upgrade bottom input bar and send button to 3D obsidian crystal and frosted glass
+- separate active pool and candidate deck into two distinct cards
+- standardize clear pool button to exact DayTimeline 32px glass capsule
+- unify preference pool and candidate deck into one frosted card
+- upgrade clear pool button to ParisTour French glass micro-capsule
+- harmonize card containers and section header typography with global UI tokens
+- clean(preferences): remove Chinese text from clear pool button to keep minimal icon button
+- clean(profile): remove redundant top-right '修改偏好' button from AI Preferences card header
+- remove layout extension and refill animations for instantaneous native DOM updates
+- eliminate layout overshoot with zero-overshoot deceleration curves
+- inject ParisTour signature liquid frosted glass and streaming light shine into tag pills
+- standardize tag pills to match Image 1 rich pastel design
+- convert tag pills to refined micro-capsules (text-[10.5px], h-6)
+- standardize extraction decision dialog to global ParisTour UI language
+- reduce tag pill height and synchronize font size with section headers
+- strictly unify tag pill design system and font size across active and candidate pools
+- guarantee 100% pure text tags with complete emoji sanitization
+- make active and candidate capsule tags 100% pixel-identical in size
+- remove emoji prefixes and output clean text-only tags
+- add French editorial pastel color palette for preference tag chips
+- compress all preference tags to <=5 chars and strictly enforce character limit on LLM extraction
+- strictly unify font size, pill height and chip dimensions across tag pools
+- align backup card styling and icon-only restore button with global UI
+- unify all modal backdrops with lightweight micro-blur glass aesthetics
+- remove role indicator dot from mobile avatar for a clean aesthetic
+- align LoginPage with French editorial liquid glassmorphism design system
+- unify top header layout to match hotel picker styling
+- remove count number from expand button text
+- streamline top header and reposition refresh button to candidates section
+- use CircleMinus icon for unselect button
+- change unselect icon to minus (-) icon
+- suppress self-save realtime echo and reduce database egress bandwidth
+- make release workflow idempotent and embed bilingual notes
+
+### 修复
+
+- align mobile day rail inset
+- respect day rail snap origin
+- align day rail left fade
+- limit edge fades to mobile
+- balance vertical padding and capsule curvature symmetry on API meter rail
+- harmonize API meter spacing
+- balance API meter panel spacing
+- resolve ShareDialog invite card, email input, role pills, and alerts dark styles
+- resolve BackupDialog snapshot cards milky background and low contrast text
+- polish AuthLoadingScreen central icon badge, smooth aura ring, and ambient glows
+- resolve header TripSelectorCapsule milky chalky background with dark glass styling
+- remove orange shadow glow halo from preference panel button
+- polish ProfileTab stats cards, action buttons, preference tags, theme selector, and danger zone
+- resolve API meter details panel milky subcards with deep obsidian dark glass grid
+- invert OpenAI brand icon in dark mode for crisp visibility
+- soften metadata capsule tints and unify text contrast across summary strip
+- resolve hotel card murky olive background with deep obsidian dark glass base
+- resolve chat Send button white-on-white text with glowing copper dark styling
+- resolve LLM model picker and thinking settings popover milky background
+- refine AddPlaceDialog tab switcher, category pills, and search inputs
+- resolve stop card hover white flash with dark micro-glow hover styles
+- resolve map header milky background and OpenStreetMap attribution badge
+- resolve Add Place button and empty state milky backgrounds
+- resolve Day 1 hero container milky card and low contrast summary text
+- resolve itinerary day tab pills, route links, hero subcards, and summary bar contrast
+- adapt footer disclaimer container and text to midnight theme
+- soften harsh white border on nav segment capsule and active pill
+- resolve flight subcard milky backgrounds, contrast issues on pills and booking badges
+- cache useSyncExternalStore avatar snapshot to prevent infinite re-renders
+- remove duplicate safe area bottom padding from floating chat panel
+- reveal model picker after height collapse
+- refine assistant transitions and overlay behavior
+- refactor LlmModelPicker popover to true in-flow height auto layout
+- prevent initial height overshoot on LlmModelPicker popover
+- fix mobile Safari WebKit height measurement for LlmModelPicker popover
+- refine model picker panel animations
+- anchor root popover panel to bottom so model section stays stationary during height expansion
+- eliminate two-stage push-down jitter when expanding thinking slider
+- eliminate collapse animation hitch by moving padding and border into inner wrapper
+- ensure robust reset and alignment to confirmed value upon cancel or reopen
+- eliminate two-stage magnification jump by locking base font-size and using pure continuous GPU scaling
+- eliminate open-time wheel spinning by removing scroll-smooth and positioning silently before paint
+- unify TimePicker wheel typography with global Outfit sans font
+- ensure high-contrast deep ink numbers by placing capsule background behind text
+- ensure pixel-perfect vertical centering of wheel numbers in lens box
+- guarantee 0px subpixel shift for TimePicker 10:00 text
+- eliminate dark outline ring during TimePicker expansion
+- resolve TimePicker popover z-index layering issue
+- eliminate all rebound by using pure linear-easeOut slide and unscaled opacity exit
+- enable mode=popLayout for instantaneous silky-smooth tag refill animations
+- remove spring physics to let candidate deck naturally extend downward
+- smooth preference pool container border resizing with layout=size
+- stabilize dialog height to prevent vertical viewport shifts when toggling tags
+- isolate tag entry animation so existing tags glide stably without springing
+- optimize preference tag extraction prompt and enable clean fallback processing
+- streamline snapshot cards into compact single-row layout
+- eliminate hairline seam between bottom sheet and overscroll bleed skirt
+- add mobile overscroll bleed skirt to prevent dark backdrop gap on pull up
+- condense BackupDialog subtitle to fit neatly on a single line
+- simplify email input placeholder to 'partner@example.com'
+- remove header badge and redesign invite form layout for clean symmetry
+- tighten spacing between danger card, version note, and footer
+- unify natural page height and restore footer across all tabs
+- update flight section hint from '请先选定左侧日期' to '请先选定旅行日期' for mobile responsiveness
+- expand itinerary readiness card to fill full viewport height without bottom gap
+- adjust mask-image fade width to 12px for crisp subtle edge transitions
+- fit itinerary readiness empty state perfectly into single mobile screen
+- adjust mask-image fade width to 20px for tighter horizontal scroll transitions
+- apply soft linear-gradient mask fade to summary strip and day tabs scroll tracks
+- eliminate mount-time layout thrashing and squash animation replay on tab switch
+- synchronize initial itinerary start date resolution to eliminate 7-to-6 day jump
+- adjust vertical spacing between Day Tabs and Mobile View Switcher
+- implement circuit breaker and straight-line fallback to prevent repeated API calls
+- resolve left shadow clipping and finalize French copper-amber gradient style
+- eliminate backdrop flashing and transition jitter on mount/unmount
+- eliminate semantic duplication, align baseline, and fix mobile avatar layout
+- render TripSelectorCapsule popover as fixed floating overlay
+- disable page scrolling and bounce on login screen
+- eliminate initial in-place bounce by adopting pure layout spring physics across all sliders
+- add onClick handler to candidate cards so clicking opens hotel details popup
+- remove unused CircleMinus and X imports to fix tsc -b
+- smooth flight card edit transitions
+
+
 ## [0.7.0] - 2026-08-20
 
 ### 新增
@@ -230,7 +438,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...HEAD
+- [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0
 - [0.7.0]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...v0.7.0
 - [0.6.0]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...v0.6.0
 - [0.5.0]: https://github.com/JackZ0526/ParisTour/compare/v0.4.0...v0.5.0
