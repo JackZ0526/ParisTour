@@ -709,20 +709,8 @@ export default function App() {
                 className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95"
                 title="查看个人中心与偏好"
               >
-                <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
                   {email ? email.charAt(0).toUpperCase() : <User size={13} />}
-                  {/* Micro role dot indicator on mobile */}
-                  {role && (
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white sm:hidden ${
-                        role === 'owner'
-                          ? 'bg-[var(--copper)]'
-                          : role === 'editor'
-                            ? 'bg-[var(--sage)]'
-                            : 'bg-zinc-400'
-                      }`}
-                    />
-                  )}
                 </div>
                 <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
                   {email}
