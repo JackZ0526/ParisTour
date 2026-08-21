@@ -967,14 +967,11 @@ export default function App() {
                               <motion.span
                                 layoutId="itinerary-pane-pill"
                                 className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-                                animate={{
-                                  scaleX: [1, 1.16, 0.95, 1],
-                                  scaleY: [1, 0.88, 1.03, 1],
-                                }}
                                 transition={{
-                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  type: 'spring',
+                                  stiffness: 450,
+                                  damping: 32,
+                                  mass: 0.8,
                                 }}
                               />
                             )}
@@ -993,14 +990,11 @@ export default function App() {
                               <motion.span
                                 layoutId="itinerary-pane-pill"
                                 className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-                                animate={{
-                                  scaleX: [1, 1.16, 0.95, 1],
-                                  scaleY: [1, 0.88, 1.03, 1],
-                                }}
                                 transition={{
-                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  type: 'spring',
+                                  stiffness: 450,
+                                  damping: 32,
+                                  mass: 0.8,
                                 }}
                               />
                             )}

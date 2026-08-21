@@ -131,14 +131,11 @@ export function LoginPage() {
               <motion.span
                 layoutId="auth-mode-pill"
                 className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
-                animate={{
-                  scaleX: [1, 1.18, 0.94, 1],
-                  scaleY: [1, 0.86, 1.04, 1],
-                }}
                 transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  type: 'spring',
+                  stiffness: 450,
+                  damping: 32,
+                  mass: 0.8,
                 }}
               />
             )}
@@ -167,14 +164,11 @@ export function LoginPage() {
               <motion.span
                 layoutId="auth-mode-pill"
                 className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
-                animate={{
-                  scaleX: [1, 1.18, 0.94, 1],
-                  scaleY: [1, 0.86, 1.04, 1],
-                }}
                 transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  type: 'spring',
+                  stiffness: 450,
+                  damping: 32,
+                  mass: 0.8,
                 }}
               />
             )}

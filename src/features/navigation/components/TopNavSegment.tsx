@@ -70,14 +70,11 @@ export function TopNavSegment({
               <motion.span
                 layoutId="light-top-nav-active-pill"
                 className="absolute inset-0 overflow-hidden rounded-full bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
-                animate={{
-                  scaleX: [1, 1.15, 0.95, 1],
-                  scaleY: [1, 0.88, 1.04, 1],
-                }}
                 transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  type: 'spring',
+                  stiffness: 450,
+                  damping: 32,
+                  mass: 0.8,
                 }}
               >
                 {/* Dynamic Pill Gradient Border (活动滑块流光描边) */}
