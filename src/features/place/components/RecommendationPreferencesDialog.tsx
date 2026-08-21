@@ -308,9 +308,13 @@ export function RecommendationPreferencesDialog({
             </div>
 
             {/* Tag Pool Container Box */}
-            <div className="min-h-[88px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
+            <motion.div
+              layout="size"
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              className="min-h-[104px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl"
+            >
               {activeTags.length === 0 ? (
-                <div className="flex min-h-[64px] flex-col items-center justify-center text-center p-1">
+                <div className="flex min-h-[76px] flex-col items-center justify-center text-center p-1">
                   <p className="text-xs font-medium text-[var(--stone)]">
                     偏好池暂为空白
                   </p>
@@ -350,7 +354,7 @@ export function RecommendationPreferencesDialog({
                   </AnimatePresence>
                 </div>
               )}
-            </div>
+            </motion.div>
           </section>
 
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
