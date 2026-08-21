@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../authContext'
@@ -47,6 +47,18 @@ export function LoginPage() {
       : null,
   )
 
+  // Prevent background scrolling / bounce on iOS & mobile browsers
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow
+    const prevDocOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevBodyOverflow
+      document.documentElement.style.overflow = prevDocOverflow
+    }
+  }, [])
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -77,7 +89,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 sm:py-16">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[var(--paper)] px-4 py-4 select-none [touch-action:none]">
       {/* Ambient background glows for glassmorphism reflections */}
       <div
         aria-hidden
@@ -88,7 +100,9 @@ export function LoginPage() {
         className="pointer-events-none absolute -bottom-24 right-1/4 -z-10 h-[360px] w-[360px] rounded-full bg-gradient-to-tl from-[#d7a98a]/15 via-white/20 to-transparent blur-3xl"
       />
 
-      <div className={`mx-auto w-full max-w-lg ${glassModalSurfaceClass} rounded-3xl p-6 sm:rounded-[36px] sm:p-10`}>
+      <div
+        className={`mx-auto w-full max-w-lg ${glassModalSurfaceClass} max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-3xl p-6 sm:rounded-[36px] sm:p-10 select-text [touch-action:pan-y] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+      >
         {/* Brand pill badge */}
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 px-3 py-1 text-[10.5px] font-medium tracking-[0.24em] text-[var(--sage)] uppercase">
