@@ -48,12 +48,20 @@ export type AccessibleTrip = {
   id: string
   title: string
   ownerId: string
+  ownerEmail?: string
+  ownerName?: string
   isPrimary: boolean
   role: TripRole
   updatedAt: string
   snapshot: TripSnapshot
   /** Label for switcher */
   label: string
+}
+
+export function formatOwnerHandle(email?: string | null): string {
+  if (!email) return '他人'
+  const prefix = email.split('@')[0]?.trim() || ''
+  return prefix ? `@${prefix}` : '他人'
 }
 
 const LAST_TRIP_KEY_PREFIX = 'paris-tour-last-trip-v1:'
@@ -344,13 +352,15 @@ export async function listAccessibleTrips(
   const primary = await ensurePrimaryTrip(userId)
   out.push({
     id: primary.id,
-    title: primary.title,
+    title: primary.title || '巴黎主行程',
     ownerId: primary.owner_id,
+    ownerEmail: email,
+    ownerName: formatOwnerHandle(email),
     isPrimary: true,
     role: 'owner',
     updatedAt: primary.updated_at,
     snapshot: primary.snapshot,
-    label: '我的行程',
+    label: primary.title || '我的主行程',
   })
 
   const { data: shares, error: shareError } = await sb
@@ -368,23 +378,26 @@ export async function listAccessibleTrips(
     const role: TripRole = row.role === 'editor' ? 'editor' : 'viewer'
     const perm = role === 'editor' ? '可编辑' : '只读'
 
-    let ownerLabel = '他人'
-    const { data: ownerEmail } = await sb.rpc('trip_owner_email', {
+    let rawOwnerEmail: string | undefined
+    const { data: ownerEmailRes } = await sb.rpc('trip_owner_email', {
       p_trip_id: t.id,
     })
-    if (typeof ownerEmail === 'string' && ownerEmail.trim()) {
-      ownerLabel = ownerEmail.trim().toLowerCase()
+    if (typeof ownerEmailRes === 'string' && ownerEmailRes.trim()) {
+      rawOwnerEmail = ownerEmailRes.trim().toLowerCase()
     }
+    const ownerName = formatOwnerHandle(rawOwnerEmail)
 
     out.push({
       id: t.id,
-      title: t.title,
+      title: t.title || '协作行程',
       ownerId: t.owner_id,
+      ownerEmail: rawOwnerEmail,
+      ownerName,
       isPrimary: Boolean(t.is_primary),
       role,
       updatedAt: t.updated_at,
       snapshot: snapshotFromCloudRow(t),
-      label: `来自 ${ownerLabel} · ${perm}`,
+      label: `来自 ${ownerName} · ${perm}`,
     })
   }
 

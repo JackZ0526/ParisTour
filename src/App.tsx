@@ -33,6 +33,7 @@ import {
 } from './features/place/components/RecommendationPreferencesDialog'
 import { PlacePanel } from './features/place/components/PlacePanel'
 import { ShareDialog } from './features/cloud-sync/components/ShareDialog'
+import { TripSelectorCapsule } from './features/cloud-sync/components/TripSelectorCapsule'
 import { TripChatPanelLazy as TripChatPanel } from './features/chat/components/TripChatPanel.lazy'
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { BottomNavBar } from './features/navigation/components/BottomNavBar'
@@ -634,26 +635,16 @@ export default function App() {
                 <h1 className="font-display text-base font-semibold leading-tight text-[var(--ink)] sm:text-lg">
                   {destinationBrand.title}
                 </h1>
-                <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)]">
-                  <span>{chineseDayCount(numberOfDays)}行程规划</span>
-                  {trips.length > 1 && (
+                <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)] mt-0.5">
+                  <span className="shrink-0">{chineseDayCount(numberOfDays)}行程规划</span>
+                  {(trips.length > 1 || (activeTrip && activeTrip.role !== 'owner')) && (
                     <>
-                      <span>·</span>
-                      <select
-                        className="max-w-[130px] truncate rounded border border-[var(--stone)]/20 bg-transparent text-[11px] text-[var(--ink)] outline-none hover:border-[var(--copper)]"
-                        value={activeTrip?.id || ''}
-                        onChange={(e) => {
-                          void switchTrip(e.target.value).catch((err) => {
-                            window.alert(err instanceof Error ? err.message : '切换失败')
-                          })
-                        }}
-                      >
-                        {trips.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="text-[var(--stone)]/40">·</span>
+                      <TripSelectorCapsule
+                        trips={trips}
+                        activeTrip={activeTrip}
+                        onSelectTrip={switchTrip}
+                      />
                     </>
                   )}
                 </div>

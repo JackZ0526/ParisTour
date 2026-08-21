@@ -2,6 +2,7 @@
 export { CloudSaveIndicator } from './components/CloudSaveIndicator'
 export { BackupDialog } from './components/BackupDialog'
 export { ShareDialog } from './components/ShareDialog'
+export { TripSelectorCapsule } from './components/TripSelectorCapsule'
 export {
   applyAccessibleTripLocally,
   applyRemoteTripSnapshot,

@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
 import {
   Archive,
+  Check,
   ChevronRight,
+  Compass,
   LogOut,
   MapPin,
   Share2,
@@ -9,8 +11,10 @@ import {
   Sparkles,
   Trash2,
   User,
+  Users,
 } from 'lucide-react'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
+import type { AccessibleTrip } from '../../cloud-sync'
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
@@ -25,7 +29,7 @@ export interface ProfileTabProps {
   onOpenBackup?: () => void
   onOpenPreferences: () => void
   onClearAll?: () => void
-  trips?: Array<{ id: string; label: string }>
+  trips?: AccessibleTrip[]
   activeTripId?: string
   onSwitchTrip?: (tripId: string) => void
   readOnly?: boolean
@@ -110,21 +114,77 @@ export function ProfileTab({
           )}
         </div>
 
-        {/* Multi-trip selector */}
+        {/* Multi-trip selector cards */}
         {trips.length > 1 && (
-          <div className="space-y-1.5">
-            <label className="text-xs text-[var(--stone)]">当前选中的行程</label>
-            <select
-              className="w-full rounded-2xl border border-white/80 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] shadow-[inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-md outline-none transition-colors focus:border-[var(--copper)]"
-              value={activeTripId || ''}
-              onChange={(e) => onSwitchTrip?.(e.target.value)}
-            >
-              {trips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-[var(--stone)]">当前可访问的行程（点击快速切换）</label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {trips.map((t) => {
+                const isActive = t.id === activeTripId
+                const isItemShared = t.role !== 'owner'
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onSwitchTrip?.(t.id)}
+                    className={`flex items-center justify-between gap-3 rounded-2xl p-3 text-left transition-all duration-150 cursor-pointer ${
+                      isActive
+                        ? 'border-2 border-[var(--copper)] bg-[var(--copper)]/10 shadow-sm'
+                        : 'border border-white/80 bg-white/60 hover:bg-white/90 hover:border-white active:scale-[0.99]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
+                          isActive
+                            ? 'bg-[var(--copper)] text-white shadow-sm'
+                            : isItemShared
+                              ? 'bg-[var(--sage)]/15 text-[var(--sage)]'
+                              : 'bg-[var(--copper)]/15 text-[var(--copper)]'
+                        }`}
+                      >
+                        {isItemShared ? (
+                          <Users size={14} strokeWidth={2} />
+                        ) : (
+                          <Compass size={14} strokeWidth={2} />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <div className="truncate text-xs font-semibold text-[var(--ink)]">
+                            {t.isPrimary ? '我的主行程' : t.title || '行程规划'}
+                          </div>
+                          {t.isPrimary && (
+                            <span className="shrink-0 rounded bg-[var(--copper)]/15 px-1 py-0.2 text-[9px] font-bold text-[var(--copper)]">
+                              默认
+                            </span>
+                          )}
+                        </div>
+                        <div className="truncate text-[11px] text-[var(--stone)]">
+                          {isItemShared ? `来自 ${t.ownerName || '他人'}` : '自己创建'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          t.role === 'owner'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200/50'
+                            : t.role === 'editor'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
+                              : 'bg-zinc-100 text-zinc-600 border border-zinc-200/50'
+                        }`}
+                      >
+                        {t.role === 'owner' ? '拥有者' : t.role === 'editor' ? '协作' : '只读'}
+                      </span>
+                      {isActive && (
+                        <Check size={14} strokeWidth={2.5} className="text-[var(--copper)]" />
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
 
