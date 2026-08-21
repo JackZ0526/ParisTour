@@ -11,12 +11,17 @@ import { fetchTripadvisorAttractionInfo } from '../../place/services/tripadvisor
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
-  getActiveLlmLabel,
+  getOpenAIModelShortLabel,
   getThinkingMode,
+  getThinkingModeLabel,
+  isDeepSeekModel,
   isLlmConfigured,
   resolveThinkingForTask,
+  supportsThinkingControls,
   type HotelDetailCopy,
 } from '../../../shared/services/llm/llm'
+import { useLlmSettings } from '../hooks/useOpenAIModel'
+import { ModelBrandIcon } from './LlmModelPicker'
 import {
   memoizePlaceDetailCopy,
   peekPlaceDetailCopy,
@@ -199,6 +204,7 @@ export function TripChatPanel({
     }
   }
   useBodyScrollLock(open)
+  const { model, thinkingMode } = useLlmSettings()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [streamingReply, setStreamingReply] = useState(false)
@@ -1916,14 +1922,39 @@ export function TripChatPanel({
           <div className="border-b border-white/85 px-4 py-3 bg-white/40 backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="font-display text-xl leading-tight">行程助手</h3>
-                <p className="mt-0.5 text-xs text-[var(--stone)]">
-                  当前第 {currentDay} 天
-                  {viewing
-                    ? ` · 正在看「${viewing.name}」`
-                    : ''}{' '}
-                  · {getActiveLlmLabel()}
-                </p>
+                <h3 className="font-display text-xl leading-tight text-[var(--ink)]">行程助手</h3>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {/* Current Day Capsule */}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 bg-[#f4f8f5]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
+                    第 {currentDay} 天
+                  </span>
+
+                  {/* Viewing Place Context Capsule */}
+                  {viewing && (
+                    <span className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full border border-[#d7a98a]/60 bg-[#f6e8de]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--copper)] shadow-2xs backdrop-blur-sm">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--copper)]" />
+                      <span className="truncate">正在看「{viewing.name}」</span>
+                    </span>
+                  )}
+
+                  {/* Model & Thinking Status Capsule */}
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/90 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm">
+                    <ModelBrandIcon
+                      deepseek={isDeepSeekModel(model)}
+                      className="h-3 w-3 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                    />
+                    <span>{getOpenAIModelShortLabel(model)}</span>
+                    {supportsThinkingControls(model) && thinkingMode !== 'off' && (
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <span className="text-[var(--stone)]">
+                          思考{getThinkingModeLabel(thinkingMode)}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </div>
               </div>
               <CloseIconButton
                 onClick={() => setOpen(false)}

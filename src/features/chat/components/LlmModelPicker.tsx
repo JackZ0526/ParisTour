@@ -47,6 +47,13 @@ const MORPH_SPRING = { type: 'spring' as const, stiffness: 350, damping: 30 }
 // Popover width target: 17.5rem max, but never wider than viewport − 2.5rem
 // margin (prevents the popover from running off the left edge on narrow phones).
 const POPOVER_MAX_WIDTH = 'min(calc(100vw - 2.5rem), 17.5rem)'
+const DESKTOP_POPOVER_WIDTH = 280
+// The shell uses border-box sizing with a 1px border on each side. Keep the
+// in-flow popover content at its FINAL inner width even while the shell is
+// still morphing from the 48px chip. Otherwise WebKit measures `height: auto`
+// against the first narrow frame and can cache a viewport-tall target until
+// the next user interaction forces layout.
+const POPOVER_CONTENT_WIDTH = 'calc(min(calc(100vw - 2.5rem), 17.5rem) - 2px)'
 
 const GLASS_INNER_CARD_CLASS =
   'relative overflow-hidden rounded-2xl border border-white/90 bg-[#fbf7f3]/85 shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1.5px_rgba(255,255,255,0.7)] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95'
@@ -88,52 +95,67 @@ function useMediaQuery(query: string): boolean {
  * Positioning: `position: fixed` anchored to the viewport bottom-right with
  * the same offsets the outer FAB container uses.
  *
- * Both the chip and the popover content layers are absolutely-positioned
- * overlays (the chip always, the popover always). An invisible sentinel
- * `<div>` renders the same popover markup off-screen for height
- * measurement; a ResizeObserver reads its `offsetHeight` and feeds it
- * back into `animate.height` so the motion.div always matches the
- * popover's natural height. `prevOpenRef` lets the first render after
- * `open` flips to true see `justOpened=true`, so the height animation
- * gets its 0.18s delay from the start (otherwise `useState` + `useEffect`
- * would only flip on the second render and the morph would run as
- * simultaneous width+height). Internal content changes (panel swap,
- * thinking toggle) leave `justOpened=false` and animate immediately.
- * `heightAnimating` is set to true on those same triggers and cleared
- * by the motion.div's `onAnimationComplete('height')` callback, so
- * `overflow: hidden` is held while ANY height animation is in flight
- * (opening morph, internal re-target, closing morph) — `overflow: auto`
- * would briefly show a scrollbar while the content is taller than
- * the in-flight motion.div.
+ * The chip is in flow while closed and the popover content is in flow while
+ * open, allowing Framer Motion to animate the shell to `height: auto` without
+ * a duplicate measurement tree. During the staged opening the content keeps
+ * its final 278px inner width from the first frame, even while the shell is
+ * still widening from the chip. This prevents iOS WebKit from caching an
+ * incorrect `height: auto` measurement made against the initial narrow width.
  *
  * The model list expands inside its own frosted card. Like the thinking
  * controls, that card owns its grid-row height animation while the outer
- * shell follows the sentinel's final measurement with matching timing.
+ * shell follows its in-flow height with matching timing.
  *
  * The thinking card owns both auto ↔ manual and on ↔ off height changes.
  * Its bottom edge stays pinned above the model section, so revealing content
  * grows the card upward and naturally pushes the thinking header with it.
- * The sentinel skips those transitions and reports the final height
- * immediately; the outer shell then follows with the same timing instead of
- * adding a second, competing layout animation.
+ * The outer shell follows the resulting natural height instead of adding a
+ * second, competing layout animation.
  */
 export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const { model, setModel, thinkingMode } = useLlmSettings()
   const [open, setOpen] = useState(false)
-  useBodyScrollLock(open)
+  // Keep the expanded content in normal flow until the closing morph has
+  // finished. If it becomes absolute as soon as `open` flips to false, the
+  // shell's natural height instantly becomes 48px and Framer Motion has no
+  // height delta left to animate before the delayed width collapse.
+  const [closing, setClosing] = useState(false)
+  const present = open || closing
   const [panel, setPanel] = useState<Panel>('root')
   // The model list grows nicely with the popover's strong ease-out, but the
   // same curve removes too much height too early on the return trip. Keep the
   // navigation direction latched until that height animation completes.
   const panelHeightDirectionRef = useRef<'idle' | 'expand' | 'collapse'>('idle')
   const rootRef = useRef<HTMLDivElement>(null)
+  const chipMeasureRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
-  // Mobile: closed chip is a 48px circle. Desktop: closed chip is a pill
-  // (auto width up to 15.5rem, 48px tall) — the morph widens the pill
-  // before the popover content unfurls upward.
+  // Mobile: closed chip is a 48px circle. Desktop: closed chip is a measured
+  // intrinsic-width pill (up to 15.5rem, 48px tall), giving the morph two
+  // concrete width endpoints instead of an unstable `auto` target.
   const isDesktop = useMediaQuery('(min-width: 640px)')
+  useBodyScrollLock(present && !isDesktop)
   const canThink = supportsThinkingControls(model)
   const deepseek = isDeepSeekModel(model)
+  const chip = getOpenAIModelShortLabel(model)
+  const [desktopChipWidth, setDesktopChipWidth] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    if (!isDesktop) return
+    const measure = () => {
+      const measuredWidth = chipMeasureRef.current?.getBoundingClientRect().width
+      if (!measuredWidth) return
+      const nextWidth = Math.ceil(measuredWidth)
+      setDesktopChipWidth((current) =>
+        current === nextWidth ? current : nextWidth,
+      )
+    }
+
+    measure()
+    if (typeof ResizeObserver === 'undefined' || !chipMeasureRef.current) return
+    const observer = new ResizeObserver(measure)
+    observer.observe(chipMeasureRef.current)
+    return () => observer.disconnect()
+  }, [chip, isDesktop])
 
   // Track whether we're currently in the chip→popover opening morph so
   // the height animation can be delayed (width-first → height-second, the
@@ -145,11 +167,6 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   useLayoutEffect(() => {
     prevOpenRef.current = open
   }, [open])
-  const [heightAnimating, setHeightAnimating] = useState(false)
-  useLayoutEffect(() => {
-    setHeightAnimating(true)
-  }, [open, panel, model, thinkingMode])
-
   useEffect(() => {
     if (!open) {
       panelHeightDirectionRef.current = 'idle'
@@ -157,7 +174,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
       return
     }
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setClosing(true)
+        setOpen(false)
+      }
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -165,7 +185,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           panelHeightDirectionRef.current = 'collapse'
           setPanel('root')
         }
-        else setOpen(false)
+        else {
+          setClosing(true)
+          setOpen(false)
+        }
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
@@ -178,7 +201,6 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 
   if (!isLlmConfigured()) return null
 
-  const chip = getOpenAIModelShortLabel(model)
   const fullLabel = getActiveLlmLabel(model)
   const panelIsCollapsing = panelHeightDirectionRef.current === 'collapse'
 
@@ -191,6 +213,17 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
     navigatePanel(panel === 'model' ? 'root' : 'model')
   }
 
+  const openPicker = () => {
+    setClosing(false)
+    setOpen(true)
+  }
+
+  const closePicker = () => {
+    if (!open) return
+    setClosing(true)
+    setOpen(false)
+  }
+
   const selectModelAndCollapse = (nextModel: string) => {
     setModel(nextModel)
     navigatePanel('root')
@@ -198,8 +231,23 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 
   return (
     <>
+      {/* Stable intrinsic target for the desktop pill. Animating to `auto`
+          makes the final width depend on the content layer's flow switch and
+          causes a visible snap at the end of the horizontal morph. */}
+      <div
+        ref={chipMeasureRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed invisible inline-flex h-12 w-max max-w-[15.5rem] items-center justify-center gap-2 border border-transparent px-3.5"
+      >
+        <ModelBrandIcon deepseek={deepseek} className="h-4 w-4 shrink-0" />
+        <span className="whitespace-nowrap text-sm font-semibold leading-none text-zinc-800">
+          {chip}
+        </span>
+        <ChevronDown aria-hidden className="h-3 w-3 shrink-0" strokeWidth={2} />
+      </div>
+
       <AnimatePresence>
-        {open && (
+        {open && !isDesktop && (
           <motion.div
             key="llm-picker-backdrop"
             initial={{ opacity: 0 }}
@@ -211,12 +259,12 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             onPointerDown={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              setOpen(false)
+              closePicker()
             }}
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              setOpen(false)
+              closePicker()
             }}
           />
         )}
@@ -225,27 +273,33 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
       <motion.div
         ref={rootRef}
         id={popoverId}
-        role={open ? 'dialog' : 'button'}
-        tabIndex={open ? -1 : 0}
-        aria-haspopup={!open ? 'dialog' : undefined}
+        role={present ? 'dialog' : 'button'}
+        tabIndex={present ? -1 : 0}
+        aria-haspopup={!present ? 'dialog' : undefined}
         aria-expanded={open}
-        aria-label={open ? '模型与思考设置' : fullLabel}
-        title={!open ? fullLabel : undefined}
-        onClick={open ? undefined : () => setOpen(true)}
+        aria-label={present ? '模型与思考设置' : fullLabel}
+        title={!present ? fullLabel : undefined}
+        onClick={present ? undefined : openPicker}
         onKeyDown={
-          open
+          present
             ? undefined
             : (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
-                  setOpen(true)
+                  openPicker()
                 }
               }
         }
-        whileTap={open ? undefined : { scale: 0.96 }}
+        whileTap={present ? undefined : { scale: 0.96 }}
         initial={false}
         animate={{
-          width: open ? POPOVER_MAX_WIDTH : isDesktop ? 'auto' : 48,
+          width: open
+            ? isDesktop
+              ? DESKTOP_POPOVER_WIDTH
+              : POPOVER_MAX_WIDTH
+            : isDesktop
+              ? desktopChipWidth ?? 'auto'
+              : 48,
           height: open ? 'auto' : 48,
         }}
         transition={{
@@ -264,8 +318,8 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           },
         }}
         onAnimationComplete={() => {
-          setHeightAnimating(false)
           panelHeightDirectionRef.current = 'idle'
+          if (!open) setClosing(false)
         }}
         style={{
           // Anchored to the viewport (not a 0x0 relative wrapper) so the
@@ -280,9 +334,11 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           right: isDesktop
             ? 'calc(max(1.25rem, env(safe-area-inset-right)) + 3.625rem)'
             : 'max(1.25rem, env(safe-area-inset-right))',
-          zIndex: open ? 2050 : 1,
+          zIndex: present ? 2050 : 1,
           borderRadius: 24,
-          overflow: !open || heightAnimating ? 'hidden' : 'hidden auto',
+          // Restore scrolling on the first frame of every open-state height
+          // change; only the outer close morph keeps content clipped.
+          overflow: open ? 'hidden auto' : 'hidden',
           // Cap the popover so it never extends past the top of the viewport.
           // 2.5rem = 40px headroom (20px top + 20px bottom margins).
           maxHeight: 'calc(100vh - 2.5rem)',
@@ -306,8 +362,8 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           aria-hidden={!open}
           style={{
             pointerEvents: 'none',
-            position: open ? 'absolute' : 'relative',
-            inset: open ? 0 : undefined,
+            position: present ? 'absolute' : 'relative',
+            inset: present ? 0 : undefined,
           }}
           className="flex h-12 w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
         >
@@ -337,9 +393,11 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
           inert={!open || undefined}
           aria-hidden={!open}
           style={{
-            position: open ? 'relative' : 'absolute',
-            inset: open ? undefined : 0,
+            position: present ? 'relative' : 'absolute',
+            inset: present ? undefined : 0,
             pointerEvents: open ? 'auto' : 'none',
+            width: POPOVER_CONTENT_WIDTH,
+            minWidth: POPOVER_CONTENT_WIDTH,
           }}
           className="flex flex-col p-3.5"
         >
@@ -379,11 +437,9 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 function ThinkingControls({
   mode,
   disabled,
-  measureOnly = false,
 }: {
   mode: ThinkingMode
   disabled?: boolean
-  measureOnly?: boolean
 }) {
   const autoCheckboxId = useId()
   const thinkingOn = mode !== 'off'
@@ -413,8 +469,6 @@ function ThinkingControls({
     duration: 0.32,
     ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
   }
-  const instantTransition = { duration: 0 }
-
   return (
     <div className="flex flex-col justify-end">
       {/* L1: section header + master capsule — same weight as 「模型」 */}
@@ -432,32 +486,23 @@ function ThinkingControls({
           master on/off and auto/manual both move the top edge, never scale it. */}
       <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5`}>
         <motion.div
-          initial={{ gridTemplateRows: thinkingOn ? '1fr' : '0fr' }}
+          initial={false}
           animate={{
             gridTemplateRows: thinkingOn ? '1fr' : '0fr',
           }}
-          style={{ gridTemplateRows: thinkingOn ? '1fr' : '0fr' }}
-          transition={
-            measureOnly
-              ? instantTransition
-              : { gridTemplateRows: layoutTransition }
-          }
+          transition={{ gridTemplateRows: layoutTransition }}
           inert={!thinkingOn || undefined}
           aria-hidden={!thinkingOn}
           className="grid"
         >
           <motion.div
-            initial={{ opacity: thinkingOn ? 1 : 0 }}
+            initial={false}
             animate={{ opacity: thinkingOn ? 1 : 0 }}
-            transition={
-              measureOnly
-                ? instantTransition
-                : {
-                    duration: thinkingOn ? 0.18 : 0.12,
-                    delay: thinkingOn ? 0.1 : 0,
-                    ease: 'easeOut',
-                  }
-            }
+            transition={{
+              duration: thinkingOn ? 0.18 : 0.12,
+              delay: thinkingOn ? 0.1 : 0,
+              ease: 'easeOut',
+            }}
             className="min-h-0 overflow-hidden"
           >
             <div className="p-2.5">
@@ -485,32 +530,23 @@ function ThinkingControls({
               </label>
 
               <motion.div
-                initial={{ gridTemplateRows: sliderExpanded ? '1fr' : '0fr' }}
+                initial={false}
                 animate={{
                   gridTemplateRows: sliderExpanded ? '1fr' : '0fr',
                 }}
-                style={{ gridTemplateRows: sliderExpanded ? '1fr' : '0fr' }}
-                transition={
-                  measureOnly
-                    ? instantTransition
-                    : { gridTemplateRows: layoutTransition }
-                }
+                transition={{ gridTemplateRows: layoutTransition }}
                 inert={!sliderExpanded || undefined}
                 aria-hidden={!sliderExpanded}
                 className="grid"
               >
                 <motion.div
-                  initial={{ opacity: sliderExpanded ? 1 : 0 }}
+                  initial={false}
                   animate={{ opacity: sliderExpanded ? 1 : 0 }}
-                  transition={
-                    measureOnly
-                      ? instantTransition
-                      : {
-                          duration: sliderExpanded ? 0.18 : 0.12,
-                          delay: sliderExpanded ? 0.1 : 0,
-                          ease: 'easeOut',
-                        }
-                  }
+                  transition={{
+                    duration: sliderExpanded ? 0.18 : 0.12,
+                    delay: sliderExpanded ? 0.1 : 0,
+                    ease: 'easeOut',
+                  }}
                   className="min-h-0 overflow-hidden"
                 >
                   <div className="pt-2">
@@ -527,32 +563,23 @@ function ThinkingControls({
         </motion.div>
 
         <motion.div
-          initial={{ gridTemplateRows: thinkingOn ? '0fr' : '1fr' }}
+          initial={false}
           animate={{
             gridTemplateRows: thinkingOn ? '0fr' : '1fr',
           }}
-          style={{ gridTemplateRows: thinkingOn ? '0fr' : '1fr' }}
-          transition={
-            measureOnly
-              ? instantTransition
-              : { gridTemplateRows: layoutTransition }
-          }
+          transition={{ gridTemplateRows: layoutTransition }}
           inert={thinkingOn || undefined}
           aria-hidden={thinkingOn}
           className="grid"
         >
           <motion.div
-            initial={{ opacity: thinkingOn ? 0 : 1 }}
+            initial={false}
             animate={{ opacity: thinkingOn ? 0 : 1 }}
-            transition={
-              measureOnly
-                ? instantTransition
-                : {
-                    duration: thinkingOn ? 0.12 : 0.18,
-                    delay: thinkingOn ? 0 : 0.1,
-                    ease: 'easeOut',
-                  }
-            }
+            transition={{
+              duration: thinkingOn ? 0.12 : 0.18,
+              delay: thinkingOn ? 0 : 0.1,
+              ease: 'easeOut',
+            }}
             className="min-h-0 overflow-hidden"
           >
             <div className="flex items-center gap-2 px-3 py-2">
@@ -921,7 +948,7 @@ function ThinkingIntensitySlider({
  * Official provider marks (trademarks of DeepSeek / OpenAI — UI identification only).
  * Assets: public/brand/deepseek.svg, public/brand/openai.svg — see public/brand/README.md.
  */
-function ModelBrandIcon({
+export function ModelBrandIcon({
   deepseek,
   className = 'h-4 w-4',
 }: {
@@ -942,7 +969,6 @@ function ModelSettingsPanel({
   model,
   disabled,
   expanded,
-  measureOnly = false,
   canThink,
   onToggle,
   onSelect,
@@ -950,14 +976,12 @@ function ModelSettingsPanel({
   model: string
   disabled?: boolean
   expanded: boolean
-  measureOnly?: boolean
   canThink: boolean
   onToggle: () => void
   onSelect: (model: string) => void
 }) {
   const optionsId = useId()
   const deepseek = isDeepSeekModel(model)
-  const instantTransition = { duration: 0 }
   const heightTransition = expanded
     ? {
         duration: 0.32,
@@ -993,26 +1017,21 @@ function ModelSettingsPanel({
 
         <motion.div
           id={optionsId}
-          initial={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+          initial={false}
           animate={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
-          style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
-          transition={measureOnly ? instantTransition : { gridTemplateRows: heightTransition }}
+          transition={{ gridTemplateRows: heightTransition }}
           inert={!expanded || undefined}
           aria-hidden={!expanded}
           className="grid"
         >
           <motion.div
-            initial={{ opacity: expanded ? 1 : 0 }}
+            initial={false}
             animate={{ opacity: expanded ? 1 : 0 }}
-            transition={
-              measureOnly
-                ? instantTransition
-                : {
-                    duration: expanded ? 0.18 : 0.12,
-                    delay: expanded ? 0.08 : 0,
-                    ease: 'easeOut',
-                  }
-            }
+            transition={{
+              duration: expanded ? 0.18 : 0.12,
+              delay: expanded ? 0.08 : 0,
+              ease: 'easeOut',
+            }}
             className="min-h-0 overflow-hidden"
           >
             <div className="border-t border-white/85 pb-1">
