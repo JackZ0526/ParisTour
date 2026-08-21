@@ -88,6 +88,7 @@ import {
   Wifi,
   Wind,
   Wine,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { loadTripDates } from '../../itinerary/services/tripDates'
@@ -162,32 +163,42 @@ function HotelCardFace({
     <div
       className={
         variant === 'selected'
-          ? 'h-full sm:grid sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] sm:items-stretch'
-          : undefined
+          ? 'relative h-full sm:grid sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] sm:items-stretch'
+          : 'relative'
       }
     >
-      <GooglePlacePhoto
-        name={hotel.name}
-        location={{ lat: hotel.lat, lng: hotel.lng }}
-        fallback={bookingPhotoUrl(hotel.image)}
-        alt={hotel.name}
-        asBackground
-        className={`h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03] ${
-          variant === 'selected'
-            ? 'sm:h-auto sm:min-h-44 sm:self-stretch'
-            : '-mx-px w-[calc(100%+2px)]'
-        }`}
-      />
+      <div className="relative overflow-hidden">
+        <GooglePlacePhoto
+          name={hotel.name}
+          location={{ lat: hotel.lat, lng: hotel.lng }}
+          fallback={bookingPhotoUrl(hotel.image)}
+          alt={hotel.name}
+          asBackground
+          className={`h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03] ${
+            variant === 'selected'
+              ? 'sm:h-full sm:min-h-44 sm:self-stretch'
+              : '-mx-px w-[calc(100%+2px)]'
+          }`}
+        />
+        {/* Soft top-down vignette so top-right action buttons always have crisp contrast */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/35 via-black/10 to-transparent z-[2]" />
+      </div>
       <div
         className={`flex flex-col p-3 ${
-          variant === 'selected' ? 'min-h-[7.75rem] sm:min-h-44 sm:p-4' : 'min-h-[7.75rem]'
+          variant === 'selected' ? 'min-h-[7.75rem] sm:min-h-44 sm:p-4 sm:justify-between' : 'min-h-[7.75rem]'
         }`}
       >
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
+            {hotel.area && (
+              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center gap-1 px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--copper)]`}>
+                <MapPin size={10} strokeWidth={2} className="shrink-0" />
+                {hotel.area}
+              </span>
+            )}
             {hotel.isBest && (
-              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center px-2 py-0.5 text-[10px] text-[var(--copper)]`}>
+              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center gap-1 px-2.5 py-0.5 text-[10.5px] font-medium text-amber-900`}>
+                <Sparkles size={10} strokeWidth={2} className="shrink-0 text-amber-700" />
                 最优推荐
               </span>
             )}
@@ -197,32 +208,35 @@ function HotelCardFace({
               </span>
             )}
           </div>
-          <p className="font-medium leading-snug">{hotel.name}</p>
+          <p className={`${variant === 'selected' ? 'font-display text-base font-semibold text-[var(--ink)] sm:text-lg' : 'font-medium text-sm text-[var(--ink)]'} leading-snug`}>
+            {hotel.name}
+          </p>
           {showCustomShimmer ? (
             <ShimmerLines lines={2} />
           ) : hotel.source === 'custom' ? (
-            <p className="m-0 line-clamp-2 text-xs text-[var(--stone)]">{customText}</p>
+            <p className="m-0 line-clamp-2 text-xs leading-relaxed text-[var(--stone)]">{customText}</p>
           ) : (
             <HotelTranslatedText
               text={hotel.reason || hotel.description}
               loadingLabel="正在翻译酒店简介…"
-              className="line-clamp-2 text-xs text-[var(--stone)]"
+              className="line-clamp-2 text-xs leading-relaxed text-[var(--stone)]"
             />
           )}
         </div>
         {hotel.rating != null && (
-          <p className="mt-auto flex justify-end pt-2 text-right text-xs leading-tight text-[var(--stone)]">
-            <span>
-              <span className="font-medium">
-                <span className="text-[#003580]">Booking</span>
-                <span className="text-[#006ce4]">.com</span>
-              </span>
-              <span className="ml-1 tabular-nums">
-                {hotel.rating.toFixed(1)}/10
-                {hotel.reviewCount != null ? `（${hotel.reviewCount}）` : ''}
-              </span>
+          <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] pt-2">
+            <span className="text-[11px] font-medium">
+              <span className="text-[#003580]">Booking</span>
+              <span className="text-[#006ce4]">.com</span>
             </span>
-          </p>
+            <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-[var(--ink)] tabular-nums shadow-[0_1px_4px_rgba(0,0,0,0.03)]`}>
+              <span className="font-semibold text-[#003580]">{hotel.rating.toFixed(1)}</span>
+              <span className="text-[10px] text-[var(--stone)]">/10</span>
+              {hotel.reviewCount != null && (
+                <span className="text-[10px] text-[var(--stone)]">（{hotel.reviewCount}）</span>
+              )}
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -234,7 +248,7 @@ function TrashIcon() {
 }
 
 function UnselectIcon() {
-  return <CircleMinus size={14} strokeWidth={1.8} aria-hidden />
+  return <X size={14} strokeWidth={2} aria-hidden />
 }
 
 function ChevronIcon({ up }: { up?: boolean }) {
@@ -2208,7 +2222,7 @@ export function HotelPicker({
                 onChange={(e) => setPreferText(e.target.value)}
                 rows={3}
                 placeholder="写下你对住宿的想法…"
-                className="mt-3 w-full resize-none rounded-2xl border border-white/80 bg-white/70 p-3.5 text-sm outline-none backdrop-blur-sm transition-all focus:border-[var(--copper)] focus:bg-white focus:shadow-sm"
+                className="mt-3 w-full resize-none rounded-2xl border border-white/90 bg-white/70 p-3.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
               />
               <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <button
@@ -2224,7 +2238,11 @@ export function HotelPicker({
                   disabled={refreshing || !preferText.trim()}
                   onClick={() => void runFreshRecommendations(preferText)}
                   aria-busy={refreshing || undefined}
-                  className="inline-flex items-center gap-1.5 rounded-2xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-50"
+                  className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-medium transition-all active:scale-95 ${
+                    !preferText.trim() || refreshing
+                      ? 'border border-black/[0.06] bg-white/45 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
+                      : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95'
+                  }`}
                 >
                   {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
                   {refreshing ? '推荐中…' : '按喜好推荐'}
@@ -2380,7 +2398,7 @@ export function HotelPicker({
                   onChange={(e) => setCustomQuery(e.target.value)}
                   placeholder="例如：25 Rue du Temple, 75004 Paris"
                   aria-label="自定义酒店名称或地址"
-                  className="w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/65 focus:border-[var(--copper)]/60 focus:bg-white/90 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
+                  className="w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && customQuery.trim() && !loading) {
                       e.preventDefault()
@@ -2393,7 +2411,11 @@ export function HotelPicker({
                   disabled={loading || !customQuery.trim() || decidingCustom}
                   onClick={() => void applyCustom()}
                   aria-busy={loading || undefined}
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98] ${
+                    !customQuery.trim() || loading || decidingCustom
+                      ? 'border border-black/[0.06] bg-white/45 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
+                      : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95 hover:shadow-[0_6px_20px_rgba(35,42,38,0.25)]'
+                  }`}
                 >
                   {loading && <ButtonSpinner />}
                   {loading ? '生成卡片中…' : '生成酒店卡片'}
