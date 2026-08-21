@@ -2093,7 +2093,7 @@ export function HotelPicker({
   return (
     <section className={`space-y-4 ${readOnly ? '[&_button]:pointer-events-none [&_input]:pointer-events-none [&_textarea]:pointer-events-none' : ''}`}>
       <article className={`relative rounded-3xl ${glassCardSurfaceClass} !overflow-visible p-5 shadow-[0_8px_32px_rgba(0,0,0,0.03)] sm:p-7`}>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 border-b border-black/5 pb-4 sm:gap-x-4 sm:pb-5">
+        <div className="flex items-center justify-between border-b border-black/5 pb-3.5 sm:pb-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--gold)]/20 to-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
               <Building2 size={18} />
@@ -2117,153 +2117,9 @@ export function HotelPicker({
               </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            disabled={refreshing || !isLlmConfigured()}
-            onClick={() => {
-              setError(null)
-              setRefreshPanel('choose')
-            }}
-            aria-busy={refreshing || undefined}
-            aria-label={refreshing ? '正在更换酒店推荐' : '换一批酒店推荐'}
-            className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex h-11 min-w-11 items-center justify-center gap-1.5 px-3 text-xs text-[var(--stone)] shadow-[0_2px_10px_rgba(0,0,0,0.045),inset_0_1px_1.5px_rgba(255,255,255,1)] transition-colors hover:text-[var(--copper)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--copper)]/25 disabled:opacity-50 sm:h-auto sm:min-w-0 sm:px-3.5 sm:py-2`}
-          >
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-              {refreshing ? (
-                <ButtonSpinner mode="thinking" task="hotelRecommend" />
-              ) : (
-                <Sparkles size={14} strokeWidth={1.8} />
-              )}
-            </span>
-            <span className="hidden min-[360px]:inline sm:hidden">
-              {refreshing ? '推荐中…' : '换一批'}
-            </span>
-            <span className="hidden sm:inline">
-              {refreshing ? '推荐中…' : '换一批推荐'}
-            </span>
-          </button>
-
-          <p className="col-span-2 ml-12 max-w-2xl text-xs leading-relaxed text-[var(--stone)]">
-            {readOnly
-              ? '当前为只读共享，可查看住宿与酒店候选。'
-              : '查看推荐酒店、确认当前住宿，或输入自己的酒店地址。'}
-          </p>
         </div>
 
-        <div className="mt-5 space-y-5">
-
-      {refreshPanel && (
-        <div className={`rounded-2xl ${glassCardSurfaceClass} p-4 transition-all sm:p-5`}>
-          {refreshPanel === 'choose' ? (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-base text-[var(--ink)]">换一批推荐</p>
-                  <p className="mt-1 text-sm text-[var(--stone)]">
-                    按你的喜好定制，或直接再换一批。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => setRefreshPanel(null)}
-                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
-                >
-                  取消
-                </button>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => setRefreshPanel('prefer')}
-                  className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
-                >
-                  <p className="font-medium text-[var(--ink)]">说说我的喜好</p>
-                  <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
-                    填写区位、预算、氛围等要求后再推荐
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => void runFreshRecommendations()}
-                  className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
-                >
-                  <p className="font-medium text-[var(--ink)]">直接再换一批</p>
-                  <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
-                    保留当前条件，重新生成一组推荐
-                  </p>
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-base text-[var(--ink)]">你的喜好与要求</p>
-                  <p className="mt-1 text-sm text-[var(--stone)]">
-                    例如：左岸、地铁方便、中档、安静一点
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => setRefreshPanel('choose')}
-                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
-                >
-                  返回
-                </button>
-              </div>
-              <textarea
-                value={preferText}
-                onChange={(e) => setPreferText(e.target.value)}
-                rows={3}
-                placeholder="写下你对住宿的想法…"
-                className="mt-3 w-full resize-none rounded-2xl border border-white/90 bg-white/70 p-3.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
-              />
-              <div className="mt-3 flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => setRefreshPanel(null)}
-                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-4 py-2 text-xs text-[var(--stone)] transition-colors active:scale-95 disabled:opacity-50`}
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  disabled={refreshing || !preferText.trim()}
-                  onClick={() => void runFreshRecommendations(preferText)}
-                  aria-busy={refreshing || undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-medium transition-all active:scale-95 ${
-                    !preferText.trim() || refreshing
-                      ? 'border border-black/[0.06] bg-white/45 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
-                      : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95'
-                  }`}
-                >
-                  {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
-                  {refreshing ? '推荐中…' : '按喜好推荐'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {refreshing && (
-        <LoadingIndicator
-          variant="block"
-          thinkingLabel={refreshHint || '正在思考酒店推荐…'}
-          generatingLabel={refreshHint || '正在推荐酒店并核对地点信息…'}
-          showDots
-          size="sm"
-          mode="thinking"
-          task="hotelRecommend"
-          className="py-3"
-        />
-      )}
+        <div className="mt-4 space-y-4">
 
       <div>
         <div className="flex items-center gap-1.5">
@@ -2436,19 +2292,158 @@ export function HotelPicker({
                   {selectedCandidate ? '其他候选酒店' : '酒店候选项'}
                 </h3>
               </div>
-              {canToggleOthers && (
-                <button
-                  type="button"
-                  onClick={() => setOthersCollapsedAndPersist(!othersCollapsed)}
-                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/30`}
-                >
-                  <ChevronIcon up={!othersCollapsed} />
-                  {othersCollapsed
-                    ? `展开（${otherCandidates.length}）`
-                    : '收起'}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {!readOnly && isLlmConfigured() && (
+                  <button
+                    type="button"
+                    disabled={refreshing}
+                    onClick={() => {
+                      setError(null)
+                      setRefreshPanel('choose')
+                      if (othersCollapsed) {
+                        setOthersCollapsedAndPersist(false)
+                      }
+                    }}
+                    aria-busy={refreshing || undefined}
+                    aria-label={refreshing ? '正在更换酒店推荐' : '换一批酒店推荐'}
+                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--copper)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--copper)]/25 disabled:opacity-50`}
+                  >
+                    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                      {refreshing ? (
+                        <ButtonSpinner mode="thinking" task="hotelRecommend" />
+                      ) : (
+                        <Sparkles size={12} strokeWidth={1.8} />
+                      )}
+                    </span>
+                    <span>{refreshing ? '推荐中…' : '换一批'}</span>
+                  </button>
+                )}
+                {canToggleOthers && (
+                  <button
+                    type="button"
+                    onClick={() => setOthersCollapsedAndPersist(!othersCollapsed)}
+                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/30`}
+                  >
+                    <ChevronIcon up={!othersCollapsed} />
+                    {othersCollapsed
+                      ? `展开（${otherCandidates.length}）`
+                      : '收起'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {refreshPanel && (
+              <div className={`rounded-2xl ${glassCardSurfaceClass} p-4 transition-all sm:p-5`}>
+                {refreshPanel === 'choose' ? (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-base text-[var(--ink)]">换一批推荐</p>
+                        <p className="mt-1 text-sm text-[var(--stone)]">
+                          按你的喜好定制，或直接再换一批。
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={refreshing}
+                        onClick={() => setRefreshPanel(null)}
+                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
+                      >
+                        取消
+                      </button>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={refreshing}
+                        onClick={() => setRefreshPanel('prefer')}
+                        className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
+                      >
+                        <p className="font-medium text-[var(--ink)]">说说我的喜好</p>
+                        <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
+                          填写区位、预算、氛围等要求后再推荐
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={refreshing}
+                        onClick={() => void runFreshRecommendations()}
+                        className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
+                      >
+                        <p className="font-medium text-[var(--ink)]">直接再换一批</p>
+                        <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
+                          保留当前条件，重新生成一组推荐
+                        </p>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-base text-[var(--ink)]">你的喜好与要求</p>
+                        <p className="mt-1 text-sm text-[var(--stone)]">
+                          例如：左岸、地铁方便、中档、安静一点
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={refreshing}
+                        onClick={() => setRefreshPanel('choose')}
+                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
+                      >
+                        返回
+                      </button>
+                    </div>
+                    <textarea
+                      value={preferText}
+                      onChange={(e) => setPreferText(e.target.value)}
+                      rows={3}
+                      placeholder="写下你对住宿的想法…"
+                      className="mt-3 w-full resize-none rounded-2xl border border-white/90 bg-white/70 p-3.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
+                    />
+                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={refreshing}
+                        onClick={() => setRefreshPanel(null)}
+                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-4 py-2 text-xs text-[var(--stone)] transition-colors active:scale-95 disabled:opacity-50`}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        disabled={refreshing || !preferText.trim()}
+                        onClick={() => void runFreshRecommendations(preferText)}
+                        aria-busy={refreshing || undefined}
+                        className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-medium transition-all active:scale-95 ${
+                          !preferText.trim() || refreshing
+                            ? 'border border-black/[0.06] bg-white/45 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
+                            : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95'
+                        }`}
+                      >
+                        {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
+                        {refreshing ? '推荐中…' : '按喜好推荐'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {refreshing && (
+              <LoadingIndicator
+                variant="block"
+                thinkingLabel={refreshHint || '正在思考酒店推荐…'}
+                generatingLabel={refreshHint || '正在推荐酒店并核对地点信息…'}
+                showDots
+                size="sm"
+                mode="thinking"
+                task="hotelRecommend"
+                className="py-3"
+              />
+            )}
 
             <div
               className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${
