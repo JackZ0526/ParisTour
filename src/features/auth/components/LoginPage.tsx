@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../authContext'
+import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 function readAuthDeepLink(): { mode: 'signin' | 'signup'; email: string } {
   try {
@@ -74,20 +75,43 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10 sm:py-16">
-      <div className="animate-fade-up rounded-3xl border border-white/80 bg-white/75 p-6 shadow-[0_12px_40px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)] backdrop-blur-2xl sm:rounded-[32px] sm:p-10">
-        <p className="text-xs uppercase tracking-[0.28em] text-[var(--sage)] font-semibold">Paris Tour</p>
-        <h1 className="font-display mt-2 text-3xl text-[var(--ink)] sm:text-4xl">邀请制登录</h1>
-        <p className="mt-3 text-sm text-[var(--stone)]">
+    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 sm:py-16">
+      {/* Ambient background glows for glassmorphism reflections */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#a8bcae]/20 via-[#d4bd91]/15 to-transparent blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 right-1/4 -z-10 h-[360px] w-[360px] rounded-full bg-gradient-to-tl from-[#d7a98a]/15 via-white/20 to-transparent blur-3xl"
+      />
+
+      <div className={`mx-auto w-full max-w-lg ${glassModalSurfaceClass} rounded-3xl p-6 sm:rounded-[36px] sm:p-10`}>
+        {/* Brand pill badge */}
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 px-3 py-1 text-[10.5px] font-medium tracking-[0.24em] text-[var(--sage)] uppercase">
+            <Sparkles size={11} strokeWidth={2} className="shrink-0" />
+            Paris Tour
+          </span>
+        </div>
+
+        {/* French editorial heading */}
+        <h1 className="font-display mt-3 text-3xl font-normal tracking-tight text-[var(--ink)] sm:text-4xl">
+          邀请制登录
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--stone)]">
           需受邀邮箱才能注册与使用。登录后可打开你的行程，也可查看他人分享给你的行程。
         </p>
 
+        {/* Not allowlisted notice banner */}
         {status === 'not_allowlisted' && (
-          <p className="mt-4 rounded-xl border border-[var(--copper)]/40 bg-[var(--copper)]/10 px-3 py-2 text-sm text-[var(--ink)]">
-            该邮箱尚未获邀请。请联系行程主人邀请你。
-          </p>
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[var(--copper)]/30 bg-[#f6e8de]/70 p-3 text-xs leading-relaxed text-[var(--ink)] shadow-sm backdrop-blur-md">
+            <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[var(--copper)]" />
+            <span>该邮箱尚未获邀请。请联系行程主人添加你的邮箱邀请。</span>
+          </div>
         )}
 
+        {/* Animated Segmented Switcher */}
         <div
           className="relative mt-6 inline-flex rounded-full border border-white/80 bg-white/70 p-1 shadow-sm backdrop-blur-xl text-sm"
           role="tablist"
@@ -160,9 +184,10 @@ export function LoginPage() {
           </button>
         </div>
 
+        {/* Login / Register Form */}
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          <label className="block text-sm">
-            <span className="text-[var(--stone)]">邮箱</span>
+          <label className="block space-y-1.5 text-xs font-medium text-[var(--stone)]">
+            <span>邮箱</span>
             <input
               type="text"
               inputMode="email"
@@ -171,12 +196,14 @@ export function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-white/80 bg-white/70 px-3.5 py-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] backdrop-blur-md"
+              placeholder="your-name@example.com"
+              className="w-full rounded-2xl border border-white/90 bg-white/70 px-4 py-3 text-sm text-[var(--ink)] shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/45 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)] outline-none"
             />
           </label>
-          <div className="block text-sm">
-            <span className="text-[var(--stone)]">密码</span>
-            <div className="relative mt-1">
+
+          <div className="block space-y-1.5 text-xs font-medium text-[var(--stone)]">
+            <span>密码</span>
+            <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
@@ -184,47 +211,63 @@ export function LoginPage() {
                 minLength={mode === 'signup' ? 6 : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-white/80 bg-white/70 py-2.5 pl-3.5 pr-11 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(99,136,112,0.1)] backdrop-blur-md"
+                placeholder={mode === 'signup' ? '至少 6 位字符' : '请输入登录密码'}
+                className="w-full rounded-2xl border border-white/90 bg-white/70 py-3 pl-4 pr-12 text-sm text-[var(--ink)] shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/45 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)] outline-none"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? '隐藏密码' : '显示密码'}
                 aria-pressed={showPassword}
-                className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--stone)] transition hover:bg-[var(--mist)]/60 hover:text-[var(--ink)]"
+                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl text-[var(--stone)] transition hover:bg-[var(--mist)]/60 hover:text-[var(--ink)] active:scale-95"
               >
                 {showPassword ? (
-                  <EyeOff size={18} strokeWidth={1.8} aria-hidden />
+                  <EyeOff size={16} strokeWidth={1.8} aria-hidden />
                 ) : (
-                  <Eye size={18} strokeWidth={1.8} aria-hidden />
+                  <Eye size={16} strokeWidth={1.8} aria-hidden />
                 )}
               </button>
             </div>
           </div>
 
+          {/* Error alert */}
           {(error || authError) && (
-            <p
+            <div
               role="alert"
-              className="rounded-xl border border-[var(--copper)]/35 bg-[var(--copper)]/10 px-3 py-2 text-sm text-[var(--ink)]"
+              className="flex items-start gap-2.5 rounded-2xl border border-[var(--copper)]/35 bg-[#f6e8de]/80 p-3.5 text-xs leading-relaxed text-[var(--ink)] shadow-sm backdrop-blur-md"
             >
-              {error || authError}
-            </p>
-          )}
-          {info && (
-            <p
-              role="status"
-              className="rounded-xl border border-[var(--sage)]/35 bg-[var(--sage)]/10 px-3 py-2 text-sm text-[var(--ink)]"
-            >
-              {info}
-            </p>
+              <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[var(--copper)]" />
+              <span>{error || authError}</span>
+            </div>
           )}
 
+          {/* Info status alert */}
+          {info && (
+            <div
+              role="status"
+              className="flex items-start gap-2.5 rounded-2xl border border-[var(--sage)]/35 bg-[#e7efe9]/80 p-3.5 text-xs leading-relaxed text-[var(--ink)] shadow-sm backdrop-blur-md"
+            >
+              <CheckCircle2 size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[var(--sage)]" />
+              <span>{info}</span>
+            </div>
+          )}
+
+          {/* Submit button */}
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-2xl border border-[var(--ink)]/90 bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] transition-all hover:bg-[var(--ink)]/95 active:scale-[0.98] disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--ink)]/90 bg-[var(--ink)] px-4 py-3.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] transition-all hover:bg-[var(--ink)]/95 active:scale-[0.98] disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
           >
-            {busy ? '请稍候…' : mode === 'signin' ? '进入行程' : '创建账号'}
+            {busy ? (
+              <>
+                <Loader2 size={16} className="animate-spin text-[var(--gold)]" />
+                <span>请稍候…</span>
+              </>
+            ) : mode === 'signin' ? (
+              '进入行程'
+            ) : (
+              '创建账号'
+            )}
           </button>
         </form>
       </div>
