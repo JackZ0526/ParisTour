@@ -231,6 +231,7 @@ export function TripChatPanel({
   const [actionNotes, setActionNotes] = useState<string[]>([])
   const [panelEntered, setPanelEntered] = useState(false)
   const [modelPickerVisible, setModelPickerVisible] = useState(!open)
+  const modelPickerVisibleRef = useRef(!open)
   const chatOpenRef = useRef(open)
   chatOpenRef.current = open
   // The morph completion callback sets `panelEntered` when the panel settles.
@@ -238,6 +239,7 @@ export function TripChatPanel({
   // case an interrupted animation does not report completion.
   useEffect(() => {
     if (open) {
+      modelPickerVisibleRef.current = false
       setModelPickerVisible(false)
       const t = setTimeout(() => setPanelEntered(true), 520)
       return () => clearTimeout(t)
@@ -1818,7 +1820,7 @@ export function TripChatPanel({
           offset = 48px button + 8px gap = 56px = 3.5rem). */}
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity duration-100 sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
+        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity duration-200 sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
           modelPickerVisible && !open
             ? 'visible opacity-100'
             : 'pointer-events-none invisible opacity-0'
@@ -1882,10 +1884,23 @@ export function TripChatPanel({
           height: { ...morphSpring, delay: open ? 0.18 : 0 },
           backgroundColor: { duration: 0.18, ease: 'easeOut' },
         }}
+        onUpdate={(latest) => {
+          const height = Number(latest.height)
+          if (
+            !chatOpenRef.current &&
+            !modelPickerVisibleRef.current &&
+            Number.isFinite(height) &&
+            Math.abs(height - 48) < 0.001
+          ) {
+            modelPickerVisibleRef.current = true
+            setModelPickerVisible(true)
+          }
+        }}
         onAnimationComplete={() => {
           const currentlyOpen = chatOpenRef.current
           setPanelEntered(currentlyOpen)
           if (!currentlyOpen) {
+            modelPickerVisibleRef.current = true
             setModelPickerVisible(true)
           }
         }}
