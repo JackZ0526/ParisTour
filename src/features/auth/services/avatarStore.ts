@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 export type AvatarType = 'initial' | 'emoji' | 'image' | 'monogram'
 
@@ -75,6 +75,7 @@ export const PARIS_EMOJI_PRESETS: string[] = [
 
 const STORAGE_PREFIX = 'paris-tour-avatar'
 const listeners = new Set<() => void>()
+const avatarMemoryCache = new Map<string, { raw: string | null; snapshot: UserAvatar }>()
 
 function getStorageKey(email?: string): string {
   const normalized = (email || '').trim().toLowerCase()
@@ -95,31 +96,48 @@ export function subscribeUserAvatar(listener: () => void): () => void {
 export function getUserAvatar(email?: string): UserAvatar {
   const key = getStorageKey(email)
   const defaultLetter = email ? email.charAt(0).toUpperCase() : 'P'
+
+  let raw: string | null = null
   try {
-    const raw = localStorage.getItem(key)
-    if (raw) {
+    raw = localStorage.getItem(key)
+  } catch {
+    raw = null
+  }
+
+  const cached = avatarMemoryCache.get(key)
+  if (cached && cached.raw === raw) {
+    return cached.snapshot
+  }
+
+  let snapshot: UserAvatar
+  if (raw) {
+    try {
       const parsed = JSON.parse(raw) as UserAvatar
       if (parsed && typeof parsed.type === 'string' && typeof parsed.value === 'string') {
-        return parsed
+        snapshot = parsed
+      } else {
+        snapshot = { type: 'initial', value: defaultLetter, gradientIndex: 0 }
       }
+    } catch {
+      snapshot = { type: 'initial', value: defaultLetter, gradientIndex: 0 }
     }
-  } catch {
-    /* ignore fallback */
+  } else {
+    snapshot = { type: 'initial', value: defaultLetter, gradientIndex: 0 }
   }
-  return {
-    type: 'initial',
-    value: defaultLetter,
-    gradientIndex: 0,
-  }
+
+  avatarMemoryCache.set(key, { raw, snapshot })
+  return snapshot
 }
 
 export function setUserAvatar(avatar: UserAvatar, email?: string): void {
   const key = getStorageKey(email)
+  const raw = JSON.stringify(avatar)
   try {
-    localStorage.setItem(key, JSON.stringify(avatar))
+    localStorage.setItem(key, raw)
   } catch (err) {
     console.warn('[avatarStore] Failed to save avatar in localStorage:', err)
   }
+  avatarMemoryCache.set(key, { raw, snapshot: avatar })
   notifyChange()
 }
 
@@ -130,6 +148,13 @@ export function clearUserAvatar(email?: string): void {
   } catch {
     /* ignore */
   }
+  const defaultLetter = email ? email.charAt(0).toUpperCase() : 'P'
+  const defaultAvatar: UserAvatar = {
+    type: 'initial',
+    value: defaultLetter,
+    gradientIndex: 0,
+  }
+  avatarMemoryCache.set(key, { raw: null, snapshot: defaultAvatar })
   notifyChange()
 }
 
@@ -138,19 +163,26 @@ export function useUserAvatar(email?: string): {
   setAvatar: (avatar: UserAvatar) => void
   resetAvatar: () => void
 } {
-  const avatar = useSyncExternalStore(
-    subscribeUserAvatar,
-    () => getUserAvatar(email),
-    () => getUserAvatar(email),
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    return subscribeUserAvatar(onStoreChange)
+  }, [])
+
+  const getSnapshot = useCallback(() => {
+    return getUserAvatar(email)
+  }, [email])
+
+  const avatar = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+
+  const setAvatar = useCallback(
+    (next: UserAvatar) => {
+      setUserAvatar(next, email)
+    },
+    [email],
   )
 
-  const setAvatar = (next: UserAvatar) => {
-    setUserAvatar(next, email)
-  }
-
-  const resetAvatar = () => {
+  const resetAvatar = useCallback(() => {
     clearUserAvatar(email)
-  }
+  }, [email])
 
   return { avatar, setAvatar, resetAvatar }
 }
