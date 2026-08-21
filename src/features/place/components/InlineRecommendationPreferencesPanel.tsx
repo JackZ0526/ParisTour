@@ -180,11 +180,11 @@ export function InlineRecommendationPreferencesPanel({
         )}
       </div>
 
-      {/* 2. Responsive 2-Column Split: Left (Time + AI Prompt) / Right (Active + Candidate Tags) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
-        {/* Left Column (5/12 on Desktop): Departure Time + Natural Language AI Extractor */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Card 1: Departure Time (Generous Expansion Runway) */}
+      {/* 2. Responsive 2-Column Split: Left (Time + Active Tags) / Right (Candidate Tags + AI Prompt) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
+        {/* Left Column: Departure Time (Top Left) + Active Preference Pool (Bottom Left) */}
+        <div className="space-y-4">
+          {/* Card 1: Departure Time */}
           <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-2xs backdrop-blur-md space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
@@ -203,7 +203,111 @@ export function InlineRecommendationPreferencesPanel({
             </div>
           </div>
 
-          {/* Card 2: Natural Language AI Extractor */}
+          {/* Card 2: Active Preference Pool */}
+          <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-2xs backdrop-blur-md space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tag size={15} className="text-[var(--copper)]" />
+                <span className="text-xs font-semibold text-[var(--ink)]">
+                  已选生效偏好池
+                </span>
+                <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--copper)]">
+                  {activeTags.length} 项生效
+                </span>
+              </div>
+
+              {activeTags.length > 0 && !readOnly && (
+                <button
+                  type="button"
+                  onClick={clearAllTags}
+                  title="清空已选偏好池"
+                  aria-label="清空已选偏好池"
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)] shadow-xs transition-colors hover:border-[#b8433e]/30 hover:bg-white hover:text-[#b8433e] active:scale-95 cursor-pointer`}
+                >
+                  <Trash2 size={13} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
+
+            {activeTags.length === 0 ? (
+              <div className="flex min-h-[56px] flex-col items-center justify-center rounded-xl border border-dashed border-black/10 bg-white/40 p-3 text-center">
+                <p className="text-xs font-medium text-[var(--stone)]">
+                  偏好池暂为空白
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--stone)]/75">
+                  点击右侧推荐标签加入，或输入补充要求让 AI 智能提炼汇入
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                {activeTags.map((tag) => {
+                  const clean = cleanTagText(tag)
+                  const theme = getTagTheme(clean)
+                  return (
+                    <button
+                      key={clean}
+                      type="button"
+                      onClick={() => removeTag(clean)}
+                      disabled={readOnly}
+                      title={readOnly ? clean : `点击移出：${clean}`}
+                      aria-label={`移除 ${clean}`}
+                      className={`${BASE_TAG_PILL} active:scale-95 ${theme.activePill} ${
+                        readOnly ? 'cursor-default' : 'cursor-pointer'
+                      }`}
+                    >
+                      <span className="relative z-10">{clean}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Candidate Presets Pool (Top Right) + Natural Language AI Extractor (Bottom Right) */}
+        <div className="space-y-4">
+          {/* Card 3: Candidate Preference Pool (Top Right) */}
+          <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-2xs backdrop-blur-md space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
+              <span className="flex items-center gap-1.5">
+                <Sparkles size={14} className="text-[var(--copper)]" />
+                <span>推荐偏好候选池</span>
+              </span>
+              <span className="text-[11px] font-normal text-[var(--stone)]">
+                点击即刻加入偏好池
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-0.5">
+              {availablePresets.length > 0 ? (
+                availablePresets.map((preset) => {
+                  const clean = cleanTagText(preset)
+                  const theme = getTagTheme(clean)
+                  return (
+                    <button
+                      key={clean}
+                      type="button"
+                      onClick={() => addTag(clean)}
+                      disabled={readOnly}
+                      title={`点击加入：${clean}`}
+                      aria-label={`加入 ${clean}`}
+                      className={`${BASE_TAG_PILL} active:scale-95 ${theme.suggestedPill} ${
+                        readOnly ? 'cursor-default opacity-50' : 'cursor-pointer'
+                      }`}
+                    >
+                      <span className="relative z-10">{clean}</span>
+                    </button>
+                  )
+                })
+              ) : (
+                <p className="text-xs text-[var(--stone)]/70 italic py-0.5">
+                  已添加所有预设推荐偏好 ✨
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Card 4: Natural Language AI Extractor (Bottom Right) */}
           <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-2xs backdrop-blur-md space-y-2.5">
             <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
@@ -262,110 +366,6 @@ export function InlineRecommendationPreferencesPanel({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-
-        {/* Right Column (7/12 on Desktop): Active Preference Pool + Candidate Preference Pool */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Card 3: Active Preference Pool Section */}
-          <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-2xs backdrop-blur-md space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Tag size={15} className="text-[var(--copper)]" />
-                <span className="text-xs font-semibold text-[var(--ink)]">
-                  已选生效偏好池
-                </span>
-                <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--copper)]">
-                  {activeTags.length} 项生效
-                </span>
-              </div>
-
-              {activeTags.length > 0 && !readOnly && (
-                <button
-                  type="button"
-                  onClick={clearAllTags}
-                  title="清空已选偏好池"
-                  aria-label="清空已选偏好池"
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)] shadow-xs transition-colors hover:border-[#b8433e]/30 hover:bg-white hover:text-[#b8433e] active:scale-95 cursor-pointer`}
-                >
-                  <Trash2 size={13} strokeWidth={1.8} />
-                </button>
-              )}
-            </div>
-
-            {activeTags.length === 0 ? (
-              <div className="flex min-h-[56px] flex-col items-center justify-center rounded-xl border border-dashed border-black/10 bg-white/40 p-3 text-center">
-                <p className="text-xs font-medium text-[var(--stone)]">
-                  偏好池暂为空白
-                </p>
-                <p className="mt-0.5 text-[11px] text-[var(--stone)]/75">
-                  点击下方推荐标签加入，或输入补充要求让 AI 智能提炼汇入
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2 pt-0.5">
-                {activeTags.map((tag) => {
-                  const clean = cleanTagText(tag)
-                  const theme = getTagTheme(clean)
-                  return (
-                    <button
-                      key={clean}
-                      type="button"
-                      onClick={() => removeTag(clean)}
-                      disabled={readOnly}
-                      title={readOnly ? clean : `点击移出：${clean}`}
-                      aria-label={`移除 ${clean}`}
-                      className={`${BASE_TAG_PILL} active:scale-95 ${theme.activePill} ${
-                        readOnly ? 'cursor-default' : 'cursor-pointer'
-                      }`}
-                    >
-                      <span className="relative z-10">{clean}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Card 4: Candidate Preference Pool Section */}
-          <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-2xs backdrop-blur-md space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
-              <span className="flex items-center gap-1.5">
-                <Sparkles size={14} className="text-[var(--copper)]" />
-                <span>推荐偏好候选池</span>
-              </span>
-              <span className="text-[11px] font-normal text-[var(--stone)]">
-                点击即刻加入偏好池
-              </span>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              {availablePresets.length > 0 ? (
-                availablePresets.map((preset) => {
-                  const clean = cleanTagText(preset)
-                  const theme = getTagTheme(clean)
-                  return (
-                    <button
-                      key={clean}
-                      type="button"
-                      onClick={() => addTag(clean)}
-                      disabled={readOnly}
-                      title={`点击加入：${clean}`}
-                      aria-label={`加入 ${clean}`}
-                      className={`${BASE_TAG_PILL} active:scale-95 ${theme.suggestedPill} ${
-                        readOnly ? 'cursor-default opacity-50' : 'cursor-pointer'
-                      }`}
-                    >
-                      <span className="relative z-10">{clean}</span>
-                    </button>
-                  )
-                })
-              ) : (
-                <p className="text-xs text-[var(--stone)]/70 italic py-0.5">
-                  已添加所有预设推荐偏好 ✨
-                </p>
-              )}
-            </div>
           </div>
         </div>
       </div>
