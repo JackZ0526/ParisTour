@@ -158,12 +158,17 @@ interface Props {
   onClose?: () => void
 }
 
-const SUGGESTIONS = [
-  '介绍一下当前选中的酒店',
-  '按左岸、中档重新推荐一批酒店',
-  '介绍一下今天行程里的第一个地点',
-  '帮我在今天加上一家附近的咖啡馆',
-  '把凯旋门从行程里删掉',
+interface ChatSuggestion {
+  text: string
+  tone: keyof typeof glassCapsuleToneClass
+}
+
+const SUGGESTIONS: ChatSuggestion[] = [
+  { text: '介绍一下当前选中的酒店', tone: 'gold' },
+  { text: '按左岸、中档重新推荐一批酒店', tone: 'gold' },
+  { text: '介绍一下今天行程里的第一个地点', tone: 'sage' },
+  { text: '帮我在今天加上一家附近的咖啡馆', tone: 'copper' },
+  { text: '把凯旋门从行程里删掉', tone: 'neutral' },
 ]
 
 export function TripChatPanel({
@@ -1939,21 +1944,15 @@ export function TripChatPanel({
                   试试问我：介绍酒店、换一批住宿、介绍今天地点、加咖啡馆，或删改行程。
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {SUGGESTIONS.map((s, idx) => (
+                  {SUGGESTIONS.map(({ text, tone }) => (
                     <button
-                      key={s}
+                      key={text}
                       type="button"
                       disabled={busy}
-                      onClick={() => void submit(s)}
-                      className={`${glassCapsuleSurfaceClass} ${
-                        idx % 3 === 0
-                          ? glassCapsuleToneClass.copper
-                          : idx % 3 === 1
-                            ? glassCapsuleToneClass.sage
-                            : glassCapsuleToneClass.neutral
-                      } inline-flex items-center px-3 py-1.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer`}
+                      onClick={() => void submit(text)}
+                      className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass[tone]} inline-flex items-center px-3 py-1.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer`}
                     >
-                      {s}
+                      {text}
                     </button>
                   ))}
                 </div>
