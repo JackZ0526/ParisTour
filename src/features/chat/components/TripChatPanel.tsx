@@ -2186,7 +2186,7 @@ export function TripChatPanel({
                 className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
                   input.trim() && open
                     ? 'border border-white/20 bg-[var(--ink)] text-white shadow-[0_4px_14px_rgba(35,42,38,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md hover:bg-black hover:scale-[1.03] hover:shadow-[0_6px_18px_rgba(35,42,38,0.32)] active:scale-95 cursor-pointer'
-                    : 'border border-white/70 bg-white/60 text-[var(--stone)]/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
+                    : 'border border-black/[0.08] bg-black/[0.07] text-[var(--stone)] shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
                 }`}
               >
                 发送
