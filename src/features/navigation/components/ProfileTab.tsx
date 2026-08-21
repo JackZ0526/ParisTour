@@ -180,7 +180,7 @@ export function ProfileTab({
                     />
 
                     {/* Floating Camera Edit Badge */}
-                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white/90 bg-white/95 text-[var(--copper)] shadow-xs transition-transform duration-200 group-hover:scale-110">
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white/90 dark:border-white/15 bg-white/95 dark:bg-[#1f2824] text-[var(--copper)] shadow-xs transition-transform duration-200 group-hover:scale-110">
                       <Camera size={11} strokeWidth={2.2} />
                     </span>
                   </button>
@@ -194,11 +194,11 @@ export function ProfileTab({
                       {cloudSync.isBusy ? (
                         <span className="relative flex h-3.5 w-3.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-white" />
+                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-white dark:ring-[#18201c]" />
                         </span>
                       ) : (
                         <span className="relative flex h-3.5 w-3.5">
-                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-white shadow-xs" />
+                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-white dark:ring-[#18201c] shadow-xs" />
                         </span>
                       )}
                     </span>
@@ -225,8 +225,8 @@ export function ProfileTab({
                     </span>
 
                     {cloudSync.enabled && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--stone)] truncate">
-                        <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--stone)] dark:text-zinc-400 truncate">
+                        <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                         <span>{cloudSync.isBusy ? '云端同步中' : '云端已加密同步'}</span>
                       </span>
                     )}
@@ -238,7 +238,7 @@ export function ProfileTab({
               <button
                 type="button"
                 onClick={onSignOut}
-                className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.rose} inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-red-600/90 transition-all hover:bg-[#fde8e8]/95 hover:border-red-300/90 hover:text-red-700 active:scale-95 cursor-pointer`}
+                className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.rose} inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-red-600/90 dark:text-red-300 transition-all hover:bg-[#fde8e8]/95 dark:hover:bg-red-500/20 hover:border-red-300/90 dark:hover:border-red-400/40 hover:text-red-700 dark:hover:text-red-200 active:scale-95 cursor-pointer`}
               >
                 <LogOut size={13} strokeWidth={2.2} />
                 <span>退出</span>
@@ -247,49 +247,49 @@ export function ProfileTab({
 
             {/* Trip Summary Metric Cards (2x2 Grid) */}
             {tripStats && (
-              <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-black/5">
-                <div className="flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-2xs backdrop-blur-sm">
+              <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-black/5 dark:border-white/10">
+                <div className="flex items-center gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-sm">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)]">
                     <CalendarDays size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] truncate">规划天数</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">规划天数</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
                       {tripStats.daysCount > 0 ? `${tripStats.daysCount} 天行程` : '未生成'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-2xs backdrop-blur-sm">
+                <div className="flex items-center gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-sm">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 text-[var(--sage)]">
                     <MapPin size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] truncate">游玩地点</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">游玩地点</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
                       {tripStats.placesCount} 处景点
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-2xs backdrop-blur-sm">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
+                <div className="flex items-center gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-sm">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400">
                     <Hotel size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] truncate">入住酒店</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">入住酒店</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
                       {tripStats.hotelReady ? '已安排' : '待配置'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-2xs backdrop-blur-sm">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700">
+                <div className="flex items-center gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-sm">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-400">
                     <Plane size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] truncate">往返航班</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">往返航班</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
                       {tripStats.flightsReady ? '已录入' : '待确认'}
                     </p>
@@ -327,8 +327,8 @@ export function ProfileTab({
                       onClick={() => onSwitchTrip?.(t.id)}
                       className={`flex items-center justify-between gap-3 rounded-2xl p-3 text-left transition-all duration-150 cursor-pointer ${
                         isActive
-                          ? 'border-2 border-[var(--copper)] bg-[var(--copper)]/10 shadow-sm'
-                          : 'border border-white/80 bg-white/60 hover:bg-white/90 hover:border-white active:scale-[0.99]'
+                          ? 'border-2 border-[var(--copper)] bg-[var(--copper)]/10 dark:bg-[var(--copper)]/15 shadow-sm'
+                          : 'border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 hover:bg-white/90 dark:hover:bg-white/10 hover:border-white dark:hover:border-white/20 active:scale-[0.99]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -358,7 +358,7 @@ export function ProfileTab({
                               </span>
                             )}
                           </div>
-                          <div className="truncate text-[11px] text-[var(--stone)]">
+                          <div className="truncate text-[11px] text-[var(--stone)] dark:text-zinc-400">
                             {isItemShared ? `来自 ${t.ownerName || '他人'}` : '自己创建'}
                           </div>
                         </div>
@@ -367,10 +367,10 @@ export function ProfileTab({
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             t.role === 'owner'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200/50'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200/50 dark:border-amber-400/30'
                               : t.role === 'editor'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
-                                : 'bg-zinc-100 text-zinc-600 border border-zinc-200/50'
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-400/30'
+                                : 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300 border border-zinc-200/50 dark:border-white/15'
                           }`}
                         >
                           {t.role === 'owner' ? '拥有者' : t.role === 'editor' ? '协作' : '只读'}
@@ -392,7 +392,7 @@ export function ProfileTab({
               <button
                 type="button"
                 onClick={onOpenShare}
-                className="group flex items-center justify-between rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/95 hover:shadow-md hover:border-white active:scale-[0.99] cursor-pointer"
+                className="group flex items-center justify-between rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/95 dark:hover:bg-white/10 hover:shadow-md hover:border-white dark:hover:border-white/20 active:scale-[0.99] cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] transition-transform group-hover:scale-105">
@@ -400,10 +400,10 @@ export function ProfileTab({
                   </div>
                   <div>
                     <div className="text-sm font-medium text-[var(--ink)]">分享与协作</div>
-                    <div className="text-xs text-[var(--stone)]">邀请同伴共同规划</div>
+                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">邀请同伴共同规划</div>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-[var(--stone)] transition-transform group-hover:translate-x-0.5" />
+                <ChevronRight size={16} className="text-[var(--stone)] dark:text-zinc-400 transition-transform group-hover:translate-x-0.5" />
               </button>
             )}
 
@@ -411,7 +411,7 @@ export function ProfileTab({
               <button
                 type="button"
                 onClick={onOpenBackup}
-                className="group flex items-center justify-between rounded-2xl border border-white/80 bg-white/60 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/95 hover:shadow-md hover:border-white active:scale-[0.99] cursor-pointer"
+                className="group flex items-center justify-between rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/95 dark:hover:bg-white/10 hover:shadow-md hover:border-white dark:hover:border-white/20 active:scale-[0.99] cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--sage)]/15 text-[var(--sage)] transition-transform group-hover:scale-105">
@@ -419,10 +419,10 @@ export function ProfileTab({
                   </div>
                   <div>
                     <div className="text-sm font-medium text-[var(--ink)]">备份与存档</div>
-                    <div className="text-xs text-[var(--stone)]">导出或恢复行程快照</div>
+                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">导出或恢复行程快照</div>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-[var(--stone)] transition-transform group-hover:translate-x-0.5" />
+                <ChevronRight size={16} className="text-[var(--stone)] dark:text-zinc-400 transition-transform group-hover:translate-x-0.5" />
               </button>
             )}
           </div>
@@ -433,13 +433,13 @@ export function ProfileTab({
       {/* Row 2: AI Recommendation Preferences Summary Card (Opens Popup Modal)    */}
       {/* ========================================================================= */}
       <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-4 transition-colors`}>
-        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3.5">
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 dark:border-white/10 pb-3.5">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
               <Sparkles size={16} className="text-[var(--copper)] shrink-0" />
               <span>AI 智能偏好配置</span>
             </div>
-            <p className="mt-0.5 text-xs text-[var(--stone)] leading-relaxed">
+            <p className="mt-0.5 text-xs text-[var(--stone)] dark:text-zinc-400 leading-relaxed">
               个性化行程偏好体系；这些倾向将直接引导 AI 生成专属巴黎路线与地点推荐。
             </p>
           </div>
@@ -448,12 +448,12 @@ export function ProfileTab({
         {/* 2 Symmetrical Metrics: Departure Time & Active Preference Pool */}
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           {/* Metric 1: Departure Time */}
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 shadow-2xs backdrop-blur-sm">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)]">
               <Timer size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)]">每日出发</p>
+              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">每日出发</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
                 {recommendationPreferences?.dayStartTime || '10:00'}
               </p>
@@ -461,12 +461,12 @@ export function ProfileTab({
           </div>
 
           {/* Metric 2: Active Tag Pool Count */}
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 p-3 shadow-2xs backdrop-blur-sm">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 shadow-2xs backdrop-blur-sm">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400">
               <Tag size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)]">生效偏好</p>
+              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">生效偏好</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
                 {recommendationPreferences?.tags?.length
                   ? `${recommendationPreferences.tags.length} 项标签生效`
@@ -518,7 +518,7 @@ export function ProfileTab({
         <button
           type="button"
           onClick={onOpenPreferences}
-          className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
+          className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] dark:from-[#2a221b] dark:to-[#1c1713] dark:border dark:border-[var(--copper)]/35 dark:shadow-[0_4px_20px_rgba(212,131,84,0.25)] py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
         >
           <SlidersHorizontal size={14} />
           <span>打开偏好设置详细面板</span>
@@ -530,12 +530,12 @@ export function ProfileTab({
       {/* Row 3: Appearance Theme Selector (外观与色彩模式)                          */}
       {/* ========================================================================= */}
       <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-3.5 transition-colors`}>
-        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 dark:border-white/10 pb-3">
           <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
             <Palette size={16} className="text-[var(--copper)]" />
             <span>外观主题 · 色彩模式</span>
           </div>
-          <span className="text-xs text-[var(--stone)]">
+          <span className="text-xs text-[var(--stone)] dark:text-zinc-400">
             {themePreference === 'system' ? '跟随系统' : themePreference === 'dark' ? '午夜深色' : '日间浅色'}
           </span>
         </div>
@@ -546,8 +546,8 @@ export function ProfileTab({
             onClick={() => setThemePreference('light')}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
               themePreference === 'light'
-                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-zinc-800 dark:text-zinc-100 ring-1 ring-black/5'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:hover:bg-white/10'
+                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-[var(--copper)] dark:text-white dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/10'
             }`}
           >
             <Sun size={15} strokeWidth={2.2} className={themePreference === 'light' ? 'text-amber-600' : ''} />
@@ -559,11 +559,11 @@ export function ProfileTab({
             onClick={() => setThemePreference('dark')}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
               themePreference === 'dark'
-                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-zinc-800 dark:text-zinc-100 ring-1 ring-black/5'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:hover:bg-white/10'
+                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-[var(--copper)] dark:text-white dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/10'
             }`}
           >
-            <Moon size={15} strokeWidth={2.2} className={themePreference === 'dark' ? 'text-indigo-400' : ''} />
+            <Moon size={15} strokeWidth={2.2} className={themePreference === 'dark' ? 'text-indigo-400 dark:text-amber-200' : ''} />
             <span>深色午夜</span>
           </button>
 
@@ -572,11 +572,11 @@ export function ProfileTab({
             onClick={() => setThemePreference('system')}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
               themePreference === 'system'
-                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-zinc-800 dark:text-zinc-100 ring-1 ring-black/5'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:hover:bg-white/10'
+                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-[var(--copper)] dark:text-white dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)] ring-1 ring-black/5'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/10'
             }`}
           >
-            <Laptop size={15} strokeWidth={2.2} className={themePreference === 'system' ? 'text-[var(--copper)]' : ''} />
+            <Laptop size={15} strokeWidth={2.2} className={themePreference === 'system' ? 'text-[var(--copper)] dark:text-amber-200' : ''} />
             <span>跟随系统</span>
           </button>
         </div>
@@ -586,18 +586,18 @@ export function ProfileTab({
       {/* Row 4: Danger Zone Card (Placed at Bottom)                                */}
       {/* ========================================================================= */}
       {!readOnly && onClearAll && (
-        <div className="rounded-3xl border border-red-200/80 bg-red-50/40 p-5 shadow-[0_8px_30px_rgba(239,68,68,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-3">
+        <div className="rounded-3xl border border-red-200/80 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/20 p-5 shadow-[0_8px_30px_rgba(239,68,68,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
             <Trash2 size={16} />
             <span>重置与数据清空</span>
           </div>
-          <p className="text-xs text-[var(--stone)]">
+          <p className="text-xs text-[var(--stone)] dark:text-zinc-400">
             清空当前行程的所有日期、酒店及自定义景点排期并重置为初始状态。请谨慎操作。
           </p>
           <button
             type="button"
             onClick={onClearAll}
-            className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50/80 px-4 py-2 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-100 active:scale-95 cursor-pointer dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"
+            className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50/80 px-4 py-2 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-100 active:scale-95 cursor-pointer dark:border-red-800/60 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/60"
           >
             <Trash2 size={14} />
             <span>清空当前行程全部数据</span>
