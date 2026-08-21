@@ -454,8 +454,8 @@ export function TripMap({
     }
 
   return (
-    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/80 bg-white/70 px-3.5 py-2 text-xs text-[var(--stone)] backdrop-blur-md">
+    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/90 px-3.5 py-2 text-xs text-[var(--stone)] dark:text-zinc-300 backdrop-blur-md transition-colors">
         <span className="hidden sm:inline font-medium">MapLibre · OpenStreetMap</span>
         <span className="sm:hidden font-medium">地图</span>
         <span title={routeError || undefined}>
@@ -464,11 +464,11 @@ export function TripMap({
       </div>
       <div
         ref={fullscreenContainerRef}
-        className="relative h-[min(60vh,440px)] w-full bg-[var(--mist)] md:h-[560px]"
+        className="relative h-[min(60vh,440px)] w-full bg-[var(--mist)] dark:bg-[#101412] md:h-[560px]"
       >
         <div
           ref={containerRef}
-          className="h-full w-full bg-[var(--mist)]/35"
+          className="h-full w-full bg-[var(--mist)]/35 dark:bg-transparent"
           style={{ position: 'absolute', inset: 0 }}
           aria-label={`第 ${day.day} 天地图`}
         />

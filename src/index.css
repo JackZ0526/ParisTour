@@ -447,6 +447,22 @@ body {
   filter: invert(0.85);
 }
 
+.dark .maplibregl-ctrl-attrib {
+  background-color: rgba(18, 22, 20, 0.85);
+  color: #9ba7a0;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark .maplibregl-ctrl-attrib a {
+  color: #7b9e9c;
+}
+
+.dark .maplibregl-ctrl-attrib-button {
+  background-color: rgba(18, 22, 20, 0.85);
+  filter: invert(0.8);
+}
+
 h1,
 h2,
 h3,
