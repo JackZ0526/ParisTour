@@ -2137,7 +2137,7 @@ export function TripChatPanel({
                         className={`px-3.5 py-2 text-sm leading-relaxed ${
                           turn.role === 'user'
                             ? 'rounded-2xl rounded-tr-xs border border-white/12 bg-[var(--ink)]/95 text-[var(--paper)] shadow-[0_3px_12px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22),inset_0_-1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm'
-                            : 'rounded-2xl rounded-tl-xs border border-white/90 bg-white/80 shadow-[0_2px_12px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md text-[var(--ink)]'
+                            : 'rounded-2xl rounded-tl-xs border border-[#c6dbcf]/80 bg-[#ebf3ee]/95 shadow-[0_2px_12px_rgba(74,99,86,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md text-[var(--ink)]'
                         }`}
                       >
                         {showThinking ? (
