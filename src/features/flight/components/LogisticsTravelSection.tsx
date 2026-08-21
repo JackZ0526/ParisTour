@@ -376,7 +376,7 @@ export function LogisticsTravelSection({
                         {outbound.airline || '航班计划'}
                       </p>
 
-                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 p-3 border border-white/80 text-sm backdrop-blur-sm shadow-xs">
+                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 dark:bg-black/30 p-3 border border-white/80 dark:border-white/10 text-sm backdrop-blur-sm shadow-xs">
                         <div className="col-span-2">
                           <p className="text-xs text-[var(--stone)]">出发</p>
                           <p className="font-bold text-base text-[var(--ink)]">
@@ -386,14 +386,14 @@ export function LogisticsTravelSection({
                             {formatEndpointTime(outbound.from?.scheduled, outbound.from)}
                           </p>
                           {outbound.from?.terminal && (
-                            <span className="mt-0.5 inline-block rounded bg-black/5 px-1 py-0.2 text-[11px] text-[var(--stone)]">
+                            <span className="mt-0.5 inline-block rounded bg-black/5 dark:bg-white/10 px-1 py-0.2 text-[11px] text-[var(--stone)]">
                               T{outbound.from.terminal}
                             </span>
                           )}
                         </div>
 
                         <div className="col-span-1 flex flex-col items-center justify-center text-[var(--mist)]">
-                          <ArrowRight size={14} className="text-[var(--sage)]/60" />
+                          <ArrowRight size={14} className="text-[var(--sage)]/60 dark:text-[var(--sage)]" />
                           {outbound.duration && (
                             <span className="text-[11px] font-medium text-[var(--stone)] mt-0.5 whitespace-nowrap">
                               {outbound.duration}
@@ -410,7 +410,7 @@ export function LogisticsTravelSection({
                             {formatEndpointTime(outbound.to?.scheduled, outbound.to)}
                           </p>
                           {outbound.to?.terminal && (
-                            <span className="mt-0.5 inline-block rounded bg-black/5 px-1 py-0.2 text-[11px] text-[var(--stone)]">
+                            <span className="mt-0.5 inline-block rounded bg-black/5 dark:bg-white/10 px-1 py-0.2 text-[11px] text-[var(--stone)]">
                               T{outbound.to.terminal}
                             </span>
                           )}
@@ -485,7 +485,7 @@ export function LogisticsTravelSection({
                           value={outboundInput}
                           onChange={(e) => setOutboundInput(e.target.value.toUpperCase())}
                           aria-label="去程航班号"
-                          className="min-w-0 w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-[var(--sage)]/60 focus:bg-white/90 focus:shadow-[0_0_0_3px_rgba(91,113,98,0.09)]"
+                          className="min-w-0 w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-[var(--sage)]/60 focus:bg-white/90 dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(91,113,98,0.09)]"
                           placeholder="去程航班号 例如 AF375"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && outboundInput.trim() && hasDates && busy === null) {
@@ -499,7 +499,7 @@ export function LogisticsTravelSection({
                           disabled={busy !== null || !outboundInput.trim() || !hasDates}
                           onClick={() => query('outbound')}
                           aria-busy={busy === 'outbound' || undefined}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 dark:bg-[var(--copper)] text-[var(--paper)] dark:text-white px-4 py-2.5 text-sm font-medium shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] dark:hover:bg-[var(--copper)]/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'outbound' && <ButtonSpinner />}
                           {busy === 'outbound' ? '查询中' : '查询'}
@@ -556,12 +556,12 @@ export function LogisticsTravelSection({
                     <div>
                       {/* Inbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1.5 text-purple-900 font-semibold text-xs uppercase tracking-wider">
+                        <div className="flex items-center gap-1.5 text-purple-900 dark:text-purple-300 font-semibold text-xs uppercase tracking-wider">
                           <PlaneLanding size={14} />
                           <span>返程 · {inbound.flightNumber}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[11px] font-medium text-purple-900`}>
+                          <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[11px] font-medium text-purple-900 dark:text-purple-300`}>
                             {flightSourceLabel(inbound.source)}
                           </span>
                           {!readOnly && (
@@ -581,7 +581,7 @@ export function LogisticsTravelSection({
                                 aria-label="刷新返程时刻"
                                 disabled={busy === 'return'}
                                 onClick={() => void loadOne('return', inbound.flightNumber, true)}
-                                className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-purple-900 active:scale-95 transition-colors disabled:opacity-50`}
+                                className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-purple-900 dark:hover:text-purple-300 active:scale-95 transition-colors disabled:opacity-50`}
                               >
                                 <RefreshCw size={14} strokeWidth={1.8} className={busy === 'return' ? 'animate-spin' : ''} />
                               </button>
@@ -594,7 +594,7 @@ export function LogisticsTravelSection({
                         {inbound.airline || '航班计划'}
                       </p>
 
-                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 p-3 border border-white/80 text-sm backdrop-blur-sm shadow-xs">
+                      <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 dark:bg-black/30 p-3 border border-white/80 dark:border-white/10 text-sm backdrop-blur-sm shadow-xs">
                         <div className="col-span-2">
                           <p className="text-xs text-[var(--stone)]">出发</p>
                           <p className="font-bold text-base text-[var(--ink)]">
@@ -604,14 +604,14 @@ export function LogisticsTravelSection({
                             {formatEndpointTime(inbound.from?.scheduled, inbound.from)}
                           </p>
                           {inbound.from?.terminal && (
-                            <span className="mt-0.5 inline-block rounded bg-black/5 px-1 py-0.2 text-[11px] text-[var(--stone)]">
+                            <span className="mt-0.5 inline-block rounded bg-black/5 dark:bg-white/10 px-1 py-0.2 text-[11px] text-[var(--stone)]">
                               T{inbound.from.terminal}
                             </span>
                           )}
                         </div>
 
                         <div className="col-span-1 flex flex-col items-center justify-center text-[var(--mist)]">
-                          <ArrowRight size={14} className="text-purple-400" />
+                          <ArrowRight size={14} className="text-purple-400 dark:text-purple-300" />
                           {inbound.duration && (
                             <span className="text-[11px] font-medium text-[var(--stone)] mt-0.5 whitespace-nowrap">
                               {inbound.duration}
@@ -628,7 +628,7 @@ export function LogisticsTravelSection({
                             {formatEndpointTime(inbound.to?.scheduled, inbound.to)}
                           </p>
                           {inbound.to?.terminal && (
-                            <span className="mt-0.5 inline-block rounded bg-black/5 px-1 py-0.2 text-[11px] text-[var(--stone)]">
+                            <span className="mt-0.5 inline-block rounded bg-black/5 dark:bg-white/10 px-1 py-0.2 text-[11px] text-[var(--stone)]">
                               T{inbound.to.terminal}
                             </span>
                           )}
@@ -703,7 +703,7 @@ export function LogisticsTravelSection({
                           value={returnInput}
                           onChange={(e) => setReturnInput(e.target.value.toUpperCase())}
                           aria-label="返程航班号"
-                          className="min-w-0 w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-purple-400/60 focus:bg-white/90 focus:shadow-[0_0_0_3px_rgba(109,78,150,0.08)]"
+                          className="min-w-0 w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-purple-400/60 focus:bg-white/90 dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(109,78,150,0.08)]"
                           placeholder="返程航班号 例如 AF374"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && returnInput.trim() && hasDates && busy === null) {
@@ -717,7 +717,7 @@ export function LogisticsTravelSection({
                           disabled={busy !== null || !returnInput.trim() || !hasDates}
                           onClick={() => query('return')}
                           aria-busy={busy === 'return' || undefined}
-                          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 dark:bg-[var(--copper)] text-[var(--paper)] dark:text-white px-4 py-2.5 text-sm font-medium shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] dark:hover:bg-[var(--copper)]/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'return' && <ButtonSpinner />}
                           {busy === 'return' ? '查询中' : '查询'}

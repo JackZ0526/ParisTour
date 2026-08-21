@@ -198,8 +198,8 @@ function HotelCardFace({
               </span>
             )}
             {hotel.isBest && (
-              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center gap-1 px-2.5 py-0.5 text-[10.5px] font-medium text-amber-900`}>
-                <Sparkles size={10} strokeWidth={2} className="shrink-0 text-amber-700" />
+              <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center gap-1 px-2.5 py-0.5 text-[10.5px] font-medium text-amber-900 dark:text-amber-200`}>
+                <Sparkles size={10} strokeWidth={2} className="shrink-0 text-amber-700 dark:text-amber-300" />
                 最优推荐
               </span>
             )}
@@ -225,13 +225,13 @@ function HotelCardFace({
           )}
         </div>
         {hotel.rating != null && (
-          <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] pt-2">
+          <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] dark:border-white/10 pt-2">
             <span className="text-[11px] font-medium">
-              <span className="text-[#003580]">Booking</span>
-              <span className="text-[#006ce4]">.com</span>
+              <span className="text-[#003580] dark:text-[#5fa2f8]">Booking</span>
+              <span className="text-[#006ce4] dark:text-[#7bb5ff]">.com</span>
             </span>
             <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-[var(--ink)] tabular-nums shadow-[0_1px_4px_rgba(0,0,0,0.03)]`}>
-              <span className="font-semibold text-[#003580]">{hotel.rating.toFixed(1)}</span>
+              <span className="font-semibold text-[#003580] dark:text-[#7bb5ff]">{hotel.rating.toFixed(1)}</span>
               <span className="text-[10px] text-[var(--stone)]">/10</span>
               {hotel.reviewCount != null && (
                 <span className="text-[10px] text-[var(--stone)]">（{hotel.reviewCount}）</span>
@@ -653,7 +653,7 @@ function BookingHotelFacts({
                   {hotel.name}
                 </h3>
                 {(hotel.propertyType || starCount > 0) && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-[#003b95]/8 px-2 py-1 text-[11px] font-medium text-[#003b95]">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-[#003b95]/8 dark:bg-[#5fa2f8]/15 px-2 py-1 text-[11px] font-medium text-[#003b95] dark:text-[#7bb5ff]">
                     {starCount > 0 && (
                       <span
                         className="text-[12px] leading-none tracking-[0.08em] text-[#f5a623]"
@@ -671,7 +671,7 @@ function BookingHotelFacts({
               </div>
               {hotel.address && (
                 <div className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-1 text-sm leading-relaxed">
-                  <span className="mt-0.5 text-[#003b95]">
+                  <span className="mt-0.5 text-[#003b95] dark:text-[#5fa2f8]">
                     <HotelFactIcon type="location" />
                   </span>
                   <p className="min-w-0">{hotel.address}</p>
@@ -684,7 +684,7 @@ function BookingHotelFacts({
                   <p className="text-sm font-semibold">{hotelScoreText(hotel.rating)}</p>
                   {hotel.reviewCount != null && <p className="text-[11px] text-[var(--stone)]">{hotel.reviewCount.toLocaleString('zh-CN')} 条住客点评</p>}
                 </div>
-                <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] px-2 text-sm font-semibold text-white">
+                <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] dark:bg-[#0051ba] px-2 text-sm font-semibold text-white">
                   {hotel.rating.toFixed(1)}
                 </span>
               </div>
@@ -693,7 +693,7 @@ function BookingHotelFacts({
 
           {hotel.sustainability && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800">
+              <span className="rounded-md bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
                 可持续住宿 · {hotel.sustainability}
               </span>
             </div>
@@ -721,12 +721,12 @@ function BookingHotelFacts({
                 href={hotel.bookingUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-[var(--mist)] bg-white/70 px-2.5 py-1.5 text-xs font-medium text-[#003b95]/85 transition hover:border-[#003b95]/20 hover:bg-[#003b95]/5 hover:text-[#003b95]"
+                className="inline-flex items-center gap-1 rounded-md border border-[var(--mist)] bg-white/70 dark:bg-white/10 px-2.5 py-1.5 text-xs font-medium text-[#003b95]/85 dark:text-[#7bb5ff] transition hover:border-[#003b95]/20 hover:bg-[#003b95]/5 dark:hover:bg-white/15 hover:text-[#003b95] dark:hover:text-[#5fa2f8]"
               >
                 前往{' '}
                 <span>
-                  <span className="text-[#003580]">Booking</span>
-                  <span className="text-[#006ce4]">.com</span>
+                  <span className="text-[#003580] dark:text-[#5fa2f8]">Booking</span>
+                  <span className="text-[#006ce4] dark:text-[#7bb5ff]">.com</span>
                 </span>
                 <ExternalLink className="h-3 w-3" strokeWidth={2} aria-hidden />
               </a>
@@ -2304,7 +2304,7 @@ export function HotelPicker({
                   onChange={(e) => setCustomQuery(e.target.value)}
                   placeholder="例如：25 Rue du Temple, 75004 Paris"
                   aria-label="自定义酒店名称或地址"
-                  className="w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
+                  className="w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && customQuery.trim() && !loading) {
                       e.preventDefault()
@@ -2319,8 +2319,8 @@ export function HotelPicker({
                   aria-busy={loading || undefined}
                   className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98] ${
                     !customQuery.trim() || loading || decidingCustom
-                      ? 'border border-black/[0.06] bg-white/45 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
-                      : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95 hover:shadow-[0_6px_20px_rgba(35,42,38,0.25)]'
+                      ? 'border border-black/[0.06] dark:border-white/10 bg-white/45 dark:bg-white/5 text-[var(--stone)]/45 dark:text-zinc-500 cursor-not-allowed shadow-none'
+                      : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] dark:bg-[var(--copper)] dark:text-white shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95 dark:hover:bg-[var(--copper)]/90 hover:shadow-[0_6px_20px_rgba(35,42,38,0.25)]'
                   }`}
                 >
                   {loading && <ButtonSpinner />}

@@ -1308,7 +1308,7 @@ export default function App() {
                     <span
                       className={`${glassCapsuleSurfaceClass} ${
                         tripDates ? glassCapsuleToneClass.blue : glassCapsuleToneClass.neutral
-                      } px-3 py-1 text-xs ${tripDates ? 'text-sky-800 font-medium' : 'text-[var(--stone)]'}`}
+                      } px-3 py-1 text-xs ${tripDates ? 'text-sky-800 dark:text-sky-300 font-medium' : 'text-[var(--stone)]'}`}
                     >
                       {tripDates
                         ? `📅 ${tripDates.startDate} → ${tripDates.endDate} (${daysBetween(tripDates.startDate, tripDates.endDate)}天)`
@@ -1321,7 +1321,7 @@ export default function App() {
                           : glassCapsuleToneClass.neutral
                       } px-3 py-1 text-xs ${
                         flights.outbound || flights.returnFlight
-                          ? 'text-purple-900 font-medium'
+                          ? 'text-purple-900 dark:text-purple-300 font-medium'
                           : 'text-[var(--stone)]'
                       }`}
                     >
@@ -1340,7 +1340,7 @@ export default function App() {
                           : glassCapsuleToneClass.neutral
                       } px-3 py-1 text-xs ${
                         isHotelSelected(hotel)
-                          ? 'text-amber-900 font-medium'
+                          ? 'text-amber-900 dark:text-amber-200 font-medium'
                           : 'text-[var(--stone)]'
                       }`}
                     >
