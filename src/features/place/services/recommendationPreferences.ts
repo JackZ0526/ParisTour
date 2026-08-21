@@ -12,10 +12,11 @@ export interface RecommendationPreferences {
   extraNotes?: string
 }
 
-/** Helper to strip any leading emoji / symbols from tag text */
+/** Helper to thoroughly strip any emoji / symbol from tag text */
 export function cleanTagText(tag: string): string {
   return String(tag || '')
     .replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s·•✨☕🍽️🚶🏰🏛️🌿📸🎨🥐🍷🛍️🥖🗼👶💰\-\+\*]+/gu, '')
+    .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]+/gu, '')
     .trim()
 }
 

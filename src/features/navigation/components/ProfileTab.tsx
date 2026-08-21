@@ -20,7 +20,10 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
+import {
+  cleanTagText,
+  type RecommendationPreferences,
+} from '../../place/services/recommendationPreferences'
 import type { AccessibleTrip } from '../../cloud-sync'
 import {
   getCloudSaveStatus,
@@ -462,7 +465,7 @@ export function ProfileTab({
                 key={tag}
                 className="inline-flex items-center rounded-full border border-white/90 bg-white/70 px-2.5 py-0.5 text-[11px] font-medium text-[var(--ink)] shadow-2xs"
               >
-                {tag}
+                {cleanTagText(tag)}
               </span>
             ))}
             {recommendationPreferences.tags.length > 4 && (

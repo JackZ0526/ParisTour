@@ -166,14 +166,17 @@ export function RecommendationPreferencesDialog({
 
   useEffect(() => {
     if (open) {
-      setDraft(value)
+      setDraft({
+        ...value,
+        tags: (value.tags || []).map(cleanTagText).filter(Boolean),
+      })
       setNaturalInput('')
       setIsExtracting(false)
       setExtractError(null)
     }
   }, [open, value])
 
-  const activeTags = draft.tags || []
+  const activeTags = (draft.tags || []).map(cleanTagText).filter(Boolean)
 
   function addTag(tag: string) {
     const cleaned = cleanTagText(tag)
