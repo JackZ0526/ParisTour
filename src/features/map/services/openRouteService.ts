@@ -18,6 +18,23 @@ const inflightSegmentGroups = new Map<
   Promise<MapRouteSegmentEntry[]>
 >()
 
+let serviceDisabledUntil = 0
+const CIRCUIT_BREAKER_COOLDOWN_MS = 10 * 60 * 1000 // 10 minutes
+
+export function isOpenRouteServiceDisabled(): boolean {
+  return Date.now() < serviceDisabledUntil
+}
+
+export function disableOpenRouteService(
+  cooldownMs = CIRCUIT_BREAKER_COOLDOWN_MS,
+): void {
+  serviceDisabledUntil = Date.now() + cooldownMs
+}
+
+export function resetOpenRouteServiceCircuitBreaker(): void {
+  serviceDisabledUntil = 0
+}
+
 interface RouteResponse {
   geometry?: { type?: unknown; coordinates?: unknown }
   distanceMeters?: unknown
@@ -51,6 +68,36 @@ function parseRouteResponse(
   }
 }
 
+export function buildFallbackStraightLineSegment(
+  profile: MapRouteProfile,
+  from: MapRoutePoint,
+  to: MapRoutePoint,
+  fromId: string,
+  toId: string,
+): MapRouteSegmentEntry {
+  const distance = haversineMeters([from.lng, from.lat], [to.lng, to.lat])
+  const speed = profile === 'driving-car' ? 10 : 1.2
+  const duration = Math.round(distance / speed)
+  return {
+    key: buildMapRouteSegmentKey(profile, from, to),
+    profile,
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [from.lng, from.lat],
+        [to.lng, to.lat],
+      ],
+    },
+    distanceMeters: Math.round(distance),
+    durationSeconds: duration,
+    updatedAt: Date.now(),
+    fromId,
+    toId,
+    from,
+    to,
+  }
+}
+
 export async function getOrFetchMapRoute(
   points: readonly MapRoutePoint[],
   profile: MapRouteProfile,
@@ -58,6 +105,29 @@ export async function getOrFetchMapRoute(
   const key = buildMapRouteKey(profile, points)
   const cached = getCachedMapRoute(key)
   if (cached) return { route: cached, fromCache: true }
+
+  if (isOpenRouteServiceDisabled()) {
+    const coordinates = points.map((p) => [p.lng, p.lat] as [number, number])
+    let totalDistance = 0
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const p1 = points[i]
+      const p2 = points[i + 1]
+      if (p1 && p2) {
+        totalDistance += haversineMeters([p1.lng, p1.lat], [p2.lng, p2.lat])
+      }
+    }
+    const speed = profile === 'driving-car' ? 10 : 1.2
+    const fallbackRoute: MapRouteCacheEntry = {
+      key,
+      profile,
+      geometry: { type: 'LineString', coordinates },
+      distanceMeters: Math.round(totalDistance),
+      durationSeconds: Math.round(totalDistance / speed),
+      updatedAt: Date.now(),
+    }
+    cacheMapRoute(fallbackRoute)
+    return { route: fallbackRoute, fromCache: true }
+  }
 
   const existing = inflightRoutes.get(key)
   // A StrictMode remount or a second consumer can share the same request. Treat
@@ -74,6 +144,13 @@ export async function getOrFetchMapRoute(
       error?: string
     }
     if (!response.ok) {
+      if (
+        response.status === 503 ||
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        disableOpenRouteService()
+      }
       throw new Error(payload.error || `道路路线请求失败（HTTP ${response.status}）`)
     }
     const route = parseRouteResponse(payload, key, profile)
@@ -196,19 +273,73 @@ export async function getOrFetchMapRouteSegments(
     return { segments: resolved as MapRouteSegmentEntry[], fetchedFromNetwork: false }
   }
 
+  // If service is disabled (e.g. 503 missing key), generate and cache straight-line fallbacks
+  if (isOpenRouteServiceDisabled()) {
+    const fallbackEntries: MapRouteSegmentEntry[] = []
+    for (let index = 0; index < segments.length; index += 1) {
+      if (resolved[index]) continue
+      const target = segments[index]
+      if (!target) continue
+      const fallback = buildFallbackStraightLineSegment(
+        profile,
+        target.from,
+        target.to,
+        target.fromId,
+        target.toId,
+      )
+      resolved[index] = fallback
+      fallbackEntries.push(fallback)
+    }
+    if (fallbackEntries.length > 0) {
+      cacheMapRouteSegments(fallbackEntries)
+    }
+    return {
+      segments: resolved as MapRouteSegmentEntry[],
+      fetchedFromNetwork: false,
+    }
+  }
+
   const groupKey = runGroupKey(profile, missingRuns)
   const work =
     inflightSegmentGroups.get(groupKey) ??
     startSegmentGroupWork(groupKey, profile, segments, missingRuns)
 
-  const newSegments = await work
-  for (const entry of newSegments) {
-    const slot = missingByEntryKey.get(runGroupEntryKey(entry))
-    if (slot !== undefined) resolved[slot] = entry
-  }
-  return {
-    segments: resolved as MapRouteSegmentEntry[],
-    fetchedFromNetwork: true,
+  try {
+    const newSegments = await work
+    for (const entry of newSegments) {
+      const slot = missingByEntryKey.get(runGroupEntryKey(entry))
+      if (slot !== undefined) resolved[slot] = entry
+    }
+    return {
+      segments: resolved as MapRouteSegmentEntry[],
+      fetchedFromNetwork: true,
+    }
+  } catch (error) {
+    if (isOpenRouteServiceDisabled()) {
+      const fallbackEntries: MapRouteSegmentEntry[] = []
+      for (let index = 0; index < segments.length; index += 1) {
+        if (resolved[index]) continue
+        const target = segments[index]
+        if (!target) continue
+        const fallback = buildFallbackStraightLineSegment(
+          profile,
+          target.from,
+          target.to,
+          target.fromId,
+          target.toId,
+        )
+        resolved[index] = fallback
+        fallbackEntries.push(fallback)
+      }
+      if (fallbackEntries.length > 0) {
+        cacheMapRouteSegments(fallbackEntries)
+      }
+      return {
+        segments: resolved as MapRouteSegmentEntry[],
+        fetchedFromNetwork: false,
+      }
+    }
+    throw error
   }
 }
 
@@ -256,11 +387,13 @@ function startSegmentGroupWork(
   })()
 
   inflightSegmentGroups.set(groupKey, work)
-  work.finally(() => {
-    if (inflightSegmentGroups.get(groupKey) === work) {
-      inflightSegmentGroups.delete(groupKey)
-    }
-  })
+  work
+    .catch(() => {})
+    .finally(() => {
+      if (inflightSegmentGroups.get(groupKey) === work) {
+        inflightSegmentGroups.delete(groupKey)
+      }
+    })
   return work
 }
 
@@ -281,6 +414,13 @@ async function fetchSegmentGroup(
     error?: string
   }
   if (!response.ok) {
+    if (
+      response.status === 503 ||
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      disableOpenRouteService()
+    }
     throw new Error(payload.error || `道路路线请求失败（HTTP ${response.status}）`)
   }
   return parseRouteResponse(payload, key, profile)

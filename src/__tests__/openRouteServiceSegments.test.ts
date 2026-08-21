@@ -9,6 +9,8 @@ import {
 } from '../features/map/services/mapRouteCache'
 import {
   getOrFetchMapRouteSegments,
+  isOpenRouteServiceDisabled,
+  resetOpenRouteServiceCircuitBreaker,
   splitPolylineByWaypoints,
   splitTotalsByPolylineLength,
   type MapRouteSegmentRequest,
@@ -24,6 +26,7 @@ beforeEach(() => {
     removeItem: (key: string) => storage.delete(key),
   })
   clearMapRouteCache()
+  resetOpenRouteServiceCircuitBreaker()
 })
 
 afterEach(() => {
@@ -337,5 +340,39 @@ describe('getOrFetchMapRouteSegments', () => {
       'B->C',
       'C->D',
     ])
+  })
+
+  it('trips circuit breaker and generates cached straight-line fallback segments on 503', async () => {
+    const fetchSpy = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        makeResponse(
+          { error: '服务器尚未配置 OPENROUTESERVICE_API_KEY' },
+          503,
+        ),
+      )
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const result = await getOrFetchMapRouteSegments(profile, [
+      { fromId: 'A', toId: 'B', from: a, to: b },
+    ])
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(isOpenRouteServiceDisabled()).toBe(true)
+    expect(result.fetchedFromNetwork).toBe(false)
+    expect(result.segments).toHaveLength(1)
+    expect(result.segments[0]?.geometry.coordinates).toEqual([
+      [a.lng, a.lat],
+      [b.lng, b.lat],
+    ])
+    expect(result.segments[0]?.distanceMeters).toBeGreaterThan(0)
+
+    // A second call should now immediately return the cached fallback without touching network
+    const secondResult = await getOrFetchMapRouteSegments(profile, [
+      { fromId: 'A', toId: 'B', from: a, to: b },
+    ])
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // Still 1! No new network calls
+    expect(secondResult.segments).toHaveLength(1)
+    expect(secondResult.fetchedFromNetwork).toBe(false)
   })
 })

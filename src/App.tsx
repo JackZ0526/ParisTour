@@ -49,7 +49,10 @@ import {
   buildDayMapRouteSegments,
   dayRouteSegmentsToRequests,
 } from './features/map/services/mapDayRoute'
-import { getOrFetchMapRouteSegments } from './features/map/services/openRouteService'
+import {
+  getOrFetchMapRouteSegments,
+  isOpenRouteServiceDisabled,
+} from './features/map/services/openRouteService'
 import { MapErrorBoundary } from './features/map/components/MapErrorBoundary'
 import { PENDING_HOTEL } from './features/hotel/constants/hotels'
 import { destinationBrandFromDestination } from './features/destination/services/tripCity'
@@ -329,7 +332,8 @@ export default function App() {
       itineraryIncrementalGenerating ||
       dayRegenerating ||
       dayRestoring ||
-      !routePrefetchFingerprint
+      !routePrefetchFingerprint ||
+      isOpenRouteServiceDisabled()
     ) {
       return
     }
@@ -341,11 +345,13 @@ export default function App() {
       let fetchedAny = false
       const worker = async () => {
         while (active) {
+          if (isOpenRouteServiceDisabled()) return
           const index = nextIndex
           nextIndex += 1
           const request = requests[index]
           if (!request) return
           for (let attempt = 0; attempt < 2 && active; attempt += 1) {
+            if (isOpenRouteServiceDisabled()) return
             try {
               const result = await getOrFetchMapRouteSegments(
                 request.profile,
@@ -354,7 +360,7 @@ export default function App() {
               if (result.fetchedFromNetwork) fetchedAny = true
               break
             } catch {
-              if (attempt === 0) {
+              if (attempt === 0 && !isOpenRouteServiceDisabled()) {
                 await new Promise((resolve) => window.setTimeout(resolve, 900))
               }
               // Keep prefetch silent; TripMap surfaces the final error if opened.
