@@ -43,7 +43,7 @@ function RoleToggle({
 
   return (
     <div
-      className="relative inline-flex rounded-full border border-white/80 bg-white/60 p-1 shadow-sm backdrop-blur-xl"
+      className="relative inline-flex rounded-full border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/10 p-1 shadow-sm backdrop-blur-xl"
       role="group"
       aria-label="权限"
     >
@@ -67,14 +67,14 @@ function RoleToggle({
             }}
             className={`relative isolate min-w-[3.75rem] sm:min-w-[4rem] rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none cursor-pointer ${
               active
-                ? 'text-[var(--paper)]'
-                : 'text-[var(--stone)] hover:text-[var(--ink)]'
+                ? 'text-[var(--paper)] dark:text-white'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
             } disabled:opacity-50`}
           >
             {active && (
               <motion.div
                 layoutId={`role-toggle-pill-${name}`}
-                className="absolute inset-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)]"
+                className="absolute inset-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)]"
                 animate={
                   hasInteracted
                     ? {
@@ -213,35 +213,35 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
         {/* Error Alert */}
         {error && (
-          <div className="flex items-start gap-2.5 rounded-2xl border border-red-200/80 bg-red-50/70 p-3 text-xs text-red-900 shadow-sm backdrop-blur-md">
-            <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-red-600" />
+          <div className="flex items-start gap-2.5 rounded-2xl border border-red-200/80 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/30 p-3 text-xs text-red-900 dark:text-red-300 shadow-sm backdrop-blur-md">
+            <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Success Info Alert */}
         {info && (
-          <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs text-emerald-900 shadow-sm backdrop-blur-md">
-            <CheckCircle2 size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-emerald-600" />
+          <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-950/30 p-3 text-xs text-emerald-900 dark:text-emerald-300 shadow-sm backdrop-blur-md">
+            <CheckCircle2 size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
             <span>{info}</span>
           </div>
         )}
 
         {/* Invite Form Card */}
-        <form onSubmit={onAdd} className="rounded-2xl border border-white/80 bg-white/50 p-4 shadow-sm backdrop-blur-md space-y-3">
+        <form onSubmit={onAdd} className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/50 dark:bg-white/5 p-4 shadow-sm backdrop-blur-md space-y-3">
           <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)]">
             <UserPlus size={14} className="text-[var(--copper)]" />
             <span>邀请新成员</span>
           </label>
           <div className="relative w-full">
-            <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--stone)]" />
+            <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--stone)] dark:text-zinc-400" />
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="partner@example.com"
-              className="w-full rounded-2xl border border-white/90 bg-white/85 pl-9 pr-3 py-2.5 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white backdrop-blur-md"
+              className="w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/85 dark:bg-white/5 pl-9 pr-3 py-2.5 text-xs sm:text-sm text-[var(--ink)] dark:text-zinc-100 placeholder:text-[var(--stone)]/60 dark:placeholder:text-zinc-500 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white dark:focus:bg-white/10 backdrop-blur-md"
             />
           </div>
           <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -249,9 +249,9 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
             <button
               type="submit"
               disabled={busy || !email.trim()}
-              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] dark:from-[var(--copper)] dark:to-[#9a542b] px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] dark:shadow-[0_4px_14px_rgba(212,131,84,0.3)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+              <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 dark:via-white/30 to-transparent" />
               <UserPlus size={14} strokeWidth={2.2} />
               <span>{busy ? '发送中…' : '发送邀请'}</span>
             </button>
@@ -265,7 +265,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
               <Users size={14} className="text-[var(--sage)]" />
               <span>已加入旅伴</span>
             </h3>
-            <span className="text-xs text-[var(--stone)]">
+            <span className="text-xs text-[var(--stone)] dark:text-zinc-400">
               {loadingList ? '加载中…' : `共 ${shares.length} 人`}
             </span>
           </div>
@@ -285,7 +285,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   {[1, 2].map((i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/40 p-3.5 shadow-2xs"
+                      className="flex items-center justify-between rounded-2xl border border-white/80 dark:border-white/10 bg-white/40 dark:bg-white/5 p-3.5 shadow-2xs"
                     >
                       <div className="space-y-1.5">
                         <div className="h-3.5 w-40 rounded-full day-tab-shimmer bg-[var(--mist)]" />
@@ -308,7 +308,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                     <Users size={20} strokeWidth={1.8} />
                   </div>
                   <p className="text-sm font-medium text-[var(--ink)]">暂无共享协作者</p>
-                  <p className="text-xs text-[var(--stone)] max-w-xs mx-auto">
+                  <p className="text-xs text-[var(--stone)] dark:text-zinc-400 max-w-xs mx-auto">
                     在上方输入同伴邮箱，即可一键邀请旅伴实时同步并共同规划巴黎之旅
                   </p>
                 </motion.div>
@@ -327,19 +327,19 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-[#202b26] hover:shadow-xs"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 font-display text-sm font-semibold text-[var(--sage)] shadow-inner">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 font-display text-sm font-semibold text-[var(--sage)] dark:text-[#88b3a0] shadow-inner">
                           {s.invitee_email.slice(0, 1).toUpperCase()}
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-xs sm:text-sm font-medium text-[var(--ink)]">
                             {s.invitee_email}
                           </p>
-                          <p className="text-[11px] text-[var(--stone)]">
+                          <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400">
                             {s.role === 'editor' ? '✨ 可共同编辑行程内容' : '👁️ 仅查看，不可修改'}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5 dark:border-white/10">
                         <RoleToggle
                           name={`role-${s.id}`}
                           value={s.role}
@@ -350,7 +350,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                           type="button"
                           disabled={busy}
                           onClick={() => setPendingRemoveShare(s)}
-                          className="inline-flex items-center gap-1 rounded-full border border-red-200/60 bg-red-50/50 hover:bg-red-100/80 px-2.5 py-1 text-xs font-medium text-red-600/90 transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
+                          className="inline-flex items-center gap-1 rounded-full border border-red-200/60 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/40 hover:bg-red-100/80 dark:hover:bg-red-900/50 px-2.5 py-1 text-xs font-medium text-red-600/90 dark:text-red-300 transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
                         >
                           <Trash2 size={12} />
                           <span>移除</span>
