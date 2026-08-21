@@ -199,3 +199,7 @@ export {
   suggestPopularDestinations,
   type DestinationSuggestion,
 } from './business/destination'
+
+export {
+  extractPreferenceTags,
+} from './business/preference'

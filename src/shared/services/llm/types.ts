@@ -41,6 +41,7 @@ export type LlmTaskKind =
   | 'itineraryDayGenerate'
   | 'itineraryStart'
   | 'destinationSuggest'
+  | 'preferenceExtract'
   | 'router'
 
 export type ResolvedThinking = {

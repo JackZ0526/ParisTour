@@ -454,6 +454,25 @@ export function ProfileTab({
           </div>
         </div>
 
+        {/* Active Preference Tags Roll Preview */}
+        {recommendationPreferences?.tags && recommendationPreferences.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-0.5">
+            {recommendationPreferences.tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center rounded-full border border-white/90 bg-white/70 px-2.5 py-0.5 text-[11px] font-medium text-[var(--ink)] shadow-2xs"
+              >
+                {tag}
+              </span>
+            ))}
+            {recommendationPreferences.tags.length > 4 && (
+              <span className="inline-flex items-center rounded-full border border-white/80 bg-white/50 px-2 py-0.5 text-[10.5px] font-medium text-[var(--stone)]">
+                +{recommendationPreferences.tags.length - 4} 项
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Primary Modal Trigger Button */}
         <button
           type="button"

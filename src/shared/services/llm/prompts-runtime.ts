@@ -58,6 +58,7 @@ const TASK_THINKING: Record<
   itineraryDayGenerate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryStart: { baseline: 'low', min: 'off', max: 'low' },
   destinationSuggest: { baseline: 'low', min: 'off', max: 'low' },
+  preferenceExtract: { baseline: 'low', min: 'off', max: 'low' },
   router: { baseline: 'low', min: 'off', max: 'low' },
 }
 
