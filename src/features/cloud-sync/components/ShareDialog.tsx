@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  AlertCircle,
+  CheckCircle2,
+  Mail,
+  Share2,
+  Sparkles,
+  Trash2,
+  UserPlus,
+  Users,
+} from 'lucide-react'
+import {
   listTripShares,
   removeTripShare,
   sendShareInviteEmail,
@@ -31,9 +41,11 @@ function RoleToggle({
   disabled?: boolean
   name: string
 }) {
+  const [hasInteracted, setHasInteracted] = useState(false)
+
   return (
     <div
-      className="inline-flex rounded-full border border-white/80 bg-white/55 p-1 shadow-sm backdrop-blur-md"
+      className="relative inline-flex rounded-full border border-white/80 bg-white/60 p-1 shadow-sm backdrop-blur-xl"
       role="group"
       aria-label="权限"
     >
@@ -51,14 +63,36 @@ function RoleToggle({
             name={name}
             disabled={disabled}
             aria-pressed={active}
-            onClick={() => onChange(opt.id)}
-            className={`min-w-[4rem] rounded-full px-3 py-1 text-xs font-medium transition ${
+            onClick={() => {
+              setHasInteracted(true)
+              onChange(opt.id)
+            }}
+            className={`relative isolate min-w-[3.75rem] sm:min-w-[4rem] rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none cursor-pointer ${
               active
-                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
+                ? 'text-[var(--paper)]'
                 : 'text-[var(--stone)] hover:text-[var(--ink)]'
             } disabled:opacity-50`}
           >
-            {opt.label}
+            {active && (
+              <motion.div
+                layoutId={`role-toggle-pill-${name}`}
+                className="absolute inset-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)]"
+                animate={
+                  hasInteracted
+                    ? {
+                        scaleX: [1, 1.12, 0.96, 1],
+                        scaleY: [1, 0.9, 1.03, 1],
+                      }
+                    : undefined
+                }
+                transition={{
+                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                  scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                  scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                }}
+              />
+            )}
+            <span className="relative z-10">{opt.label}</span>
           </button>
         )
       })}
@@ -161,59 +195,84 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       onClose={onClose}
       overlayZIndex={2000}
       ariaLabelledBy={titleId}
-      className={`flex max-h-[min(88vh,100dvh)] max-w-lg flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl`}
+      className={`flex max-h-[min(88vh,100dvh)] max-w-lg flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)]`}
     >
-      <header className="relative shrink-0 border-b border-[var(--mist)] px-5 pb-4 pt-2 sm:pt-5 sm:px-6">
+      {/* Header Section */}
+      <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
           <div>
-            <h2 id={titleId} className="font-display text-2xl text-[var(--ink)]">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)] mb-2">
+              <Sparkles size={11} strokeWidth={2.2} />
+              <span>PARIS TOUR · 协作中心</span>
+            </div>
+            <h2 id={titleId} className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
               分享与协作
             </h2>
-            <p className="mt-1 text-sm text-[var(--stone)]">
-              邀请旅伴一起查看或编辑行程；修改会实时同步到云端。
+            <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
+              邀请旅伴一起查看或编辑行程；所有改动将通过云端实时安全同步。
             </p>
           </div>
           <CloseIconButton onClick={onClose} className="hidden sm:flex" />
         </div>
       </header>
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
+      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+        {/* Error Alert */}
         {error && (
-          <p className="rounded-xl bg-red-50/80 border border-red-200/60 px-4 py-3 text-sm text-red-800 backdrop-blur-sm">{error}</p>
-        )}
-        {info && (
-          <p className="rounded-xl bg-emerald-50/80 border border-emerald-200/60 px-4 py-3 text-sm text-emerald-900 backdrop-blur-sm">{info}</p>
+          <div className="flex items-start gap-2.5 rounded-2xl border border-red-200/80 bg-red-50/70 p-3 text-xs text-red-900 shadow-sm backdrop-blur-md">
+            <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-red-600" />
+            <span>{error}</span>
+          </div>
         )}
 
-        <form onSubmit={onAdd} className="space-y-3">
-          <label className="block text-xs font-medium text-[var(--stone)]">
-            邀请新成员
-            <div className="mt-1.5 flex flex-wrap gap-2">
+        {/* Success Info Alert */}
+        {info && (
+          <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs text-emerald-900 shadow-sm backdrop-blur-md">
+            <CheckCircle2 size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-emerald-600" />
+            <span>{info}</span>
+          </div>
+        )}
+
+        {/* Invite Form Card */}
+        <form onSubmit={onAdd} className="rounded-2xl border border-white/80 bg-white/50 p-4 shadow-sm backdrop-blur-md space-y-3">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)]">
+            <UserPlus size={14} className="text-[var(--copper)]" />
+            <span>邀请新成员</span>
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1 min-w-[160px]">
+              <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--stone)]" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="partner@example.com"
-                className="min-w-0 flex-1 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-sm text-[var(--ink)] shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] backdrop-blur-md"
+                className="w-full rounded-2xl border border-white/90 bg-white/80 pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white backdrop-blur-md"
               />
-              <RoleToggle value={role} onChange={setRole} disabled={busy} name="newRole" />
-              <button
-                type="submit"
-                disabled={busy || !email.trim()}
-                className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:bg-[var(--ink)]/90 disabled:opacity-50"
-              >
-                {busy ? '处理中…' : '发送邀请'}
-              </button>
             </div>
-          </label>
+            <RoleToggle value={role} onChange={setRole} disabled={busy} name="newRole" />
+            <button
+              type="submit"
+              disabled={busy || !email.trim()}
+              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+              <Share2 size={13} strokeWidth={2.2} />
+              <span>{busy ? '发送中…' : '发送邀请'}</span>
+            </button>
+          </div>
         </form>
 
-        <section>
-          <div className="mb-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-sm font-medium text-[var(--ink)]">已分享</h3>
+        {/* Collaborators List Section */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs sm:text-sm font-semibold text-[var(--ink)] flex items-center gap-1.5">
+              <Users size={14} className="text-[var(--sage)]" />
+              <span>已加入旅伴</span>
+            </h3>
             <span className="text-xs text-[var(--stone)]">
-              {loadingList ? '加载中…' : `${shares.length} 人`}
+              {loadingList ? '加载中…' : `共 ${shares.length} 人`}
             </span>
           </div>
 
@@ -226,41 +285,37 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
-                  className="divide-y divide-[var(--mist)] border-y border-[var(--mist)]"
+                  className="space-y-2"
                   aria-hidden="true"
                 >
                   {[1, 2].map((i) => (
                     <div
                       key={i}
-                      className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between px-1"
+                      className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/40 p-3.5 shadow-2xs"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex h-5 items-center">
-                          <div className="h-3.5 w-40 rounded-full day-tab-shimmer bg-[var(--mist)]" />
-                        </div>
-                        <div className="mt-0.5 flex h-4 items-center">
-                          <div className="h-3 w-28 rounded-full day-tab-shimmer bg-[var(--mist)]/70" />
-                        </div>
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-40 rounded-full day-tab-shimmer bg-[var(--mist)]" />
+                        <div className="h-3 w-28 rounded-full day-tab-shimmer bg-[var(--mist)]/70" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-7 w-36 rounded-lg day-tab-shimmer bg-[var(--mist)]/60" />
-                        <div className="h-7 w-9 rounded-md day-tab-shimmer bg-[var(--mist)]/40" />
-                      </div>
+                      <div className="h-7 w-28 rounded-full day-tab-shimmer bg-[var(--mist)]/60" />
                     </div>
                   ))}
                 </motion.div>
               ) : shares.length === 0 ? (
                 <motion.div
                   key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18 }}
-                  className="border border-dashed border-[var(--mist)] px-4 py-8 text-center"
+                  className="rounded-2xl border border-dashed border-[var(--copper)]/25 bg-white/40 px-4 py-8 text-center backdrop-blur-sm space-y-2"
                 >
-                  <p className="text-sm text-[var(--stone)]">还没有共享对象</p>
-                  <p className="mt-1 text-xs text-[var(--stone)]/80">
-                    上方输入邮箱即可邀请同伴一起看行程
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
+                    <Users size={20} strokeWidth={1.8} />
+                  </div>
+                  <p className="text-sm font-medium text-[var(--ink)]">暂无共享协作者</p>
+                  <p className="text-xs text-[var(--stone)] max-w-xs mx-auto">
+                    在上方输入同伴邮箱，即可一键邀请旅伴实时同步并共同规划巴黎之旅
                   </p>
                 </motion.div>
               ) : (
@@ -270,22 +325,27 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18 }}
-                  className="divide-y divide-[var(--mist)] border-y border-[var(--mist)]"
+                  className="space-y-2.5"
                 >
                   {shares.map((s) => (
                     <li
                       key={s.id}
-                      className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between transition hover:bg-[var(--mist)]/20 px-1 rounded-lg"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 bg-white/65 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 hover:shadow-xs"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[var(--ink)]">
-                          {s.invitee_email}
-                        </p>
-                        <p className="mt-0.5 text-xs text-[var(--stone)]">
-                          {s.role === 'editor' ? '可编辑行程内容' : '仅查看，不可修改'}
-                        </p>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 font-display text-sm font-semibold text-[var(--sage)] shadow-inner">
+                          {s.invitee_email.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs sm:text-sm font-medium text-[var(--ink)]">
+                            {s.invitee_email}
+                          </p>
+                          <p className="text-[11px] text-[var(--stone)]">
+                            {s.role === 'editor' ? '✨ 可共同编辑行程内容' : '👁️ 仅查看，不可修改'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5">
                         <RoleToggle
                           name={`role-${s.id}`}
                           value={s.role}
@@ -296,9 +356,10 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                           type="button"
                           disabled={busy}
                           onClick={() => setPendingRemoveShare(s)}
-                          className="px-2 py-1.5 text-xs text-[var(--copper)] transition hover:underline disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-full border border-red-200/60 bg-red-50/50 hover:bg-red-100/80 px-2.5 py-1 text-xs font-medium text-red-600/90 transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
                         >
-                          移除
+                          <Trash2 size={12} />
+                          <span>移除</span>
                         </button>
                       </div>
                     </li>
