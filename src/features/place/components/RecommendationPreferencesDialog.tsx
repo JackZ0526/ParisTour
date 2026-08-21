@@ -301,9 +301,9 @@ export function RecommendationPreferencesDialog({
                   onClick={clearAllTags}
                   title="清空偏好池"
                   aria-label="清空偏好池"
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--stone)] hover:bg-red-50 hover:text-red-600 transition-all active:scale-90 cursor-pointer"
+                  className="group relative isolate flex h-6 w-6 items-center justify-center rounded-full border border-black/8 bg-white/75 text-[var(--stone)] shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,1)] backdrop-blur-md transition-all hover:border-red-200 hover:bg-red-50/90 hover:text-red-600 hover:shadow-xs active:scale-90 cursor-pointer"
                 >
-                  <Trash2 size={13} strokeWidth={1.8} />
+                  <Trash2 size={12.5} strokeWidth={1.8} />
                 </button>
               )}
             </div>
