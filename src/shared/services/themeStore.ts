@@ -2,9 +2,9 @@
  * Theme Store for Paris Tour
  *
  * Supports 3 modes:
- * - 'light': Classic French Pale Paper theme (default)
+ * - 'light': Classic French Pale Paper theme
  * - 'dark': Midnight Paris (Noir Emeraude & Champagne Gold)
- * - 'system': Automatically follows OS / browser dark mode preference
+ * - 'system': Automatically follows OS / browser dark mode preference (default)
  */
 
 import { useSyncExternalStore } from 'react'
@@ -93,10 +93,10 @@ export function initTheme(): void {
     if (saved === 'light' || saved === 'dark' || saved === 'system') {
       currentPreference = saved
     } else {
-      currentPreference = 'light' // Default to classic light theme if unset
+      currentPreference = 'system'
     }
   } catch {
-    currentPreference = 'light'
+    currentPreference = 'system'
   }
 
   const resolved = resolveTheme(currentPreference)
@@ -125,7 +125,7 @@ export function initTheme(): void {
  * React hook to read and update theme state.
  */
 export function useTheme() {
-  const preference = useSyncExternalStore(subscribeTheme, getThemePreference, () => 'light' as ThemePreference)
+  const preference = useSyncExternalStore(subscribeTheme, getThemePreference, () => 'system' as ThemePreference)
   const resolved = resolveTheme(preference)
 
   return {
@@ -140,6 +140,6 @@ export function useTheme() {
  * Resets theme store state (primarily for unit tests).
  */
 export function _resetThemeStoreForTests(): void {
-  currentPreference = 'light'
+  currentPreference = 'system'
   listeners.clear()
 }

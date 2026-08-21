@@ -13,11 +13,13 @@ import {
 describe('Theme Store & Dark Mode', () => {
   let storage: Record<string, string> = {}
   let classList: Set<string> = new Set()
+  let systemPrefersDark = false
 
   beforeEach(() => {
     _resetThemeStoreForTests()
     storage = {}
     classList = new Set()
+    systemPrefersDark = false
 
     const mockLocalStorage = {
       getItem: vi.fn((key: string) => storage[key] ?? null),
@@ -41,7 +43,7 @@ describe('Theme Store & Dark Mode', () => {
     }
 
     const mockMatchMedia = vi.fn((query: string) => ({
-      matches: false,
+      matches: systemPrefersDark,
       media: query,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -106,6 +108,14 @@ describe('Theme Store & Dark Mode', () => {
     storage['paris_tour_theme_mode'] = 'dark'
     initTheme()
     expect(getThemePreference()).toBe('dark')
+    expect(classList.has('dark')).toBe(true)
+  })
+
+  it('defaults to the system preference when no saved preference exists', () => {
+    systemPrefersDark = true
+    initTheme()
+
+    expect(getThemePreference()).toBe('system')
     expect(classList.has('dark')).toBe(true)
   })
 })
