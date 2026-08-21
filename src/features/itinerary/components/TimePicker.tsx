@@ -86,14 +86,29 @@ function TimeWheelColumn<T extends number>({
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const idx = items.indexOf(value)
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevIdx = Math.max(0, idx - 1)
+      handleItemClick(prevIdx)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextIdx = Math.min(items.length - 1, idx + 1)
+      handleItemClick(nextIdx)
+    }
+  }
+
   return (
     <div
       ref={containerRef}
       onScroll={handleScroll}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
       role="listbox"
       aria-label={ariaLabel}
       style={{ height: `${WHEEL_HEIGHT}px` }}
-      className="relative w-full snap-y snap-mandatory overflow-y-auto scroll-smooth scrollbar-none select-none touch-pan-y"
+      className="relative w-full snap-y snap-mandatory overflow-y-auto scroll-smooth select-none touch-pan-y outline-none focus-visible:ring-1 focus-visible:ring-[var(--copper)]/30 rounded-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Top spacer (1 item height) to vertically center the first item in the lens */}
       <div style={{ height: `${ITEM_HEIGHT}px` }} aria-hidden />
@@ -113,7 +128,7 @@ function TimeWheelColumn<T extends number>({
                 : 'text-sm font-medium text-[var(--stone)]/40 hover:text-[var(--stone)]/80 scale-90'
             }`}
           >
-            <span className="tabular-nums font-mono">{formatItem(item)}</span>
+            <span className="tabular-nums font-mono leading-none">{formatItem(item)}</span>
           </div>
         )
       })}
@@ -241,37 +256,40 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               className="overflow-hidden border-t border-[var(--mist)]/70 px-3.5 pb-3.5 pt-2"
             >
               {/* iOS Wheel Body */}
-              <div className="relative my-1.5 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-1.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
-                {/* Center Highlight Selection Lens (Frosted Glass with warm copper tint) */}
-                <div
-                  className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 rounded-xl border border-[var(--copper)]/35 bg-[var(--copper)]/12 shadow-[0_2px_8px_rgba(181,106,60,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-xs"
-                  style={{ height: `${ITEM_HEIGHT}px` }}
-                />
-
-                {/* Top & Bottom Depth Gradients for 3D Cylinder effect */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent rounded-t-2xl z-10" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent rounded-b-2xl z-10" />
-
+              <div className="relative my-1.5 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
                 {/* Column Headers (小时 / 分钟) */}
-                <div className="relative z-10 grid grid-cols-2 text-center text-[10.5px] font-semibold text-[var(--stone)]/75 pt-0.5 pb-0.5">
+                <div className="relative z-20 grid grid-cols-2 text-center text-[11px] font-semibold text-[var(--stone)]/80 pb-1.5 border-b border-black/[0.04]">
                   <span>小时</span>
                   <span>分钟</span>
                 </div>
 
-                {/* Dual Scroll Columns */}
-                <div className="relative z-10 grid grid-cols-2 items-center">
-                  <TimeWheelColumn
-                    items={HOURS}
-                    value={draftHour}
-                    onChange={setDraftHour}
-                    ariaLabel="小时滚轮选择"
+                {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
+                <div className="relative mt-1" style={{ height: `${WHEEL_HEIGHT}px` }}>
+                  {/* Center Highlight Selection Lens: Exactly in the middle [38px, 76px] */}
+                  <div
+                    className="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 rounded-xl border border-[var(--copper)]/35 bg-[var(--copper)]/12 shadow-[0_2px_8px_rgba(181,106,60,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-xs"
+                    style={{ height: `${ITEM_HEIGHT}px` }}
                   />
-                  <TimeWheelColumn
-                    items={minuteOptions}
-                    value={draftMinute}
-                    onChange={setDraftMinute}
-                    ariaLabel="分钟滚轮选择"
-                  />
+
+                  {/* Top & Bottom Depth Gradients for 3D Cylinder effect */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent z-10 pointer-events-none" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent z-10 pointer-events-none" />
+
+                  {/* Dual Scroll Columns */}
+                  <div className="relative z-0 grid grid-cols-2 items-center h-full">
+                    <TimeWheelColumn
+                      items={HOURS}
+                      value={draftHour}
+                      onChange={setDraftHour}
+                      ariaLabel="小时滚轮选择"
+                    />
+                    <TimeWheelColumn
+                      items={minuteOptions}
+                      value={draftMinute}
+                      onChange={setDraftMinute}
+                      ariaLabel="分钟滚轮选择"
+                    />
+                  </div>
                 </div>
               </div>
 
