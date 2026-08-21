@@ -530,7 +530,7 @@ export function ProfileTab({
       {/* ========================================================================= */}
       {/* Row 3: Appearance Theme Selector (外观与色彩模式)                          */}
       {/* ========================================================================= */}
-      <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-3.5 transition-colors`}>
+      <div className={`appearance-theme-card rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 space-y-3.5 transition-colors`}>
         <div className="flex items-center justify-between border-b border-[var(--mist)]/60 dark:border-white/10 pb-3">
           <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
             <Palette size={16} className="text-[var(--copper)]" />
