@@ -13,7 +13,6 @@ import {
   Plane,
   Share2,
   Sparkles,
-  User,
 } from 'lucide-react'
 import { useAuth } from './features/auth/authContext'
 import { useTripCore } from './hooks/useTripCore'
@@ -41,6 +40,8 @@ import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { BottomNavBar } from './features/navigation/components/BottomNavBar'
 import { TopNavSegment } from './features/navigation/components/TopNavSegment'
 import { ProfileTab } from './features/navigation/components/ProfileTab'
+import { UserAvatarView } from './shared/components/UserAvatarView'
+import { useUserAvatar } from './features/auth/services/avatarStore'
 import type { AppTab } from './features/navigation/types'
 const TripMap = React.lazy(() =>
   import('./features/map/components/TripMap').then((m) => ({ default: m.TripMap })),
@@ -140,6 +141,7 @@ export default function App() {
     refreshTrips,
     tripSyncEpoch,
   } = useAuth()
+  const { avatar } = useUserAvatar(email)
   const readOnly = !canEdit
   const {
     shareOpen,
@@ -715,12 +717,16 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleSelectTab('profile')}
-                className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95"
+                className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95 cursor-pointer"
                 title="查看个人中心与偏好"
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--copper)]/15 text-xs font-bold text-[var(--copper)]">
-                  {email ? email.charAt(0).toUpperCase() : <User size={13} />}
-                </div>
+                <UserAvatarView
+                  avatar={avatar}
+                  email={email}
+                  size="sm"
+                  shape="circle"
+                  className="border border-white/90"
+                />
                 <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
                   {email}
                 </span>

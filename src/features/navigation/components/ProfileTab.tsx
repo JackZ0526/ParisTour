@@ -1,8 +1,9 @@
-import { useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { motion } from 'framer-motion'
 import {
   Archive,
   CalendarDays,
+  Camera,
   Check,
   ChevronRight,
   Compass,
@@ -20,6 +21,9 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
+import { UserAvatarView } from '../../../shared/components/UserAvatarView'
+import { useUserAvatar } from '../../auth/services/avatarStore'
+import { AvatarPickerDialog } from './AvatarPickerDialog'
 import {
   BASE_TAG_PILL,
   cleanTagText,
@@ -108,7 +112,8 @@ export function ProfileTab({
   tripStats,
 }: ProfileTabProps) {
   const cloudSync = useLiveCloudSync()
-  const initialLetter = email ? email.slice(0, 1).toUpperCase() : 'P'
+  const { avatar } = useUserAvatar(email)
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
 
   const roleLabel =
     role === 'owner'
@@ -147,17 +152,34 @@ export function ProfileTab({
         <div className="relative z-10 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-              {/* Luxury Frosted Avatar with Live Cloud Sync Green Dot */}
-              <div className="relative shrink-0">
-                <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-[#f8f1eb] via-white to-[#eef4f0] font-display text-xl sm:text-2xl font-semibold text-[var(--copper)] shadow-[0_8px_20px_rgba(181,106,60,0.15),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
-                  {initialLetter}
-                </div>
+              {/* Luxury Frosted Avatar with Live Cloud Sync Green Dot and Edit Trigger */}
+              <div className="relative shrink-0 group">
+                <button
+                  type="button"
+                  onClick={() => setAvatarPickerOpen(true)}
+                  className="relative block rounded-2xl transition-transform active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--copper)]"
+                  title="点击定制个性头像"
+                  aria-label="点击定制个性头像"
+                >
+                  <UserAvatarView
+                    avatar={avatar}
+                    email={email}
+                    size="lg"
+                    shape="squircle"
+                    className="group-hover:shadow-[0_10px_25px_rgba(181,106,60,0.25)] transition-shadow duration-200"
+                  />
+
+                  {/* Floating Camera Edit Badge */}
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white/90 bg-white/95 text-[var(--copper)] shadow-xs transition-transform duration-200 group-hover:scale-110">
+                    <Camera size={11} strokeWidth={2.2} />
+                  </span>
+                </button>
 
                 {/* Cloud Real-Time Live Sync Status Dot */}
                 {cloudSync.enabled && (
                   <span
                     title={cloudSync.label}
-                    className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center cursor-help"
+                    className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center cursor-help pointer-events-none"
                   >
                     {cloudSync.isBusy ? (
                       <span className="relative flex h-3.5 w-3.5">
@@ -518,6 +540,13 @@ export function ProfileTab({
         <p>Paris Tour v0.7.0 · Supabase 端到端加密安全同步</p>
         <p>Made with ❤️ for Paris Explorers</p>
       </div>
+
+      {/* Avatar Customization Modal */}
+      <AvatarPickerDialog
+        open={avatarPickerOpen}
+        onClose={() => setAvatarPickerOpen(false)}
+        email={email}
+      />
     </motion.div>
   )
 }
