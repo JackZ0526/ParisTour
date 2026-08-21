@@ -308,7 +308,11 @@ export function RecommendationPreferencesDialog({
             </div>
 
             {/* Tag Pool Container Box */}
-            <div className="min-h-[104px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
+            <motion.div
+              layout="size"
+              transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+              className="min-h-[104px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl"
+            >
               {activeTags.length === 0 ? (
                 <div className="flex min-h-[76px] flex-col items-center justify-center text-center p-1">
                   <p className="text-xs font-medium text-[var(--stone)]">
@@ -350,11 +354,15 @@ export function RecommendationPreferencesDialog({
                   </AnimatePresence>
                 </div>
               )}
-            </div>
+            </motion.div>
           </section>
 
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
-          <section className="space-y-2.5">
+          <motion.section
+            layout="position"
+            transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-2.5"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[var(--stone)] flex items-center gap-1.5">
                 <Sparkles size={13} className="text-amber-600" />
@@ -398,10 +406,14 @@ export function RecommendationPreferencesDialog({
                 </p>
               )}
             </div>
-          </section>
+          </motion.section>
 
           {/* 4. Natural Language Smart Input Extractor (自然语言提取) */}
-          <section className="rounded-2xl border border-white/80 bg-white/55 p-4 shadow-sm backdrop-blur-md space-y-2.5">
+          <motion.section
+            layout="position"
+            transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+            className="rounded-2xl border border-white/80 bg-white/55 p-4 shadow-sm backdrop-blur-md space-y-2.5"
+          >
             <label className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Wand2 size={14} className="text-[var(--copper)]" />
@@ -458,7 +470,7 @@ export function RecommendationPreferencesDialog({
                 </button>
               </div>
             </form>
-          </section>
+          </motion.section>
         </div>
 
         {/* Footer Action Bar */}
