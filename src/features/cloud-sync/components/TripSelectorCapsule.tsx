@@ -53,29 +53,38 @@ export function TripSelectorCapsule({
 }: TripSelectorCapsuleProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   const isShared = activeTrip ? activeTrip.role !== 'owner' : false
   const canSwitch = trips.length > 1
 
-  // Close dropdown on click outside
+  // Handle opening and measuring button location
+  const toggleOpen = () => {
+    if (!canSwitch) return
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const popoverWidth = Math.min(300, window.innerWidth - 32)
+      let left = rect.left
+      if (left + popoverWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - 16 - popoverWidth)
+      }
+      setPopoverPos({
+        top: rect.bottom + 6,
+        left: Math.max(16, left),
+      })
+    }
+    setIsOpen((prev) => !prev)
+  }
+
+  // Close on ESC
   useEffect(() => {
     if (!isOpen) return
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false)
-      }
-    }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setIsOpen(false)
     }
-    document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleKeyDown)
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen])
@@ -122,16 +131,17 @@ export function TripSelectorCapsule({
         : '只读'
 
   return (
-    <div ref={dropdownRef} className={`relative inline-block ${className}`}>
+    <div className={`relative inline-flex shrink-0 ${className}`}>
       {/* Trigger Capsule Button */}
       <button
+        ref={buttonRef}
         type="button"
         disabled={!canSwitch}
-        onClick={() => canSwitch && setIsOpen((prev) => !prev)}
+        onClick={toggleOpen}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={`当前行程：${displayTitle}，点击切换`}
-        className={`group relative isolate flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--ink)] shadow-sm backdrop-blur-md transition-all duration-200 ${
+        className={`group relative isolate inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/80 bg-white/70 px-2.5 py-0.5 text-xs font-medium text-[var(--ink)] shadow-sm backdrop-blur-md transition-all duration-200 ${
           canSwitch
             ? 'cursor-pointer hover:bg-white/95 hover:shadow hover:border-white active:scale-95'
             : 'cursor-default opacity-90'
@@ -155,13 +165,13 @@ export function TripSelectorCapsule({
         </span>
 
         {/* Title / Owner Handle */}
-        <span className="max-w-[130px] truncate text-[11px] font-medium tracking-tight text-[var(--ink)] sm:max-w-[160px]">
+        <span className="max-w-[110px] truncate text-[11px] font-medium tracking-tight text-[var(--ink)] sm:max-w-[150px]">
           {displayTitle}
         </span>
 
         {/* Micro Role Pill */}
         <span
-          className={`${glassCapsuleSurfaceClass} ${roleTone} inline-flex items-center px-1.5 py-0.2 text-[9.5px] font-semibold leading-tight`}
+          className={`${glassCapsuleSurfaceClass} ${roleTone} inline-flex shrink-0 items-center px-1.5 py-0.2 text-[9.5px] font-semibold leading-tight`}
         >
           {roleText}
         </span>
@@ -178,27 +188,41 @@ export function TripSelectorCapsule({
         )}
       </button>
 
-      {/* Dropdown Menu Popover */}
+      {/* Floating Popover Overlay */}
       <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            role="listbox"
-            aria-label="选择行程"
-            className={`absolute left-0 top-full z-50 mt-2 w-[270px] sm:w-[300px] overflow-hidden rounded-2xl p-2 shadow-[0_16px_40px_rgba(0,0,0,0.12),inset_0_1px_1.5px_rgba(255,255,255,1)] ${glassModalSurfaceClass}`}
-          >
-            {/* Popover Header */}
-            <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--mist)]/50 pb-2">
-              <span className="text-[10px] font-bold tracking-[0.16em] uppercase text-[var(--stone)]">
-                行程空间切换
-              </span>
-              <span className="text-[10.5px] text-[var(--stone)]/80">
-                共 {trips.length} 个行程
-              </span>
-            </div>
+        {isOpen && popoverPos && (
+          <div className="fixed inset-0 z-50 overflow-hidden">
+            {/* Click-outside backdrop */}
+            <div
+              className="absolute inset-0 bg-black/10 backdrop-blur-[1px] transition-opacity"
+              onClick={() => setIsOpen(false)}
+            />
+
+            {/* Popover Card */}
+            <motion.div
+              style={{
+                position: 'fixed',
+                top: popoverPos.top,
+                left: popoverPos.left,
+                width: 'min(300px, calc(100vw - 32px))',
+              }}
+              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.96 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              role="listbox"
+              aria-label="选择行程"
+              className={`overflow-hidden rounded-3xl p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] ${glassModalSurfaceClass}`}
+            >
+              {/* Popover Header */}
+              <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--mist)]/50 pb-2">
+                <span className="text-[10px] font-bold tracking-[0.16em] uppercase text-[var(--stone)]">
+                  行程空间切换
+                </span>
+                <span className="text-[10.5px] text-[var(--stone)]/80">
+                  共 {trips.length} 个行程
+                </span>
+              </div>
 
             {/* Trips List */}
             <div className="mt-1.5 max-h-[260px] space-y-1 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -308,8 +332,9 @@ export function TripSelectorCapsule({
               })}
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+        </div>
+      )}
+    </AnimatePresence>
+  </div>
+)
 }
