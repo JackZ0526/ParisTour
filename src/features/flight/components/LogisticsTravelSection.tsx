@@ -288,7 +288,7 @@ export function LogisticsTravelSection({
                 </div>
                 {(!outbound || !inbound) && (
                   <span className="text-xs text-[var(--copper)] font-medium">
-                    {hasDates ? '分别输入航班号查询计划时刻' : '请先选定左侧日期'}
+                    {hasDates ? '分别输入航班号查询计划时刻' : '请先选定旅行日期'}
                   </span>
                 )}
               </div>
