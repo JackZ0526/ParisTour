@@ -526,10 +526,15 @@ function ThinkingControls({
     else setThinkingEffort(getThinkingEffort())
   }
 
+  const layoutTransition = {
+    duration: 0.32,
+    ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+  }
+
   return (
-    <div>
+    <div className="flex flex-col justify-end">
       {/* L1: section header + master capsule — same weight as 「模型」 */}
-      <div className="flex items-center gap-3 px-1">
+      <motion.div layout="position" transition={layoutTransition} className="flex items-center gap-3 px-1">
         <p className="min-w-0 flex-1 text-sm font-semibold text-[var(--ink)]">思考</p>
         <PillSwitch
           checked={thinkingOn}
@@ -537,19 +542,26 @@ function ThinkingControls({
           ariaLabel="开启思考"
           onCheckedChange={setThinkingEnabled}
         />
-      </div>
+      </motion.div>
 
       {/* L2: nested under 思考 — 自动 checkbox (child) + 低/中/高 when custom */}
       <AnimatePresence initial={false}>
         {thinkingOn && (
           <motion.div
             key="thinking-on"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            layout
+            initial={{ opacity: 0, scaleY: 0.8 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.8 }}
+            transition={layoutTransition}
+            style={{ transformOrigin: 'bottom' }}
           >
-            <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5 p-2.5`}>
+            <motion.div
+              layout
+              transition={layoutTransition}
+              style={{ transformOrigin: 'bottom' }}
+              className={`${GLASS_INNER_CARD_CLASS} mt-2.5 p-2.5`}
+            >
               <label
                 htmlFor={autoCheckboxId}
                 className={`flex items-start gap-2.5 ${
@@ -577,10 +589,10 @@ function ThinkingControls({
                 {!autoOn && (
                   <motion.div
                     key="slider"
-                    initial={{ opacity: 0, y: -4 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.24, delay: 0.06, ease: 'easeOut' }}
                   >
                     <div className="pt-2">
                       <ThinkingIntensitySlider
@@ -592,7 +604,7 @@ function ThinkingControls({
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -602,10 +614,12 @@ function ThinkingControls({
         {!thinkingOn && (
           <motion.div
             key="thinking-off"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            layout
+            initial={{ opacity: 0, scaleY: 0.8 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.8 }}
+            transition={layoutTransition}
+            style={{ transformOrigin: 'bottom' }}
           >
             <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5 flex items-center gap-2 px-3 py-2`}>
               <span
