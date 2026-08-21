@@ -542,11 +542,10 @@ function ThinkingControls({
         {thinkingOn && (
           <motion.div
             key="thinking-on"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            className="overflow-hidden"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             <div className="mt-2.5 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_4px_rgba(0,0,0,0.02)] backdrop-blur-md">
               <label
@@ -576,11 +575,10 @@ function ThinkingControls({
                 {!autoOn && (
                   <motion.div
                     key="slider"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="overflow-hidden"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
                   >
                     <div className="pt-2">
                       <ThinkingIntensitySlider
@@ -602,11 +600,10 @@ function ThinkingControls({
         {!thinkingOn && (
           <motion.div
             key="thinking-off"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            className="overflow-hidden"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             <div className="mt-2.5 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 px-3 py-2 shadow-2xs backdrop-blur-md">
               <span
