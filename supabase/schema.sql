@@ -31,6 +31,16 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+alter table public.profiles
+  add column if not exists theme_preference text not null default 'system';
+
+alter table public.profiles
+  drop constraint if exists profiles_theme_preference_check;
+
+alter table public.profiles
+  add constraint profiles_theme_preference_check
+  check (theme_preference in ('light', 'dark', 'system'));
+
 create index if not exists profiles_email_idx on public.profiles (lower(email));
 
 alter table public.profiles enable row level security;

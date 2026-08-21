@@ -20,6 +20,10 @@ export const DARK_THEME_COLOR = '#121614'
 let currentPreference: ThemePreference = 'system'
 const listeners = new Set<() => void>()
 
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return value === 'light' || value === 'dark' || value === 'system'
+}
+
 function getSystemPrefersDark(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -89,8 +93,8 @@ export function initTheme(): void {
   if (typeof window === 'undefined') return
 
   try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY) as ThemePreference | null
-    if (saved === 'light' || saved === 'dark' || saved === 'system') {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY)
+    if (isThemePreference(saved)) {
       currentPreference = saved
     } else {
       currentPreference = 'system'

@@ -3,6 +3,7 @@ import {
   initTheme,
   getThemePreference,
   setThemePreference,
+  isThemePreference,
   resolveTheme,
   subscribeTheme,
   LIGHT_THEME_COLOR,
@@ -70,6 +71,14 @@ describe('Theme Store & Dark Mode', () => {
     expect(resolveTheme('dark')).toBe('dark')
     expect(LIGHT_THEME_COLOR).toBe('#ecefe8')
     expect(DARK_THEME_COLOR).toBe('#121614')
+  })
+
+  it('validates supported theme preference values', () => {
+    expect(isThemePreference('light')).toBe(true)
+    expect(isThemePreference('dark')).toBe(true)
+    expect(isThemePreference('system')).toBe(true)
+    expect(isThemePreference('sepia')).toBe(false)
+    expect(isThemePreference(null)).toBe(false)
   })
 
   it('switches to dark mode and applies dark class to document root', () => {

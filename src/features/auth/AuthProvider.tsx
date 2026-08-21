@@ -27,7 +27,16 @@ import {
   type AccessibleTrip,
 } from '../cloud-sync/services/tripCloud'
 import { subscribeLlmArtifacts } from '../../shared/services/llm/llmArtifactStore'
+import {
+  getThemePreference,
+  setThemePreference,
+  subscribeTheme,
+} from '../../shared/services/themeStore'
 import { emptyTripSnapshot } from '../cloud-sync/services/tripSnapshot'
+import {
+  loadProfileThemePreference,
+  saveProfileThemePreference,
+} from './services/themePreferenceCloud'
 import {
   AuthContext,
   type AuthContextValue,
@@ -78,6 +87,22 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
     return '当前不允许注册，请联系管理员。'
   }
   return msg || '登录失败，请稍后重试。'
+}
+
+async function hydrateAccountThemePreference(userId: string): Promise<void> {
+  try {
+    const cloudPreference = await loadProfileThemePreference(userId)
+    if (cloudPreference) {
+      setThemePreference(cloudPreference)
+      return
+    }
+
+    // Supports profiles created before the theme column was populated.
+    await saveProfileThemePreference(userId, getThemePreference())
+  } catch (err) {
+    // Theme sync must never block authentication or trip loading.
+    console.warn('[profile-theme] unable to load account preference', err)
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -158,7 +183,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setAllowlisted(true)
     try {
-      const accessible = await listAccessibleTrips(next.user.id, userEmail)
+      const [accessible] = await Promise.all([
+        listAccessibleTrips(next.user.id, userEmail),
+        hydrateAccountThemePreference(next.user.id),
+      ])
       setTrips(accessible)
       const preferred = pickPreferredTrip(accessible, next.user.id)
       if (preferred) {
@@ -230,6 +258,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe()
     }
   }, [bootstrapSession])
+
+  useEffect(() => {
+    const userId = user?.id
+    if (
+      !isCloudSyncEnabled() ||
+      status !== 'ready' ||
+      !allowlisted ||
+      !userId
+    ) {
+      return
+    }
+
+    return subscribeTheme(() => {
+      saveProfileThemePreference(userId, getThemePreference()).catch((err) => {
+        console.warn('[profile-theme] unable to save account preference', err)
+      })
+    })
+  }, [allowlisted, status, user?.id])
 
   const signIn = useCallback(async (emailInput: string, password: string) => {
     setError(null)
