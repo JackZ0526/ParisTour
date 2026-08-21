@@ -454,7 +454,7 @@ export function TripMap({
     }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/80 bg-white/70 px-3.5 py-2 text-xs text-[var(--stone)] backdrop-blur-md">
         <span className="hidden sm:inline font-medium">MapLibre · OpenStreetMap</span>
         <span className="sm:hidden font-medium">地图</span>

@@ -102,6 +102,23 @@ const TRIP_CHAT_PANEL_Z = 2045
 // otherwise overshoot the screen).
 const TRIP_CHAT_PANEL_WIDTH = 'min(calc(100vw - 2.5rem), 23.75rem)'
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mediaQuery = window.matchMedia(query)
+    setMatches(mediaQuery.matches)
+    const onChange = (event: MediaQueryListEvent) => setMatches(event.matches)
+    mediaQuery.addEventListener('change', onChange)
+    return () => mediaQuery.removeEventListener('change', onChange)
+  }, [query])
+
+  return matches
+}
+
 export interface TripChatHandlers {
   switchDay: (day: number) => void
   selectPlace: (placeId: string) => void
@@ -203,7 +220,8 @@ export function TripChatPanel({
       onClose()
     }
   }
-  useBodyScrollLock(open)
+  const isDesktop = useMediaQuery('(min-width: 640px)')
+  useBodyScrollLock(open && !isDesktop)
   const { model, thinkingMode } = useLlmSettings()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -212,14 +230,15 @@ export function TripChatPanel({
   const [history, setHistory] = useState<TripChatTurn[]>([])
   const [actionNotes, setActionNotes] = useState<string[]>([])
   const [panelEntered, setPanelEntered] = useState(false)
-  // `onAnimationComplete('height')` on the morph sets `panelEntered` when
-  // the height run settles, but that's a single point in time. A
-  // closing morph (or any interrupted animation) wouldn't reset it, so
-  // re-opening later could see the wrong value. Reset it explicitly on
-  // close and back to true on the opening settle, with a timer as a
-  // belt-and-braces fallback in case the callback doesn't fire.
+  const [modelPickerVisible, setModelPickerVisible] = useState(!open)
+  const chatOpenRef = useRef(open)
+  chatOpenRef.current = open
+  // The morph completion callback sets `panelEntered` when the panel settles.
+  // Reset it immediately on close, and keep a fallback timer for opening in
+  // case an interrupted animation does not report completion.
   useEffect(() => {
     if (open) {
+      setModelPickerVisible(false)
       const t = setTimeout(() => setPanelEntered(true), 520)
       return () => clearTimeout(t)
     }
@@ -492,11 +511,10 @@ export function TripChatPanel({
     bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
   }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open, panelEntered])
 
-  // Outside-click + Escape close handlers. Only active when the panel is
-  // open; the panel itself is the rootRef so any pointer event landing
-  // outside it (including the FAB area) triggers a close.
+  // Mobile keeps modal-style outside-click and Escape dismissal. On desktop,
+  // the assistant is non-modal and can only be closed with its X button.
   useEffect(() => {
-    if (!open) return
+    if (!open || isDesktop) return
 
     function onPointerDown(event: PointerEvent) {
       const root = rootRef.current
@@ -516,7 +534,7 @@ export function TripChatPanel({
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open])
+  }, [open, isDesktop])
 
   function beginWorkPipeline(userText: string) {
     setWorkSteps(initialChatWorkSteps(userText))
@@ -1797,12 +1815,13 @@ export function TripChatPanel({
       {/* LlmModelPicker stays anchored at the FAB position; hidden when the
           chat panel is open so the morphing card can take over the corner.
           Mobile: stacked above the chat button (column, 8px gap → bottom
-          offset = 48px button + 8px gap = 56px = 3.5rem).
-      {/* LlmModelPicker stays anchored above the chat FAB on mobile, left on desktop */}
+          offset = 48px button + 8px gap = 56px = 3.5rem). */}
       <div
         data-trip-chat-fab="1"
-        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
-          open ? 'pointer-events-none invisible opacity-0' : ''
+        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity duration-100 sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
+          modelPickerVisible && !open
+            ? 'visible opacity-100'
+            : 'pointer-events-none invisible opacity-0'
         }`}
       >
         <LlmModelPicker />
@@ -1863,10 +1882,11 @@ export function TripChatPanel({
           height: { ...morphSpring, delay: open ? 0.18 : 0 },
           backgroundColor: { duration: 0.18, ease: 'easeOut' },
         }}
-        onAnimationComplete={(definition) => {
-          // Fires per-property; only the height run is the last to settle.
-          if (definition === 'height') {
-            setPanelEntered(open)
+        onAnimationComplete={() => {
+          const currentlyOpen = chatOpenRef.current
+          setPanelEntered(currentlyOpen)
+          if (!currentlyOpen) {
+            setModelPickerVisible(true)
           }
         }}
         style={{
