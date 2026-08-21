@@ -308,11 +308,7 @@ export function RecommendationPreferencesDialog({
             </div>
 
             {/* Tag Pool Container Box */}
-            <motion.div
-              layout="size"
-              transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-              className="min-h-[104px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl"
-            >
+            <div className="min-h-[104px] rounded-3xl border border-white/85 bg-white/65 p-3.5 sm:p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
               {activeTags.length === 0 ? (
                 <div className="flex min-h-[76px] flex-col items-center justify-center text-center p-1">
                   <p className="text-xs font-medium text-[var(--stone)]">
@@ -324,45 +320,29 @@ export function RecommendationPreferencesDialog({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    {activeTags.map((tag) => {
-                      const cleanTag = cleanTagText(tag)
-                      const theme = getTagTheme(cleanTag)
-                      return (
-                        <motion.button
-                          key={cleanTag}
-                          type="button"
-                          layout="position"
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0 }}
-                          whileTap={{ scale: 0.96 }}
-                          transition={{
-                            layout: { duration: 0.18, ease: 'easeOut' },
-                            opacity: { duration: 0.14 },
-                            scale: { duration: 0.14, ease: 'easeOut' },
-                          }}
-                          onClick={() => removeTag(cleanTag)}
-                          title={`点击移出：${cleanTag}`}
-                          aria-label={`移除 ${cleanTag}`}
-                          className={`${BASE_TAG_PILL} ${theme.activePill}`}
-                        >
-                          <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
-                        </motion.button>
-                      )
-                    })}
-                  </AnimatePresence>
+                  {activeTags.map((tag) => {
+                    const cleanTag = cleanTagText(tag)
+                    const theme = getTagTheme(cleanTag)
+                    return (
+                      <button
+                        key={cleanTag}
+                        type="button"
+                        onClick={() => removeTag(cleanTag)}
+                        title={`点击移出：${cleanTag}`}
+                        aria-label={`移除 ${cleanTag}`}
+                        className={`${BASE_TAG_PILL} active:scale-95 ${theme.activePill}`}
+                      >
+                        <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
-            </motion.div>
+            </div>
           </section>
 
           {/* 3. AI Suggested Tags Deck (候选偏好库) */}
-          <motion.section
-            layout="position"
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="space-y-2.5"
-          >
+          <section className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[var(--stone)] flex items-center gap-1.5">
                 <Sparkles size={13} className="text-amber-600" />
@@ -372,48 +352,32 @@ export function RecommendationPreferencesDialog({
 
             <div className="flex flex-wrap gap-2">
               {availablePresets.length > 0 ? (
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {availablePresets.map((preset) => {
-                    const cleanPreset = cleanTagText(preset)
-                    const theme = getTagTheme(cleanPreset)
-                    return (
-                      <motion.button
-                        key={cleanPreset}
-                        type="button"
-                        layout="position"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0 }}
-                        whileTap={{ scale: 0.96 }}
-                        transition={{
-                          layout: { duration: 0.18, ease: 'easeOut' },
-                          opacity: { duration: 0.14 },
-                          scale: { duration: 0.14, ease: 'easeOut' },
-                        }}
-                        onClick={() => addTag(cleanPreset)}
-                        title={`点击加入：${cleanPreset}`}
-                        aria-label={`加入 ${cleanPreset}`}
-                        className={`${BASE_TAG_PILL} ${theme.suggestedPill}`}
-                      >
-                        <span className="relative z-10">{cleanPreset}</span>
-                      </motion.button>
-                    )
-                  })}
-                </AnimatePresence>
+                availablePresets.map((preset) => {
+                  const cleanPreset = cleanTagText(preset)
+                  const theme = getTagTheme(cleanPreset)
+                  return (
+                    <button
+                      key={cleanPreset}
+                      type="button"
+                      onClick={() => addTag(cleanPreset)}
+                      title={`点击加入：${cleanPreset}`}
+                      aria-label={`加入 ${cleanPreset}`}
+                      className={`${BASE_TAG_PILL} active:scale-95 ${theme.suggestedPill}`}
+                    >
+                      <span className="relative z-10">{cleanPreset}</span>
+                    </button>
+                  )
+                })
               ) : (
                 <p className="text-xs text-[var(--stone)]/70 italic py-1">
                   已添加所有预设推荐偏好 ✨
                 </p>
               )}
             </div>
-          </motion.section>
+          </section>
 
           {/* 4. Natural Language Smart Input Extractor (自然语言提取) */}
-          <motion.section
-            layout="position"
-            transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-            className="rounded-2xl border border-white/80 bg-white/55 p-4 shadow-sm backdrop-blur-md space-y-2.5"
-          >
+          <section className="rounded-2xl border border-white/80 bg-white/55 p-4 shadow-sm backdrop-blur-md space-y-2.5">
             <label className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Wand2 size={14} className="text-[var(--copper)]" />
@@ -470,7 +434,7 @@ export function RecommendationPreferencesDialog({
                 </button>
               </div>
             </form>
-          </motion.section>
+          </section>
         </div>
 
         {/* Footer Action Bar */}
