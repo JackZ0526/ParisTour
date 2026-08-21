@@ -34,18 +34,18 @@ export function AuthLoadingScreen({
       {/* Ambient background glows for glassmorphism reflections */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#a8bcae]/20 via-[#d4bd91]/15 to-transparent blur-3xl"
+        className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#a8bcae]/20 dark:from-[#668b7a]/10 via-[#d4bd91]/15 dark:via-transparent to-transparent blur-3xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 right-1/4 -z-10 h-[360px] w-[360px] rounded-full bg-gradient-to-tl from-[#d7a98a]/15 via-white/20 to-transparent blur-3xl"
+        className="pointer-events-none absolute -bottom-24 right-1/4 -z-10 h-[360px] w-[360px] rounded-full bg-gradient-to-tl from-[#d7a98a]/15 dark:from-[#d48354]/10 via-white/20 dark:via-transparent to-transparent blur-3xl"
       />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className={`relative mx-auto w-full max-w-md overflow-hidden rounded-3xl ${glassModalSurfaceClass} p-8 sm:p-10 text-center shadow-[0_16px_40px_rgba(0,0,0,0.08),inset_0_1px_2px_rgba(255,255,255,1)]`}
+        className={`relative mx-auto w-full max-w-md overflow-hidden rounded-3xl ${glassModalSurfaceClass} p-8 sm:p-10 text-center shadow-[0_16px_40px_rgba(0,0,0,0.08),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.08)]`}
       >
         {/* Decorative background watermark */}
         <div
@@ -66,11 +66,11 @@ export function AuthLoadingScreen({
           </div>
 
           {/* Central 3D Frosted Icon Badge with Aura Rings */}
-          <div className="relative my-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
+          <div className="relative my-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/90 dark:border-white/10 bg-gradient-to-br from-white/95 to-[#fcf6f0] dark:from-[#1f2824] dark:to-[#18201c] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.08)] backdrop-blur-md">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
-              className="pointer-events-none absolute -inset-2 rounded-[22px] border border-dashed border-[var(--copper)]/25 opacity-70"
+              className="pointer-events-none absolute -inset-2.5 rounded-full border border-dashed border-[var(--copper)]/30 dark:border-[var(--copper)]/40 opacity-70"
             />
             {mode === 'auth' ? (
               <KeyRound size={28} strokeWidth={1.8} className="text-[var(--copper)] animate-pulse" />
@@ -93,7 +93,7 @@ export function AuthLoadingScreen({
 
           {/* Optical Fiber Stream Loading Bar */}
           {mode !== 'unconfigured' ? (
-            <div className="mt-6 w-full max-w-[200px] overflow-hidden rounded-full bg-black/5 p-[1.5px] border border-black/5 shadow-inner">
+            <div className="mt-6 w-full max-w-[200px] overflow-hidden rounded-full bg-black/5 dark:bg-white/10 p-[1.5px] border border-black/5 dark:border-white/10 shadow-inner">
               <motion.div
                 animate={{ x: ['-100%', '100%'] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
