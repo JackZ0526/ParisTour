@@ -405,14 +405,6 @@ export function ProfileTab({
             <Sparkles size={16} className="text-[var(--copper)]" />
             <span>AI 智能偏好配置</span>
           </div>
-          <button
-            type="button"
-            onClick={onOpenPreferences}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--copper)] hover:underline"
-          >
-            <SlidersHorizontal size={13} />
-            <span>修改偏好</span>
-          </button>
         </div>
 
         {/* 3 Configured Preference Tiles */}
