@@ -170,7 +170,7 @@ function TimeWheelColumn<T extends number>({
                 : 'text-sm sm:text-base font-semibold text-[var(--stone)]/75 hover:text-[var(--ink)] scale-90'
             }`}
           >
-            <span className="tabular-nums font-mono leading-none">{formatItem(item)}</span>
+            <span className="tabular-nums tracking-normal leading-none">{formatItem(item)}</span>
           </div>
         )
       })}
