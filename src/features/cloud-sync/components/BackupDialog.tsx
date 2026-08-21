@@ -148,7 +148,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
               存档备份
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-              每次保存前自动保留历史快照（最多 5 份）；出错时可随时一键回退与恢复。
+              自动保留最近 5 份快照，可随时一键回退恢复。
             </p>
           </div>
           <CloseIconButton onClick={onClose} className="hidden sm:flex" />
