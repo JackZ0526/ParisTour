@@ -2325,9 +2325,7 @@ export function HotelPicker({
                     className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/30`}
                   >
                     <ChevronIcon up={!othersCollapsed} />
-                    {othersCollapsed
-                      ? `展开（${otherCandidates.length}）`
-                      : '收起'}
+                    {othersCollapsed ? '展开' : '收起'}
                   </button>
                 )}
               </div>
