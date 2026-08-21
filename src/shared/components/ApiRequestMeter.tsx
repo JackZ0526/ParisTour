@@ -415,9 +415,9 @@ export function ApiRequestMeter() {
                 <li key={group.id}>
                   <div className="flex items-baseline justify-between gap-2 text-[12px]">
                     <span className="font-medium text-[var(--ink)]">{group.label}</span>
-                    <span className="tabular-nums font-semibold text-[var(--sage)]">{total}</span>
+                    <span className="tabular-nums font-semibold text-[var(--sage)] dark:text-[#88b3a0]">{total}</span>
                   </div>
-                  <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)]">
+                  <ul className="mt-0.5 space-y-0.5 text-[11px] text-[var(--stone)] dark:text-zinc-400">
                     {group.kinds
                       .filter(
                         (item) =>
@@ -426,7 +426,7 @@ export function ApiRequestMeter() {
                       .map((item) => (
                         <li key={item.kind} className="flex justify-between gap-2">
                           <span>{item.label}</span>
-                          <span className="tabular-nums">
+                          <span className="tabular-nums dark:text-zinc-300">
                             {snapshot.byKind[item.kind] || 0}
                           </span>
                         </li>
