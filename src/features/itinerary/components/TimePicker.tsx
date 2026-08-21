@@ -1,7 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type UIEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
-import { glassCapsuleToneClass } from '../../../shared/styles/glassCapsule'
 
 interface Props {
   value: string
@@ -12,6 +11,10 @@ interface Props {
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
 const MINUTES = Array.from({ length: 12 }, (_, index) => index * 5)
+
+const ITEM_HEIGHT = 38 // 38px per item height
+const VISIBLE_COUNT = 3 // 3 visible items in view window
+const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_COUNT // 114px
 
 function parseTime(value: string): { hour: number; minute: number } {
   const match = /^(\d{2}):(\d{2})$/.exec(value)
@@ -24,6 +27,101 @@ function parseTime(value: string): { hour: number; minute: number } {
 
 function formatTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+interface WheelColumnProps<T extends number> {
+  items: readonly T[]
+  value: T
+  onChange: (v: T) => void
+  formatItem?: (v: T) => string
+  ariaLabel: string
+}
+
+function TimeWheelColumn<T extends number>({
+  items,
+  value,
+  onChange,
+  formatItem = (v) => String(v).padStart(2, '0'),
+  ariaLabel,
+}: WheelColumnProps<T>) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isScrollingRef = useRef(false)
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Scroll to selected item on mount or when value changes externally
+  useEffect(() => {
+    const idx = items.indexOf(value)
+    if (idx >= 0 && containerRef.current && !isScrollingRef.current) {
+      containerRef.current.scrollTop = idx * ITEM_HEIGHT
+    }
+  }, [value, items])
+
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget
+    isScrollingRef.current = true
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+
+    const index = Math.round(target.scrollTop / ITEM_HEIGHT)
+    const clamped = Math.max(0, Math.min(index, items.length - 1))
+    const selected = items[clamped]
+    if (selected !== undefined && selected !== value) {
+      onChange(selected)
+    }
+
+    scrollTimerRef.current = setTimeout(() => {
+      isScrollingRef.current = false
+    }, 150)
+  }
+
+  const handleItemClick = (idx: number) => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: idx * ITEM_HEIGHT,
+        behavior: 'smooth',
+      })
+    }
+    const selected = items[idx]
+    if (selected !== undefined) {
+      onChange(selected)
+    }
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      role="listbox"
+      aria-label={ariaLabel}
+      style={{ height: `${WHEEL_HEIGHT}px` }}
+      className="relative w-full snap-y snap-mandatory overflow-y-auto scroll-smooth scrollbar-none select-none touch-pan-y"
+    >
+      {/* Top spacer (1 item height) to vertically center the first item in the lens */}
+      <div style={{ height: `${ITEM_HEIGHT}px` }} aria-hidden />
+
+      {items.map((item, idx) => {
+        const isSelected = item === value
+        return (
+          <div
+            key={item}
+            role="option"
+            aria-selected={isSelected}
+            onClick={() => handleItemClick(idx)}
+            style={{ height: `${ITEM_HEIGHT}px` }}
+            className={`flex snap-center items-center justify-center text-center cursor-pointer transition-all duration-150 ${
+              isSelected
+                ? 'text-lg sm:text-xl font-bold text-[var(--ink)] scale-105'
+                : 'text-sm font-medium text-[var(--stone)]/40 hover:text-[var(--stone)]/80 scale-90'
+            }`}
+          >
+            <span className="tabular-nums font-mono">{formatItem(item)}</span>
+          </div>
+        )
+      })}
+
+      {/* Bottom spacer (1 item height) to vertically center the last item in the lens */}
+      <div style={{ height: `${ITEM_HEIGHT}px` }} aria-hidden />
+    </div>
+  )
 }
 
 export function TimePicker({ value, onChange, label, id: idProp }: Props) {
@@ -77,7 +175,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
 
       {/*
         Persistent Container:
-        Seamlessly holds the persistent top anchor bar, expanding the hour/minute selection below.
+        Seamlessly holds the persistent top anchor bar, expanding the hour/minute wheel selector below.
       */}
       <div
         className={`relative overflow-hidden rounded-2xl border transition-colors duration-200 ${
@@ -96,11 +194,11 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           className="flex h-9 w-full items-center justify-between gap-2 px-2.5 py-1 text-left outline-none focus:outline-none focus-visible:outline-none cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
-            {/* Time Capsule: Always has identical inline-flex, px, py, rounded-lg, border box model so 10:00 NEVER shifts */}
+            {/* Time Capsule: High-end 3D Parisian Frosted Glass depth with 1px reflection highlight */}
             <span
-              className={`relative inline-flex items-center rounded-lg border px-2.5 py-0.5 text-sm font-semibold tabular-nums transition-all duration-200 ${
+              className={`relative overflow-hidden inline-flex items-center rounded-lg border px-2.5 py-0.5 text-sm font-semibold tabular-nums backdrop-blur-md transition-all duration-200 ${
                 open
-                  ? `${glassCapsuleToneClass.copper} text-[var(--copper)] shadow-2xs`
+                  ? 'border-[#d7a98a]/80 bg-[#f6e8de]/85 text-[var(--copper)] shadow-[0_2px_8px_rgba(181,106,60,0.15),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/90 before:to-transparent'
                   : 'border-transparent bg-transparent text-[var(--ink)]'
               }`}
             >
@@ -132,7 +230,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           />
         </button>
 
-        {/* Expanded Selection Body (Smooth In-Place Downward Accordion Flow) */}
+        {/* Expanded iOS Alarm-Style Rolling Wheel Selector */}
         <AnimatePresence>
           {open && (
             <motion.div
@@ -140,56 +238,45 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="overflow-hidden border-t border-[var(--mist)]/70 px-3.5 pb-3.5 pt-2.5"
+              className="overflow-hidden border-t border-[var(--mist)]/70 px-3.5 pb-3.5 pt-2"
             >
-              {/* Hours Grid */}
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">小时</p>
-                <div className="grid grid-cols-6 gap-1">
-                  {HOURS.map((hour) => (
-                     <button
-                      key={hour}
-                      type="button"
-                      aria-pressed={draftHour === hour}
-                      onClick={() => setDraftHour(hour)}
-                      className={[
-                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition cursor-pointer',
-                        draftHour === hour
-                          ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
-                          : 'text-[var(--ink)] hover:bg-[var(--copper)]/10 focus-visible:ring-2 focus-visible:ring-[var(--copper)]/40',
-                      ].join(' ')}
-                    >
-                      {String(hour).padStart(2, '0')}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* iOS Wheel Body */}
+              <div className="relative my-1.5 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-1.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
+                {/* Center Highlight Selection Lens (Frosted Glass with warm copper tint) */}
+                <div
+                  className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 rounded-xl border border-[var(--copper)]/35 bg-[var(--copper)]/12 shadow-[0_2px_8px_rgba(181,106,60,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-xs"
+                  style={{ height: `${ITEM_HEIGHT}px` }}
+                />
 
-              {/* Minutes Grid */}
-              <div className="mt-3 border-t border-[var(--mist)]/60 pt-2">
-                <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">分钟</p>
-                <div className="grid grid-cols-6 gap-1">
-                  {minuteOptions.map((minute) => (
-                    <button
-                      key={minute}
-                      type="button"
-                      aria-pressed={draftMinute === minute}
-                      onClick={() => setDraftMinute(minute)}
-                      className={[
-                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition cursor-pointer',
-                        draftMinute === minute
-                          ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
-                          : 'text-[var(--ink)] hover:bg-[var(--copper)]/10 focus-visible:ring-2 focus-visible:ring-[var(--copper)]/40',
-                      ].join(' ')}
-                    >
-                      {String(minute).padStart(2, '0')}
-                    </button>
-                  ))}
+                {/* Top & Bottom Depth Gradients for 3D Cylinder effect */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent rounded-t-2xl z-10" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent rounded-b-2xl z-10" />
+
+                {/* Column Headers (小时 / 分钟) */}
+                <div className="relative z-10 grid grid-cols-2 text-center text-[10.5px] font-semibold text-[var(--stone)]/75 pt-0.5 pb-0.5">
+                  <span>小时</span>
+                  <span>分钟</span>
+                </div>
+
+                {/* Dual Scroll Columns */}
+                <div className="relative z-10 grid grid-cols-2 items-center">
+                  <TimeWheelColumn
+                    items={HOURS}
+                    value={draftHour}
+                    onChange={setDraftHour}
+                    ariaLabel="小时滚轮选择"
+                  />
+                  <TimeWheelColumn
+                    items={minuteOptions}
+                    value={draftMinute}
+                    onChange={setDraftMinute}
+                    ariaLabel="分钟滚轮选择"
+                  />
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-3.5 flex justify-end gap-2 border-t border-[var(--mist)]/70 pt-2.5">
+              <div className="mt-2.5 flex justify-end gap-2 border-t border-[var(--mist)]/70 pt-2.5">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
