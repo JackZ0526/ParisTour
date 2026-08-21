@@ -196,16 +196,16 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                   return (
                     <article
                       key={backup.id}
-                      className={`flex items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/65 p-3 sm:p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/95 hover:shadow-xs ${
-                        isLatest ? 'border-[var(--copper)]/30 bg-white/80' : ''
+                      className={`flex items-center justify-between gap-3 rounded-2xl border border-white/85 bg-white/60 p-3 shadow-[0_2px_12px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-all hover:bg-white/80 ${
+                        isLatest ? 'border-[var(--copper)]/30 bg-white/75' : ''
                       }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <div
-                          className={`flex h-8.5 w-8.5 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl font-display text-sm font-semibold shadow-inner ${
+                          className={`flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-xl transition-colors ${
                             isLatest
-                              ? 'bg-[var(--copper)]/15 text-[var(--copper)]'
-                              : 'bg-[var(--sage)]/15 text-[var(--sage)]'
+                              ? 'border border-[var(--copper)]/20 bg-[#f6e8de]/75 text-[var(--copper)]'
+                              : 'border border-[#a8bcae]/25 bg-[#e7efe9]/70 text-[#557864]'
                           }`}
                         >
                           {isLatest ? (
@@ -220,7 +220,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                               {isLatest ? '最新快照' : `快照 #${backups.length - index}`}
                             </span>
                             {isLatest && (
-                              <span className="rounded-full bg-[var(--copper)]/15 px-1.5 py-0.2 text-[9.5px] font-bold text-[var(--copper)]">
+                              <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-1.5 py-0.2 text-[9.5px] font-semibold text-[var(--copper)]">
                                 当前
                               </span>
                             )}
@@ -242,24 +242,23 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                           aria-label="恢复此版本"
                           aria-busy={isRestoringThis || undefined}
                           title={isRestoringThis ? '正在恢复…' : '恢复此版本'}
-                          className="group relative isolate inline-flex items-center gap-1 rounded-full border border-[var(--copper)]/35 bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--copper)] shadow-2xs backdrop-blur-sm transition-all hover:bg-[var(--copper)] hover:text-white active:scale-95 disabled:opacity-50 cursor-pointer"
+                          className="group relative isolate flex h-8.5 w-8.5 items-center justify-center rounded-full border border-white/90 bg-white/80 text-[var(--stone)] shadow-2xs backdrop-blur-md transition-all hover:border-[var(--copper)]/40 hover:bg-white hover:text-[var(--copper)] hover:shadow-xs active:scale-95 disabled:opacity-40 cursor-pointer"
                         >
                           {isRestoringThis ? (
                             <LoaderCircle
-                              className="animate-spin"
-                              size={12}
+                              className="animate-spin text-[var(--copper)]"
+                              size={14}
                               strokeWidth={2.2}
                               aria-hidden
                             />
                           ) : (
                             <RotateCcw
-                              size={12}
-                              strokeWidth={2.2}
+                              size={14}
+                              strokeWidth={1.9}
                               className="transition-transform group-hover:-rotate-45"
                               aria-hidden
                             />
                           )}
-                          <span>{isRestoringThis ? '恢复中…' : '恢复'}</span>
                         </button>
                       </div>
                     </article>
