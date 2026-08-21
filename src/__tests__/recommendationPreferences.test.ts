@@ -29,24 +29,24 @@ describe('recommendationPreferences', () => {
 
     const normalized = normalizeRecommendationPreferences(legacy)
     expect(normalized.dayStartTime).toBe('09:30')
-    expect(normalized.tags).toContain('☕ 晨间咖啡')
-    expect(normalized.tags).toContain('🍽️ 两顿正餐')
-    expect(normalized.tags).toContain('🏰 巴黎迪士尼')
-    expect(normalized.tags).toContain('🌿 避开大展馆')
+    expect(normalized.tags).toContain('晨间咖啡')
+    expect(normalized.tags).toContain('两顿正餐')
+    expect(normalized.tags).toContain('巴黎迪士尼')
+    expect(normalized.tags).toContain('避开大展馆')
     expect(normalized.extraNotes).toBe('热爱摄影')
   })
 
   it('generates rich prompt lines including all active tags', () => {
     const prefs = {
       dayStartTime: '10:30',
-      tags: ['📸 摄影出片', '🍷 塞纳河游船'],
+      tags: ['摄影出片', '塞纳河游船'],
       extraNotes: '晚上想吃海鲜',
     }
 
     const prompt = recommendationPreferencesPrompt(prefs)
     expect(prompt[0]).toContain('10:30')
-    expect(prompt.some((line) => line.includes('📸 摄影出片'))).toBe(true)
-    expect(prompt.some((line) => line.includes('🍷 塞纳河游船'))).toBe(true)
+    expect(prompt.some((line) => line.includes('摄影出片'))).toBe(true)
+    expect(prompt.some((line) => line.includes('塞纳河游船'))).toBe(true)
     expect(prompt.some((line) => line.includes('晚上想吃海鲜'))).toBe(true)
   })
 

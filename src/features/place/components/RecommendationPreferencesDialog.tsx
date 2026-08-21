@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   PRESET_PREFERENCE_TAGS,
+  cleanTagText,
   type RecommendationPreferences,
 } from '../services/recommendationPreferences'
 import { extractPreferenceTags } from '../../../shared/services/llm/llm'
@@ -113,20 +114,20 @@ const COLOR_PALETTES: readonly TagTheme[] = [
 ]
 
 function getTagTheme(tag: string): TagTheme {
-  const t = tag.toLowerCase()
-  if (t.includes('☕') || t.includes('咖啡') || t.includes('早餐')) return COLOR_PALETTES[0]
-  if (t.includes('🍽️') || t.includes('餐') || t.includes('吃') || t.includes('肉') || t.includes('面') || t.includes('生蚝')) return COLOR_PALETTES[1]
-  if (t.includes('🚶') || t.includes('步') || t.includes('慢') || t.includes('轻松') || t.includes('避开')) return COLOR_PALETTES[2]
-  if (t.includes('🎨') || t.includes('画') || t.includes('展') || t.includes('故居') || t.includes('文艺')) return COLOR_PALETTES[3]
-  if (t.includes('🥐') || t.includes('甜') || t.includes('烘焙') || t.includes('面包')) return COLOR_PALETTES[4]
-  if (t.includes('🏛️') || t.includes('凯旋门') || t.includes('香街') || t.includes('地标')) return COLOR_PALETTES[5]
-  if (t.includes('📸') || t.includes('🗼') || t.includes('照') || t.includes('出片') || t.includes('夜景') || t.includes('铁塔')) return COLOR_PALETTES[6]
-  if (t.includes('🏰') || t.includes('👶') || t.includes('迪士尼') || t.includes('亲子') || t.includes('乐园')) return COLOR_PALETTES[7]
-  if (t.includes('🛍️') || t.includes('🥖') || t.includes('市集') || t.includes('中古') || t.includes('买手') || t.includes('购物')) return COLOR_PALETTES[8]
-  if (t.includes('🍷') || t.includes('酒') || t.includes('船') || t.includes('塞纳河')) return COLOR_PALETTES[9]
+  const t = cleanTagText(tag).toLowerCase()
+  if (t.includes('咖啡') || t.includes('早餐')) return COLOR_PALETTES[0]
+  if (t.includes('餐') || t.includes('吃') || t.includes('肉') || t.includes('面') || t.includes('生蚝') || t.includes('菜') || t.includes('美食')) return COLOR_PALETTES[1]
+  if (t.includes('步') || t.includes('慢') || t.includes('轻松') || t.includes('避开')) return COLOR_PALETTES[2]
+  if (t.includes('画') || t.includes('展') || t.includes('故居') || t.includes('文艺') || t.includes('艺术')) return COLOR_PALETTES[3]
+  if (t.includes('甜') || t.includes('烘焙') || t.includes('面包')) return COLOR_PALETTES[4]
+  if (t.includes('凯旋门') || t.includes('香街') || t.includes('地标')) return COLOR_PALETTES[5]
+  if (t.includes('照') || t.includes('出片') || t.includes('夜景') || t.includes('铁塔') || t.includes('摄影')) return COLOR_PALETTES[6]
+  if (t.includes('迪士尼') || t.includes('亲子') || t.includes('乐园') || t.includes('儿童')) return COLOR_PALETTES[7]
+  if (t.includes('市集') || t.includes('中古') || t.includes('买手') || t.includes('购物')) return COLOR_PALETTES[8]
+  if (t.includes('酒') || t.includes('船') || t.includes('塞纳河')) return COLOR_PALETTES[9]
 
   let hash = 0
-  for (let i = 0; i < tag.length; i++) hash = (hash << 5) - hash + tag.charCodeAt(i)
+  for (let i = 0; i < t.length; i++) hash = (hash << 5) - hash + t.charCodeAt(i)
   const index = Math.abs(hash) % COLOR_PALETTES.length
   return COLOR_PALETTES[index]
 }
@@ -175,11 +176,11 @@ export function RecommendationPreferencesDialog({
   const activeTags = draft.tags || []
 
   function addTag(tag: string) {
-    const trimmed = tag.trim()
-    if (!trimmed || activeTags.includes(trimmed)) return
+    const cleaned = cleanTagText(tag)
+    if (!cleaned || activeTags.includes(cleaned)) return
     setDraft((prev) => ({
       ...prev,
-      tags: [...prev.tags, trimmed],
+      tags: [...prev.tags, cleaned],
     }))
   }
 
@@ -212,7 +213,8 @@ export function RecommendationPreferencesDialog({
 
       if (extracted.length > 0) {
         setDraft((prev) => {
-          const combined = Array.from(new Set([...prev.tags, ...extracted]))
+          const cleanedExtracted = extracted.map(cleanTagText).filter(Boolean)
+          const combined = Array.from(new Set([...prev.tags, ...cleanedExtracted]))
           return {
             ...prev,
             tags: combined,

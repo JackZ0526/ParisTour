@@ -12,30 +12,37 @@ export interface RecommendationPreferences {
   extraNotes?: string
 }
 
-/** Pre-curated list of ultra-concise French travel preference tags (2-5 chars each) */
+/** Helper to strip any leading emoji / symbols from tag text */
+export function cleanTagText(tag: string): string {
+  return String(tag || '')
+    .replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s·•✨☕🍽️🚶🏰🏛️🌿📸🎨🥐🍷🛍️🥖🗼👶💰\-\+\*]+/gu, '')
+    .trim()
+}
+
+/** Pre-curated list of ultra-concise French travel preference tags (2-5 chars each, pure text) */
 export const PRESET_PREFERENCE_TAGS: readonly string[] = [
-  '☕ 晨间咖啡',
-  '🍽️ 两顿正餐',
-  '🚶 轻松少步行',
-  '🏰 巴黎迪士尼',
-  '🏛️ 凯旋门香街',
-  '🌿 避开大展馆',
-  '📸 摄影出片',
-  '🎨 艺术画廊',
-  '🥐 法式烘焙',
-  '🍷 塞纳河游船',
-  '🛍️ 玛黑中古店',
-  '🥖 在地市集',
-  '🗼 铁塔夜景',
-  '👶 亲子友好',
-  '💰 平价美食',
+  '晨间咖啡',
+  '两顿正餐',
+  '轻松少步行',
+  '巴黎迪士尼',
+  '凯旋门香街',
+  '避开大展馆',
+  '摄影出片',
+  '艺术画廊',
+  '法式烘焙',
+  '塞纳河游船',
+  '玛黑中古店',
+  '在地市集',
+  '铁塔夜景',
+  '亲子友好',
+  '平价美食',
 ]
 
 export const DEFAULT_PREFERENCE_TAGS: readonly string[] = [
-  '☕ 晨间咖啡',
-  '🍽️ 两顿正餐',
-  '🚶 轻松少步行',
-  '🏛️ 凯旋门香街',
+  '晨间咖啡',
+  '两顿正餐',
+  '轻松少步行',
+  '凯旋门香街',
 ]
 
 export const DEFAULT_RECOMMENDATION_PREFERENCES: RecommendationPreferences = {
@@ -66,19 +73,19 @@ export function normalizeRecommendationPreferences(
     tags = Array.from(
       new Set(
         value.tags
-          .map((t) => String(t || '').trim())
+          .map((t) => cleanTagText(t))
           .filter(Boolean),
       ),
     )
   } else {
     // Backward compatibility: Derive tags from legacy boolean flags
     tags = []
-    if (value?.preferCafeStart ?? true) tags.push('☕ 晨间咖啡')
-    if (value?.preferLunchAndDinner ?? true) tags.push('🍽️ 两顿正餐')
-    if (value?.preferLowWalking ?? true) tags.push('🚶 轻松少步行')
-    if (value?.includeDisneyDay) tags.push('🏰 巴黎迪士尼')
-    if (value?.includeChampsAndArc ?? true) tags.push('🏛️ 凯旋门香街')
-    if (value?.avoidLouvreAndVersailles) tags.push('🌿 避开大展馆')
+    if (value?.preferCafeStart ?? true) tags.push('晨间咖啡')
+    if (value?.preferLunchAndDinner ?? true) tags.push('两顿正餐')
+    if (value?.preferLowWalking ?? true) tags.push('轻松少步行')
+    if (value?.includeDisneyDay) tags.push('巴黎迪士尼')
+    if (value?.includeChampsAndArc ?? true) tags.push('凯旋门香街')
+    if (value?.avoidLouvreAndVersailles) tags.push('避开大展馆')
     if (tags.length === 0) tags = [...DEFAULT_PREFERENCE_TAGS]
   }
 
