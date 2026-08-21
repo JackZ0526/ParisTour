@@ -170,7 +170,9 @@ function TimeWheelColumn<T extends number>({
                 : 'text-sm font-medium text-[var(--stone)]/40 hover:text-[var(--stone)]/80 scale-90'
             }`}
           >
-            <span className="tabular-nums font-mono leading-none pr-5">{formatItem(item)}</span>
+            <div className="w-[84px] flex items-center">
+              <span className="w-[58px] text-center tabular-nums font-mono leading-none">{formatItem(item)}</span>
+            </div>
           </div>
         )
       })}
@@ -301,23 +303,29 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               <div className="relative my-1 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
                 {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
                 <div className="relative" style={{ height: `${WHEEL_HEIGHT}px` }}>
-                  {/* Dual Distinct 3D Frosted Glass Capsules (Hour Capsule & Minute Capsule) */}
+                  {/* Dual Distinct 3D Frosted Glass Capsules (Framing ONLY the numbers) */}
                   <div
-                    className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 grid grid-cols-2 gap-3 px-2 z-10"
+                    className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 grid grid-cols-2 z-10"
                     style={{ height: `${ITEM_HEIGHT}px` }}
                   >
-                    {/* Hour Capsule: 3D Frosted Glass Pill with 1px top highlight */}
-                    <div className="relative mx-auto flex h-full w-full max-w-[116px] items-center justify-center rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/80 shadow-[0_2px_8px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent">
-                      <span className="absolute right-3.5 text-xs font-semibold text-[var(--copper)] select-none">
-                        点
-                      </span>
+                    {/* Hour Column: Capsule frames ONLY the digits, "点" is outside */}
+                    <div className="flex items-center justify-center">
+                      <div className="w-[84px] flex items-center">
+                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/80 shadow-[0_2px_8px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
+                        <span className="ml-2 text-xs font-semibold text-[var(--copper)] select-none">
+                          点
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Minute Capsule: 3D Frosted Glass Pill with 1px top highlight */}
-                    <div className="relative mx-auto flex h-full w-full max-w-[116px] items-center justify-center rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/80 shadow-[0_2px_8px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent">
-                      <span className="absolute right-3.5 text-xs font-semibold text-[var(--copper)] select-none">
-                        分
-                      </span>
+                    {/* Minute Column: Capsule frames ONLY the digits, "分" is outside */}
+                    <div className="flex items-center justify-center">
+                      <div className="w-[84px] flex items-center">
+                        <div className="relative w-[58px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/80 shadow-[0_2px_8px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
+                        <span className="ml-2 text-xs font-semibold text-[var(--copper)] select-none">
+                          分
+                        </span>
+                      </div>
                     </div>
                   </div>
 
