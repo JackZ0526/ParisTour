@@ -32,6 +32,105 @@ interface Props {
   onClose: () => void
 }
 
+interface TagTheme {
+  activePill: string
+  activeClose: string
+  suggestedPill: string
+  suggestedIcon: string
+}
+
+const COLOR_PALETTES: readonly TagTheme[] = [
+  {
+    // 0. Amber / Morning Cafe
+    activePill: 'bg-amber-500/14 border-amber-300/80 text-amber-950',
+    activeClose: 'hover:bg-amber-200/90 text-amber-800',
+    suggestedPill: 'bg-amber-500/8 border-amber-300/50 hover:bg-amber-500/18 hover:border-amber-400 text-amber-950',
+    suggestedIcon: 'text-amber-600',
+  },
+  {
+    // 1. Terracotta / Dining & Meat
+    activePill: 'bg-orange-500/14 border-orange-300/80 text-orange-950',
+    activeClose: 'hover:bg-orange-200/90 text-orange-800',
+    suggestedPill: 'bg-orange-500/8 border-orange-300/50 hover:bg-orange-500/18 hover:border-orange-400 text-orange-950',
+    suggestedIcon: 'text-orange-600',
+  },
+  {
+    // 2. Sage Botanical Green / Walking & Nature
+    activePill: 'bg-emerald-600/14 border-emerald-300/80 text-emerald-950',
+    activeClose: 'hover:bg-emerald-200/90 text-emerald-800',
+    suggestedPill: 'bg-emerald-600/8 border-emerald-300/50 hover:bg-emerald-600/18 hover:border-emerald-400 text-emerald-950',
+    suggestedIcon: 'text-emerald-600',
+  },
+  {
+    // 3. Artsy Indigo / Gallery & Museum
+    activePill: 'bg-indigo-500/14 border-indigo-300/80 text-indigo-950',
+    activeClose: 'hover:bg-indigo-200/90 text-indigo-800',
+    suggestedPill: 'bg-indigo-500/8 border-indigo-300/50 hover:bg-indigo-500/18 hover:border-indigo-400 text-indigo-950',
+    suggestedIcon: 'text-indigo-600',
+  },
+  {
+    // 4. Rose / French Bakery & Sweets
+    activePill: 'bg-rose-500/14 border-rose-300/80 text-rose-950',
+    activeClose: 'hover:bg-rose-200/90 text-rose-800',
+    suggestedPill: 'bg-rose-500/8 border-rose-300/50 hover:bg-rose-500/18 hover:border-rose-400 text-rose-950',
+    suggestedIcon: 'text-rose-600',
+  },
+  {
+    // 5. Seine River Teal / Landmarks
+    activePill: 'bg-teal-600/14 border-teal-300/80 text-teal-950',
+    activeClose: 'hover:bg-teal-200/90 text-teal-800',
+    suggestedPill: 'bg-teal-600/8 border-teal-300/50 hover:bg-teal-600/18 hover:border-teal-400 text-teal-950',
+    suggestedIcon: 'text-teal-600',
+  },
+  {
+    // 6. Sky Blue / Photo & Tower Night
+    activePill: 'bg-sky-500/14 border-sky-300/80 text-sky-950',
+    activeClose: 'hover:bg-sky-200/90 text-sky-800',
+    suggestedPill: 'bg-sky-500/8 border-sky-300/50 hover:bg-sky-500/18 hover:border-sky-400 text-sky-950',
+    suggestedIcon: 'text-sky-600',
+  },
+  {
+    // 7. Fairy Purple / Disney & Kids
+    activePill: 'bg-purple-500/14 border-purple-300/80 text-purple-950',
+    activeClose: 'hover:bg-purple-200/90 text-purple-800',
+    suggestedPill: 'bg-purple-500/8 border-purple-300/50 hover:bg-purple-500/18 hover:border-purple-400 text-purple-950',
+    suggestedIcon: 'text-purple-600',
+  },
+  {
+    // 8. Vintage Gold Ochre / Marais & Vintage Market
+    activePill: 'bg-amber-600/14 border-amber-300/80 text-amber-950',
+    activeClose: 'hover:bg-amber-200/90 text-amber-800',
+    suggestedPill: 'bg-amber-600/8 border-amber-300/50 hover:bg-amber-600/18 hover:border-amber-400 text-amber-950',
+    suggestedIcon: 'text-amber-700',
+  },
+  {
+    // 9. Wine Burgundy / Seine Sunset Cruise
+    activePill: 'bg-red-500/14 border-red-300/80 text-red-950',
+    activeClose: 'hover:bg-red-200/90 text-red-800',
+    suggestedPill: 'bg-red-500/8 border-red-300/50 hover:bg-red-500/18 hover:border-red-400 text-red-950',
+    suggestedIcon: 'text-red-600',
+  },
+]
+
+function getTagTheme(tag: string): TagTheme {
+  const t = tag.toLowerCase()
+  if (t.includes('☕') || t.includes('咖啡') || t.includes('早餐')) return COLOR_PALETTES[0]
+  if (t.includes('🍽️') || t.includes('餐') || t.includes('吃') || t.includes('肉') || t.includes('面') || t.includes('生蚝')) return COLOR_PALETTES[1]
+  if (t.includes('🚶') || t.includes('步') || t.includes('慢') || t.includes('轻松') || t.includes('避开')) return COLOR_PALETTES[2]
+  if (t.includes('🎨') || t.includes('画') || t.includes('展') || t.includes('故居') || t.includes('文艺')) return COLOR_PALETTES[3]
+  if (t.includes('🥐') || t.includes('甜') || t.includes('烘焙') || t.includes('面包')) return COLOR_PALETTES[4]
+  if (t.includes('🏛️') || t.includes('凯旋门') || t.includes('香街') || t.includes('地标')) return COLOR_PALETTES[5]
+  if (t.includes('📸') || t.includes('🗼') || t.includes('照') || t.includes('出片') || t.includes('夜景') || t.includes('铁塔')) return COLOR_PALETTES[6]
+  if (t.includes('🏰') || t.includes('👶') || t.includes('迪士尼') || t.includes('亲子') || t.includes('乐园')) return COLOR_PALETTES[7]
+  if (t.includes('🛍️') || t.includes('🥖') || t.includes('市集') || t.includes('中古') || t.includes('买手') || t.includes('购物')) return COLOR_PALETTES[8]
+  if (t.includes('🍷') || t.includes('酒') || t.includes('船') || t.includes('塞纳河')) return COLOR_PALETTES[9]
+
+  let hash = 0
+  for (let i = 0; i < tag.length; i++) hash = (hash << 5) - hash + tag.charCodeAt(i)
+  const index = Math.abs(hash) % COLOR_PALETTES.length
+  return COLOR_PALETTES[index]
+}
+
 export function RecommendationPreferencesButton({
   onClick,
   className = 'inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95',
@@ -211,27 +310,30 @@ export function RecommendationPreferencesDialog({
             ) : (
               <motion.div layout className="flex flex-wrap gap-2">
                 <AnimatePresence>
-                  {activeTags.map((tag) => (
-                    <motion.div
-                      key={tag}
-                      layout
-                      initial={{ scale: 0.82, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.82, opacity: 0 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.7 }}
-                      className="group relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border border-white/95 bg-white/90 pl-3 pr-1.5 text-xs font-medium text-[var(--ink)] shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md transition-all hover:bg-white hover:shadow-xs"
-                    >
-                      <span className="truncate max-w-[240px] sm:max-w-none">{tag}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeTag(tag)}
-                        aria-label={`移除 ${tag}`}
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/80 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer active:scale-90"
+                  {activeTags.map((tag) => {
+                    const theme = getTagTheme(tag)
+                    return (
+                      <motion.div
+                        key={tag}
+                        layout
+                        initial={{ scale: 0.82, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.82, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.7 }}
+                        className={`group relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border pl-3 pr-1.5 text-xs font-medium shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md transition-all ${theme.activePill}`}
                       >
-                        <X size={12} strokeWidth={2.4} />
-                      </button>
-                    </motion.div>
-                  ))}
+                        <span className="truncate max-w-[240px] sm:max-w-none">{tag}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          aria-label={`移除 ${tag}`}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer active:scale-90 ${theme.activeClose}`}
+                        >
+                          <X size={12} strokeWidth={2.4} />
+                        </button>
+                      </motion.div>
+                    )
+                  })}
                 </AnimatePresence>
               </motion.div>
             )}
@@ -249,21 +351,24 @@ export function RecommendationPreferencesDialog({
 
           <div className="flex flex-wrap gap-2">
             {availablePresets.length > 0 ? (
-              availablePresets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => addTag(preset)}
-                  className="group inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed border-[var(--copper)]/35 bg-white/50 hover:bg-white/95 hover:border-[var(--copper)] hover:shadow-2xs pl-3 pr-2 text-xs font-medium text-[var(--ink)]/85 backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <span>{preset}</span>
-                  <Plus
-                    size={12}
-                    strokeWidth={2.4}
-                    className="text-[var(--copper)] transition-transform group-hover:rotate-90 shrink-0"
-                  />
-                </button>
-              ))
+              availablePresets.map((preset) => {
+                const theme = getTagTheme(preset)
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => addTag(preset)}
+                    className={`group inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed pl-3 pr-2 text-xs font-medium backdrop-blur-sm transition-all active:scale-95 cursor-pointer shadow-2xs ${theme.suggestedPill}`}
+                  >
+                    <span>{preset}</span>
+                    <Plus
+                      size={12}
+                      strokeWidth={2.4}
+                      className={`transition-transform group-hover:rotate-90 shrink-0 ${theme.suggestedIcon}`}
+                    />
+                  </button>
+                )
+              })
             ) : (
               <p className="text-xs text-[var(--stone)]/70 italic py-1">
                 已添加所有预设推荐偏好 ✨
