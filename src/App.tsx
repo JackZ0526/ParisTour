@@ -869,7 +869,7 @@ export default function App() {
               {itineraryReady ? (
                 <section className="space-y-4">
                   {showItineraryLoading && (
-                    <div className="rounded-2xl border border-white/80 bg-white/65 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl px-4 py-8">
+                    <div className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl px-4 py-8">
                       <LoadingIndicator
                         variant="block"
                         mode="thinking"

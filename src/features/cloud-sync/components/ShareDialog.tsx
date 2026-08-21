@@ -324,7 +324,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   {shares.map((s) => (
                     <li
                       key={s.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 bg-white/65 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 hover:shadow-xs"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-[#202b26] hover:shadow-xs"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 font-display text-sm font-semibold text-[var(--sage)] shadow-inner">

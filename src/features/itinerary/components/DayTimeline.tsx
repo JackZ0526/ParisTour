@@ -1490,21 +1490,21 @@ export function DayTimeline({
       <motion.div
         custom={direction}
         variants={timelineItemVariants}
-        className="relative overflow-hidden w-full min-w-0 max-w-full rounded-2xl sm:rounded-3xl border border-white/80 bg-white/65 p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.05),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+        className="relative overflow-hidden w-full min-w-0 max-w-full rounded-2xl sm:rounded-3xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.05),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.36),inset_0_1px_1.5px_rgba(255,255,255,0.08),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent before:content-['']"
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.copper} px-2.5 py-1 text-xs text-[var(--copper)]`}>
               Day {day.day}
             </span>
-            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.sage} px-2.5 py-1 text-xs text-[var(--sage)]`}>
+            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.sage} px-2.5 py-1 text-xs text-[var(--sage)] dark:text-emerald-300`}>
               {dayPending ? (
                 <span className="inline-block h-3 w-16 rounded-full day-tab-shimmer" />
               ) : (
                 day.pace
               )}
             </span>
-            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.neutral} hidden px-2.5 py-1 text-xs text-[var(--stone)] sm:inline-flex`}>
+            <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.neutral} hidden px-2.5 py-1 text-xs text-[var(--stone)] dark:text-zinc-300 sm:inline-flex`}>
               {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
             </span>
             {copyRefreshing && !dayRegenerating && (
@@ -1559,7 +1559,7 @@ export function DayTimeline({
           </div>
           )}
         </div>
-        <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl">
+        <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl text-[var(--ink)]">
           {dayPending ? (
             <span className="mt-1 inline-block h-8 w-2/3 rounded-full day-tab-shimmer" />
           ) : (
@@ -1573,7 +1573,7 @@ export function DayTimeline({
             day.theme
           )}
         </p>
-        <p className="mt-2 break-words text-sm text-[var(--stone)]">
+        <p className="mt-2 break-words text-sm text-[var(--stone)] dark:text-zinc-300">
           {dayPending ? (
             <span className="mt-1 inline-block h-4 w-full rounded-full day-tab-shimmer" />
           ) : (

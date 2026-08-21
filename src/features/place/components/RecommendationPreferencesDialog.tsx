@@ -195,7 +195,7 @@ export function RecommendationPreferencesDialog({
         {/* Main Content Body */}
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           {/* 1. Departure Time Anchor */}
-          <section className="relative z-30 rounded-3xl border border-white/80 bg-white/65 p-3.5 sm:p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl">
+          <section className="relative z-30 rounded-3xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-3.5 sm:p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2">
               <Clock size={14} className="text-[var(--copper)]" />
               <span>通常开始时间</span>
