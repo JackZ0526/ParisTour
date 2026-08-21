@@ -23,6 +23,10 @@ export const glassSageCardSurfaceClass =
 export const glassVioletCardSurfaceClass =
   "relative overflow-hidden rounded-2xl border border-[#c4bcd8]/45 bg-[#f8f5fa]/65 shadow-[0_4px_24px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
 
+/** Shared liquid frosted-glass card surface with a warm hotel / booking tint. */
+export const glassGoldCardSurfaceClass =
+  "relative overflow-hidden rounded-2xl border border-[#d4bd91]/55 bg-[#fbf8f0]/72 shadow-[0_4px_24px_rgba(109,82,39,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.65)] backdrop-blur-xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+
 /** Active / selected state for glass cards with warm copper-amber glow. */
 export const glassCardActiveSurfaceClass =
   "relative overflow-hidden rounded-2xl border border-[var(--copper)]/80 bg-white/90 shadow-[0_8px_32px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(255,255,255,1)] ring-2 ring-[var(--copper)]/35 backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-[''] timeline-card-selected-highlight"

@@ -1215,14 +1215,25 @@ export default function App() {
               />
 
               {itineraryReady && (
-                <div className="flex justify-center pt-2">
+                <div className={`flex flex-col gap-4 rounded-3xl ${glassCardSurfaceClass} px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6`}>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--sage)]/15 to-[var(--gold)]/10 text-[var(--sage)] shadow-inner">
+                      <CalendarDays size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--ink)]">出行信息已就绪</p>
+                      <p className="mt-0.5 text-xs text-[var(--stone)]">
+                        日期、往返航班与当前住宿均已确认
+                      </p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleSelectTab('itinerary')}
-                    className={`${glassCapsuleSurfaceClass} border-[var(--copper)]/30 bg-white/90 text-[var(--ink)] shadow-md inline-flex items-center gap-2 px-8 py-3.5 text-sm font-medium hover:bg-white active:scale-95 transition-all`}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-5 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 sm:w-auto"
                   >
-                    <CalendarDays size={17} className="text-[var(--copper)]" />
-                    <span>查看已规划的每日行程 →</span>
+                    <span>查看每日行程</span>
+                    <span aria-hidden>→</span>
                   </button>
                 </div>
               )}

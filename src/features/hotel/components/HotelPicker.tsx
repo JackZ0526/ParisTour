@@ -36,6 +36,7 @@ import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
   glassCardSurfaceClass,
+  glassGoldCardSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 import {
   fetchBookingHotelFeaturedReviews,
@@ -147,25 +148,41 @@ function HotelCardFace({
   hotel,
   blurb,
   blurbLoading,
+  variant = 'candidate',
 }: {
   hotel: HotelCandidate
   blurb?: string
   blurbLoading?: boolean
+  variant?: 'candidate' | 'selected'
 }) {
   const customText = (blurb || hotel.reason || '').trim()
   const showCustomShimmer = hotel.source === 'custom' && blurbLoading && !customText
 
   return (
-    <>
+    <div
+      className={
+        variant === 'selected'
+          ? 'h-full sm:grid sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] sm:items-stretch'
+          : undefined
+      }
+    >
       <GooglePlacePhoto
         name={hotel.name}
         location={{ lat: hotel.lat, lng: hotel.lng }}
         fallback={bookingPhotoUrl(hotel.image)}
         alt={hotel.name}
         asBackground
-        className="h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
+        className={`h-28 bg-cover bg-center transition duration-500 group-hover:scale-[1.03] ${
+          variant === 'selected'
+            ? 'sm:h-auto sm:min-h-44 sm:self-stretch'
+            : '-mx-px w-[calc(100%+2px)]'
+        }`}
       />
-      <div className="flex min-h-[7.75rem] flex-col p-3">
+      <div
+        className={`flex flex-col p-3 ${
+          variant === 'selected' ? 'min-h-[7.75rem] sm:min-h-44 sm:p-4' : 'min-h-[7.75rem]'
+        }`}
+      >
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="text-xs text-[var(--copper)]">{hotel.area}</p>
@@ -208,7 +225,7 @@ function HotelCardFace({
           </p>
         )}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -2062,19 +2079,32 @@ export function HotelPicker({
 
   return (
     <section className={`space-y-4 ${readOnly ? '[&_button]:pointer-events-none [&_input]:pointer-events-none [&_textarea]:pointer-events-none' : ''}`}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-2xl text-[var(--ink)] sm:text-3xl">酒店</h2>
-          <p className="mt-1 max-w-xl text-sm text-[var(--stone)]">
-            {readOnly
-              ? '当前为只读共享，无法修改酒店。'
-              : '打开后会先给出几家酒店候选。点开详情并选「就住这儿了」才会定为当前住宿；日期、往返航班和酒店都选好后，下方行程才会展开。'}
-          </p>
-        </div>
-          <div className="flex flex-wrap items-center gap-2">
-          <div className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-3 py-1 text-sm text-[var(--sage)]`}>
-            {isHotelSelected(selected) ? `当前：${selected.name}` : '当前：尚未选择'}
+      <article className={`relative rounded-3xl ${glassCardSurfaceClass} !overflow-visible p-5 shadow-[0_8px_32px_rgba(0,0,0,0.03)] sm:p-7`}>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 border-b border-black/5 pb-4 sm:gap-x-4 sm:pb-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--gold)]/20 to-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
+              <Building2 size={18} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-xl leading-tight text-[var(--ink)] sm:text-2xl">
+                  住宿选择
+                </h2>
+                <span
+                  className={`${glassCapsuleSurfaceClass} ${
+                    isHotelSelected(selected)
+                      ? glassCapsuleToneClass.gold
+                      : glassCapsuleToneClass.neutral
+                  } px-2.5 py-0.5 text-[11px] font-medium ${
+                    isHotelSelected(selected) ? 'text-amber-900' : 'text-[var(--stone)]'
+                  }`}
+                >
+                  {isHotelSelected(selected) ? '已选择' : '待选择'}
+                </span>
+              </div>
+            </div>
           </div>
+
           <button
             type="button"
             disabled={refreshing || !isLlmConfigured()}
@@ -2083,16 +2113,35 @@ export function HotelPicker({
               setRefreshPanel('choose')
             }}
             aria-busy={refreshing || undefined}
-            className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--sage)] active:scale-95 disabled:opacity-50`}
+            aria-label={refreshing ? '正在更换酒店推荐' : '换一批酒店推荐'}
+            className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex h-11 min-w-11 items-center justify-center gap-1.5 px-3 text-xs text-[var(--stone)] shadow-[0_2px_10px_rgba(0,0,0,0.045),inset_0_1px_1.5px_rgba(255,255,255,1)] transition-colors hover:text-[var(--copper)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--copper)]/25 disabled:opacity-50 sm:h-auto sm:min-w-0 sm:px-3.5 sm:py-2`}
           >
-            {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
-            {refreshing ? '推荐中…' : '换一批推荐'}
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+              {refreshing ? (
+                <ButtonSpinner mode="thinking" task="hotelRecommend" />
+              ) : (
+                <Sparkles size={14} strokeWidth={1.8} />
+              )}
+            </span>
+            <span className="hidden min-[360px]:inline sm:hidden">
+              {refreshing ? '推荐中…' : '换一批'}
+            </span>
+            <span className="hidden sm:inline">
+              {refreshing ? '推荐中…' : '换一批推荐'}
+            </span>
           </button>
+
+          <p className="col-span-2 ml-12 max-w-2xl text-xs leading-relaxed text-[var(--stone)]">
+            {readOnly
+              ? '当前为只读共享，可查看住宿与酒店候选。'
+              : '查看推荐酒店、确认当前住宿，或输入自己的酒店地址。'}
+          </p>
         </div>
-      </div>
+
+        <div className="mt-5 space-y-5">
 
       {refreshPanel && (
-        <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 transition-all`}>
+        <div className={`rounded-2xl ${glassCardSurfaceClass} p-4 transition-all sm:p-5`}>
           {refreshPanel === 'choose' ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -2106,7 +2155,7 @@ export function HotelPicker({
                   type="button"
                   disabled={refreshing}
                   onClick={() => setRefreshPanel(null)}
-                  className="text-sm text-[var(--stone)] hover:text-[var(--ink)]"
+                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
                 >
                   取消
                 </button>
@@ -2149,7 +2198,7 @@ export function HotelPicker({
                   type="button"
                   disabled={refreshing}
                   onClick={() => setRefreshPanel('choose')}
-                  className="text-sm text-[var(--stone)] hover:text-[var(--ink)]"
+                    className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
                 >
                   返回
                 </button>
@@ -2200,25 +2249,30 @@ export function HotelPicker({
       )}
 
       <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--stone)]">我的住宿</p>
-        <div className="mt-2 space-y-3">
-          <div className="grid gap-4 lg:grid-cols-12 items-stretch">
-            <div className="lg:col-span-7 xl:col-span-8 flex flex-col">
+        <div className="flex items-center gap-1.5">
+          <Bed size={14} className="text-[var(--copper)]" />
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--copper)]">
+            当前住宿
+          </p>
+        </div>
+        <div className="mt-2.5 space-y-4">
+          <div className="grid items-stretch gap-3.5 lg:grid-cols-12">
+            <div className="flex flex-col lg:col-span-8">
               <AnimatePresence mode="wait">
                 {selectedCandidate ? (
                   <motion.div
                     key={`selected-hotel-${selectedCandidate.id}`}
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     ref={currentSlotRef}
-                    className={`group relative flex-1 overflow-hidden rounded-3xl border text-left shadow-[0_8px_30px_rgba(0,0,0,0.04)] ring-2 backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                    className={`group flex-1 text-left ring-1 transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${glassGoldCardSurfaceClass} ${
                       currentSlotDropReady
-                        ? 'border-[var(--sage)] ring-[var(--sage)]/40 bg-[var(--sage)]/10'
+                        ? '!border-[var(--sage)] ring-[var(--sage)]/40 !bg-[var(--sage)]/10'
                         : currentSlotHighlight
-                          ? 'border-[var(--copper)] ring-[var(--copper)]/50 bg-[var(--copper)]/5'
-                          : 'border-white/80 bg-white/80 ring-[var(--copper)]/30'
+                          ? '!border-[var(--copper)] ring-[var(--copper)]/45 !bg-[var(--copper)]/5'
+                          : 'ring-[#d4bd91]/25'
                     }`}
                   >
                     <div className="absolute right-2 top-2 z-10 flex gap-1.5">
@@ -2232,7 +2286,7 @@ export function HotelPicker({
                             e.stopPropagation()
                             setPendingDeleteHotel(selectedCandidate)
                           }}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
+                          className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} flex h-8 w-8 items-center justify-center text-[var(--stone)] transition-colors hover:text-red-700 active:scale-95`}
                         >
                           <TrashIcon />
                         </button>
@@ -2246,7 +2300,7 @@ export function HotelPicker({
                           e.stopPropagation()
                           clearCurrentSelection()
                         }}
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-[var(--copper)]"
+                        className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} flex h-8 w-8 items-center justify-center text-[var(--stone)] transition-colors hover:text-[var(--copper)] active:scale-95`}
                       >
                         <UnselectIcon />
                       </button>
@@ -2261,7 +2315,7 @@ export function HotelPicker({
                     <button
                       type="button"
                       onClick={() => openHotelCard(selectedCandidate)}
-                      className="w-full text-left"
+                      className="h-full w-full text-left"
                     >
                       <HotelCardFace
                         hotel={selectedCandidate}
@@ -2269,18 +2323,19 @@ export function HotelPicker({
                         blurbLoading={
                           needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
                         }
+                        variant="selected"
                       />
                     </button>
                   </motion.div>
                 ) : (
                   <motion.div
                     key="empty-hotel-slot"
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     ref={currentSlotRef}
-                    className={`flex-1 flex flex-col justify-center rounded-3xl border border-dashed p-6 sm:p-8 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                    className={`flex flex-1 flex-col justify-center rounded-2xl border border-dashed p-6 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] sm:p-8 ${
                       currentSlotDropReady
                         ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
                         : currentSlotHighlight
@@ -2301,20 +2356,31 @@ export function HotelPicker({
               </AnimatePresence>
             </div>
 
-            <div className="lg:col-span-5 xl:col-span-4 rounded-3xl border border-dashed border-[var(--stone)]/30 bg-white/60 p-5 sm:p-6 shadow-sm backdrop-blur-xl flex flex-col justify-between">
+            <div className={`flex flex-col justify-between p-4 sm:p-5 lg:col-span-4 ${glassCardSurfaceClass}`}>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--copper)] font-medium">自定义</p>
-                <p className="mt-1 font-medium text-base text-[var(--ink)]">输入我自己的酒店地址</p>
-                <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
-                  生成后会打开详情页，再决定是否加入候选项
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-[var(--copper)]">
+                    <MapPin size={14} strokeWidth={1.8} />
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em]">
+                      自定义住宿
+                    </p>
+                  </div>
+                  <p className="mt-2 text-base font-medium text-[var(--ink)]">
+                    已经订好酒店？
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--stone)]">
+                    输入酒店名称或地址，生成详情后再决定是否加入候选。
+                  </p>
+                </div>
               </div>
+
               <div className="mt-4 flex flex-col gap-2.5">
                 <input
                   value={customQuery}
                   onChange={(e) => setCustomQuery(e.target.value)}
                   placeholder="例如：25 Rue du Temple, 75004 Paris"
-                  className="w-full rounded-2xl border border-white/80 bg-white/70 px-3.5 py-2.5 text-sm outline-none backdrop-blur-sm transition-all focus:border-[var(--copper)] focus:bg-white focus:shadow-sm"
+                  aria-label="自定义酒店名称或地址"
+                  className="w-full rounded-2xl border border-white/90 bg-white/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/65 focus:border-[var(--copper)]/60 focus:bg-white/90 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && customQuery.trim() && !loading) {
                       e.preventDefault()
@@ -2327,7 +2393,7 @@ export function HotelPicker({
                   disabled={loading || !customQuery.trim() || decidingCustom}
                   onClick={() => void applyCustom()}
                   aria-busy={loading || undefined}
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   {loading && <ButtonSpinner />}
                   {loading ? '生成卡片中…' : '生成酒店卡片'}
@@ -2341,16 +2407,19 @@ export function HotelPicker({
         </div>
 
         {(canToggleOthers || (!selectedCandidate && candidates.length > 0)) && (
-          <div className="space-y-2">
+          <div className="space-y-3 border-t border-black/5 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-medium text-[var(--ink)]">
-                {selectedCandidate ? '其他候选项' : '酒店候选项'}
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={14} className="text-[var(--gold)]" />
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--stone)]">
+                  {selectedCandidate ? '其他候选酒店' : '酒店候选项'}
+                </h3>
+              </div>
               {canToggleOthers && (
                 <button
                   type="button"
                   onClick={() => setOthersCollapsedAndPersist(!othersCollapsed)}
-                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
+                  className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/30`}
                 >
                   <ChevronIcon up={!othersCollapsed} />
                   {othersCollapsed
@@ -2369,10 +2438,10 @@ export function HotelPicker({
             >
               <div className="min-h-0 overflow-hidden">
                 <div
-                  className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-3 transition-[opacity,transform] duration-500 ease-in-out ${
+                  className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-3 transition-opacity duration-300 ease-out ${
                     selectedCandidate && othersCollapsed
-                      ? 'pointer-events-none -translate-y-2 opacity-0'
-                      : 'translate-y-0 opacity-100'
+                      ? 'pointer-events-none opacity-0'
+                      : 'opacity-100'
                   } ${dragging ? 'select-none' : ''}`}
                 >
                   {(selectedCandidate ? otherCandidates : candidates).map((hotel) => (
@@ -2381,10 +2450,10 @@ export function HotelPicker({
                       key={hotel.id}
                       transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
                       onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
-                      className={`group relative cursor-pointer overflow-hidden rounded-3xl border bg-white/75 backdrop-blur-xl text-left touch-none shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-[border-color,opacity,transform] duration-200 [transition-timing-function:var(--timeline-ease)] ${
+                      className={`group relative cursor-pointer text-left touch-none transition-[border-color,opacity,box-shadow] duration-200 [transition-timing-function:var(--timeline-ease)] ${glassCardSurfaceClass} ${
                         dragHotelId === hotel.id
-                          ? 'pointer-events-none border-transparent opacity-0'
-                          : 'border-white/80 hover:border-[var(--gold)]'
+                          ? 'pointer-events-none !border-transparent opacity-0'
+                          : 'hover:!border-[var(--gold)]/70 hover:shadow-[0_8px_28px_rgba(109,82,39,0.08)]'
                       }`}
                     >
                       {hotel.source === 'custom' && (
@@ -2397,7 +2466,7 @@ export function HotelPicker({
                             e.stopPropagation()
                             setPendingDeleteHotel(hotel)
                           }}
-                          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-red-700/90"
+                          className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} !absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center text-[var(--stone)] transition-colors hover:text-red-700 active:scale-95`}
                         >
                           <TrashIcon />
                         </button>
@@ -2420,6 +2489,8 @@ export function HotelPicker({
         <p className="text-sm text-[var(--stone)]">暂无候选项。可点「换一批推荐」或自定义地址。</p>
       )}
       {error && <p className="text-sm text-red-700">{error}</p>}
+        </div>
+      </article>
 
       {drag && (
         <div
