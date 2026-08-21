@@ -931,8 +931,8 @@ export default function App() {
 
                   {showItineraryContent && (
                     <>
-                      <div className="space-y-2">
-                        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1.5 -mx-1.5 -my-1.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <div className="flex flex-col gap-3 sm:gap-3.5">
+                        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 -mx-1.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                           {days.map((d, i) => {
                             const cal = dateForTripDay(itineraryStartDate, d.day)
                             return (
