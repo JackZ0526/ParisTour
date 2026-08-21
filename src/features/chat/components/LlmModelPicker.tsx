@@ -46,6 +46,9 @@ const MORPH_SPRING = { type: 'spring' as const, stiffness: 350, damping: 30 }
 // margin (prevents the popover from running off the left edge on narrow phones).
 const POPOVER_MAX_WIDTH = 'min(calc(100vw - 2.5rem), 17.5rem)'
 
+const GLASS_INNER_CARD_CLASS =
+  'relative overflow-hidden rounded-2xl border border-white/90 bg-[#fbf7f3]/85 shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1.5px_rgba(255,255,255,0.7)] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95'
+
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
@@ -310,7 +313,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             ) : (
               <div>
                 <SectionHeader>思考</SectionHeader>
-                <div className="rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 shadow-2xs backdrop-blur-md">
+                <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
                   <p className="text-xs leading-snug text-[var(--stone)]">
                     当前模型不支持思考强度设置
                   </p>
@@ -435,7 +438,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
               ) : (
                 <div>
                   <SectionHeader>思考</SectionHeader>
-                  <div className="rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 shadow-2xs backdrop-blur-md">
+                  <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
                     <p className="text-xs leading-snug text-[var(--stone)]">
                       当前模型不支持思考强度设置
                     </p>
@@ -546,7 +549,7 @@ function ThinkingControls({
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
-            <div className="mt-2.5 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_4px_rgba(0,0,0,0.02)] backdrop-blur-md">
+            <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5 p-2.5`}>
               <label
                 htmlFor={autoCheckboxId}
                 className={`flex items-start gap-2.5 ${
@@ -604,7 +607,7 @@ function ThinkingControls({
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
-            <div className="mt-2.5 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 px-3 py-2 shadow-2xs backdrop-blur-md">
+            <div className={`${GLASS_INNER_CARD_CLASS} mt-2.5 flex items-center gap-2 px-3 py-2`}>
               <span
                 aria-hidden
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/60"
@@ -1056,7 +1059,7 @@ function SettingsRow({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 hover:border-white active:scale-98 disabled:opacity-50 cursor-pointer"
+      className={`${GLASS_INNER_CARD_CLASS} flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] transition-all hover:bg-white/95 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05),inset_0_1.5px_2px_rgba(255,255,255,1)] active:scale-98 disabled:opacity-50 cursor-pointer`}
     >
       {icon}
       <span className="min-w-0 flex-1">{label}</span>
