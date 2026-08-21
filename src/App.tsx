@@ -622,7 +622,7 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[100svh] max-w-7xl flex-col px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(4.75rem,calc(env(safe-area-inset-top)+1.25rem))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+    <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(4.75rem,calc(env(safe-area-inset-top)+1.25rem))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
       <ApiRequestMeter />
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -763,7 +763,7 @@ export default function App() {
         />
       )}
 
-      <main className="mt-4 flex flex-1 flex-col space-y-6 sm:mt-6 sm:space-y-8">
+      <main className="mt-4 space-y-6 sm:mt-6 sm:space-y-8">
         <AnimatePresence mode="wait">
           {activeTab === 'itinerary' && (
             <motion.div
@@ -773,7 +773,7 @@ export default function App() {
               exit={{ opacity: 0, y: -8 }}
               onAnimationStart={() => restoreTabScroll('itinerary')}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className={itineraryReady ? 'space-y-4' : 'flex flex-1 flex-col'}
+              className="space-y-4"
             >
               {/* Top Quick Itinerary Summary Strip */}
               {itineraryReady && (
@@ -1115,7 +1115,7 @@ export default function App() {
                   )}
                 </section>
               ) : (
-                <div className={`relative flex flex-1 flex-col justify-center overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-8 md:p-10 text-center shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)]`}>
+                <div className={`relative overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-6 sm:p-10 text-center shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)]`}>
                   {/* Subtle decorative background watermark */}
                   <div
                     className="pointer-events-none absolute inset-0 opacity-[0.035] grayscale"
@@ -1127,7 +1127,7 @@ export default function App() {
                     }}
                   />
 
-                  <div className="relative mx-auto my-auto w-full max-w-lg space-y-4 sm:space-y-6">
+                  <div className="relative mx-auto max-w-lg space-y-5">
                     {/* Top Editorial Category Badge */}
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)]">
                       <Sparkles size={12} strokeWidth={2.2} />
@@ -1135,9 +1135,8 @@ export default function App() {
                     </div>
 
                     {/* Central 3D Frosted Icon Badge */}
-                    <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
-                      <Luggage size={26} className="sm:hidden" strokeWidth={1.9} />
-                      <Luggage size={30} className="hidden sm:block" strokeWidth={1.9} />
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
+                      <Luggage size={30} strokeWidth={1.9} />
                     </div>
 
                     {/* Typography */}
@@ -1151,7 +1150,7 @@ export default function App() {
                     </div>
 
                     {/* Interactive 3-Step Readiness Matrix */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1.5 text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-left">
                       {/* Step 1: Dates */}
                       <button
                         type="button"
@@ -1248,7 +1247,7 @@ export default function App() {
                     </div>
 
                     {/* Primary CTA Button: French Copper-Amber Gradient */}
-                    <div className="pt-1.5">
+                    <div className="pt-2">
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
@@ -1427,13 +1426,11 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {!(activeTab === 'itinerary' && !itineraryReady) && (
-          <footer className="rounded-3xl border border-white/80 bg-white/60 px-5 py-4 text-xs text-zinc-500 shadow-sm backdrop-blur-xl transition-colors">
-            <p>
-              航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
-            </p>
-          </footer>
-        )}
+        <footer className="rounded-3xl border border-white/80 bg-white/60 px-5 py-4 text-xs text-zinc-500 shadow-sm backdrop-blur-xl transition-colors">
+          <p>
+            航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
+          </p>
+        </footer>
       </main>
 
       {/* Mobile Native Bottom Navigation Bar */}
