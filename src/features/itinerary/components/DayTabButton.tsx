@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 
+export type DayTabTheme = 'glass-copper' | 'copper-gradient' | 'ink'
+
 type DayTabButtonProps = {
   dayNumber: number
   dateLabel?: string
@@ -8,6 +10,7 @@ type DayTabButtonProps = {
   pending: boolean
   active: boolean
   hasInteracted?: boolean
+  theme?: DayTabTheme
   onSelect: () => void
 }
 
@@ -23,6 +26,7 @@ export function DayTabButton({
   pending,
   active,
   hasInteracted,
+  theme = 'glass-copper',
   onSelect,
 }: DayTabButtonProps) {
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -53,8 +57,36 @@ export function DayTabButton({
     })
   }, [pending, title, dateLabel, active, streamingTitle])
 
-  const shimmerClass = active ? 'day-tab-shimmer-on-ink' : 'day-tab-shimmer'
   const dateLine = `D${dayNumber}${dateLabel ? ` · ${dateLabel}` : ''}`
+
+  const activePillClass =
+    theme === 'glass-copper'
+      ? 'absolute inset-0 z-0 rounded-full border border-white bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-md'
+      : theme === 'copper-gradient'
+        ? 'absolute inset-0 z-0 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] shadow-[0_4px_16px_rgba(179,107,60,0.32),inset_0_1px_1.5px_rgba(255,255,255,0.45)] border border-[#c47c4d]/50'
+        : 'absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]'
+
+  const dateTextColor = active
+    ? theme === 'glass-copper'
+      ? 'text-[var(--copper)] font-bold'
+      : theme === 'copper-gradient'
+        ? 'text-white font-bold'
+        : 'text-[var(--paper)] font-bold'
+    : 'text-[var(--ink)]/85 font-medium'
+
+  const subtitleTextColor = active
+    ? theme === 'glass-copper'
+      ? 'text-[var(--ink)] font-medium'
+      : theme === 'copper-gradient'
+        ? 'text-white/90 font-medium'
+        : 'text-[var(--paper)]/85'
+    : 'text-[var(--stone)]'
+
+  const shimmerClass = active
+    ? theme === 'glass-copper'
+      ? 'day-tab-shimmer'
+      : 'day-tab-shimmer-on-ink'
+    : 'day-tab-shimmer'
 
   return (
     <button
@@ -64,12 +96,16 @@ export function DayTabButton({
       aria-busy={pending || undefined}
       aria-label={pending ? `第 ${dayNumber} 天，正在生成` : undefined}
       style={box ? { width: box.w, height: box.h } : undefined}
-      className="day-tab-button relative isolate snap-start shrink-0 rounded-full bg-white/70 px-3 py-2 text-sm outline-none transition-colors duration-200 hover:bg-white/90 sm:px-4"
+      className={`day-tab-button relative isolate snap-start shrink-0 rounded-full px-3.5 py-2 text-sm outline-none transition-all duration-200 sm:px-4 ${
+        active
+          ? ''
+          : 'border border-white/70 bg-white/60 shadow-xs hover:border-white hover:bg-white/85 hover:shadow'
+      }`}
     >
       {active && (
         <motion.span
           layoutId="active-day-tab-ink"
-          className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+          className={activePillClass}
           animate={
             hasInteracted
               ? {
@@ -86,13 +122,9 @@ export function DayTabButton({
         />
       )}
 
-      <span
-        className={`relative z-10 block w-max max-w-none transition-colors duration-200 ${
-          active ? 'text-[var(--paper)]' : 'text-[var(--ink)]'
-        }`}
-      >
-        <span className="block leading-tight font-medium">{dateLine}</span>
-        <span className="mt-0.5 block text-[11px] leading-[1.25]">
+      <span className="relative z-10 block w-max max-w-none transition-colors duration-200">
+        <span className={`block leading-tight ${dateTextColor}`}>{dateLine}</span>
+        <span className={`mt-0.5 block text-[11px] leading-[1.25] ${subtitleTextColor}`}>
           {pending && !streamingTitle ? (
             <span
               aria-hidden
@@ -101,9 +133,7 @@ export function DayTabButton({
           ) : (
             <span
               className={`block max-w-[9.5rem] truncate sm:max-w-none ${
-                streamingTitle
-                  ? 'chat-step-shimmer'
-                  : 'opacity-80'
+                streamingTitle ? 'chat-step-shimmer' : ''
               }`}
             >
               {title}

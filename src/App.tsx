@@ -23,7 +23,7 @@ import { useMobilePane } from './hooks/useMobilePane'
 import { useTripDialogs } from './hooks/useTripDialogs'
 import { useTripSync } from './hooks/useTripSync'
 import { DayTimeline } from './features/itinerary/components/DayTimeline'
-import { DayTabButton } from './features/itinerary/components/DayTabButton'
+import { DayTabButton, type DayTabTheme } from './features/itinerary/components/DayTabButton'
 import { LogisticsTravelSection } from './features/flight/components/LogisticsTravelSection'
 import { HotelPicker } from './features/hotel/components/HotelPicker'
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
@@ -174,6 +174,10 @@ export default function App() {
   const destination = '巴黎'
   const destinationBrand = destinationBrandFromDestination(destination)
   const numberOfDaysRef = useRef(0)
+  const [dayTabTheme, setDayTabTheme] = useState<DayTabTheme>(() => {
+    if (typeof window === 'undefined') return 'glass-copper'
+    return (localStorage.getItem('preview_day_tab_theme') as DayTabTheme) || 'glass-copper'
+  })
   const {
     dayIndex,
     setDayIndex,
@@ -926,6 +930,57 @@ export default function App() {
                   {showItineraryContent && (
                     <>
                       <div className="space-y-2">
+                        {/* Temporary Theme Comparison Switcher */}
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 px-1 pb-1">
+                          <span className="text-[11px] font-medium text-[var(--stone)]">
+                            🎨 日期栏样式方案对比:
+                          </span>
+                          <div className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/70 p-0.5 shadow-xs backdrop-blur-md">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDayTabTheme('glass-copper')
+                                localStorage.setItem('preview_day_tab_theme', 'glass-copper')
+                              }}
+                              className={`rounded-full px-2.5 py-0.5 text-[10.5px] transition-all duration-150 ${
+                                dayTabTheme === 'glass-copper'
+                                  ? 'bg-[var(--copper)] text-white font-semibold shadow-xs'
+                                  : 'text-[var(--stone)] hover:text-[var(--ink)]'
+                              }`}
+                            >
+                              方案A: 白玻暖铜
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDayTabTheme('copper-gradient')
+                                localStorage.setItem('preview_day_tab_theme', 'copper-gradient')
+                              }}
+                              className={`rounded-full px-2.5 py-0.5 text-[10.5px] transition-all duration-150 ${
+                                dayTabTheme === 'copper-gradient'
+                                  ? 'bg-[var(--copper)] text-white font-semibold shadow-xs'
+                                  : 'text-[var(--stone)] hover:text-[var(--ink)]'
+                              }`}
+                            >
+                              方案B: 暖铜鎏金
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDayTabTheme('ink')
+                                localStorage.setItem('preview_day_tab_theme', 'ink')
+                              }}
+                              className={`rounded-full px-2.5 py-0.5 text-[10.5px] transition-all duration-150 ${
+                                dayTabTheme === 'ink'
+                                  ? 'bg-[var(--ink)] text-white font-semibold shadow-xs'
+                                  : 'text-[var(--stone)] hover:text-[var(--ink)]'
+                              }`}
+                            >
+                              原版: 纯黑墨斑
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                           {days.map((d, i) => {
                             const cal = dateForTripDay(itineraryStartDate, d.day)
@@ -940,6 +995,7 @@ export default function App() {
                                 pending={isDayGenerationPending(d.day)}
                                 active={i === dayIndex}
                                 hasInteracted={hasInteractedDay}
+                                theme={dayTabTheme}
                                 onSelect={() => {
                                   setHasInteractedDay(true)
                                   handleSelectDay(i)
