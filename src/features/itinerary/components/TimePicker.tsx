@@ -4,7 +4,6 @@ import { Clock3 } from 'lucide-react'
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
-  glassPopoverSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 
 interface Props {
@@ -84,10 +83,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         Seamlessly holds the persistent top anchor bar, expanding the hour/minute selection below.
       */}
       <div
-        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 ${
+        className={`relative overflow-hidden rounded-2xl border transition-colors duration-200 ${
           open
-            ? `border-white/90 bg-white/95 ${glassPopoverSurfaceClass} shadow-2xl`
-            : 'border-[var(--mist)] bg-white/80 hover:border-[var(--copper)]/60'
+            ? 'border-white/90 bg-white/95 shadow-[0_12px_32px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl'
+            : 'border-[var(--mist)]/80 bg-white/80 shadow-2xs hover:border-[var(--copper)]/60'
         }`}
       >
         {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
@@ -97,12 +96,12 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
-          className="flex h-9 w-full items-center justify-between gap-2 px-3 py-1.5 text-left outline-none cursor-pointer select-none"
+          className="flex h-9 w-full items-center justify-between gap-2 px-3 py-1.5 text-left outline-none focus:outline-none focus-visible:outline-none cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
             {/* Time Capsule: In-place transition from plain text to highlight glass capsule */}
             <span
-              className={`tabular-nums font-semibold text-sm transition-all duration-200 ${
+              className={`tabular-nums font-semibold text-sm transition-colors duration-150 ${
                 open
                   ? `${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center rounded-lg px-2 py-0.5 text-[var(--copper)] shadow-2xs`
                   : 'text-[var(--ink)]'
