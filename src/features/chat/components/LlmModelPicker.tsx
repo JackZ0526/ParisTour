@@ -129,6 +129,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const panelHeightDirectionRef = useRef<'idle' | 'expand' | 'collapse'>('idle')
   const rootRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
   // Sentinel measures the popover's natural height. With all real layers
   // absolutely positioned, there's nothing in-flow for `height: 'auto'`
@@ -145,15 +146,16 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   // Track the popover's natural height. Re-measures when `open`, `panel`,
   // `model`, or `thinkingMode` change.
   useLayoutEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
     const update = () => {
-      const h = el.offsetHeight
+      const hSentinel = sentinelRef.current?.offsetHeight || 0
+      const hContent = contentRef.current?.offsetHeight || 0
+      const h = Math.max(hSentinel, hContent)
       if (h > 0) setPopoverHeight(h)
     }
     update()
     const observer = new ResizeObserver(update)
-    observer.observe(el)
+    if (sentinelRef.current) observer.observe(sentinelRef.current)
+    if (contentRef.current) observer.observe(contentRef.current)
     return () => observer.disconnect()
   }, [open, panel, model, thinkingMode])
 
@@ -241,6 +243,48 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
 
   return (
     <>
+      {/* Sentinel -- off-screen, unclipped, non-interactive copy of the popover content.
+          Placed OUTSIDE the transformed/filtered motion.div container so WebKit on iOS Safari
+          measures the true, unclipped natural height. */}
+      <div
+        ref={sentinelRef}
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          width: 'min(calc(100vw - 2.5rem), 17.5rem)',
+          pointerEvents: 'none',
+          visibility: 'hidden',
+          zIndex: -1,
+        }}
+      >
+        <div className="p-3.5">
+          {canThink ? (
+            <ThinkingControls mode={thinkingMode} disabled={disabled} measureOnly />
+          ) : (
+            <div>
+              <SectionHeader>思考</SectionHeader>
+              <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
+                <p className="text-xs leading-snug text-[var(--stone)]">
+                  当前模型不支持思考强度设置
+                </p>
+              </div>
+            </div>
+          )}
+
+          <ModelSettingsPanel
+            model={model}
+            disabled={disabled}
+            expanded={panel === 'model'}
+            measureOnly
+            canThink={canThink}
+            onToggle={toggleModelPanel}
+            onSelect={selectModelAndCollapse}
+          />
+        </div>
+      </div>
+
       <AnimatePresence>
         {open && (
           <motion.div
@@ -325,124 +369,81 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             : 'max(1.25rem, env(safe-area-inset-right))',
           zIndex: open ? 2050 : 1,
           borderRadius: 24,
-        // overflow: hidden while closed or while the height is animating (opening morph,
-        // internal re-target from panel switch / thinking toggle, closing
-        // morph) — the popover content can be taller than the in-flight
-        // motion.div, so 'auto' would briefly show a scrollbar. Once
-        // the height run settles (onAnimationComplete), we switch to
-        // 'hidden auto' so the panel can scroll if the sentinel-reported
-        // height ever exceeds maxHeight.
-        overflow: !open || heightAnimating ? 'hidden' : 'hidden auto',
-        // Cap the popover so it never extends past the top of the viewport.
-        // 2.5rem = 40px headroom (20px top + 20px bottom margins).
-        maxHeight: 'calc(100vh - 2.5rem)',
-        transformOrigin: 'bottom right',
-        color: 'var(--ink)',
-        backgroundColor: 'rgba(255, 255, 255, 0.85)',
-        border: '1px solid rgba(255, 255, 255, 0.9)',
-        boxShadow:
-          '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
-        backdropFilter: 'blur(24px) saturate(180%)',
-      }}
-      className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
-    >
-      {/* Sentinel -- off-screen, invisible, non-interactive copy of the
-          popover content. Used solely for height measurement (its content
-          updates with `panel`/`model`/`thinkingMode`, and ResizeObserver
-          feeds `offsetHeight` into `animate.height` above). */}
-      <div
-        ref={sentinelRef}
-        aria-hidden
-        style={{
-          position: 'fixed',
-          left: '-9999px',
-          top: 0,
-          width: 'min(calc(100vw - 2.5rem), 17.5rem)',
-          pointerEvents: 'none',
-          visibility: 'hidden',
-          zIndex: -1,
+          // overflow: hidden while closed or while the height is animating (opening morph,
+          // internal re-target from panel switch / thinking toggle, closing
+          // morph) — the popover content can be taller than the in-flight
+          // motion.div, so 'auto' would briefly show a scrollbar. Once
+          // the height run settles (onAnimationComplete), we switch to
+          // 'hidden auto' so the panel can scroll if the sentinel-reported
+          // height ever exceeds maxHeight.
+          overflow: !open || heightAnimating ? 'hidden' : 'hidden auto',
+          // Cap the popover so it never extends past the top of the viewport.
+          // 2.5rem = 40px headroom (20px top + 20px bottom margins).
+          maxHeight: 'calc(100vh - 2.5rem)',
+          transformOrigin: 'bottom right',
+          color: 'var(--ink)',
+          backgroundColor: 'rgba(255, 255, 255, 0.85)',
+          border: '1px solid rgba(255, 255, 255, 0.9)',
+          boxShadow:
+            '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
+          backdropFilter: 'blur(24px) saturate(180%)',
         }}
+        className={`fixed [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
       >
-        <div className="p-3.5">
-          {canThink ? (
-            <ThinkingControls mode={thinkingMode} disabled={disabled} measureOnly />
-          ) : (
-            <div>
-              <SectionHeader>思考</SectionHeader>
-              <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
-                <p className="text-xs leading-snug text-[var(--stone)]">
-                  当前模型不支持思考强度设置
-                </p>
-              </div>
-            </div>
-          )}
-
-          <ModelSettingsPanel
-            model={model}
-            disabled={disabled}
-            expanded={panel === 'model'}
-            measureOnly
-            canThink={canThink}
-            onToggle={toggleModelPanel}
-            onSelect={selectModelAndCollapse}
+        {/* Visible chip content -- fills the motion.div.
+            `pointer-events: none` always: this layer is purely visual; the
+            outer motion.div owns the click handler, and when the popover is
+            open this overlay would otherwise swallow clicks meant for the
+            model/thinking controls underneath. */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: open ? 0 : 1 }}
+          transition={{
+            opacity: { duration: 0.2, delay: open ? 0 : 0.28, ease: 'easeOut' },
+          }}
+          aria-hidden={!open}
+          style={{
+            pointerEvents: 'none',
+          }}
+          className="relative flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
+        >
+          {/* Top specular reflection arc */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
           />
-        </div>
-      </div>
+          <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)] sm:h-4 sm:w-4" />
+          <span className="hidden whitespace-nowrap text-sm font-semibold leading-none text-zinc-800 sm:inline">{chip}</span>
+          <ChevronDown
+            aria-hidden
+            strokeWidth={2}
+            className={`hidden h-3 w-3 shrink-0 text-zinc-500 transition duration-200 sm:block ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </motion.div>
 
-      {/* Visible chip content -- fills the motion.div.
-          `pointer-events: none` always: this layer is purely visual; the
-          outer motion.div owns the click handler, and when the popover is
-          open this overlay would otherwise swallow clicks meant for the
-          model/thinking controls underneath. */}
-      <motion.div
-        initial={false}
-        animate={{ opacity: open ? 0 : 1 }}
-        transition={{
-          opacity: { duration: 0.2, delay: open ? 0 : 0.28, ease: 'easeOut' },
-        }}
-        aria-hidden={!open}
-        style={{
-          pointerEvents: 'none',
-        }}
-        className="relative flex h-full w-full items-center justify-center gap-1.5 px-3 sm:max-w-[15.5rem] sm:gap-2 sm:px-3.5"
-      >
-        {/* Top specular reflection arc */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
-        />
-        <ModelBrandIcon deepseek={deepseek} className="h-5 w-5 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)] sm:h-4 sm:w-4" />
-        <span className="hidden whitespace-nowrap text-sm font-semibold leading-none text-zinc-800 sm:inline">{chip}</span>
-        <ChevronDown
-          aria-hidden
-          strokeWidth={2}
-          className={`hidden h-3 w-3 shrink-0 text-zinc-500 transition duration-200 sm:block ${
-            open ? 'rotate-180' : ''
-          }`}
-        />
-      </motion.div>
+        {/* Visible popover content -- absolute overlay, fills the motion.div.
+            Thinking and model controls stay in one bottom-anchored layout;
+            their inner cards expand upward and move the content above them. */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: open ? 1 : 0 }}
+          transition={{
+            opacity: { duration: 0.2, delay: open ? 0.18 : 0, ease: 'easeOut' },
+          }}
+          inert={!open || undefined}
+          aria-hidden={!open}
+          style={{ position: 'absolute', inset: 0 }}
+          className="flex flex-col overflow-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {/* Top Specular Streaming Reflection Line */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
+          />
 
-      {/* Visible popover content -- absolute overlay, fills the motion.div.
-          Thinking and model controls stay in one bottom-anchored layout;
-          their inner cards expand upward and move the content above them. */}
-      <motion.div
-        initial={false}
-        animate={{ opacity: open ? 1 : 0 }}
-        transition={{
-          opacity: { duration: 0.2, delay: open ? 0.18 : 0, ease: 'easeOut' },
-        }}
-        inert={!open || undefined}
-        aria-hidden={!open}
-        style={{ position: 'absolute', inset: 0 }}
-        className="flex flex-col overflow-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {/* Top Specular Streaming Reflection Line */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
-        />
-
-        <div className="absolute inset-x-0 bottom-0 p-3.5">
+          <div ref={contentRef} className="absolute inset-x-0 bottom-0 p-3.5">
           {canThink ? (
             <ThinkingControls mode={thinkingMode} disabled={disabled} />
           ) : (
