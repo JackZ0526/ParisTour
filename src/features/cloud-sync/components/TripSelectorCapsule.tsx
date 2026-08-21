@@ -122,16 +122,16 @@ export function TripSelectorCapsule({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={`当前行程：${displayTitle}，点击切换`}
-        className={`group relative isolate inline-flex h-[22px] shrink-0 items-center gap-1 rounded-full border border-white/80 bg-white/70 px-2 text-[11px] font-medium text-[var(--ink)] shadow-xs backdrop-blur-md transition-all duration-200 ${
+        className={`group relative isolate inline-flex h-[22px] shrink-0 items-center gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 px-2 text-[11px] font-medium text-[var(--ink)] dark:text-zinc-200 shadow-xs backdrop-blur-md transition-all duration-200 ${
           canSwitch
-            ? 'cursor-pointer hover:bg-white/95 hover:shadow hover:border-white active:scale-95'
+            ? 'cursor-pointer hover:bg-white/95 dark:hover:bg-white/15 hover:shadow hover:border-white dark:hover:border-white/20 active:scale-95'
             : 'cursor-default opacity-90'
-        } ${isOpen ? 'ring-1.5 ring-[var(--copper)]/40 bg-white' : ''}`}
+        } ${isOpen ? 'ring-1.5 ring-[var(--copper)]/40 bg-white dark:bg-white/15' : ''}`}
       >
         {/* Subtle Specular Top Highlight */}
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-80"
+          className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-80"
         />
 
         {/* Icon & Source indicator */}
@@ -146,7 +146,7 @@ export function TripSelectorCapsule({
         </span>
 
         {/* Title / Owner Handle */}
-        <span className="max-w-[120px] truncate text-[11px] font-medium leading-none text-[var(--ink)] sm:max-w-[160px]">
+        <span className="max-w-[120px] truncate text-[11px] font-medium leading-none text-[var(--ink)] dark:text-zinc-200 sm:max-w-[160px]">
           {displayTitle}
         </span>
 
@@ -155,8 +155,8 @@ export function TripSelectorCapsule({
           <ChevronDown
             size={10.5}
             strokeWidth={2.4}
-            className={`shrink-0 text-[var(--stone)] transition-transform duration-200 ${
-              isOpen ? 'rotate-180 text-[var(--ink)]' : 'group-hover:text-[var(--ink)]'
+            className={`shrink-0 text-[var(--stone)] dark:text-zinc-400 transition-transform duration-200 ${
+              isOpen ? 'rotate-180 text-[var(--ink)] dark:text-zinc-100' : 'group-hover:text-[var(--ink)] dark:group-hover:text-zinc-100'
             }`}
           />
         )}
@@ -221,8 +221,8 @@ export function TripSelectorCapsule({
                     onClick={() => handleSelect(trip.id)}
                     className={`group relative w-full flex items-center justify-between gap-2.5 rounded-xl p-2.5 text-left transition-all duration-150 outline-none ${
                       isActive
-                        ? 'bg-[var(--copper)]/10 border border-[var(--copper)]/25 shadow-sm'
-                        : 'hover:bg-white/80 border border-transparent hover:border-white/60 active:scale-[0.98]'
+                        ? 'bg-[var(--copper)]/10 dark:bg-[var(--copper)]/20 border border-[var(--copper)]/25 dark:border-[var(--copper)]/40 shadow-sm'
+                        : 'hover:bg-white/80 dark:hover:bg-white/10 border border-transparent hover:border-white/60 dark:hover:border-white/15 active:scale-[0.98]'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -262,7 +262,7 @@ export function TripSelectorCapsule({
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1 text-[10.5px] text-[var(--stone)] mt-0.5">
+                        <div className="flex items-center gap-1 text-[10.5px] text-[var(--stone)] dark:text-zinc-400 mt-0.5">
                           <span>
                             {isItemShared
                               ? `来自 ${trip.ownerName || '他人'}`
@@ -286,10 +286,10 @@ export function TripSelectorCapsule({
                       <span
                         className={`px-1.5 py-0.5 rounded text-[9.5px] font-medium ${
                           trip.role === 'owner'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200/50'
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200/50 dark:border-amber-400/30'
                             : trip.role === 'editor'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50'
-                              : 'bg-zinc-100 text-zinc-600 border border-zinc-200/50'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-400/30'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300 border border-zinc-200/50 dark:border-white/15'
                         }`}
                       >
                         {trip.role === 'owner'
