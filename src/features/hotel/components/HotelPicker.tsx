@@ -111,6 +111,8 @@ const HOTEL_DRAG_SETTLE_MS = 200
 const BOOKING_DETAILS_VERSION = 6
 /** Start float after this pointer travel so clicks still open the card. */
 const HOTEL_DRAG_THRESHOLD_PX = 6
+/** Long-press duration for mobile touch drag to avoid conflict with scrolling and tapping. */
+const HOTEL_LONG_PRESS_MS = 280
 /** Viscous follow — same language as DayTimeline tickFloat. */
 const HOTEL_FLOAT_EASE = 0.22
 
@@ -996,12 +998,14 @@ export function HotelPicker({
   const rafRef = useRef<number | null>(null)
   const suppressClickRef = useRef(false)
   const settlingRef = useRef(false)
+  const longPressTimerRef = useRef<number | null>(null)
   const pendingPointerRef = useRef<{
     hotelId: string
     startX: number
     startY: number
     cardEl: HTMLElement
     pointerId: number
+    pointerType: string
   } | null>(null)
   const cardBlurbInflightRef = useRef(new Set<string>())
   const cardBlurbFailedRef = useRef(new Set<string>())
@@ -1926,7 +1930,7 @@ export function HotelPicker({
       suppressClickRef.current = true
       window.setTimeout(() => {
         suppressClickRef.current = false
-      }, 40)
+      }, 150)
     }, HOTEL_DRAG_SETTLE_MS)
   }
 
@@ -1972,13 +1976,42 @@ export function HotelPicker({
     if ((e.target as HTMLElement).closest('[data-hotel-no-drag]')) return
     // Left button / primary touch only.
     if (e.button !== 0) return
-    pendingPointerRef.current = {
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+
+    const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen'
+    const pointerInfo = {
       hotelId,
       startX: e.clientX,
       startY: e.clientY,
       cardEl: e.currentTarget,
       pointerId: e.pointerId,
+      pointerType: e.pointerType,
     }
+
+    if (isTouch) {
+      // Long press required on touch devices to prevent conflict with scrolling & clicking
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = null
+        if (pendingPointerRef.current && !dragRef.current && !settlingRef.current) {
+          const p = pendingPointerRef.current
+          pendingPointerRef.current = null
+          if (typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
+            try {
+              navigator.vibrate(35)
+            } catch {
+              /* ignore */
+            }
+          }
+          beginDrag(p.hotelId, { clientX: p.startX, clientY: p.startY, pointerId: p.pointerId }, p.cardEl)
+        }
+      }, HOTEL_LONG_PRESS_MS)
+    }
+
+    pendingPointerRef.current = pointerInfo
   }
 
   useEffect(() => {
@@ -2000,14 +2033,30 @@ export function HotelPicker({
       if (pending && !dragRef.current && !settlingRef.current) {
         const dx = e.clientX - pending.startX
         const dy = e.clientY - pending.startY
-        if (Math.hypot(dx, dy) >= HOTEL_DRAG_THRESHOLD_PX) {
-          const { hotelId, cardEl, pointerId } = pending
-          pendingPointerRef.current = null
-          beginDrag(hotelId, { clientX: e.clientX, clientY: e.clientY, pointerId }, cardEl)
+        const dist = Math.hypot(dx, dy)
+
+        if (pending.pointerType === 'touch' || pending.pointerType === 'pen') {
+          // If finger moves more than 10px before long-press fires, user is scrolling: cancel long press
+          if (dist > 10 && longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+            pendingPointerRef.current = null
+          }
+        } else {
+          // Mouse: instant threshold drag
+          if (dist >= HOTEL_DRAG_THRESHOLD_PX) {
+            const { hotelId, cardEl, pointerId } = pending
+            pendingPointerRef.current = null
+            beginDrag(hotelId, { clientX: e.clientX, clientY: e.clientY, pointerId }, cardEl)
+          }
         }
       }
     }
     const onUp = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
       if (settlingRef.current) {
         pendingPointerRef.current = null
         return
@@ -2016,15 +2065,13 @@ export function HotelPicker({
         endDrag(true)
         return
       }
-      const pending = pendingPointerRef.current
       pendingPointerRef.current = null
-      if (!pending || suppressClickRef.current) return
-      const hotel =
-        candidatesRef.current.find((item) => item.id === pending.hotelId) ||
-        candidates.find((item) => item.id === pending.hotelId)
-      if (hotel) openHotelCard(hotel)
     }
     const onCancel = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
       if (settlingRef.current) {
         pendingPointerRef.current = null
         return
@@ -2040,6 +2087,10 @@ export function HotelPicker({
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onCancel)
     return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
@@ -2469,7 +2520,9 @@ export function HotelPicker({
                         if (dragRef.current || suppressClickRef.current) return
                         openHotelCard(hotel)
                       }}
-                      className={`group relative cursor-pointer text-left touch-none transition-[border-color,opacity,box-shadow] duration-200 [transition-timing-function:var(--timeline-ease)] ${glassCardSurfaceClass} ${
+                      className={`group relative cursor-pointer text-left ${
+                        drag ? 'touch-none' : 'touch-pan-y'
+                      } select-none transition-[border-color,opacity,box-shadow] duration-200 [transition-timing-function:var(--timeline-ease)] ${glassCardSurfaceClass} ${
                         dragHotelId === hotel.id
                           ? 'pointer-events-none !border-transparent opacity-0'
                           : 'hover:!border-[var(--gold)]/70 hover:shadow-[0_8px_28px_rgba(109,82,39,0.08)]'
