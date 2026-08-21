@@ -4,8 +4,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Mail,
-  Share2,
-  Sparkles,
   Trash2,
   UserPlus,
   Users,
@@ -201,10 +199,6 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)] mb-2">
-              <Sparkles size={11} strokeWidth={2.2} />
-              <span>PARIS TOUR · 协作中心</span>
-            </div>
             <h2 id={titleId} className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
               分享与协作
             </h2>
@@ -239,26 +233,26 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
             <UserPlus size={14} className="text-[var(--copper)]" />
             <span>邀请新成员</span>
           </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-0 flex-1 min-w-[160px]">
-              <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--stone)]" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="partner@example.com"
-                className="w-full rounded-2xl border border-white/90 bg-white/80 pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white backdrop-blur-md"
-              />
-            </div>
+          <div className="relative w-full">
+            <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--stone)]" />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="请输入旅伴邮箱 partner@example.com"
+              className="w-full rounded-2xl border border-white/90 bg-white/85 pl-9 pr-3 py-2.5 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white backdrop-blur-md"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-0.5">
             <RoleToggle value={role} onChange={setRole} disabled={busy} name="newRole" />
             <button
               type="submit"
               disabled={busy || !email.trim()}
-              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent" />
-              <Share2 size={13} strokeWidth={2.2} />
+              <UserPlus size={14} strokeWidth={2.2} />
               <span>{busy ? '发送中…' : '发送邀请'}</span>
             </button>
           </div>
