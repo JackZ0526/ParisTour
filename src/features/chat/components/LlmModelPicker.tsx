@@ -654,27 +654,41 @@ function PillSwitch({
   ariaLabel: string
   onCheckedChange: (on: boolean) => void
 }) {
+  const [hasToggled, setHasToggled] = useState(false)
+
   return (
-    <button
+    <motion.button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
       disabled={disabled}
-      onClick={() => onCheckedChange(!checked)}
-      className={`relative h-[1.65rem] w-[2.85rem] shrink-0 rounded-full border border-white/80 p-0.5 transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] backdrop-blur-sm disabled:opacity-50 cursor-pointer ${
+      whileTap={disabled ? undefined : { scale: 0.94 }}
+      onClick={() => {
+        setHasToggled(true)
+        onCheckedChange(!checked)
+      }}
+      className={`relative h-[1.65rem] w-[2.85rem] shrink-0 rounded-full border border-white/90 p-0.5 transition-colors duration-250 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md disabled:opacity-50 cursor-pointer ${
         checked
           ? 'bg-[var(--sage)]'
           : 'bg-[var(--ink)]/16'
       }`}
     >
-      <span
+      <motion.span
         aria-hidden
-        className={`block h-5 w-5 rounded-full bg-white shadow-[0_2px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,1)] transition-transform duration-200 ease-[cubic-bezier(0.34,1.2,0.64,1)] ${
-          checked ? 'translate-x-[1.2rem]' : 'translate-x-0'
-        }`}
+        animate={{
+          x: checked ? 19.5 : 0,
+          scaleX: hasToggled ? [1, 1.22, 0.94, 1] : 1,
+          scaleY: hasToggled ? [1, 0.86, 1.04, 1] : 1,
+        }}
+        transition={{
+          x: { type: 'spring', stiffness: 500, damping: 28, mass: 0.8 },
+          scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+          scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+        }}
+        className="block h-5 w-5 rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1),inset_0_1.5px_1.5px_rgba(255,255,255,1)]"
       />
-    </button>
+    </motion.button>
   )
 }
 
