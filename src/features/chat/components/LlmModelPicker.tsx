@@ -11,6 +11,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { Checkbox } from '../../../shared/components/Checkbox'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { glassBackdropSurfaceClass } from '../../../shared/styles/glassCapsule'
 import {
   DEEPSEEK_MODEL_OPTIONS,
@@ -119,6 +120,7 @@ function useMediaQuery(query: string): boolean {
 export function LlmModelPicker({ disabled = false, className = '' }: Props) {
   const { model, setModel, thinkingMode } = useLlmSettings()
   const [open, setOpen] = useState(false)
+  useBodyScrollLock(open)
   const [panel, setPanel] = useState<Panel>('root')
   // The model list grows nicely with the popover's strong ease-out, but the
   // same curve removes too much height too early on the return trip. Keep the
@@ -247,8 +249,18 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.24, ease: 'easeOut' }}
-            className={`fixed inset-0 z-[2040] ${glassBackdropSurfaceClass}`}
-            onClick={() => setOpen(false)}
+            aria-hidden="true"
+            className={`fixed inset-0 z-[2040] select-none [touch-action:none] pointer-events-auto ${glassBackdropSurfaceClass}`}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setOpen(false)
+            }}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setOpen(false)
+            }}
           />
         )}
       </AnimatePresence>
