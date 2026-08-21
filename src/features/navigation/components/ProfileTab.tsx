@@ -519,7 +519,7 @@ export function ProfileTab({
         <button
           type="button"
           onClick={onOpenPreferences}
-          className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] dark:from-white/10 dark:to-white/5 dark:border dark:border-white/15 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white dark:text-zinc-100 shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] dark:shadow-none transition-all hover:brightness-110 dark:hover:bg-white/15 active:scale-[0.99] cursor-pointer"
+          className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] dark:from-white/12 dark:to-white/[0.07] dark:border dark:border-white/18 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white dark:text-zinc-100 shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] dark:shadow-[0_8px_22px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.15),inset_0_-1px_1px_rgba(0,0,0,0.4)] transition-all hover:-translate-y-px hover:brightness-110 dark:hover:border-white/25 active:translate-y-0 active:scale-[0.99] cursor-pointer"
         >
           <SlidersHorizontal size={14} />
           <span>打开偏好设置详细面板</span>

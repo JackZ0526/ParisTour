@@ -323,6 +323,9 @@ body.is-pwa.orientation-landscape::after {
   --river: #5f7a78;
   --card: rgba(255, 252, 247, 0.88);
   --shadow: 0 18px 50px rgba(28, 36, 32, 0.12);
+  --timeline-card-depth:
+    0 8px 32px rgba(181, 106, 60, 0.14),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
   /* === Motion tokens ===
      Easings & durations are project-wide single source of truth.
      Timeline / API-meter / LLM / sheet all read from these so a global
@@ -381,9 +384,93 @@ body.is-pwa.orientation-landscape::after {
   --river: #7b9e9c;
   --card: rgba(24, 31, 28, 0.85);
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  /* Dark elevation is driven primarily by surface luminance and edge light.
+     A black shadow alone disappears against the midnight page background. */
+  --surface-card-dark: rgba(30, 41, 35, 0.92);
+  --surface-raised-dark: rgba(36, 49, 42, 0.95);
+  --surface-modal-dark: rgba(27, 37, 32, 0.97);
+  --surface-popover-dark: rgba(38, 51, 44, 0.98);
+  --edge-card-dark: rgba(255, 255, 255, 0.13);
+  --edge-raised-dark: rgba(255, 255, 255, 0.16);
+  --edge-modal-dark: rgba(255, 255, 255, 0.17);
+  --shadow-capsule-dark:
+    0 4px 14px rgba(0, 0, 0, 0.34),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.13),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.46);
+  --shadow-card-dark:
+    0 10px 30px rgba(0, 0, 0, 0.44),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.13),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.48);
+  --shadow-raised-dark:
+    0 14px 38px rgba(0, 0, 0, 0.48),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.5);
+  --shadow-modal-dark:
+    0 24px 70px rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.52);
+  --timeline-card-depth:
+    0 12px 36px rgba(0, 0, 0, 0.5),
+    inset 0 1px 2px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.5);
   --nav-capsule-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 35%, rgba(255, 255, 255, 0.02) 65%, rgba(255, 255, 255, 0.12) 100%);
   --nav-pill-border-gradient: linear-gradient(135deg, rgba(212, 131, 84, 0.42) 0%, rgba(255, 255, 255, 0.1) 35%, rgba(255, 255, 255, 0.03) 65%, rgba(212, 131, 84, 0.22) 100%);
   color-scheme: dark;
+}
+
+/* Shared dark-mode elevation surfaces. These semantic classes deliberately
+   sit outside Tailwind's cascade layers so component-local light utilities
+   cannot accidentally flatten the dark treatment. */
+.dark .glass-surface-capsule {
+  box-shadow: var(--shadow-capsule-dark);
+}
+
+.dark .glass-surface-card {
+  background: var(--surface-card-dark);
+  border-color: var(--edge-card-dark);
+  box-shadow: var(--shadow-card-dark);
+}
+
+.dark .glass-surface-raised,
+.dark .glass-surface-sage,
+.dark .glass-surface-violet,
+.dark .glass-surface-gold {
+  background: var(--surface-raised-dark);
+  border-color: var(--edge-raised-dark);
+  box-shadow: var(--shadow-raised-dark);
+}
+
+.dark .glass-surface-sage {
+  background: color-mix(in srgb, var(--surface-raised-dark) 90%, var(--sage) 10%);
+}
+
+.dark .glass-surface-violet {
+  background: color-mix(in srgb, var(--surface-raised-dark) 91%, #a89bc5 9%);
+}
+
+.dark .glass-surface-gold {
+  background: color-mix(in srgb, var(--surface-raised-dark) 91%, var(--gold) 9%);
+}
+
+.dark .glass-surface-handle {
+  background: var(--surface-raised-dark);
+  border-color: var(--edge-raised-dark);
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.32),
+    inset 0 1px 1px rgba(255, 255, 255, 0.14),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.45);
+}
+
+.dark .glass-surface-modal {
+  background: var(--surface-modal-dark);
+  border-color: var(--edge-modal-dark);
+  box-shadow: var(--shadow-modal-dark);
+}
+
+.dark .glass-surface-popover {
+  background: var(--surface-popover-dark);
+  border-color: var(--edge-modal-dark);
+  box-shadow: var(--shadow-modal-dark);
 }
 
 * {
@@ -1944,13 +2031,19 @@ body.timeline-dragging {
 /* Timeline card selected highlight shimmer */
 @keyframes timeline-card-shimmer-flash {
   0% {
-    box-shadow: 0 0 0 0 rgba(74, 99, 86, 0);
+    box-shadow: var(--timeline-card-depth), 0 0 0 0 rgba(74, 99, 86, 0);
   }
   30% {
-    box-shadow: 0 0 0 4px rgba(74, 99, 86, 0.35), 0 4px 16px rgba(74, 99, 86, 0.15);
+    box-shadow:
+      var(--timeline-card-depth),
+      0 0 0 4px rgba(74, 99, 86, 0.35),
+      0 4px 16px rgba(74, 99, 86, 0.15);
   }
   100% {
-    box-shadow: 0 0 0 2px rgba(74, 99, 86, 0.25), 0 2px 8px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      var(--timeline-card-depth),
+      0 0 0 2px rgba(74, 99, 86, 0.25),
+      0 2px 8px rgba(0, 0, 0, 0.06);
   }
 }
 

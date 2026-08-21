@@ -638,7 +638,7 @@ export function LogisticsTravelSection({
 
                     <div className="mt-3 flex items-center justify-between text-xs text-[var(--stone)]">
                       <span>{inbound.aircraft ? `机型 ${inbound.aircraft}` : '直飞航班'}</span>
-                      <span className="text-purple-900 font-medium">
+                      <span className="text-purple-900 dark:text-purple-300 font-medium">
                         {meaningfulFlightStatus(inbound.status) || '计划正常'}
                       </span>
                     </div>
@@ -672,12 +672,12 @@ export function LogisticsTravelSection({
                     <div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-900">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 dark:text-purple-300">
                             <PlaneLanding size={14} />
                             <span>返程航班</span>
                           </span>
                           {inbound && (
-                            <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[10px] font-medium text-purple-900`}>
+                            <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[10px] font-medium text-purple-900 dark:text-purple-300`}>
                               修改中
                             </span>
                           )}

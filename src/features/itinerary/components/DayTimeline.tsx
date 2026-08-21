@@ -2258,7 +2258,7 @@ export function DayTimeline({
               type="button"
               onClick={() => setAddOpen(true)}
               disabled={dayRestoring}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 dark:border-[var(--sage)]/40 bg-white/50 dark:bg-[#18201c]/70 px-4 py-3 text-sm font-medium text-[var(--sage)] dark:text-emerald-300 shadow-sm dark:shadow-none backdrop-blur-md transition-all hover:bg-white/80 dark:hover:bg-[#222d27] hover:border-[var(--sage)] dark:hover:border-[var(--sage)] hover:shadow active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 dark:border-[var(--sage)]/50 bg-white/50 dark:bg-[#1d2822]/90 px-4 py-3 text-sm font-medium text-[var(--sage)] dark:text-emerald-300 shadow-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.36),inset_0_1px_1px_rgba(255,255,255,0.1)] backdrop-blur-md transition-all hover:-translate-y-px hover:bg-white/80 dark:hover:bg-[#25332b] hover:border-[var(--sage)] dark:hover:border-[var(--sage)] hover:shadow active:translate-y-0 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
               <Plus size={15} strokeWidth={2} aria-hidden />
               添加地点
