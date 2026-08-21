@@ -79,7 +79,7 @@ export function AvatarPickerDialog({
       overlayZIndex={2050}
       className={`flex max-h-[min(88vh,100dvh)] max-w-lg flex-col overflow-hidden rounded-t-3xl ${glassModalSurfaceClass} sm:rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)]`}
     >
-      {/* Header Section matching BackupDialog / ShareDialog standard */}
+      {/* Header Section */}
       <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -90,7 +90,7 @@ export function AvatarPickerDialog({
               上传本地照片作为您的专属头像，全局即时生效。
             </p>
           </div>
-          <CloseIconButton onClick={onClose} className="hidden sm:flex" />
+          <CloseIconButton onClick={onClose} aria-label="关闭" />
         </div>
       </header>
 
@@ -104,7 +104,7 @@ export function AvatarPickerDialog({
       />
 
       {/* Main Body */}
-      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6 pb-6 sm:pb-8">
         {/* Error Alert */}
         {uploadError && (
           <div className="flex items-start gap-2.5 rounded-2xl border border-red-200/80 bg-red-50/70 p-3 text-xs text-red-900 shadow-sm backdrop-blur-md">
@@ -224,21 +224,6 @@ export function AvatarPickerDialog({
           </p>
         </div>
       </div>
-
-      {/* Footer Section */}
-      <footer className="flex items-center justify-between border-t border-[var(--mist)]/60 bg-white/50 px-5 py-4 sm:px-6 backdrop-blur-md">
-        <p className="text-[11px] text-[var(--stone)]/70">
-          Paris Tour · 本地安全加密存储
-        </p>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/90 px-6 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs hover:bg-white hover:shadow transition-all active:scale-95 cursor-pointer"
-        >
-          完成
-        </button>
-      </footer>
     </BottomSheet>
   )
 }
