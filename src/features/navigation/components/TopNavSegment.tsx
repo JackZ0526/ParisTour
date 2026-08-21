@@ -31,7 +31,7 @@ export function TopNavSegment({
     <div
       role="tablist"
       aria-label="主要导航"
-      className={`relative inline-flex items-center overflow-hidden rounded-full bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
+      className={`relative inline-flex items-center overflow-hidden rounded-full bg-white/45 dark:bg-[#151c18]/75 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45),inset_0_1px_1.5px_0_rgba(255,255,255,0.15),inset_0_-1px_1px_0_rgba(0,0,0,0.5)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
     >
       {/* Liquid Glass Flowing Gradient Border (流光折射渐变发丝描边) */}
       <div
@@ -50,11 +50,11 @@ export function TopNavSegment({
       {/* Specular Light Reflection Highlights (顶部与底部玻璃反光弧光) */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-6 top-0 z-20 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+        className="pointer-events-none absolute inset-x-6 top-0 z-20 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-95"
       />
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-75"
+        className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 dark:via-white/10 to-transparent opacity-75"
       />
 
       {TABS.map(({ id, label, Icon }) => {
@@ -69,12 +69,12 @@ export function TopNavSegment({
               setHasInteracted(true)
               onSelectTab(id)
             }}
-            className="relative isolate flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-medium transition-colors outline-none"
+            className="relative isolate flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-medium transition-colors outline-none cursor-pointer"
           >
             {isActive && (
               <motion.span
                 layoutId="light-top-nav-active-pill"
-                className="absolute inset-0 overflow-hidden rounded-full bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
+                className="absolute inset-0 overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
                 animate={
                   hasInteracted
                     ? {
@@ -115,7 +115,7 @@ export function TopNavSegment({
               className={`relative z-10 transition-colors ${
                 isActive
                   ? 'text-[var(--copper)]'
-                  : 'text-zinc-500 group-hover:text-zinc-800'
+                  : 'text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-100'
               }`}
             />
 
@@ -123,7 +123,7 @@ export function TopNavSegment({
               className={`relative z-10 transition-colors ${
                 isActive
                   ? 'font-bold text-[var(--copper)]'
-                  : 'font-medium text-zinc-600 hover:text-zinc-900'
+                  : 'font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
               }`}
             >
               {label}

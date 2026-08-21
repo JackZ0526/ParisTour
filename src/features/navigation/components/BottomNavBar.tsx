@@ -33,7 +33,7 @@ export function BottomNavBar({
       {/* High-transparency Semi-transparent Frosted Glass Capsule with Specular Reflection */}
       <nav
         aria-label="主要导航"
-        className="relative flex h-[60px] items-center justify-around gap-1.5 overflow-hidden rounded-full bg-white/45 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
+        className="relative flex h-[60px] items-center justify-around gap-1.5 overflow-hidden rounded-full bg-white/45 dark:bg-[#151c18]/75 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45),inset_0_1px_1.5px_0_rgba(255,255,255,0.15),inset_0_-1px_1px_0_rgba(0,0,0,0.5)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
       >
         {/* Liquid Glass Flowing Gradient Border (流光折射渐变发丝描边) */}
         <div
@@ -52,11 +52,11 @@ export function BottomNavBar({
         {/* Specular Light Reflection Highlights (顶部与底部玻璃反光弧光) */}
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-x-6 top-0 z-20 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+          className="pointer-events-none absolute inset-x-6 top-0 z-20 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-95"
         />
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-75"
+          className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 dark:via-white/10 to-transparent opacity-75"
         />
 
         {TABS.map(({ id, label, Icon }) => {
@@ -76,7 +76,7 @@ export function BottomNavBar({
               {isActive && (
                 <motion.div
                   layoutId="semi-translucent-active-pill"
-                  className="absolute inset-0 overflow-hidden rounded-full bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
+                  className="absolute inset-0 overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
                   animate={
                     hasInteracted
                       ? {
@@ -126,7 +126,7 @@ export function BottomNavBar({
                       className={
                         isActive
                           ? 'text-[var(--copper)] drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]'
-                          : 'text-zinc-600 transition-colors hover:text-zinc-950'
+                          : 'text-zinc-600 dark:text-zinc-400 transition-colors hover:text-zinc-950 dark:hover:text-zinc-100'
                       }
                     />
                   </motion.div>
@@ -141,7 +141,7 @@ export function BottomNavBar({
                   className={`text-[10.5px] tracking-tight transition-colors ${
                     isActive
                       ? 'font-bold text-[var(--copper)]'
-                      : 'font-medium text-zinc-600'
+                      : 'font-medium text-zinc-600 dark:text-zinc-400'
                   }`}
                 >
                   {label}

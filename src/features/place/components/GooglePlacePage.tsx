@@ -259,7 +259,7 @@ function PlaceReviewsShimmer() {
       {Array.from({ length: 2 }, (_, index) => (
         <article
           key={index}
-          className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-sm shadow-sm backdrop-blur-md"
+          className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-3.5 text-sm shadow-sm backdrop-blur-md"
           aria-hidden
         >
           <span className="mb-2 block h-3.5 w-24 rounded-full day-tab-shimmer" />
@@ -2084,7 +2084,7 @@ export function GooglePlacePage({
                   <PlaceSourceMark source="google" showLabel={false} />
                   {reviewSourceLabel}
                 </p>
-                <div className="rounded-2xl border border-white/80 bg-white/60 p-3.5 text-sm shadow-sm backdrop-blur-md">
+                <div className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-3.5 text-sm shadow-sm backdrop-blur-md">
                   <p className="leading-relaxed text-[var(--stone)]">
                     Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。
                   </p>
@@ -2106,7 +2106,7 @@ export function GooglePlacePage({
           {showMap && (
             <div>
               <p className="mb-2 text-sm font-medium">地图位置（本页嵌入）</p>
-              <div className="overflow-hidden rounded-2xl border border-white/80 shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 shadow-sm">
                 <iframe
                   title={`${name} map`}
                   src={embedSrc}
@@ -2121,7 +2121,7 @@ export function GooglePlacePage({
         </div>
 
         {footer && (
-          <div className="shrink-0 border-t border-white/80 bg-white/75 px-4 py-3 backdrop-blur-xl">
+          <div className="shrink-0 border-t border-white/80 dark:border-white/10 bg-white/75 dark:bg-[#161d19]/90 px-4 py-3 backdrop-blur-xl">
             {footer}
           </div>
         )}

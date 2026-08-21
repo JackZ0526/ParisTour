@@ -100,7 +100,7 @@ export function BottomSheet({
               <motion.div
                 style={{ y: dragY }}
                 aria-hidden="true"
-                className="pointer-events-none absolute top-[calc(100%-3px)] inset-x-0 h-[400px] bg-white/85 backdrop-blur-2xl sm:hidden"
+                className="pointer-events-none absolute top-[calc(100%-3px)] inset-x-0 h-[400px] bg-white/85 dark:bg-[#161d19]/90 backdrop-blur-2xl sm:hidden"
               />
 
               <motion.div

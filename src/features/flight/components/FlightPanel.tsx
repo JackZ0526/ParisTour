@@ -302,7 +302,7 @@ export function FlightPanel({
                     <input
                       value={outboundInput}
                       onChange={(e) => setOutboundInput(e.target.value.toUpperCase())}
-                      className="w-full rounded-2xl border border-white/80 bg-white/70 px-3.5 py-2.5 text-sm outline-none backdrop-blur-sm transition-all focus:border-[var(--copper)] focus:bg-white focus:shadow-sm"
+                      className="w-full rounded-2xl border border-white/80 dark:border-white/10 bg-white/70 dark:bg-black/35 text-[var(--ink)] px-3.5 py-2.5 text-sm outline-none backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)] focus:bg-white dark:focus:bg-black/50 focus:shadow-sm"
                       placeholder="例如 AF375"
                     />
                     <button
@@ -310,7 +310,7 @@ export function FlightPanel({
                       disabled={busy !== null || !outboundInput.trim() || !hasDates}
                       onClick={() => query('outbound')}
                       aria-busy={busy === 'outbound' || undefined}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[var(--ink)] dark:bg-[var(--copper)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] dark:text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
                     >
                       {busy === 'outbound' && <ButtonSpinner />}
                       {busy === 'outbound' ? '查询中' : '查询'}
@@ -324,7 +324,7 @@ export function FlightPanel({
                     <input
                       value={returnInput}
                       onChange={(e) => setReturnInput(e.target.value.toUpperCase())}
-                      className="w-full rounded-2xl border border-white/80 bg-white/70 px-3.5 py-2.5 text-sm outline-none backdrop-blur-sm transition-all focus:border-[var(--copper)] focus:bg-white focus:shadow-sm"
+                      className="w-full rounded-2xl border border-white/80 dark:border-white/10 bg-white/70 dark:bg-black/35 text-[var(--ink)] px-3.5 py-2.5 text-sm outline-none backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)] focus:bg-white dark:focus:bg-black/50 focus:shadow-sm"
                       placeholder="例如 AF374"
                     />
                     <button
@@ -332,7 +332,7 @@ export function FlightPanel({
                       disabled={busy !== null || !returnInput.trim() || !hasDates}
                       onClick={() => query('return')}
                       aria-busy={busy === 'return' || undefined}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[var(--ink)] dark:bg-[var(--copper)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] dark:text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
                     >
                       {busy === 'return' && <ButtonSpinner />}
                       {busy === 'return' ? '查询中' : '查询'}

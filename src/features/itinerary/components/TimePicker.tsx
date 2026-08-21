@@ -310,10 +310,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         Seamlessly holds the persistent top anchor bar, expanding the hour/minute wheel selector below.
       */}
       <div
-        className={`relative overflow-hidden rounded-2xl border border-white/90 bg-[#fbf7f3]/90 backdrop-blur-xl backdrop-saturate-[180%] transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent ${
+        className={`relative overflow-hidden rounded-2xl border border-white/90 dark:border-white/10 bg-[#fbf7f3]/90 dark:bg-[#18201c]/90 backdrop-blur-xl backdrop-saturate-[180%] transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent ${
           open
-            ? 'shadow-[0_16px_36px_rgba(0,0,0,0.06),0_2px_8px_rgba(181,106,60,0.06),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7)]'
-            : 'shadow-[0_3px_10px_rgba(0,0,0,0.04),0_1px_3px_rgba(181,106,60,0.04),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7)] hover:bg-[#f8f1ec]/95 hover:border-white'
+            ? 'shadow-[0_16px_36px_rgba(0,0,0,0.06),0_2px_8px_rgba(181,106,60,0.06),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7)] dark:shadow-[0_16px_36px_rgba(0,0,0,0.4)]'
+            : 'shadow-[0_3px_10px_rgba(0,0,0,0.04),0_1px_3px_rgba(181,106,60,0.04),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_10px_rgba(0,0,0,0.3)] hover:bg-[#f8f1ec]/95 dark:hover:bg-[#1f2824]/95 hover:border-white dark:hover:border-white/20'
         }`}
       >
         {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
@@ -330,7 +330,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
             <span
               className={`relative overflow-hidden inline-flex items-center rounded-lg border px-2.5 py-0.5 text-sm font-semibold tabular-nums backdrop-blur-md transition-all duration-200 ${
                 open
-                  ? 'border-[#d7a98a]/80 bg-[#f6e8de]/85 text-[var(--copper)] shadow-[0_2px_8px_rgba(181,106,60,0.15),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/90 before:to-transparent'
+                  ? 'border-[#d7a98a]/80 dark:border-[#d48354]/50 bg-[#f6e8de]/85 dark:bg-[#d48354]/20 text-[var(--copper)] shadow-[0_2px_8px_rgba(181,106,60,0.15),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_2px_8px_rgba(212,131,84,0.25)] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/90 dark:before:via-white/25 before:to-transparent'
                   : 'border-transparent bg-transparent text-[var(--ink)]'
               }`}
             >
@@ -372,9 +372,9 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="overflow-hidden"
             >
-              <div className="border-t border-white/90 px-3.5 pb-3.5 pt-2">
+              <div className="border-t border-white/90 dark:border-white/10 px-3.5 pb-3.5 pt-2">
                 {/* iOS Wheel Body */}
-                <div className="relative my-1 overflow-hidden rounded-2xl border border-white/90 bg-white/60 p-2 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
+                <div className="relative my-1 overflow-hidden rounded-2xl border border-white/90 dark:border-white/10 bg-white/60 dark:bg-black/30 p-2 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)] backdrop-blur-md">
                   {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
                   <div className="relative" style={{ height: `${WHEEL_HEIGHT}px` }}>
                     {/* Layer 1 (z-0): Dual Distinct 3D Frosted Glass Capsules */}
@@ -384,12 +384,12 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     >
                       {/* Hour Column Capsule */}
                       <div className="flex items-center justify-center">
-                        <div className="relative w-[64px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
+                        <div className="relative w-[64px] h-[38px] rounded-xl border border-[#d7a98a]/80 dark:border-[#d48354]/50 bg-[#f6e8de]/85 dark:bg-[#d48354]/20 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_2px_8px_rgba(212,131,84,0.25)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 dark:before:via-white/25 before:to-transparent" />
                       </div>
 
                       {/* Minute Column Capsule */}
                       <div className="flex items-center justify-center">
-                        <div className="relative w-[64px] h-[38px] rounded-xl border border-[#d7a98a]/80 bg-[#f6e8de]/85 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent" />
+                        <div className="relative w-[64px] h-[38px] rounded-xl border border-[#d7a98a]/80 dark:border-[#d48354]/50 bg-[#f6e8de]/85 dark:bg-[#d48354]/20 shadow-[0_2px_8px_rgba(181,106,60,0.14),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_2px_8px_rgba(212,131,84,0.25)] before:pointer-events-none before:absolute before:inset-x-1.5 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 dark:before:via-white/25 before:to-transparent" />
                       </div>
                     </div>
 
@@ -415,24 +415,24 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     </div>
 
                     {/* Layer 3 (z-20): Top & Bottom Depth Gradients for 3D Cylinder effect */}
-                    <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent z-20" />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent z-20" />
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 dark:from-[#18201c] via-white/60 dark:via-[#18201c]/60 to-transparent z-20" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 dark:from-[#18201c] via-white/60 dark:via-[#18201c]/60 to-transparent z-20" />
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-2.5 flex justify-end gap-2 border-t border-white/90 pt-2.5">
+                <div className="mt-2.5 flex justify-end gap-2 border-t border-white/90 dark:border-white/10 pt-2.5">
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="rounded-full border border-white/90 bg-white/75 px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm transition hover:bg-white active:scale-95 cursor-pointer"
+                    className="rounded-full border border-white/90 dark:border-white/10 bg-white/75 dark:bg-white/10 px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm transition hover:bg-white dark:hover:bg-white/20 active:scale-95 cursor-pointer"
                   >
                     取消
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirm}
-                    className="rounded-full bg-[var(--ink)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] transition hover:bg-black shadow-[0_3px_10px_rgba(0,0,0,0.18)] active:scale-95 cursor-pointer"
+                    className="rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] dark:text-white transition hover:bg-black dark:hover:bg-[var(--copper)]/90 shadow-[0_3px_10px_rgba(0,0,0,0.18)] active:scale-95 cursor-pointer"
                   >
                     完成
                   </button>

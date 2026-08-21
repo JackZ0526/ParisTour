@@ -691,7 +691,7 @@ export default function App() {
                   onClick={() => setBackupOpen(true)}
                   aria-label="存档备份"
                   title="存档备份"
-                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:text-zinc-900 hover:shadow active:scale-95 lg:inline-flex"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-zinc-100 hover:shadow active:scale-95 lg:inline-flex cursor-pointer"
                 >
                   <Archive size={15} strokeWidth={1.9} />
                 </button>
@@ -707,7 +707,7 @@ export default function App() {
                   }}
                   aria-label="邀请协作分享"
                   title="邀请协作分享"
-                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:text-zinc-900 hover:shadow active:scale-95 lg:inline-flex"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-zinc-100 hover:shadow active:scale-95 lg:inline-flex cursor-pointer"
                 >
                   <Share2 size={15} strokeWidth={1.9} />
                 </button>
@@ -717,7 +717,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleSelectTab('profile')}
-                className="flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 hover:shadow active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-white/20 hover:shadow active:scale-95 cursor-pointer"
                 title="查看个人中心与偏好"
               >
                 <UserAvatarView
@@ -725,7 +725,7 @@ export default function App() {
                   email={email}
                   size="sm"
                   shape="circle"
-                  className="border border-white/90"
+                  className="border border-white/90 dark:border-white/20"
                 />
                 <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
                   {email}
@@ -964,7 +964,7 @@ export default function App() {
                         </div>
 
                         <div
-                          className="relative flex gap-1 rounded-full border border-white/80 bg-white/70 p-1 shadow-sm backdrop-blur-xl lg:hidden"
+                          className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/70 p-1 shadow-sm backdrop-blur-xl lg:hidden"
                           role="tablist"
                           aria-label="行程视图"
                         >
@@ -976,12 +976,12 @@ export default function App() {
                               setHasInteractedPane(true)
                               setMobileItineraryPane('timeline')
                             }}
-                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none"
+                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
                           >
                             {mobileItineraryPane === 'timeline' && (
                               <motion.span
                                 layoutId="itinerary-pane-pill"
-                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                                 animate={
                                   hasInteractedPane
                                     ? {
@@ -997,7 +997,7 @@ export default function App() {
                                 }}
                               />
                             )}
-                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500'}`}>
+                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
                               时间线
                             </span>
                           </button>
@@ -1009,12 +1009,12 @@ export default function App() {
                               setHasInteractedPane(true)
                               setMobileItineraryPane('map')
                             }}
-                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none"
+                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
                           >
                             {mobileItineraryPane === 'map' && (
                               <motion.span
                                 layoutId="itinerary-pane-pill"
-                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                                 animate={
                                   hasInteractedPane
                                     ? {
@@ -1030,7 +1030,7 @@ export default function App() {
                                 }}
                               />
                             )}
-                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500'}`}>
+                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
                               地图
                             </span>
                           </button>

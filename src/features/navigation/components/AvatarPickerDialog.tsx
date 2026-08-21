@@ -145,7 +145,7 @@ export function AvatarPickerDialog({
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="relative p-1.5 rounded-[2rem] border border-white/95 bg-gradient-to-b from-white/90 via-white/60 to-white/30 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1.5px_2px_rgba(255,255,255,1)] backdrop-blur-xl"
+              className="relative p-1.5 rounded-[2rem] border border-white/95 dark:border-white/10 bg-gradient-to-b from-white/90 via-white/60 to-white/30 dark:from-white/10 dark:via-white/5 dark:to-transparent shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1.5px_2px_rgba(255,255,255,1)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.4),inset_0_1.5px_2px_rgba(255,255,255,0.1)] backdrop-blur-xl"
             >
               <UserAvatarView
                 avatar={avatar}
@@ -191,7 +191,7 @@ export function AvatarPickerDialog({
                 type="button"
                 disabled={isProcessing}
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-[var(--ink)] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(35,42,38,0.2),inset_0_1px_1.5px_rgba(255,255,255,0.3)] transition-all hover:bg-black hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(35,42,38,0.2),inset_0_1px_1.5px_rgba(255,255,255,0.3)] transition-all hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
               >
                 <Camera size={14} />
                 <span>{isCustomPhoto ? '更换新照片' : '上传本地照片'}</span>
@@ -202,7 +202,7 @@ export function AvatarPickerDialog({
                   type="button"
                   disabled={isProcessing}
                   onClick={handleResetDefault}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-4 py-2.5 text-xs font-medium text-[var(--stone)] hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all active:scale-95 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-2.5 text-xs font-medium text-[var(--stone)] hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-all active:scale-95 cursor-pointer"
                   title="恢复为默认邮箱首字母"
                 >
                   <RotateCcw size={13} />
@@ -214,7 +214,7 @@ export function AvatarPickerDialog({
         </div>
 
         {/* 2. Format & Security Note Card */}
-        <div className="rounded-2xl border border-[var(--mist)]/80 bg-white/40 p-4 backdrop-blur-md space-y-1.5">
+        <div className="rounded-2xl border border-[var(--mist)]/80 dark:border-white/10 bg-white/40 dark:bg-white/5 p-4 backdrop-blur-md space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--ink)]">
             <ImageIcon size={14} className="text-[var(--copper)]" />
             <span>图片格式与隐私说明</span>

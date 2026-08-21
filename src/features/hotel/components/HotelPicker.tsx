@@ -641,7 +641,7 @@ function BookingHotelFacts({
   return (
     <section className="space-y-4">
       {showHotelOverview && (
-        <div className="rounded-2xl border border-[var(--mist)] bg-white/65 p-4">
+        <div className="rounded-2xl border border-[var(--mist)] bg-white/65 dark:bg-[#18201c]/75 p-4">
           <div className="flex items-stretch justify-between gap-3">
             <div
               className={`flex min-w-0 flex-1 flex-col ${
@@ -763,7 +763,7 @@ function BookingHotelFacts({
 
         {factsPending && (
           <>
-            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4" aria-busy>
               <ShimmerLines lines={1} className="mb-3 max-w-[8rem]" />
               <div className="flex flex-wrap gap-x-5 gap-y-3">
                 {Array.from({ length: 6 }, (_, index) => (
@@ -771,7 +771,7 @@ function BookingHotelFacts({
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+            <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4" aria-busy>
               <ShimmerLines lines={1} className="mb-3 max-w-[8rem]" />
               <div className="space-y-3">
                 {Array.from({ length: 4 }, (_, index) => (
@@ -785,14 +785,14 @@ function BookingHotelFacts({
           </>
         )}
         {showPolicySkeleton && (
-          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4" aria-busy>
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4" aria-busy>
             <ShimmerLines lines={1} className="mb-3 max-w-[10rem]" />
             <ShimmerLines lines={4} />
           </div>
         )}
 
         {popularFacilities.length ? (
-          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
             <BookingSectionHeader icon={Building2} title="热门设施" />
             <div className="flex flex-wrap gap-x-5 gap-y-3">
               {popularFacilities.map((facility) => (
@@ -808,7 +808,7 @@ function BookingHotelFacts({
         ) : null}
 
         {reviewScores.length > 0 && (
-          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
             <BookingSectionHeader icon={BarChart3} title="住客评分细项" />
             <ReviewScoreBars
               items={reviewScores}
@@ -824,7 +824,7 @@ function BookingHotelFacts({
 
         {(hotel.checkIn || hotel.checkOut || visibleLanguages.length > 0 || policies.length > 0 || paymentMethods.length > 0) && (
           <div className={showPolicySkeleton && !hotel.checkIn && !hotel.checkOut && !visibleLanguages.length && !paymentMethods.length ? 'hidden' : undefined}>
-          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+          <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
             <BookingSectionHeader icon={Info} title="住宿规定与实用信息" />
             <div className="divide-y divide-[var(--mist)] text-sm">
               {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">入住与退房</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
@@ -895,7 +895,7 @@ function BookingReviewsPanel({
   }, [hotel.id, reviewsKey, reviewsNeedTranslate])
 
   return (
-    <section className="rounded-2xl border border-[var(--mist)] bg-white/60 p-4">
+    <section className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
       <BookingSectionHeader
         icon={MessageSquareQuote}
         title="住客精选评论"
@@ -903,7 +903,7 @@ function BookingReviewsPanel({
       {showReviewShimmer && (
         <div className="space-y-3" aria-busy>
           {Array.from({ length: 2 }, (_, index) => (
-            <div key={index} className="rounded-xl bg-white/70 px-3 py-2">
+            <div key={index} className="rounded-xl bg-white/70 dark:bg-white/5 px-3 py-2">
               <ShimmerLines lines={1} className="mb-2 max-w-[10rem]" />
               <ShimmerLines lines={3} />
             </div>
@@ -2407,7 +2407,7 @@ export function HotelPicker({
                         type="button"
                         disabled={refreshing}
                         onClick={() => setRefreshPanel('prefer')}
-                        className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
+                        className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:hover:bg-[#1f2824] hover:border-white dark:hover:border-white/20 disabled:opacity-50"
                       >
                         <p className="font-medium text-[var(--ink)]">说说我的喜好</p>
                         <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
@@ -2418,7 +2418,7 @@ export function HotelPicker({
                         type="button"
                         disabled={refreshing}
                         onClick={() => void runFreshRecommendations()}
-                        className="rounded-2xl border border-white/80 bg-white/60 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 hover:border-white disabled:opacity-50"
+                        className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:hover:bg-[#1f2824] hover:border-white dark:hover:border-white/20 disabled:opacity-50"
                       >
                         <p className="font-medium text-[var(--ink)]">直接再换一批</p>
                         <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
@@ -2450,7 +2450,7 @@ export function HotelPicker({
                       onChange={(e) => setPreferText(e.target.value)}
                       rows={3}
                       placeholder="写下你对住宿的想法…"
-                      className="mt-3 w-full resize-none rounded-2xl border border-white/90 bg-white/70 p-3.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
+                      className="mt-3 w-full resize-none rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 p-3.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
                     />
                     <div className="mt-3 flex flex-wrap justify-end gap-2">
                       <button
@@ -2468,8 +2468,8 @@ export function HotelPicker({
                         aria-busy={refreshing || undefined}
                         className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-medium transition-all active:scale-95 ${
                           !preferText.trim() || refreshing
-                            ? 'border border-black/[0.06] bg-white/45 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
-                            : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95'
+                            ? 'border border-black/[0.06] dark:border-white/10 bg-white/45 dark:bg-white/5 text-[var(--stone)]/45 cursor-not-allowed shadow-none'
+                            : 'border border-[var(--ink)]/90 bg-[var(--ink)] text-[var(--paper)] dark:bg-[var(--copper)] dark:text-white shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] hover:bg-[var(--ink)]/95 dark:hover:bg-[var(--copper)]/90'
                         }`}
                       >
                         {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
@@ -2576,7 +2576,7 @@ export function HotelPicker({
             width: drag.width,
           }}
         >
-          <div className="timeline-drag-float-card relative overflow-hidden rounded-3xl border border-white/90 bg-white/85 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
+          <div className="timeline-drag-float-card relative overflow-hidden rounded-3xl border border-white/90 dark:border-white/10 bg-white/85 dark:bg-[#161d19]/90 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.08)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
             <div className="timeline-drag-float-content group">
               {(() => {
                 const hotel =

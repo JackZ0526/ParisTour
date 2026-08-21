@@ -72,6 +72,7 @@ import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
 } from '../../../shared/styles/glassCapsule'
+import { useTheme } from '../../../shared/services/themeStore'
 import { InlineMarkdown } from './InlineMarkdown'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
@@ -258,6 +259,7 @@ export function TripChatPanel({
   }
   const isDesktop = useMediaQuery('(min-width: 640px)')
   useBodyScrollLock(open && !isDesktop)
+  const { isDark } = useTheme()
   const { model, thinkingMode } = useLlmSettings()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1913,7 +1915,13 @@ export function TripChatPanel({
         animate={{
           width: open ? TRIP_CHAT_PANEL_WIDTH : 48,
           height: open ? 560 : 48,
-          backgroundColor: open ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.75)',
+          backgroundColor: isDark
+            ? open
+              ? 'rgba(22, 29, 25, 0.94)'
+              : 'rgba(22, 29, 25, 0.85)'
+            : open
+              ? 'rgba(255, 255, 255, 0.85)'
+              : 'rgba(255, 255, 255, 0.75)',
         }}
         transition={{
           width: { ...morphSpring, delay: open ? 0 : 0.18 },
@@ -1948,9 +1956,10 @@ export function TripChatPanel({
           transformOrigin: 'bottom right',
           maxHeight: 'calc(100vh - max(1.15rem, env(safe-area-inset-bottom)) - 5.5rem)',
           color: 'var(--ink)',
-          border: '1px solid rgba(255, 255, 255, 0.9)',
-          boxShadow:
-            '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.9)',
+          boxShadow: isDark
+            ? '0 16px 48px rgba(0, 0, 0, 0.5), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.08)'
+            : '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px 0 rgba(255, 255, 255, 1)',
           backdropFilter: 'blur(24px) saturate(180%)',
         }}
         className="fixed flex flex-col bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+4.85rem)] right-[max(1.25rem,env(safe-area-inset-right))] sm:bottom-5 sm:right-5"
@@ -1968,7 +1977,7 @@ export function TripChatPanel({
           {/* Top specular reflection arc */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95"
+            className="pointer-events-none absolute inset-x-2 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-95"
           />
           <ChatBubbleIcon className="h-5 w-5 text-[var(--copper)] drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]" />
         </motion.div>
@@ -1987,10 +1996,10 @@ export function TripChatPanel({
           {/* Top Specular Streaming Reflection Line */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
+            className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-95 z-10"
           />
 
-          <div className="border-b border-white/85 px-4 py-3 bg-white/40 backdrop-blur-md">
+          <div className="border-b border-white/85 dark:border-white/10 px-4 py-3 bg-white/40 dark:bg-black/20 backdrop-blur-md">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2021,14 +2030,14 @@ export function TripChatPanel({
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {/* Current Day Capsule */}
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 bg-[#f4f8f5]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 dark:border-[#668b7a]/40 bg-[#f4f8f5]/85 dark:bg-[#668b7a]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
                     第 {currentDay} 天
                   </span>
 
                   {/* Viewing Place Context Capsule */}
                   {viewing && (
-                    <span className="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-full border border-[#d7a98a]/60 bg-[#f6e8de]/85 px-2 py-0.5 text-[11px] font-medium text-[var(--copper)] shadow-2xs backdrop-blur-sm">
+                    <span className="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-full border border-[#d7a98a]/60 dark:border-[#d48354]/40 bg-[#f6e8de]/85 dark:bg-[#d48354]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--copper)] shadow-2xs backdrop-blur-sm">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--copper)]" />
                       <span className="truncate">正在看「{viewing.name}」</span>
                     </span>
@@ -2136,8 +2145,8 @@ export function TripChatPanel({
                       <div
                         className={`px-3.5 py-2 text-sm leading-relaxed ${
                           turn.role === 'user'
-                            ? 'rounded-2xl rounded-tr-xs border border-white/12 bg-[var(--ink)]/95 text-[var(--paper)] shadow-[0_3px_12px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22),inset_0_-1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm'
-                            : 'rounded-2xl rounded-tl-xs border border-[#c6dbcf]/80 bg-[#ebf3ee]/95 shadow-[0_2px_12px_rgba(74,99,86,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md text-[var(--ink)]'
+                            ? 'rounded-2xl rounded-tr-xs border border-white/12 bg-[var(--ink)]/95 text-[var(--paper)] dark:bg-[var(--copper)] dark:text-white shadow-[0_3px_12px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22),inset_0_-1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm'
+                            : 'rounded-2xl rounded-tl-xs border border-[#c6dbcf]/80 dark:border-[#668b7a]/30 bg-[#ebf3ee]/95 dark:bg-[#1a2420]/95 shadow-[0_2px_12px_rgba(74,99,86,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.9)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-md text-[var(--ink)]'
                         }`}
                       >
                         {showThinking ? (
@@ -2154,7 +2163,7 @@ export function TripChatPanel({
                           <>
                             <InlineMarkdown
                               text={turn.content}
-                              className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
+                              className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 dark:[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
                             />
                             {isStreamingAssistant && streamingReply ? (
                               <span
@@ -2179,7 +2188,7 @@ export function TripChatPanel({
             )}
 
             {error && (
-              <div className="flex items-start gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 p-3 text-xs leading-relaxed text-red-900 shadow-2xs backdrop-blur-md">
+              <div className="flex items-start gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 dark:border-red-900/50 dark:bg-red-950/40 p-3 text-xs leading-relaxed text-red-900 dark:text-red-300 shadow-2xs backdrop-blur-md">
                 <span className="shrink-0 mt-0.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" />
                 <p className="min-w-0 flex-1">{error}</p>
               </div>
@@ -2188,7 +2197,7 @@ export function TripChatPanel({
           </div>
 
           <form
-            className="relative flex items-center gap-2 border-t border-white/85 bg-white/50 p-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95"
+            className="relative flex items-center gap-2 border-t border-white/85 dark:border-white/10 bg-white/50 dark:bg-black/20 p-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent before:opacity-95"
             onSubmit={(e) => {
               e.preventDefault()
               void submit(input)
@@ -2203,13 +2212,13 @@ export function TripChatPanel({
               aria-busy={busy || undefined}
               enterKeyHint="send"
               autoComplete="off"
-              className="min-w-0 flex-1 rounded-full border border-white/90 bg-white/85 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.02)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white focus:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(0,0,0,0.02)] disabled:bg-white/60 disabled:text-[var(--stone)]/60"
+              className="min-w-0 flex-1 rounded-full border border-white/90 dark:border-white/10 bg-white/85 dark:bg-black/35 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)] disabled:bg-white/60 dark:disabled:bg-black/20 disabled:text-[var(--stone)]/60"
             />
             {busy ? (
               <div
                 role="status"
                 aria-live="polite"
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 px-3.5 py-2 text-xs font-medium text-white shadow-[0_3px_12px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.35)] backdrop-blur-md select-none"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 text-white shadow-[0_3px_12px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.35)] backdrop-blur-md select-none"
               >
                 <ButtonSpinner
                   mode="thinking"

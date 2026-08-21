@@ -84,7 +84,7 @@ export function ConfirmDialog({
         return 'bg-[var(--sage)]/10 border-[var(--sage)]/25 text-[var(--sage)]'
       case 'neutral':
       default:
-        return 'bg-black/5 border-black/10 text-[var(--stone)]'
+        return 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-[var(--stone)]'
     }
   }
 
@@ -157,7 +157,7 @@ export function ConfirmDialog({
                   aria-label="关闭"
                   disabled={busy}
                   onClick={onClose}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/80 transition-colors hover:bg-black/5 hover:text-[var(--ink)] active:scale-95"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/80 transition-colors hover:bg-black/5 dark:hover:bg-white/10 hover:text-[var(--ink)] active:scale-95"
                 >
                   <X size={15} />
                 </button>
@@ -169,7 +169,7 @@ export function ConfirmDialog({
                   type="button"
                   disabled={busy}
                   onClick={onClose}
-                  className="min-h-[38px] rounded-full border border-black/8 bg-white/70 px-4.5 py-2 text-xs sm:text-sm font-medium text-[var(--stone)] shadow-xs backdrop-blur-md transition-all hover:bg-white hover:text-[var(--ink)] active:scale-95 disabled:opacity-50"
+                  className="min-h-[38px] rounded-full border border-black/8 dark:border-white/10 bg-white/70 dark:bg-white/10 px-4.5 py-2 text-xs sm:text-sm font-medium text-[var(--stone)] shadow-xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95 disabled:opacity-50"
                 >
                   {cancelText}
                 </button>

@@ -248,7 +248,7 @@ export function DateRangePicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={[
-          'mt-1 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/85 px-3.5 py-2.5 text-left outline-none transition backdrop-blur-md shadow-xs',
+          'mt-1 flex w-full items-center justify-between gap-2 rounded-xl border bg-white/85 dark:bg-[#18201c]/85 px-3.5 py-2.5 text-left outline-none transition backdrop-blur-md shadow-xs',
           open
             ? 'border-[var(--sage)] shadow-[0_0_0_3px_rgba(74,99,86,0.14)]'
             : 'border-[var(--mist)] hover:border-[var(--sage)]/60 focus:border-[var(--sage)]',
@@ -277,7 +277,7 @@ export function DateRangePicker({
                 type="button"
                 aria-label="上一个月"
                 onClick={() => shiftMonth(-1)}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 bg-white/70 text-[var(--stone)] shadow-xs transition-colors hover:bg-white hover:text-[var(--ink)] active:scale-95"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/10 text-[var(--stone)] shadow-xs transition-colors hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95"
               >
                 <ChevronLeft size={15} aria-hidden />
               </button>
@@ -288,7 +288,7 @@ export function DateRangePicker({
                 type="button"
                 aria-label="下一个月"
                 onClick={() => shiftMonth(1)}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 bg-white/70 text-[var(--stone)] shadow-xs transition-colors hover:bg-white hover:text-[var(--ink)] active:scale-95"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/10 text-[var(--stone)] shadow-xs transition-colors hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95"
               >
                 <ChevronRight size={15} aria-hidden />
               </button>
@@ -347,17 +347,17 @@ export function DateRangePicker({
                           <>
                             {isStart && (
                               <div
-                                className="pointer-events-none absolute inset-y-1.5 left-1/2 right-0 bg-[#e7efe9]/90 z-0"
+                                className="pointer-events-none absolute inset-y-1.5 left-1/2 right-0 bg-[#e7efe9]/90 dark:bg-[#668b7a]/25 z-0"
                               />
                             )}
                             {isEnd && (
                               <div
-                                className="pointer-events-none absolute inset-y-1.5 left-0 right-1/2 bg-[#e7efe9]/90 z-0"
+                                className="pointer-events-none absolute inset-y-1.5 left-0 right-1/2 bg-[#e7efe9]/90 dark:bg-[#668b7a]/25 z-0"
                               />
                             )}
                             {inRange && (
                               <div
-                                className={`pointer-events-none absolute inset-y-1.5 inset-x-0 bg-[#e7efe9]/90 z-0 ${
+                                className={`pointer-events-none absolute inset-y-1.5 inset-x-0 bg-[#e7efe9]/90 dark:bg-[#668b7a]/25 z-0 ${
                                   colIndex === 0 ? 'rounded-l-full' : ''
                                 } ${colIndex === 6 ? 'rounded-r-full' : ''}`}
                               />
@@ -375,14 +375,14 @@ export function DateRangePicker({
                           className={[
                             'relative z-10 flex h-8 w-8 items-center justify-center rounded-full text-xs tabular-nums outline-none transition-colors duration-150',
                             isStart
-                              ? 'bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(181,106,60,0.35)] ring-2 ring-white font-bold'
+                              ? 'bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(181,106,60,0.35)] ring-2 ring-white dark:ring-[#18201c] font-bold'
                               : isEnd
-                                ? 'bg-[var(--sage)] text-white shadow-[0_2px_8px_rgba(74,99,86,0.35)] ring-2 ring-white font-bold'
+                                ? 'bg-[var(--sage)] text-white shadow-[0_2px_8px_rgba(74,99,86,0.35)] ring-2 ring-white dark:ring-[#18201c] font-bold'
                                 : inRange
-                                  ? 'text-[var(--ink)] font-semibold hover:bg-white/80'
+                                  ? 'text-[var(--ink)] font-semibold hover:bg-white/80 dark:hover:bg-white/15'
                                   : isToday
                                     ? 'font-bold text-[var(--copper)] ring-1.5 ring-[var(--copper)]/50 bg-[var(--copper)]/8'
-                                    : 'text-[var(--ink)] font-medium hover:bg-black/5',
+                                    : 'text-[var(--ink)] font-medium hover:bg-black/5 dark:hover:bg-white/10',
                           ].join(' ')}
                         >
                           {cell.day}
@@ -402,7 +402,7 @@ export function DateRangePicker({
                   ? { duration: 0.01 }
                   : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
               }
-              className="mt-2.5 pt-2.5 border-t border-black/5 flex items-center justify-between gap-2 text-[11px] text-[var(--stone)] px-1"
+              className="mt-2.5 pt-2.5 border-t border-black/5 dark:border-white/10 flex items-center justify-between gap-2 text-[11px] text-[var(--stone)] px-1"
             >
               <span className="inline-flex items-center gap-2">
                 <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--copper)] font-medium`}>

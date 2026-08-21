@@ -2,6 +2,7 @@ import { useEffect, useState, useId, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  Check,
   Clock,
   LoaderCircle,
   RotateCcw,
@@ -208,7 +209,7 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 2. Active Preference Tag Pool Card (已选偏好池卡片) */}
-          <section className="relative z-20 rounded-3xl border border-white/80 bg-white/65 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-2.5">
+          <section className="relative z-20 rounded-3xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Tag size={14} className="text-[var(--copper)]" />
@@ -225,7 +226,7 @@ export function RecommendationPreferencesDialog({
                   onClick={clearAllTags}
                   title="清空偏好池"
                   aria-label="清空偏好池"
-                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40 cursor-pointer`}
+                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white dark:hover:bg-white/10 hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40 cursor-pointer`}
                 >
                   <Trash2 size={14} strokeWidth={1.8} aria-hidden />
                 </button>
@@ -233,7 +234,7 @@ export function RecommendationPreferencesDialog({
             </div>
 
             {activeTags.length === 0 ? (
-              <div className="flex min-h-[64px] flex-col items-center justify-center text-center rounded-2xl border border-dashed border-black/10 bg-white/40 p-2.5">
+              <div className="flex min-h-[64px] flex-col items-center justify-center text-center rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-2.5">
                 <p className="text-xs font-medium text-[var(--stone)]">
                   偏好池暂为空白
                 </p>
@@ -264,7 +265,7 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 3. Candidate Tag Deck Card (推荐偏好候选卡片) */}
-          <section className="relative z-10 rounded-3xl border border-white/80 bg-white/65 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-2.5">
+          <section className="relative z-10 rounded-3xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl space-y-2.5">
             <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Sparkles size={14} className="text-[var(--copper)]" />
@@ -302,7 +303,7 @@ export function RecommendationPreferencesDialog({
           </section>
 
           {/* 4. Natural Language Smart Input Extractor (自然语言提取) */}
-          <section className="rounded-3xl border border-white/80 bg-white/65 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-2.5">
+          <section className="rounded-3xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl space-y-2.5">
             <label className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Wand2 size={14} className="text-[var(--copper)]" />
@@ -327,12 +328,12 @@ export function RecommendationPreferencesDialog({
                   disabled={isExtracting}
                   rows={2}
                   placeholder="例如：喜欢小众咖啡馆和复古市集，晚餐想吃生蚝，不希望太费体力……"
-                  className="w-full resize-none rounded-2xl border border-white/90 bg-white/90 p-3 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white backdrop-blur-md placeholder:text-[var(--stone)]/60"
+                  className="w-full resize-none rounded-2xl border border-white/90 dark:border-white/10 bg-white/90 dark:bg-black/25 p-3 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white dark:focus:bg-black/40 backdrop-blur-md placeholder:text-[var(--stone)]/60"
                 />
               </div>
 
               {extractError && (
-                <p className="text-xs text-red-600 px-1">{extractError}</p>
+                <p className="text-xs text-red-600 dark:text-red-400 px-1">{extractError}</p>
               )}
 
               <div className="flex items-center justify-between gap-2">
@@ -363,11 +364,11 @@ export function RecommendationPreferencesDialog({
         </div>
 
         {/* Footer Action Bar */}
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--mist)]/60 px-5 py-4 bg-white/30 backdrop-blur-md">
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--mist)]/60 px-5 py-4 bg-white/30 dark:bg-black/20 backdrop-blur-md">
           <button
             type="button"
             onClick={() => setDraft({ ...DEFAULT_RECOMMENDATION_PREFERENCES })}
-            className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/10 px-3.5 py-1.5 text-xs font-medium text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white dark:hover:bg-white/20 shadow-2xs transition-all active:scale-95 cursor-pointer"
           >
             <RotateCcw size={12} />
             <span>恢复默认</span>
@@ -376,7 +377,7 @@ export function RecommendationPreferencesDialog({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full border border-black/10 bg-white/70 px-4 py-1.5 text-xs font-medium text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white shadow-2xs transition-all active:scale-95 cursor-pointer"
+              className="rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/10 px-4 py-1.5 text-xs font-medium text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white dark:hover:bg-white/20 shadow-2xs transition-all active:scale-95 cursor-pointer"
             >
               取消
             </button>
@@ -386,8 +387,10 @@ export function RecommendationPreferencesDialog({
                 onSave(draft)
                 onClose()
               }}
-              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-5 py-1.5 text-xs sm:text-sm font-semibold text-[var(--paper)] shadow-[0_4px_14px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] transition-all hover:bg-black active:scale-95 cursor-pointer"
+              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] px-5 py-1.5 text-xs sm:text-sm font-semibold text-[var(--paper)] dark:text-white shadow-[0_3px_10px_rgba(0,0,0,0.14)] dark:shadow-[0_3px_10px_rgba(212,131,84,0.25)] transition-all hover:bg-black dark:hover:bg-[var(--copper)]/90 active:scale-95 cursor-pointer"
             >
+              <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+              <Check size={13} strokeWidth={2.2} />
               <span>保存偏好配置</span>
             </button>
           </div>
