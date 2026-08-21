@@ -30,9 +30,6 @@ function formatTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
-const MORPH_EASE = [0.22, 1, 0.36, 1] as const
-const MORPH_DURATION = 0.32
-
 export function TimePicker({ value, onChange, label, id: idProp }: Props) {
   const autoId = useId()
   const id = idProp ?? autoId
@@ -83,78 +80,87 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
       )}
 
       {/*
-        Sub-wrapper holds the shared layoutId. min-h-[2.25rem] reserves the
-        button's vertical slot so the cards below don't jump when the
-        popover (absolute) replaces the in-flow button.
+        Persistent Container:
+        Seamlessly holds the persistent top anchor bar, expanding the hour/minute selection below.
       */}
-      <div className="relative mt-2 min-h-[2.25rem]">
-        <AnimatePresence>
-          {!open ? (
-            <motion.button
-              key="time-picker-button"
-              layoutId="time-picker-card"
-              type="button"
-              id={id}
-              aria-haspopup="dialog"
-              aria-expanded={false}
-              onClick={() => setOpen(true)}
-              transition={{
-                opacity: { duration: 0.18, ease: 'easeOut' },
-                layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
-              }}
-              className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-left outline-none transition-colors hover:border-[var(--copper)]/60 focus-visible:border-[var(--copper)] focus-visible:ring-2 focus-visible:ring-[var(--copper)]/25 cursor-pointer"
+      <div
+        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 ${
+          open
+            ? `border-white/90 bg-white/95 ${glassPopoverSurfaceClass} shadow-2xl`
+            : 'border-[var(--mist)] bg-white/80 hover:border-[var(--copper)]/60'
+        }`}
+      >
+        {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
+        <button
+          type="button"
+          id={id}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen((prev) => !prev)}
+          className="flex h-9 w-full items-center justify-between gap-2 px-3 py-1.5 text-left outline-none cursor-pointer select-none"
+        >
+          <div className="flex items-center gap-2">
+            {/* Time Capsule: In-place transition from plain text to highlight glass capsule */}
+            <span
+              className={`tabular-nums font-semibold text-sm transition-all duration-200 ${
+                open
+                  ? `${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center rounded-lg px-2 py-0.5 text-[var(--copper)] shadow-2xs`
+                  : 'text-[var(--ink)]'
+              }`}
             >
-              <span className="tabular-nums font-semibold text-sm text-[var(--ink)]">{value}</span>
-              <Clock3
-                className="h-4 w-4 shrink-0 text-[var(--copper)]/80"
-                strokeWidth={1.8}
-                aria-hidden
-              />
-            </motion.button>
-          ) : (
-            <motion.div
-              key="time-picker-popover"
-              layoutId="time-picker-card"
-              role="dialog"
-              aria-modal="true"
-              aria-label={label ? `${label}选择器` : '选择时间'}
-              transition={{
-                opacity: { duration: 0.18, ease: 'easeOut' },
-                layout: { duration: MORPH_DURATION, ease: MORPH_EASE },
-              }}
-              style={{ transformOrigin: 'top center' }}
-              className={`absolute inset-x-0 top-0 z-50 max-h-[min(70dvh,420px)] overflow-y-auto ${glassPopoverSurfaceClass} p-3.5 sm:p-4 shadow-2xl`}
-            >
-              <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mist)]/70 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center px-2.5 py-0.5 text-sm font-semibold tabular-nums text-[var(--copper)] shadow-2xs`}>
-                    {formatTime(draftHour, draftMinute)}
-                  </span>
-                  <span className="text-xs font-medium text-[var(--stone)]">
-                    {label ? `选择${label}` : '选择开始时间'}
-                  </span>
-                </div>
-                <Clock3
-                  className="h-4 w-4 shrink-0 text-[var(--copper)]/80"
-                  strokeWidth={1.8}
-                  aria-hidden
-                />
-              </div>
+              {open ? formatTime(draftHour, draftMinute) : value}
+            </span>
 
+            {/* In-place subtitle fading in on the right of the time capsule */}
+            <AnimatePresence>
+              {open && (
+                <motion.span
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="text-xs font-medium text-[var(--stone)]"
+                >
+                  {label ? `选择${label}` : '选择开始时间'}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <Clock3
+            className={`h-4 w-4 shrink-0 transition-colors ${
+              open ? 'text-[var(--copper)]' : 'text-[var(--copper)]/80'
+            }`}
+            strokeWidth={1.8}
+            aria-hidden
+          />
+        </button>
+
+        {/* Expanded Selection Body (Smooth In-Place Downward Accordion Flow) */}
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden border-t border-[var(--mist)]/70 px-3.5 pb-3.5 pt-2.5"
+            >
+              {/* Hours Grid */}
               <div>
                 <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">小时</p>
                 <div className="grid grid-cols-6 gap-1">
                   {HOURS.map((hour) => (
-                    <button
+                     <button
                       key={hour}
                       type="button"
                       aria-pressed={draftHour === hour}
                       onClick={() => setDraftHour(hour)}
                       className={[
-                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
+                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition cursor-pointer',
                         draftHour === hour
                           ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
-                          : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
+                          : 'text-[var(--ink)] hover:bg-[var(--copper)]/10 focus-visible:ring-2 focus-visible:ring-[var(--copper)]/40',
                       ].join(' ')}
                     >
                       {String(hour).padStart(2, '0')}
@@ -163,7 +169,8 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 </div>
               </div>
 
-              <div className="mt-3 border-t border-[var(--mist)] pt-2">
+              {/* Minutes Grid */}
+              <div className="mt-3 border-t border-[var(--mist)]/60 pt-2">
                 <p className="mb-1.5 text-xs font-medium text-[var(--stone)]">分钟</p>
                 <div className="grid grid-cols-6 gap-1">
                   {minuteOptions.map((minute) => (
@@ -173,10 +180,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                       aria-pressed={draftMinute === minute}
                       onClick={() => setDraftMinute(minute)}
                       className={[
-                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition',
+                        'rounded-lg py-1.5 text-sm tabular-nums outline-none transition cursor-pointer',
                         draftMinute === minute
-                          ? 'bg-[var(--sage)] font-medium text-[var(--paper)] shadow-sm'
-                          : 'text-[var(--ink)] hover:bg-[var(--sage)]/12 focus-visible:ring-2 focus-visible:ring-[var(--sage)]/40',
+                          ? 'bg-[var(--copper)] font-medium text-[var(--paper)] shadow-sm'
+                          : 'text-[var(--ink)] hover:bg-[var(--copper)]/10 focus-visible:ring-2 focus-visible:ring-[var(--copper)]/40',
                       ].join(' ')}
                     >
                       {String(minute).padStart(2, '0')}
@@ -185,11 +192,12 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                 </div>
               </div>
 
-              <div className="mt-3 flex justify-end gap-2 border-t border-[var(--mist)] pt-3">
+              {/* Action Buttons */}
+              <div className="mt-3.5 flex justify-end gap-2 border-t border-[var(--mist)]/70 pt-2.5">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-xs text-[var(--stone)] transition hover:border-[var(--sage)]"
+                  className="rounded-full border border-black/10 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[var(--stone)] transition hover:bg-white hover:text-[var(--ink)] shadow-2xs active:scale-95 cursor-pointer"
                 >
                   取消
                 </button>
@@ -199,7 +207,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     onChange(formatTime(draftHour, draftMinute))
                     setOpen(false)
                   }}
-                  className="rounded-full bg-[var(--ink)] px-4 py-1.5 text-xs text-[var(--paper)] transition hover:opacity-90 shadow-sm"
+                  className="rounded-full bg-[var(--ink)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] transition hover:bg-black shadow-[0_3px_10px_rgba(0,0,0,0.15)] active:scale-95 cursor-pointer"
                 >
                   完成
                 </button>
