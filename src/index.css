@@ -520,27 +520,21 @@ body,
 
 .mobile-scroll-edge-fade {
   --mobile-left-edge-mask-alpha: 1;
-  --mobile-left-edge-mask-offset: 0px;
   mask-image: linear-gradient(
     to right,
-    rgba(0, 0, 0, var(--mobile-left-edge-mask-alpha)) var(--mobile-left-edge-mask-offset),
-    #000 calc(var(--mobile-left-edge-mask-offset) + 4px),
+    rgba(0, 0, 0, var(--mobile-left-edge-mask-alpha)) 0,
+    #000 4px,
     #000 calc(100% - 12px),
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to right,
-    rgba(0, 0, 0, var(--mobile-left-edge-mask-alpha)) var(--mobile-left-edge-mask-offset),
-    #000 calc(var(--mobile-left-edge-mask-offset) + 4px),
+    rgba(0, 0, 0, var(--mobile-left-edge-mask-alpha)) 0,
+    #000 4px,
     #000 calc(100% - 12px),
     transparent 100%
   );
   transition: --mobile-left-edge-mask-alpha 160ms ease-out;
-}
-
-.mobile-scroll-edge-fade--inset {
-  /* The day rail uses -mx-1.5, so its visible edge begins 6px inward. */
-  --mobile-left-edge-mask-offset: 6px;
 }
 
 .mobile-scroll-edge-fade.has-left-overflow {
