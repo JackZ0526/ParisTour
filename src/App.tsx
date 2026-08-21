@@ -622,7 +622,7 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-[100svh] max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(4.75rem,calc(env(safe-area-inset-top)+1.25rem))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+    <div className="mx-auto flex min-h-[100svh] max-w-7xl flex-col px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(4.75rem,calc(env(safe-area-inset-top)+1.25rem))] sm:min-h-screen sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
       <ApiRequestMeter />
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -763,7 +763,7 @@ export default function App() {
         />
       )}
 
-      <main className="mt-4 space-y-6 sm:mt-6 sm:space-y-8">
+      <main className="mt-4 flex flex-1 flex-col space-y-6 sm:mt-6 sm:space-y-8">
         <AnimatePresence mode="wait">
           {activeTab === 'itinerary' && (
             <motion.div
@@ -773,7 +773,7 @@ export default function App() {
               exit={{ opacity: 0, y: -8 }}
               onAnimationStart={() => restoreTabScroll('itinerary')}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="space-y-4"
+              className={itineraryReady ? 'space-y-4' : 'flex flex-1 flex-col'}
             >
               {/* Top Quick Itinerary Summary Strip */}
               {itineraryReady && (
@@ -1115,7 +1115,7 @@ export default function App() {
                   )}
                 </section>
               ) : (
-                <div className={`relative overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-4 sm:p-8 md:p-10 text-center shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)]`}>
+                <div className={`relative flex flex-1 flex-col justify-center overflow-hidden rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-8 md:p-10 text-center shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,1)]`}>
                   {/* Subtle decorative background watermark */}
                   <div
                     className="pointer-events-none absolute inset-0 opacity-[0.035] grayscale"
@@ -1127,36 +1127,36 @@ export default function App() {
                     }}
                   />
 
-                  <div className="relative mx-auto max-w-lg space-y-3.5 sm:space-y-5">
+                  <div className="relative mx-auto my-auto w-full max-w-lg space-y-4 sm:space-y-6">
                     {/* Top Editorial Category Badge */}
-                    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)]">
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)]">
                       <Sparkles size={12} strokeWidth={2.2} />
                       <span>ITINERARY READINESS · 行程就绪准备</span>
                     </div>
 
                     {/* Central 3D Frosted Icon Badge */}
-                    <div className="mx-auto flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
-                      <Luggage size={24} className="sm:hidden" strokeWidth={1.9} />
+                    <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
+                      <Luggage size={26} className="sm:hidden" strokeWidth={1.9} />
                       <Luggage size={30} className="hidden sm:block" strokeWidth={1.9} />
                     </div>
 
                     {/* Typography */}
-                    <div className="space-y-1">
-                      <h3 className="font-display text-lg sm:text-2xl font-semibold text-[var(--ink)] tracking-tight">
+                    <div className="space-y-1.5">
+                      <h3 className="font-display text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-tight">
                         还差几项即可生成完整多日行程
                       </h3>
-                      <p className="text-[11.5px] sm:text-sm text-[var(--stone)] leading-relaxed max-w-md mx-auto">
+                      <p className="text-xs sm:text-sm text-[var(--stone)] leading-relaxed max-w-md mx-auto">
                         配置旅行日期、往返航班与心仪酒店后，AI 将为您智能规划每日景点动线、合理串联交通与就餐建议。
                       </p>
                     </div>
 
                     {/* Interactive 3-Step Readiness Matrix */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5 pt-1 text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1.5 text-left">
                       {/* Step 1: Dates */}
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-2.5 sm:p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
                           datesReady
                             ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
                             : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
@@ -1186,7 +1186,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-2.5 sm:p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
                           flights.outbound && flights.returnFlight
                             ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
                             : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
@@ -1220,7 +1220,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-2.5 sm:p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
                           isHotelSelected(hotel)
                             ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
                             : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
@@ -1248,19 +1248,19 @@ export default function App() {
                     </div>
 
                     {/* Primary CTA Button: French Copper-Amber Gradient */}
-                    <div className="pt-1">
+                    <div className="pt-1.5">
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className="group relative isolate inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-5 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white shadow-[0_6px_20px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all duration-200 hover:brightness-105 hover:shadow-[0_8px_24px_rgba(179,107,60,0.36)] active:scale-95"
+                        className="group relative isolate inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all duration-200 hover:brightness-105 hover:shadow-[0_8px_24px_rgba(179,107,60,0.36)] active:scale-95"
                       >
                         <span
                           aria-hidden
                           className="pointer-events-none absolute inset-x-3 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent"
                         />
-                        <Luggage size={15} strokeWidth={2.2} />
+                        <Luggage size={16} strokeWidth={2.2} />
                         <span>前往「出行」一键完善</span>
-                        <ChevronRight size={14} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
+                        <ChevronRight size={15} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
                       </button>
                     </div>
                   </div>
