@@ -182,6 +182,7 @@ export {
 
 export {
   resolveItineraryStart,
+  resolveItineraryStartSync,
   generateFullItinerary,
   generateSingleDayItinerary,
   type FullItineraryPlaceDraft,

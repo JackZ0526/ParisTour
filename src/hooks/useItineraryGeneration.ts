@@ -87,7 +87,7 @@ import {
 import { getPlace } from '../features/place/constants/places'
 import {
   isLlmConfigured,
-  resolveItineraryStart,
+  resolveItineraryStartSync,
   type ItineraryStartResult,
 } from '../shared/services/llm/llm'
 import { LlmRequestError } from '../shared/services/llm/errors'
@@ -211,11 +211,27 @@ export function useItineraryGeneration(
   const { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId } = setters
 
   // -- State -----------------------------------------------------------------
-  const [itineraryStart, setItineraryStart] = useState<ItineraryStartResult | null>(null)
-  // True on first paint when outbound+dates exist so fingerprint gates wait for resolve.
-  const [itineraryStartLoading, setItineraryStartLoading] = useState(() =>
-    Boolean(loadTripDates()?.startDate && initialFlightsState().outbound?.flightNumber),
-  )
+  const [itineraryStart, setItineraryStart] = useState<ItineraryStartResult | null>(() => {
+    const dates = deps.tripDates ?? loadTripDates()
+    const flights = deps.flights ?? initialFlightsState()
+    if (!dates?.startDate || !flights.outbound?.flightNumber) return null
+    return resolveItineraryStartSync({
+      tripStartDate: dates.startDate,
+      tripEndDate: dates.endDate,
+      destination: deps.destination,
+      hotelName: deps.hotelReady ? deps.hotel.name : null,
+      outbound: {
+        flightNumber: flights.outbound.flightNumber,
+        airline: flights.outbound.airline,
+        from: flights.outbound.from,
+        to: flights.outbound.to,
+        duration: flights.outbound.duration,
+        status: flights.outbound.status,
+        rawNote: flights.outbound.rawNote,
+      },
+    })
+  })
+  const [itineraryStartLoading, setItineraryStartLoading] = useState(false)
   const [itineraryGenerated, setItineraryGenerated] = useState(() => {
     // Mirror App.tsx's pre-4.3 initial load: read generated + days from
     // localStorage so a refresh doesn't trigger hasUsableGeneratedItinerary
@@ -365,41 +381,23 @@ export function useItineraryGeneration(
       return
     }
 
-    let cancelled = false
-    setItineraryStartLoading(true)
-    const timer = window.setTimeout(() => {
-      void resolveItineraryStart({
-        tripStartDate: tripDates.startDate,
-        tripEndDate: tripDates.endDate,
-        destination,
-        hotelName: hotelReady ? hotel.name : null,
-        outbound: {
-          flightNumber: flights.outbound!.flightNumber,
-          airline: flights.outbound!.airline,
-          from: flights.outbound!.from,
-          to: flights.outbound!.to,
-          duration: flights.outbound!.duration,
-          status: flights.outbound!.status,
-          rawNote: flights.outbound!.rawNote,
-        },
-      })
-        .then((result) => {
-          if (cancelled) return
-          setItineraryStart(result)
-        })
-        .catch(() => {
-          if (cancelled) return
-          setItineraryStart(null)
-        })
-        .finally(() => {
-          if (!cancelled) setItineraryStartLoading(false)
-        })
-    }, 280)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
+    const result = resolveItineraryStartSync({
+      tripStartDate: tripDates.startDate,
+      tripEndDate: tripDates.endDate,
+      destination,
+      hotelName: hotelReady ? hotel.name : null,
+      outbound: {
+        flightNumber: flights.outbound.flightNumber,
+        airline: flights.outbound.airline,
+        from: flights.outbound.from,
+        to: flights.outbound.to,
+        duration: flights.outbound.duration,
+        status: flights.outbound.status,
+        rawNote: flights.outbound.rawNote,
+      },
+    })
+    setItineraryStart(result)
+    setItineraryStartLoading(false)
   }, [
     tripDates?.startDate,
     tripDates?.endDate,

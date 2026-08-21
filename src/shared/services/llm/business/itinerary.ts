@@ -270,13 +270,20 @@ function seasonForDate(isoDate: string): string {
 
 // ── resolveItineraryStart ────────────────────────────────────────────────
 
+/** Synchronous resolution of itinerary start from structured flight timestamps. */
+export function resolveItineraryStartSync(
+  input: ItineraryStartInput,
+): ItineraryStartResult | null {
+  const start = input.tripStartDate?.trim()
+  if (!start || !input.outbound?.flightNumber) return null
+  return fallbackItineraryStart(start, input.outbound, input.tripEndDate)
+}
+
 /** Resolve the itinerary start only from structured flight timestamps. */
 export async function resolveItineraryStart(
   input: ItineraryStartInput,
 ): Promise<ItineraryStartResult | null> {
-  const start = input.tripStartDate?.trim()
-  if (!start || !input.outbound?.flightNumber) return null
-  return fallbackItineraryStart(start, input.outbound, input.tripEndDate)
+  return resolveItineraryStartSync(input)
 }
 
 // ── generateFullItinerary ────────────────────────────────────────────────
