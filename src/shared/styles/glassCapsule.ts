@@ -37,7 +37,7 @@ export const glassHandleSurfaceClass =
 
 /** Shared frosted-glass modal / sheet surface used by bottom sheets & dialogs. */
 export const glassModalSurfaceClass =
-  "relative overflow-hidden border border-white/90 bg-white/85 shadow-[0_20px_60px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.6)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
+  "relative overflow-hidden border border-white/90 max-sm:border-b-0 bg-white/85 shadow-[0_20px_60px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:content-['']"
 
 /** Shared floating dropdown / popover glass surface. */
 export const glassPopoverSurfaceClass =

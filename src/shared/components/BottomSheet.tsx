@@ -96,10 +96,17 @@ export function BottomSheet({
               transition={sheet.transition}
               className="pointer-events-auto relative z-10 flex w-full justify-center"
             >
+              {/* Mobile Overscroll Bleed Skirt: Seamlessly extends below the sheet without any seams or hairline borders */}
+              <motion.div
+                style={{ y: dragY }}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-[calc(100%-3px)] inset-x-0 h-[400px] bg-white/85 backdrop-blur-2xl sm:hidden"
+              />
+
               <motion.div
                 ref={sheetRef}
                 style={{ y: dragY }}
-                className={`relative w-full [touch-action:pan-y] [overscroll-behavior-y:contain] ${className}`}
+                className={`relative w-full [touch-action:pan-y] [overscroll-behavior-y:contain] max-sm:border-b-0 ${className}`}
               >
                 {showHandle && (
                   <div
@@ -111,13 +118,6 @@ export function BottomSheet({
                 )}
                 {children}
               </motion.div>
-
-              {/* Mobile Overscroll Bleed Skirt: Prevents dark backdrop from leaking when rubber-band pulling up */}
-              <motion.div
-                style={{ y: dragY }}
-                aria-hidden="true"
-                className="pointer-events-none absolute -bottom-[400px] inset-x-0 h-[400px] bg-white/95 backdrop-blur-2xl sm:hidden"
-              />
             </motion.div>
           </div>
         </>
