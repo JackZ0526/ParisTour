@@ -12,30 +12,30 @@ export interface RecommendationPreferences {
   extraNotes?: string
 }
 
-/** Pre-curated list of French travel preference tags */
+/** Pre-curated list of ultra-concise French travel preference tags (2-5 chars each) */
 export const PRESET_PREFERENCE_TAGS: readonly string[] = [
-  '☕ 咖啡馆与早餐开场',
-  '🍽️ 每日两顿正餐',
-  '🚶 慢节奏少步行',
-  '🏰 安排巴黎迪士尼日',
-  '🏛️ 香街与凯旋门同日',
-  '🌿 避开大型博物馆',
-  '📸 绝佳摄影出片机位',
-  '🎨 艺术馆与画廊巡礼',
-  '🥐 小众法式烘焙甜点',
-  '🍷 塞纳河落日游船',
-  '🛍️ 玛黑区中古买手店',
-  '🥖 深度在地生活市集',
-  '🗼 埃菲尔铁塔夜景观景',
-  '👶 亲子家庭轻松节奏',
-  '💰 经济高性价比美食',
+  '☕ 晨间咖啡',
+  '🍽️ 两顿正餐',
+  '🚶 轻松少步行',
+  '🏰 巴黎迪士尼',
+  '🏛️ 凯旋门香街',
+  '🌿 避开大展馆',
+  '📸 摄影出片',
+  '🎨 艺术画廊',
+  '🥐 法式烘焙',
+  '🍷 塞纳河游船',
+  '🛍️ 玛黑中古店',
+  '🥖 在地市集',
+  '🗼 铁塔夜景',
+  '👶 亲子友好',
+  '💰 平价美食',
 ]
 
 export const DEFAULT_PREFERENCE_TAGS: readonly string[] = [
-  '☕ 咖啡馆与早餐开场',
-  '🍽️ 每日两顿正餐',
-  '🚶 慢节奏少步行',
-  '🏛️ 香街与凯旋门同日',
+  '☕ 晨间咖啡',
+  '🍽️ 两顿正餐',
+  '🚶 轻松少步行',
+  '🏛️ 凯旋门香街',
 ]
 
 export const DEFAULT_RECOMMENDATION_PREFERENCES: RecommendationPreferences = {
@@ -73,12 +73,12 @@ export function normalizeRecommendationPreferences(
   } else {
     // Backward compatibility: Derive tags from legacy boolean flags
     tags = []
-    if (value?.preferCafeStart ?? true) tags.push('☕ 咖啡馆与早餐开场')
-    if (value?.preferLunchAndDinner ?? true) tags.push('🍽️ 每日两顿正餐')
-    if (value?.preferLowWalking ?? true) tags.push('🚶 慢节奏少步行')
-    if (value?.includeDisneyDay) tags.push('🏰 安排巴黎迪士尼全日')
-    if (value?.includeChampsAndArc ?? true) tags.push('🏛️ 香榭丽舍与凯旋门同日')
-    if (value?.avoidLouvreAndVersailles) tags.push('🌿 避开大型博物馆(卢浮宫/凡尔赛)')
+    if (value?.preferCafeStart ?? true) tags.push('☕ 晨间咖啡')
+    if (value?.preferLunchAndDinner ?? true) tags.push('🍽️ 两顿正餐')
+    if (value?.preferLowWalking ?? true) tags.push('🚶 轻松少步行')
+    if (value?.includeDisneyDay) tags.push('🏰 巴黎迪士尼')
+    if (value?.includeChampsAndArc ?? true) tags.push('🏛️ 凯旋门香街')
+    if (value?.avoidLouvreAndVersailles) tags.push('🌿 避开大展馆')
     if (tags.length === 0) tags = [...DEFAULT_PREFERENCE_TAGS]
   }
 
@@ -88,12 +88,12 @@ export function normalizeRecommendationPreferences(
   return {
     dayStartTime: normalizeTime(value?.dayStartTime),
     tags,
-    preferCafeStart: hasTag((t) => t.includes('咖啡馆') || t.includes('早餐')),
-    preferLunchAndDinner: hasTag((t) => t.includes('正餐') || t.includes('午餐')),
+    preferCafeStart: hasTag((t) => t.includes('咖啡') || t.includes('早餐')),
+    preferLunchAndDinner: hasTag((t) => t.includes('正餐') || t.includes('午餐') || t.includes('晚餐')),
     includeDisneyDay: hasTag((t) => t.includes('迪士尼')),
-    includeChampsAndArc: hasTag((t) => t.includes('香榭丽舍') || t.includes('凯旋门')),
-    avoidLouvreAndVersailles: hasTag((t) => t.includes('避开') && (t.includes('卢浮宫') || t.includes('凡尔赛') || t.includes('博物馆'))),
-    preferLowWalking: hasTag((t) => t.includes('少步行') || t.includes('慢节奏')),
+    includeChampsAndArc: hasTag((t) => t.includes('香街') || t.includes('香榭丽舍') || t.includes('凯旋门')),
+    avoidLouvreAndVersailles: hasTag((t) => t.includes('避开') || t.includes('卢浮宫') || t.includes('凡尔赛') || t.includes('展馆')),
+    preferLowWalking: hasTag((t) => t.includes('少步行') || t.includes('慢节奏') || t.includes('轻松')),
     extraNotes: String(value?.extraNotes || '').trim().slice(0, 800),
   }
 }
