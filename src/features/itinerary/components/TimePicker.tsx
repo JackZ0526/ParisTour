@@ -298,24 +298,32 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               className="overflow-hidden border-t border-[var(--mist)]/70 px-3.5 pb-3.5 pt-2"
             >
               {/* iOS Wheel Body */}
-              <div className="relative my-1.5 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
-                {/* Column Headers (小时 / 分钟) */}
-                <div className="relative z-20 grid grid-cols-2 text-center text-[11px] font-semibold text-[var(--stone)]/80 pb-1.5 border-b border-black/[0.04]">
-                  <span>小时</span>
-                  <span>分钟</span>
-                </div>
-
+              <div className="relative my-1 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
                 {/* Wheels Section: Lens and Columns share the EXACT SAME container */}
-                <div className="relative mt-1" style={{ height: `${WHEEL_HEIGHT}px` }}>
-                  {/* Center Highlight Selection Lens: Exactly in the middle [38px, 76px] */}
+                <div className="relative" style={{ height: `${WHEEL_HEIGHT}px` }}>
+                  {/* Center Highlight Selection Lens with Static Fixed "点" and "分" Labels */}
                   <div
-                    className="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 rounded-xl border border-[var(--copper)]/35 bg-[var(--copper)]/12 shadow-[0_2px_8px_rgba(181,106,60,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-xs"
+                    className="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 rounded-xl border border-[var(--copper)]/35 bg-[var(--copper)]/12 shadow-[0_2px_8px_rgba(181,106,60,0.1),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-xs flex items-center z-10"
                     style={{ height: `${ITEM_HEIGHT}px` }}
-                  />
+                  >
+                    {/* Left Column Static Label "点" */}
+                    <div className="w-1/2 flex items-center justify-center relative">
+                      <span className="absolute left-[calc(50%+1.35rem)] text-xs font-semibold text-[var(--copper)] select-none">
+                        点
+                      </span>
+                    </div>
+
+                    {/* Right Column Static Label "分" */}
+                    <div className="w-1/2 flex items-center justify-center relative">
+                      <span className="absolute left-[calc(50%+1.35rem)] text-xs font-semibold text-[var(--copper)] select-none">
+                        分
+                      </span>
+                    </div>
+                  </div>
 
                   {/* Top & Bottom Depth Gradients for 3D Cylinder effect */}
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent z-10 pointer-events-none" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent z-10 pointer-events-none" />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/95 via-white/60 to-transparent z-20" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white/95 via-white/60 to-transparent z-20" />
 
                   {/* Dual Scroll Columns */}
                   <div className="relative z-0 grid grid-cols-2 items-center h-full">
