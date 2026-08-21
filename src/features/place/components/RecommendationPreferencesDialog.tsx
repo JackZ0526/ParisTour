@@ -322,7 +322,7 @@ export function RecommendationPreferencesDialog({
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.82, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.7 }}
-                        className={`group relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border pl-3 pr-1.5 text-xs font-medium shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md transition-all ${theme.activePill}`}
+                        className={`group relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border pl-3 pr-1.5 text-xs font-medium leading-none shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md transition-all ${theme.activePill}`}
                       >
                         <span className="truncate max-w-[240px] sm:max-w-none">{tag}</span>
                         <button
@@ -360,14 +360,16 @@ export function RecommendationPreferencesDialog({
                     key={preset}
                     type="button"
                     onClick={() => addTag(preset)}
-                    className={`group inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed pl-3 pr-2 text-xs font-medium backdrop-blur-sm transition-all active:scale-95 cursor-pointer shadow-2xs ${theme.suggestedPill}`}
+                    className={`group inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed pl-3 pr-1.5 text-xs font-medium leading-none backdrop-blur-sm transition-all active:scale-95 cursor-pointer shadow-2xs ${theme.suggestedPill}`}
                   >
                     <span>{preset}</span>
-                    <Plus
-                      size={12}
-                      strokeWidth={2.4}
-                      className={`transition-transform group-hover:rotate-90 shrink-0 ${theme.suggestedIcon}`}
-                    />
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                      <Plus
+                        size={12}
+                        strokeWidth={2.4}
+                        className={`transition-transform group-hover:rotate-90 shrink-0 ${theme.suggestedIcon}`}
+                      />
+                    </span>
                   </button>
                 )
               })
