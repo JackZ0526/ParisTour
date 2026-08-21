@@ -324,7 +324,7 @@ export function RecommendationPreferencesDialog({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  <AnimatePresence initial={false}>
+                  <AnimatePresence mode="popLayout" initial={false}>
                     {activeTags.map((tag) => {
                       const cleanTag = cleanTagText(tag)
                       const theme = getTagTheme(cleanTag)
@@ -335,12 +335,12 @@ export function RecommendationPreferencesDialog({
                           layout="position"
                           initial={{ opacity: 0, scale: 0.85 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
+                          exit={{ opacity: 0, scale: 0.75 }}
                           whileTap={{ scale: 0.93 }}
                           transition={{
-                            layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
-                            scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
-                            opacity: { duration: 0.16 },
+                            layout: { type: 'spring', stiffness: 360, damping: 28, mass: 0.75 },
+                            scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
+                            opacity: { duration: 0.18 },
                           }}
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
@@ -372,7 +372,7 @@ export function RecommendationPreferencesDialog({
 
             <div className="flex flex-wrap gap-2">
               {availablePresets.length > 0 ? (
-                <AnimatePresence initial={false}>
+                <AnimatePresence mode="popLayout" initial={false}>
                   {availablePresets.map((preset) => {
                     const cleanPreset = cleanTagText(preset)
                     const theme = getTagTheme(cleanPreset)
@@ -383,12 +383,12 @@ export function RecommendationPreferencesDialog({
                         layout="position"
                         initial={{ opacity: 0, scale: 0.85 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
+                        exit={{ opacity: 0, scale: 0.75 }}
                         whileTap={{ scale: 0.93 }}
                         transition={{
-                          layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
-                          scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
-                          opacity: { duration: 0.16 },
+                          layout: { type: 'spring', stiffness: 360, damping: 28, mass: 0.75 },
+                          scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
+                          opacity: { duration: 0.18 },
                         }}
                         onClick={() => addTag(cleanPreset)}
                         title={`点击加入：${cleanPreset}`}
