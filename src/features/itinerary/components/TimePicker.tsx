@@ -49,6 +49,8 @@ function TimeWheelColumn<T extends number>({
   const containerRef = useRef<HTMLDivElement>(null)
   const isScrollingRef = useRef(false)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wheelLockRef = useRef(false)
+  const wheelLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const n = items.length
 
   // Construct infinite repeated item list for circular rolling
@@ -80,6 +82,48 @@ function TimeWheelColumn<T extends number>({
       }
     }
   }, [value, items, n])
+
+  // Desktop Mouse Wheel: 1 wheel notch = exactly 1 discrete step (prevent large continuous multi-item jumps)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const onWheelNative = (e: WheelEvent) => {
+      // Prevent browser default large continuous scrolling on desktop mouse wheel
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (wheelLockRef.current) return
+      const delta = e.deltaY
+      if (Math.abs(delta) < 2) return
+
+      const direction = delta > 0 ? 1 : -1
+      const currentScroll = el.scrollTop
+      const currentRepIdx = Math.round(currentScroll / ITEM_HEIGHT)
+      const targetRepIdx = currentRepIdx + direction
+
+      el.scrollTo({
+        top: targetRepIdx * ITEM_HEIGHT,
+        behavior: 'smooth',
+      })
+
+      const normIdx = ((targetRepIdx % n) + n) % n
+      const selected = items[normIdx]
+      if (selected !== undefined) onChange(selected)
+
+      wheelLockRef.current = true
+      if (wheelLockTimerRef.current) clearTimeout(wheelLockTimerRef.current)
+      wheelLockTimerRef.current = setTimeout(() => {
+        wheelLockRef.current = false
+      }, 75)
+    }
+
+    el.addEventListener('wheel', onWheelNative, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheelNative)
+      if (wheelLockTimerRef.current) clearTimeout(wheelLockTimerRef.current)
+    }
+  }, [items, n, onChange])
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget
@@ -150,7 +194,7 @@ function TimeWheelColumn<T extends number>({
       role="listbox"
       aria-label={ariaLabel}
       style={{ height: `${WHEEL_HEIGHT}px` }}
-      className="relative w-full snap-y snap-mandatory overflow-y-auto scroll-smooth select-none touch-pan-y outline-none focus-visible:ring-1 focus-visible:ring-[var(--copper)]/30 rounded-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      className="relative w-full snap-y snap-mandatory overflow-y-auto scroll-smooth select-none touch-pan-y overscroll-contain outline-none focus-visible:ring-1 focus-visible:ring-[var(--copper)]/30 rounded-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Top spacer (1 item height) to vertically center the first item in the lens */}
       <div style={{ height: `${ITEM_HEIGHT}px` }} aria-hidden />
