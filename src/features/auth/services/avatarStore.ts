@@ -1,77 +1,11 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-export type AvatarType = 'initial' | 'emoji' | 'image' | 'monogram'
+export type AvatarType = 'initial' | 'image'
 
 export interface UserAvatar {
   type: AvatarType
   value: string
-  gradientIndex?: number
 }
-
-export interface AvatarGradient {
-  id: string
-  name: string
-  className: string
-  textClass: string
-}
-
-export const AVATAR_GRADIENTS: AvatarGradient[] = [
-  {
-    id: 'copper',
-    name: '法式琥珀铜',
-    className: 'bg-gradient-to-br from-[#f8f1eb] via-white to-[#f4e6dc] border-[#e8cebc]/80 text-[var(--copper)]',
-    textClass: 'text-[var(--copper)]',
-  },
-  {
-    id: 'sage',
-    name: '塞纳鼠尾草',
-    className: 'bg-gradient-to-br from-[#f2f7f4] via-white to-[#e5eee8] border-[#c7dcd0]/80 text-[var(--sage)]',
-    textClass: 'text-[var(--sage)]',
-  },
-  {
-    id: 'gold',
-    name: '凡尔赛香槟金',
-    className: 'bg-gradient-to-br from-[#faf6ee] via-white to-[#f4ecd8] border-[#ead9b7]/80 text-[#9c783e]',
-    textClass: 'text-[#9c783e]',
-  },
-  {
-    id: 'obsidian',
-    name: '巴黎黑曜石',
-    className: 'bg-gradient-to-br from-[#2c3530] via-[#1c2420] to-[#121715] border-white/20 text-white shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.25)]',
-    textClass: 'text-white',
-  },
-  {
-    id: 'rose',
-    name: '蒙马特玫瑰',
-    className: 'bg-gradient-to-br from-[#fdf2f4] via-white to-[#fce4e8] border-[#f5c6d0]/80 text-[#c24367]',
-    textClass: 'text-[#c24367]',
-  },
-  {
-    id: 'azure',
-    name: '皇家蔚蓝',
-    className: 'bg-gradient-to-br from-[#eff5ff] via-white to-[#dbe8fd] border-[#bed3fc]/80 text-[#2554eb]',
-    textClass: 'text-[#2554eb]',
-  },
-  {
-    id: 'lavender',
-    name: '普罗旺斯薰衣草',
-    className: 'bg-gradient-to-br from-[#f6f2fd] via-white to-[#ebe0fc] border-[#d8c5fa]/80 text-[#7c3aed]',
-    textClass: 'text-[#7c3aed]',
-  },
-  {
-    id: 'terracotta',
-    name: '左岸陶土',
-    className: 'bg-gradient-to-br from-[#fdf4ed] via-white to-[#fae2d0] border-[#f2c4a2]/80 text-[#b94f1f]',
-    textClass: 'text-[#b94f1f]',
-  },
-]
-
-export const PARIS_EMOJI_PRESETS: string[] = [
-  '🗼', '🥐', '☕', '🍷', '🎨', '🥖',
-  '👒', '🚲', '🏰', '🌸', '🌿', '✈️',
-  '🐱', '🐶', '🦊', '🦁', '👑', '💎',
-  '🌟', '🕊️', '🦔', '🍇', '🧀', '⛵',
-]
 
 const STORAGE_PREFIX = 'paris-tour-avatar'
 const listeners = new Set<() => void>()
@@ -113,16 +47,16 @@ export function getUserAvatar(email?: string): UserAvatar {
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as UserAvatar
-      if (parsed && typeof parsed.type === 'string' && typeof parsed.value === 'string') {
+      if (parsed && parsed.type === 'image' && typeof parsed.value === 'string' && parsed.value) {
         snapshot = parsed
       } else {
-        snapshot = { type: 'initial', value: defaultLetter, gradientIndex: 0 }
+        snapshot = { type: 'initial', value: defaultLetter }
       }
     } catch {
-      snapshot = { type: 'initial', value: defaultLetter, gradientIndex: 0 }
+      snapshot = { type: 'initial', value: defaultLetter }
     }
   } else {
-    snapshot = { type: 'initial', value: defaultLetter, gradientIndex: 0 }
+    snapshot = { type: 'initial', value: defaultLetter }
   }
 
   avatarMemoryCache.set(key, { raw, snapshot })
@@ -152,7 +86,6 @@ export function clearUserAvatar(email?: string): void {
   const defaultAvatar: UserAvatar = {
     type: 'initial',
     value: defaultLetter,
-    gradientIndex: 0,
   }
   avatarMemoryCache.set(key, { raw: null, snapshot: defaultAvatar })
   notifyChange()
@@ -194,7 +127,7 @@ export function useUserAvatar(email?: string): {
 export function processAvatarImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
-      reject(new Error('请选择有效的图片文件'))
+      reject(new Error('请选择有效的图片文件 (JPG / PNG / WebP)'))
       return
     }
 
