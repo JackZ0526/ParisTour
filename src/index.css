@@ -512,6 +512,49 @@ body,
   min-height: 100%;
 }
 
+@property --mobile-left-edge-mask-alpha {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+
+.mobile-scroll-edge-fade {
+  --mobile-left-edge-mask-alpha: 1;
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, var(--mobile-left-edge-mask-alpha)) 0,
+    #000 4px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, var(--mobile-left-edge-mask-alpha)) 0,
+    #000 4px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  transition: --mobile-left-edge-mask-alpha 160ms ease-out;
+}
+
+.mobile-scroll-edge-fade.has-left-overflow {
+  --mobile-left-edge-mask-alpha: 0;
+}
+
+@media (min-width: 640px) {
+  .mobile-scroll-edge-fade {
+    mask-image: none;
+    -webkit-mask-image: none;
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-scroll-edge-fade {
+    transition: none;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;

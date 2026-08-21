@@ -156,6 +156,8 @@ export default function App() {
   const { mobileItineraryPane, setMobileItineraryPane } = useMobilePane()
   const [hasInteractedPane, setHasInteractedPane] = useState(false)
   const [hasInteractedDay, setHasInteractedDay] = useState(false)
+  const [summaryHasLeftOverflow, setSummaryHasLeftOverflow] = useState(false)
+  const [dayRailHasLeftOverflow, setDayRailHasLeftOverflow] = useState(false)
   const initialItinerary = useMemo(() => {
     const state = loadItineraryState()
     ensureBaselineFromGenerated(state)
@@ -785,8 +787,13 @@ export default function App() {
               {itineraryReady && (
                 <div className="flex items-center justify-between gap-2.5 rounded-2xl border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/80 px-3 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors sm:px-4 sm:py-3">
                   <div
-                    className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent_0,black_4px,black_calc(100%-12px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0,black_4px,black_calc(100%-12px),transparent_100%)] sm:[mask-image:none] sm:[-webkit-mask-image:none]"
+                    className={`mobile-scroll-edge-fade flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                      summaryHasLeftOverflow ? 'has-left-overflow' : ''
+                    }`}
                     aria-label="行程摘要"
+                    onScroll={(event) => {
+                      setSummaryHasLeftOverflow(event.currentTarget.scrollLeft > 1)
+                    }}
                   >
                     <span
                       className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.destination} font-semibold text-[var(--copper)] dark:text-zinc-200`}
@@ -940,7 +947,14 @@ export default function App() {
                   {showItineraryContent && (
                     <>
                       <div className="flex flex-col gap-3 sm:gap-3.5">
-                        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 -mx-1.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent_0,black_4px,black_calc(100%-12px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0,black_4px,black_calc(100%-12px),transparent_100%)] sm:[mask-image:none] sm:[-webkit-mask-image:none]">
+                        <div
+                          className={`mobile-scroll-edge-fade flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 -mx-1.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                            dayRailHasLeftOverflow ? 'has-left-overflow' : ''
+                          }`}
+                          onScroll={(event) => {
+                            setDayRailHasLeftOverflow(event.currentTarget.scrollLeft > 1)
+                          }}
+                        >
                           {days.map((d, i) => {
                             const cal = dateForTripDay(itineraryStartDate, d.day)
                             return (
