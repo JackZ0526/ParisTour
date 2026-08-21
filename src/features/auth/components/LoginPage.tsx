@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useAuth } from '../authContext'
 
 function readAuthDeepLink(): { mode: 'signin' | 'signup'; email: string } {
@@ -87,35 +88,75 @@ export function LoginPage() {
           </p>
         )}
 
-        <div className="mt-6 inline-flex rounded-full border border-white/80 bg-white/50 p-1 shadow-sm backdrop-blur-md text-sm">
+        <div
+          className="relative mt-6 inline-flex rounded-full border border-white/80 bg-white/70 p-1 shadow-sm backdrop-blur-xl text-sm"
+          role="tablist"
+          aria-label="登录或注册"
+        >
           <button
             type="button"
-            className={`rounded-full px-5 py-1.5 font-medium transition ${
-              mode === 'signin'
-                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
-                : 'text-[var(--stone)] hover:text-[var(--ink)]'
-            }`}
+            role="tab"
+            aria-selected={mode === 'signin'}
+            className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none"
             onClick={() => {
               setMode('signin')
               setError(null)
             }}
           >
-            登录
+            {mode === 'signin' && (
+              <motion.span
+                layoutId="auth-mode-pill"
+                className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                transition={{
+                  type: 'spring',
+                  stiffness: 450,
+                  damping: 32,
+                  mass: 0.8,
+                }}
+              />
+            )}
+            <span
+              className={`relative z-10 transition-colors duration-200 ${
+                mode === 'signin'
+                  ? 'font-semibold text-[var(--paper)]'
+                  : 'text-[var(--stone)] hover:text-[var(--ink)]'
+              }`}
+            >
+              登录
+            </span>
           </button>
           <button
             type="button"
-            className={`rounded-full px-5 py-1.5 font-medium transition ${
-              mode === 'signup'
-                ? 'bg-[var(--ink)] text-[var(--paper)] shadow-sm'
-                : 'text-[var(--stone)] hover:text-[var(--ink)]'
-            }`}
+            role="tab"
+            aria-selected={mode === 'signup'}
+            className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none"
             onClick={() => {
               setMode('signup')
               setError(null)
               setInfo(null)
             }}
           >
-            注册
+            {mode === 'signup' && (
+              <motion.span
+                layoutId="auth-mode-pill"
+                className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                transition={{
+                  type: 'spring',
+                  stiffness: 450,
+                  damping: 32,
+                  mass: 0.8,
+                }}
+              />
+            )}
+            <span
+              className={`relative z-10 transition-colors duration-200 ${
+                mode === 'signup'
+                  ? 'font-semibold text-[var(--paper)]'
+                  : 'text-[var(--stone)] hover:text-[var(--ink)]'
+              }`}
+            >
+              注册
+            </span>
           </button>
         </div>
 
@@ -143,7 +184,7 @@ export function LoginPage() {
                 minLength={mode === 'signup' ? 6 : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-[var(--stone)]/25 bg-white/70 py-2 pl-3 pr-11 outline-none focus:border-[var(--sage)]"
+                className="w-full rounded-xl border border-white/80 bg-white/70 py-2.5 pl-3.5 pr-11 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] outline-none transition focus:border-[var(--sage)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(99,136,112,0.1)] backdrop-blur-md"
               />
               <button
                 type="button"
@@ -181,7 +222,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-full bg-[var(--ink)] px-4 py-2.5 text-sm text-[var(--paper)] transition hover:bg-[var(--sage)] disabled:opacity-60"
+            className="w-full rounded-2xl border border-[var(--ink)]/90 bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] transition-all hover:bg-[var(--ink)]/95 active:scale-[0.98] disabled:opacity-60"
           >
             {busy ? '请稍候…' : mode === 'signin' ? '进入行程' : '创建账号'}
           </button>
