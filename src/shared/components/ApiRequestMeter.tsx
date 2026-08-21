@@ -58,9 +58,9 @@ const CLOSE_DELAY_MS = 240
 const STORAGE_KEY = 'paristour_api_meter_pos_v1'
 const MIN_TOP = 64
 const RAIL_WIDTH = 34
-const RAIL_HEIGHT = 158
+const RAIL_HEIGHT = 164
 const PANEL_WIDTH = 380
-const PANEL_HEIGHT = 456
+const PANEL_HEIGHT = 480
 
 export interface ApiMeterPosition {
   side: 'left' | 'right'
