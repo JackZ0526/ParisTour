@@ -328,11 +328,16 @@ export function RecommendationPreferencesDialog({
                         <motion.button
                           key={cleanTag}
                           type="button"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          whileTap={{ scale: 0.95 }}
-                          transition={{ duration: 0.15 }}
+                          layout="position"
+                          initial={{ opacity: 0, scale: 0.85 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          whileTap={{ scale: 0.93 }}
+                          transition={{
+                            layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                            scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
+                            opacity: { duration: 0.16 },
+                          }}
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
                           aria-label={`移除 ${cleanTag}`}
@@ -359,22 +364,34 @@ export function RecommendationPreferencesDialog({
 
             <div className="flex flex-wrap gap-2">
               {availablePresets.length > 0 ? (
-                availablePresets.map((preset) => {
-                  const cleanPreset = cleanTagText(preset)
-                  const theme = getTagTheme(cleanPreset)
-                  return (
-                    <button
-                      key={cleanPreset}
-                      type="button"
-                      onClick={() => addTag(cleanPreset)}
-                      title={`点击加入：${cleanPreset}`}
-                      aria-label={`加入 ${cleanPreset}`}
-                      className={`${BASE_TAG_PILL} ${theme.suggestedPill}`}
-                    >
-                      <span className="relative z-10">{cleanPreset}</span>
-                    </button>
-                  )
-                })
+                <AnimatePresence initial={false}>
+                  {availablePresets.map((preset) => {
+                    const cleanPreset = cleanTagText(preset)
+                    const theme = getTagTheme(cleanPreset)
+                    return (
+                      <motion.button
+                        key={cleanPreset}
+                        type="button"
+                        layout="position"
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileTap={{ scale: 0.93 }}
+                        transition={{
+                          layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                          scale: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
+                          opacity: { duration: 0.16 },
+                        }}
+                        onClick={() => addTag(cleanPreset)}
+                        title={`点击加入：${cleanPreset}`}
+                        aria-label={`加入 ${cleanPreset}`}
+                        className={`${BASE_TAG_PILL} ${theme.suggestedPill}`}
+                      >
+                        <span className="relative z-10">{cleanPreset}</span>
+                      </motion.button>
+                    )
+                  })}
+                </AnimatePresence>
               ) : (
                 <p className="text-xs text-[var(--stone)]/70 italic py-1">
                   已添加所有预设推荐偏好 ✨
