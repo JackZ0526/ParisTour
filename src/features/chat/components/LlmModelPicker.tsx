@@ -956,7 +956,9 @@ export function ModelBrandIcon({
       alt=""
       aria-hidden
       draggable={false}
-      className={`${className} block aspect-square object-contain`}
+      className={`${className} block aspect-square object-contain ${
+        deepseek ? '' : 'dark:invert dark:brightness-125'
+      }`}
     />
   )
 }
