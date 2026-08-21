@@ -90,7 +90,7 @@ export function AvatarPickerDialog({
               上传本地照片作为您的专属头像，全局即时生效。
             </p>
           </div>
-          <CloseIconButton onClick={onClose} aria-label="关闭" />
+          <CloseIconButton onClick={onClose} className="hidden sm:flex" aria-label="关闭" />
         </div>
       </header>
 
