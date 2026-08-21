@@ -1439,7 +1439,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <footer className="rounded-3xl border border-white/80 bg-white/60 px-5 py-4 text-xs text-zinc-500 shadow-sm backdrop-blur-xl transition-colors">
+        <footer className="rounded-3xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#151c18]/60 px-5 py-4 text-xs text-zinc-500 dark:text-zinc-400 shadow-sm dark:shadow-none backdrop-blur-xl transition-colors">
           <p>
             航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
           </p>
