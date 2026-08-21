@@ -8,14 +8,18 @@ import {
   ChevronRight,
   Compass,
   Hotel,
+  Laptop,
   LogOut,
   MapPin,
   MessageSquare,
+  Moon,
+  Palette,
   Plane,
   Share2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Sun,
   Tag,
   Timer,
   Trash2,
@@ -24,6 +28,7 @@ import {
 import { UserAvatarView } from '../../../shared/components/UserAvatarView'
 import { useUserAvatar } from '../../auth/services/avatarStore'
 import { AvatarPickerDialog } from './AvatarPickerDialog'
+import { useTheme } from '../../../shared/services/themeStore'
 import {
   BASE_TAG_PILL,
   DEFAULT_RECOMMENDATION_PREFERENCES,
@@ -116,6 +121,7 @@ export function ProfileTab({
   const cloudSync = useLiveCloudSync()
   const { avatar } = useUserAvatar(email)
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
+  const { themePreference, setThemePreference } = useTheme()
 
   const roleLabel =
     role === 'owner'
@@ -521,7 +527,63 @@ export function ProfileTab({
       </div>
 
       {/* ========================================================================= */}
-      {/* Row 3: Danger Zone Card (Placed at Bottom)                                */}
+      {/* Row 3: Appearance Theme Selector (外观与色彩模式)                          */}
+      {/* ========================================================================= */}
+      <div className={`rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] space-y-3.5 transition-colors`}>
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
+          <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
+            <Palette size={16} className="text-[var(--copper)]" />
+            <span>外观主题 · 色彩模式</span>
+          </div>
+          <span className="text-xs text-[var(--stone)]">
+            {themePreference === 'system' ? '跟随系统' : themePreference === 'dark' ? '午夜深色' : '日间浅色'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 p-1 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+          <button
+            type="button"
+            onClick={() => setThemePreference('light')}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+              themePreference === 'light'
+                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-zinc-800 dark:text-zinc-100 ring-1 ring-black/5'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:hover:bg-white/10'
+            }`}
+          >
+            <Sun size={15} strokeWidth={2.2} className={themePreference === 'light' ? 'text-amber-600' : ''} />
+            <span>浅色日间</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setThemePreference('dark')}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+              themePreference === 'dark'
+                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-zinc-800 dark:text-zinc-100 ring-1 ring-black/5'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:hover:bg-white/10'
+            }`}
+          >
+            <Moon size={15} strokeWidth={2.2} className={themePreference === 'dark' ? 'text-indigo-400' : ''} />
+            <span>深色午夜</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setThemePreference('system')}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+              themePreference === 'system'
+                ? 'bg-white text-[var(--ink)] shadow-xs dark:bg-zinc-800 dark:text-zinc-100 ring-1 ring-black/5'
+                : 'text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white/50 dark:hover:bg-white/10'
+            }`}
+          >
+            <Laptop size={15} strokeWidth={2.2} className={themePreference === 'system' ? 'text-[var(--copper)]' : ''} />
+            <span>跟随系统</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* Row 4: Danger Zone Card (Placed at Bottom)                                */}
       {/* ========================================================================= */}
       {!readOnly && onClearAll && (
         <div className="rounded-3xl border border-red-200/80 bg-red-50/40 p-5 shadow-[0_8px_30px_rgba(239,68,68,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl space-y-3">

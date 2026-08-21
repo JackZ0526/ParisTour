@@ -7,6 +7,8 @@
 
 export const DEFAULT_THEME_COLOR = '#ecefe8'
 export const OVERLAY_THEME_COLOR = '#7f847f'
+export const DARK_DEFAULT_THEME_COLOR = '#121614'
+export const DARK_OVERLAY_THEME_COLOR = '#090d0b'
 
 let lockCount = 0
 let originalThemeColor: string | null = null
@@ -42,15 +44,20 @@ export function setThemeColor(color: string): void {
  * Acquires a theme color lock for an overlay (e.g. BottomSheet, TripChatPanel).
  * Returns a release callback to restore the original color when all overlays close.
  */
-export function acquireThemeColorLock(overlayColor = OVERLAY_THEME_COLOR): () => void {
+export function acquireThemeColorLock(overlayColor?: string): () => void {
   if (typeof document === 'undefined') {
     return () => {}
   }
 
+  const isDark =
+    Boolean(document.documentElement?.classList?.contains?.('dark'))
+  const effectiveOverlayColor =
+    overlayColor || (isDark ? DARK_OVERLAY_THEME_COLOR : OVERLAY_THEME_COLOR)
+
   if (lockCount === 0) {
     const current = getThemeMetaElement()?.getAttribute('content')
-    originalThemeColor = current || DEFAULT_THEME_COLOR
-    setThemeColor(overlayColor)
+    originalThemeColor = current || (isDark ? DARK_DEFAULT_THEME_COLOR : DEFAULT_THEME_COLOR)
+    setThemeColor(effectiveOverlayColor)
   }
   lockCount++
 
@@ -60,7 +67,10 @@ export function acquireThemeColorLock(overlayColor = OVERLAY_THEME_COLOR): () =>
     released = true
     lockCount = Math.max(0, lockCount - 1)
     if (lockCount === 0) {
-      setThemeColor(originalThemeColor || DEFAULT_THEME_COLOR)
+      const fallback = Boolean(document.documentElement?.classList?.contains?.('dark'))
+        ? DARK_DEFAULT_THEME_COLOR
+        : DEFAULT_THEME_COLOR
+      setThemeColor(originalThemeColor || fallback)
       originalThemeColor = null
     }
   }

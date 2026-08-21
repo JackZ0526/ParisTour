@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* === iOS Safari experience patches (L1) ===
    NOTE: The root <div> in App.tsx already uses `min-h-[100svh]` for
@@ -368,6 +369,21 @@ body.is-pwa.orientation-landscape::after {
   -webkit-font-smoothing: antialiased;
 }
 
+/* === Midnight Paris Dark Mode Design Tokens === */
+.dark {
+  --ink: #e6ede8;
+  --paper: #121614;
+  --mist: #232c27;
+  --stone: #9ba7a0;
+  --sage: #668b7a;
+  --copper: #d48354;
+  --gold: #deb881;
+  --river: #7b9e9c;
+  --card: rgba(24, 31, 28, 0.85);
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -388,8 +404,19 @@ body {
   background-attachment: scroll;
 }
 
+.dark body {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(212, 131, 84, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(123, 158, 156, 0.12), transparent 50%),
+    linear-gradient(165deg, #101412 0%, #141a17 45%, #18201c 100%);
+  background-attachment: scroll;
+}
+
 @media (min-width: 640px) {
   body {
+    background-attachment: fixed;
+  }
+  .dark body {
     background-attachment: fixed;
   }
 }

@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { AuthGate } from './features/auth/components/AuthGate'
+import { initTheme } from './shared/services/themeStore'
+
+initTheme()
 
 // vite-plugin-pwa: register the service worker. With `autoUpdate` in
 // vite.config.ts, the new SW activates in the background; we just log
