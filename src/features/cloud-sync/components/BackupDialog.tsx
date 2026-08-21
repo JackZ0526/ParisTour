@@ -187,7 +187,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="space-y-2.5"
+                className="space-y-2"
               >
                 {backups.map((backup, index) => {
                   const isLatest = index === 0
@@ -196,26 +196,26 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                   return (
                     <article
                       key={backup.id}
-                      className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 bg-white/65 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/95 hover:shadow-xs ${
+                      className={`flex items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/65 p-3 sm:p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/95 hover:shadow-xs ${
                         isLatest ? 'border-[var(--copper)]/30 bg-white/80' : ''
                       }`}
                     >
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <div
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-sm font-semibold shadow-inner ${
+                          className={`flex h-8.5 w-8.5 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl font-display text-sm font-semibold shadow-inner ${
                             isLatest
                               ? 'bg-[var(--copper)]/15 text-[var(--copper)]'
                               : 'bg-[var(--sage)]/15 text-[var(--sage)]'
                           }`}
                         >
                           {isLatest ? (
-                            <Sparkles size={16} strokeWidth={2.2} />
+                            <Sparkles size={15} strokeWidth={2.2} />
                           ) : (
-                            <History size={16} strokeWidth={2} />
+                            <History size={15} strokeWidth={2} />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-xs sm:text-sm font-semibold text-[var(--ink)]">
                               {isLatest ? '最新快照' : `快照 #${backups.length - index}`}
                             </span>
@@ -224,17 +224,17 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                                 当前
                               </span>
                             )}
-                            <span className="text-[11px] text-[var(--stone)]">
+                            <span className="text-[11px] text-[var(--stone)] truncate">
                               · {formatBackupTime(backup.createdAt)}
                             </span>
                           </div>
-                          <p className="mt-0.5 truncate text-[11px] sm:text-xs text-[var(--stone)]">
+                          <p className="mt-0.5 truncate text-[11px] sm:text-xs text-[var(--stone)]/85">
                             {backupSummary(backup)}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-end shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5">
+                      <div className="shrink-0">
                         <button
                           type="button"
                           disabled={Boolean(restoringId)}
@@ -242,18 +242,18 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                           aria-label="恢复此版本"
                           aria-busy={isRestoringThis || undefined}
                           title={isRestoringThis ? '正在恢复…' : '恢复此版本'}
-                          className="group relative isolate inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/30 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-[var(--copper)] shadow-2xs backdrop-blur-sm transition-all hover:bg-[var(--copper)] hover:text-white active:scale-95 disabled:opacity-50 cursor-pointer"
+                          className="group relative isolate inline-flex items-center gap-1 rounded-full border border-[var(--copper)]/35 bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--copper)] shadow-2xs backdrop-blur-sm transition-all hover:bg-[var(--copper)] hover:text-white active:scale-95 disabled:opacity-50 cursor-pointer"
                         >
                           {isRestoringThis ? (
                             <LoaderCircle
                               className="animate-spin"
-                              size={13}
+                              size={12}
                               strokeWidth={2.2}
                               aria-hidden
                             />
                           ) : (
                             <RotateCcw
-                              size={13}
+                              size={12}
                               strokeWidth={2.2}
                               className="transition-transform group-hover:-rotate-45"
                               aria-hidden
