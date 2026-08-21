@@ -310,10 +310,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         Seamlessly holds the persistent top anchor bar, expanding the hour/minute wheel selector below.
       */}
       <div
-        className={`relative overflow-hidden rounded-2xl border transition-colors duration-200 ${
+        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent ${
           open
             ? 'border-white/90 bg-white/95 shadow-[0_12px_32px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl'
-            : 'border-[var(--mist)]/80 bg-white/80 shadow-2xs hover:border-[var(--copper)]/60'
+            : 'border-white/85 bg-[#fbf7f4]/85 shadow-[0_2px_8px_rgba(181,106,60,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.5)] backdrop-blur-md hover:bg-[#f8f1ec]/95 hover:border-[#d7a98a]/50'
         }`}
       >
         {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
