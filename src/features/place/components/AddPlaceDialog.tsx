@@ -952,7 +952,7 @@ export function AddPlaceDialog({
 
           <div className="px-4 pt-3">
             <div
-              className="relative flex gap-1 rounded-full border border-white/80 bg-white/50 p-1 shadow-sm backdrop-blur-md"
+              className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/50 dark:bg-black/35 p-1 shadow-sm dark:shadow-none backdrop-blur-md"
               role="tablist"
               aria-label="添加地点视图"
             >
@@ -971,7 +971,7 @@ export function AddPlaceDialog({
                   (tabsInteractive ? (
                     <motion.span
                       layoutId="add-place-main-tab-pill"
-                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
                       animate={
                         hasSwitchedMainTab
                           ? {
@@ -987,11 +987,11 @@ export function AddPlaceDialog({
                       }}
                     />
                   ) : (
-                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm" />
+                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
                   ))}
                 <span
                   className={`relative z-10 transition-colors duration-200 ${
-                    mainTab === 'ai' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'
+                    mainTab === 'ai' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                   }`}
                 >
                   AI 推荐
@@ -1012,7 +1012,7 @@ export function AddPlaceDialog({
                   (tabsInteractive ? (
                     <motion.span
                       layoutId="add-place-main-tab-pill"
-                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
                       animate={
                         hasSwitchedMainTab
                           ? {
@@ -1028,11 +1028,11 @@ export function AddPlaceDialog({
                       }}
                     />
                   ) : (
-                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-sm" />
+                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
                   ))}
                 <span
                   className={`relative z-10 transition-colors duration-200 ${
-                    mainTab === 'google' ? 'text-[var(--paper)]' : 'text-[var(--ink)]'
+                    mainTab === 'google' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                   }`}
                 >
                   Google 搜索
@@ -1071,7 +1071,7 @@ export function AddPlaceDialog({
                         setExpandedKey(null)
                         void ensureRecommendationCategory(tab.id)
                       }}
-                      className="relative isolate shrink-0 rounded-full bg-white/70 px-3 py-1.5 text-sm transition-colors hover:bg-white/90"
+                      className="relative isolate shrink-0 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/5 px-3 py-1.5 text-sm transition-colors hover:bg-white/90 dark:hover:bg-white/15"
                     >
                       {active &&
                         (tabsInteractive ? (
@@ -1097,7 +1097,7 @@ export function AddPlaceDialog({
                         ))}
                       <span
                         className={`relative z-10 font-medium transition-colors duration-200 ${
-                          active ? 'text-white' : 'text-[var(--ink)]'
+                          active ? 'text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                         }`}
                       >
                         {tab.label}
@@ -1272,7 +1272,7 @@ export function AddPlaceDialog({
                                             )
                                           }
                                           aria-busy={busyEnd || undefined}
-                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] dark:bg-[var(--copper)] px-3 py-2.5 text-sm text-[var(--paper)] dark:text-white disabled:opacity-50"
                                         >
                                           {busyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
                                           {busyEnd ? '加入中…' : '加到最后'}
@@ -1305,7 +1305,7 @@ export function AddPlaceDialog({
                   disabled={loadingRecs || searching}
                   onClick={() => void refreshRecommendations()}
                   aria-busy={refreshingRecs || undefined}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 bg-[var(--sage)]/5 px-3 py-2.5 text-sm font-medium text-[var(--sage)] hover:bg-[var(--sage)]/10 disabled:opacity-50"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 dark:border-[var(--sage)]/40 bg-[var(--sage)]/5 dark:bg-[var(--sage)]/10 px-3 py-2.5 text-sm font-medium text-[var(--sage)] dark:text-emerald-300 hover:bg-[var(--sage)]/10 dark:hover:bg-[var(--sage)]/20 disabled:opacity-50"
                 >
                   {refreshingRecs && (
                     <ButtonSpinner mode="thinking" task="placeRecommend" />
@@ -1328,7 +1328,7 @@ export function AddPlaceDialog({
                 value={googleQuery}
                 onChange={(e) => setGoogleQuery(e.target.value)}
                 placeholder="例如：Musée Rodin Paris"
-                className="w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 outline-none focus:border-[var(--sage)]"
+                className="w-full rounded-xl border border-[var(--mist)] dark:border-white/10 bg-white/80 dark:bg-black/35 px-3 py-2 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--stone)]/55 focus:border-[var(--sage)]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -1341,7 +1341,7 @@ export function AddPlaceDialog({
                 <select
                   value={googleType}
                   onChange={(e) => setGoogleType(e.target.value as PlaceType)}
-                  className="mt-1 w-full rounded-xl border border-[var(--mist)] bg-white/80 px-3 py-2 text-base"
+                  className="mt-1 w-full rounded-xl border border-[var(--mist)] dark:border-white/10 bg-white/80 dark:bg-black/35 px-3 py-2 text-base text-[var(--ink)]"
                 >
                   <option value="attraction">景点</option>
                   <option value="cafe">咖啡馆</option>
