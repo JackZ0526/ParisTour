@@ -310,10 +310,10 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
         Seamlessly holds the persistent top anchor bar, expanding the hour/minute wheel selector below.
       */}
       <div
-        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/95 before:to-transparent ${
+        className={`relative overflow-hidden rounded-2xl border transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent ${
           open
-            ? 'border-white/90 bg-white/95 shadow-[0_12px_32px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl'
-            : 'border-white/85 bg-[#fbf7f4]/85 shadow-[0_2px_8px_rgba(181,106,60,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.5)] backdrop-blur-md hover:bg-[#f8f1ec]/95 hover:border-[#d7a98a]/50'
+            ? 'border-white/90 bg-white/95 shadow-[0_12px_32px_rgba(181,106,60,0.12),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1px_1.5px_rgba(255,255,255,0.6)] backdrop-blur-xl'
+            : 'border-[#d7a98a]/70 bg-[#f6ebe2]/85 shadow-[0_4px_14px_rgba(181,106,60,0.14),0_1px_3px_rgba(0,0,0,0.03),inset_0_1.5px_2px_rgba(255,255,255,1),inset_0_-1.5px_2px_rgba(255,255,255,0.7),inset_0_-1px_2px_rgba(181,106,60,0.12)] backdrop-blur-xl backdrop-saturate-[180%] hover:bg-[#f3e3d6]/95 hover:border-[#c59272]'
         }`}
       >
         {/* Persistent Top Bar Anchor (NEVER UNMOUNTS, 100% SPATIAL CONTINUITY) */}
