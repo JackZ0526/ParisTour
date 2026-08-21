@@ -428,30 +428,29 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="absolute inset-x-0 bottom-0 p-3.5"
             >
-              <div className="p-3.5">
-                {canThink ? (
-                  <ThinkingControls mode={thinkingMode} disabled={disabled} />
-                ) : (
-                  <div>
-                    <SectionHeader>思考</SectionHeader>
-                    <div className="rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 shadow-2xs backdrop-blur-md">
-                      <p className="text-xs leading-snug text-[var(--stone)]">
-                        当前模型不支持思考强度设置
-                      </p>
-                    </div>
+              {canThink ? (
+                <ThinkingControls mode={thinkingMode} disabled={disabled} />
+              ) : (
+                <div>
+                  <SectionHeader>思考</SectionHeader>
+                  <div className="rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 shadow-2xs backdrop-blur-md">
+                    <p className="text-xs leading-snug text-[var(--stone)]">
+                      当前模型不支持思考强度设置
+                    </p>
                   </div>
-                )}
-
-                <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
-                  <SectionHeader>模型</SectionHeader>
-                  <SettingsRow
-                    label={getOpenAIModelShortLabel(model)}
-                    icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
-                    disabled={disabled}
-                    onClick={() => setPanel('model')}
-                  />
                 </div>
+              )}
+
+              <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
+                <SectionHeader>模型</SectionHeader>
+                <SettingsRow
+                  label={getOpenAIModelShortLabel(model)}
+                  icon={<ModelBrandIcon deepseek={deepseek} className="h-3.5 w-3.5" />}
+                  disabled={disabled}
+                  onClick={() => setPanel('model')}
+                />
               </div>
             </motion.div>
           ) : (
