@@ -33,6 +33,7 @@ export function LoginPage() {
   const deepLink = useMemo(() => readAuthDeepLink(), [])
   const { signIn, signUp, status, error: authError } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>(deepLink.mode)
+  const [hasSwitched, setHasSwitched] = useState(false)
   const [email, setEmail] = useState(deepLink.email)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -65,6 +66,7 @@ export function LoginPage() {
           setInfo('注册成功，可直接登录。')
         }
         setMode('signin')
+        setHasSwitched(true)
         clearAuthDeepLink()
       }
     } catch (err) {
@@ -123,6 +125,7 @@ export function LoginPage() {
             aria-selected={mode === 'signin'}
             className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none"
             onClick={() => {
+              setHasSwitched(true)
               setMode('signin')
               setError(null)
             }}
@@ -131,11 +134,18 @@ export function LoginPage() {
               <motion.span
                 layoutId="auth-mode-pill"
                 className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                animate={
+                  hasSwitched
+                    ? {
+                        scaleX: [1, 1.18, 0.94, 1],
+                        scaleY: [1, 0.86, 1.04, 1],
+                      }
+                    : undefined
+                }
                 transition={{
-                  type: 'spring',
-                  stiffness: 450,
-                  damping: 32,
-                  mass: 0.8,
+                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                 }}
               />
             )}
@@ -155,6 +165,7 @@ export function LoginPage() {
             aria-selected={mode === 'signup'}
             className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none"
             onClick={() => {
+              setHasSwitched(true)
               setMode('signup')
               setError(null)
               setInfo(null)
@@ -164,11 +175,18 @@ export function LoginPage() {
               <motion.span
                 layoutId="auth-mode-pill"
                 className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                animate={
+                  hasSwitched
+                    ? {
+                        scaleX: [1, 1.18, 0.94, 1],
+                        scaleY: [1, 0.86, 1.04, 1],
+                      }
+                    : undefined
+                }
                 transition={{
-                  type: 'spring',
-                  stiffness: 450,
-                  damping: 32,
-                  mass: 0.8,
+                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                 }}
               />
             )}

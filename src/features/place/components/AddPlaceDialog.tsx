@@ -152,11 +152,15 @@ export function AddPlaceDialog({
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
   const [tabsInteractive, setTabsInteractive] = useState(false)
+  const [hasSwitchedMainTab, setHasSwitchedMainTab] = useState(false)
+  const [hasSwitchedCategory, setHasSwitchedCategory] = useState(false)
 
   // Reset height and tab animation gate when the sheet closes so reopen doesn't tween from stale size or fly in.
   useLayoutEffect(() => {
     if (!open) {
       setTabsInteractive(false)
+      setHasSwitchedMainTab(false)
+      setHasSwitchedCategory(false)
       setHeightReady(false)
       setBodyHeight(undefined)
     } else {
@@ -957,6 +961,7 @@ export function AddPlaceDialog({
                 role="tab"
                 aria-selected={mainTab === 'ai'}
                 onClick={() => {
+                  setHasSwitchedMainTab(true)
                   setMainTab('ai')
                   closeGoogleDetail()
                 }}
@@ -967,11 +972,18 @@ export function AddPlaceDialog({
                     <motion.span
                       layoutId="add-place-main-tab-pill"
                       className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                      animate={
+                        hasSwitchedMainTab
+                          ? {
+                              scaleX: [1, 1.16, 0.95, 1],
+                              scaleY: [1, 0.88, 1.03, 1],
+                            }
+                          : undefined
+                      }
                       transition={{
-                        type: 'spring',
-                        stiffness: 450,
-                        damping: 32,
-                        mass: 0.8,
+                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                        scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                        scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                       }}
                     />
                   ) : (
@@ -990,6 +1002,7 @@ export function AddPlaceDialog({
                 role="tab"
                 aria-selected={mainTab === 'google'}
                 onClick={() => {
+                  setHasSwitchedMainTab(true)
                   setMainTab('google')
                   closeGoogleDetail()
                 }}
@@ -1000,11 +1013,18 @@ export function AddPlaceDialog({
                     <motion.span
                       layoutId="add-place-main-tab-pill"
                       className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)]"
+                      animate={
+                        hasSwitchedMainTab
+                          ? {
+                              scaleX: [1, 1.16, 0.95, 1],
+                              scaleY: [1, 0.88, 1.03, 1],
+                            }
+                          : undefined
+                      }
                       transition={{
-                        type: 'spring',
-                        stiffness: 450,
-                        damping: 32,
-                        mass: 0.8,
+                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                        scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                        scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                       }}
                     />
                   ) : (
@@ -1046,6 +1066,7 @@ export function AddPlaceDialog({
                       key={tab.id}
                       type="button"
                       onClick={() => {
+                        setHasSwitchedCategory(true)
                         setCategory(tab.id)
                         setExpandedKey(null)
                         void ensureRecommendationCategory(tab.id)
@@ -1057,11 +1078,18 @@ export function AddPlaceDialog({
                           <motion.span
                             layoutId="add-place-category-pill"
                             className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-[0_2px_8px_rgba(99,136,112,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.25)]"
+                            animate={
+                              hasSwitchedCategory
+                                ? {
+                                    scaleX: [1, 1.14, 0.96, 1],
+                                    scaleY: [1, 0.88, 1.03, 1],
+                                  }
+                                : undefined
+                            }
                             transition={{
-                              type: 'spring',
-                              stiffness: 450,
-                              damping: 32,
-                              mass: 0.8,
+                              layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                              scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                              scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                             }}
                           />
                         ) : (

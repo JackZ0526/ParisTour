@@ -146,6 +146,8 @@ export default function App() {
     setRecommendationPreferences,
   } = useTripDialogs()
   const { mobileItineraryPane, setMobileItineraryPane } = useMobilePane()
+  const [hasInteractedPane, setHasInteractedPane] = useState(false)
+  const [hasInteractedDay, setHasInteractedDay] = useState(false)
   const initialItinerary = useMemo(() => {
     const state = loadItineraryState()
     ensureBaselineFromGenerated(state)
@@ -945,7 +947,11 @@ export default function App() {
                                 title={d.title}
                                 pending={isDayGenerationPending(d.day)}
                                 active={i === dayIndex}
-                                onSelect={() => handleSelectDay(i)}
+                                hasInteracted={hasInteractedDay}
+                                onSelect={() => {
+                                  setHasInteractedDay(true)
+                                  handleSelectDay(i)
+                                }}
                               />
                             )
                           })}
@@ -960,18 +966,28 @@ export default function App() {
                             type="button"
                             role="tab"
                             aria-selected={mobileItineraryPane === 'timeline'}
-                            onClick={() => setMobileItineraryPane('timeline')}
+                            onClick={() => {
+                              setHasInteractedPane(true)
+                              setMobileItineraryPane('timeline')
+                            }}
                             className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none"
                           >
                             {mobileItineraryPane === 'timeline' && (
                               <motion.span
                                 layoutId="itinerary-pane-pill"
                                 className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                                animate={
+                                  hasInteractedPane
+                                    ? {
+                                        scaleX: [1, 1.16, 0.95, 1],
+                                        scaleY: [1, 0.88, 1.03, 1],
+                                      }
+                                    : undefined
+                                }
                                 transition={{
-                                  type: 'spring',
-                                  stiffness: 450,
-                                  damping: 32,
-                                  mass: 0.8,
+                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                                 }}
                               />
                             )}
@@ -983,18 +999,28 @@ export default function App() {
                             type="button"
                             role="tab"
                             aria-selected={mobileItineraryPane === 'map'}
-                            onClick={() => setMobileItineraryPane('map')}
+                            onClick={() => {
+                              setHasInteractedPane(true)
+                              setMobileItineraryPane('map')
+                            }}
                             className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none"
                           >
                             {mobileItineraryPane === 'map' && (
                               <motion.span
                                 layoutId="itinerary-pane-pill"
                                 className="absolute inset-0 z-0 rounded-full border border-black/[0.04] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                                animate={
+                                  hasInteractedPane
+                                    ? {
+                                        scaleX: [1, 1.16, 0.95, 1],
+                                        scaleY: [1, 0.88, 1.03, 1],
+                                      }
+                                    : undefined
+                                }
                                 transition={{
-                                  type: 'spring',
-                                  stiffness: 450,
-                                  damping: 32,
-                                  mass: 0.8,
+                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                                 }}
                               />
                             )}

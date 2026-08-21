@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CalendarDays, Luggage, User } from 'lucide-react'
 import type { AppTab } from '../types'
@@ -25,6 +26,7 @@ export function TopNavSegment({
   itineraryReady,
   className = '',
 }: TopNavSegmentProps) {
+  const [hasInteracted, setHasInteracted] = useState(false)
   return (
     <div
       role="tablist"
@@ -63,18 +65,28 @@ export function TopNavSegment({
             type="button"
             role="tab"
             aria-selected={isActive}
-            onClick={() => onSelectTab(id)}
+            onClick={() => {
+              setHasInteracted(true)
+              onSelectTab(id)
+            }}
             className="relative isolate flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-medium transition-colors outline-none"
           >
             {isActive && (
               <motion.span
                 layoutId="light-top-nav-active-pill"
                 className="absolute inset-0 overflow-hidden rounded-full bg-white/70 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] backdrop-blur-md"
+                animate={
+                  hasInteracted
+                    ? {
+                        scaleX: [1, 1.15, 0.95, 1],
+                        scaleY: [1, 0.88, 1.04, 1],
+                      }
+                    : undefined
+                }
                 transition={{
-                  type: 'spring',
-                  stiffness: 450,
-                  damping: 32,
-                  mass: 0.8,
+                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
                 }}
               >
                 {/* Dynamic Pill Gradient Border (活动滑块流光描边) */}
