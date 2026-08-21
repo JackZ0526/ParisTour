@@ -3,14 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Clock,
   LoaderCircle,
-  Plus,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
   Tag,
   Trash2,
   Wand2,
-  X,
 } from 'lucide-react'
 import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
@@ -35,81 +33,59 @@ interface Props {
 
 interface TagTheme {
   activePill: string
-  activeClose: string
   suggestedPill: string
-  suggestedIcon: string
 }
 
 const COLOR_PALETTES: readonly TagTheme[] = [
   {
     // 0. Amber / Morning Cafe
-    activePill: 'bg-amber-500/14 border-amber-300/80 text-amber-950',
-    activeClose: 'hover:bg-amber-200/90 text-amber-800',
+    activePill: 'bg-amber-500/15 border-amber-300/80 hover:bg-amber-500/22 text-amber-950',
     suggestedPill: 'bg-amber-500/8 border-amber-300/50 hover:bg-amber-500/18 hover:border-amber-400 text-amber-950',
-    suggestedIcon: 'text-amber-600',
   },
   {
     // 1. Terracotta / Dining & Meat
-    activePill: 'bg-orange-500/14 border-orange-300/80 text-orange-950',
-    activeClose: 'hover:bg-orange-200/90 text-orange-800',
+    activePill: 'bg-orange-500/15 border-orange-300/80 hover:bg-orange-500/22 text-orange-950',
     suggestedPill: 'bg-orange-500/8 border-orange-300/50 hover:bg-orange-500/18 hover:border-orange-400 text-orange-950',
-    suggestedIcon: 'text-orange-600',
   },
   {
     // 2. Sage Botanical Green / Walking & Nature
-    activePill: 'bg-emerald-600/14 border-emerald-300/80 text-emerald-950',
-    activeClose: 'hover:bg-emerald-200/90 text-emerald-800',
+    activePill: 'bg-emerald-600/15 border-emerald-300/80 hover:bg-emerald-600/22 text-emerald-950',
     suggestedPill: 'bg-emerald-600/8 border-emerald-300/50 hover:bg-emerald-600/18 hover:border-emerald-400 text-emerald-950',
-    suggestedIcon: 'text-emerald-600',
   },
   {
     // 3. Artsy Indigo / Gallery & Museum
-    activePill: 'bg-indigo-500/14 border-indigo-300/80 text-indigo-950',
-    activeClose: 'hover:bg-indigo-200/90 text-indigo-800',
+    activePill: 'bg-indigo-500/15 border-indigo-300/80 hover:bg-indigo-500/22 text-indigo-950',
     suggestedPill: 'bg-indigo-500/8 border-indigo-300/50 hover:bg-indigo-500/18 hover:border-indigo-400 text-indigo-950',
-    suggestedIcon: 'text-indigo-600',
   },
   {
     // 4. Rose / French Bakery & Sweets
-    activePill: 'bg-rose-500/14 border-rose-300/80 text-rose-950',
-    activeClose: 'hover:bg-rose-200/90 text-rose-800',
+    activePill: 'bg-rose-500/15 border-rose-300/80 hover:bg-rose-500/22 text-rose-950',
     suggestedPill: 'bg-rose-500/8 border-rose-300/50 hover:bg-rose-500/18 hover:border-rose-400 text-rose-950',
-    suggestedIcon: 'text-rose-600',
   },
   {
     // 5. Seine River Teal / Landmarks
-    activePill: 'bg-teal-600/14 border-teal-300/80 text-teal-950',
-    activeClose: 'hover:bg-teal-200/90 text-teal-800',
+    activePill: 'bg-teal-600/15 border-teal-300/80 hover:bg-teal-600/22 text-teal-950',
     suggestedPill: 'bg-teal-600/8 border-teal-300/50 hover:bg-teal-600/18 hover:border-teal-400 text-teal-950',
-    suggestedIcon: 'text-teal-600',
   },
   {
     // 6. Sky Blue / Photo & Tower Night
-    activePill: 'bg-sky-500/14 border-sky-300/80 text-sky-950',
-    activeClose: 'hover:bg-sky-200/90 text-sky-800',
+    activePill: 'bg-sky-500/15 border-sky-300/80 hover:bg-sky-500/22 text-sky-950',
     suggestedPill: 'bg-sky-500/8 border-sky-300/50 hover:bg-sky-500/18 hover:border-sky-400 text-sky-950',
-    suggestedIcon: 'text-sky-600',
   },
   {
     // 7. Fairy Purple / Disney & Kids
-    activePill: 'bg-purple-500/14 border-purple-300/80 text-purple-950',
-    activeClose: 'hover:bg-purple-200/90 text-purple-800',
+    activePill: 'bg-purple-500/15 border-purple-300/80 hover:bg-purple-500/22 text-purple-950',
     suggestedPill: 'bg-purple-500/8 border-purple-300/50 hover:bg-purple-500/18 hover:border-purple-400 text-purple-950',
-    suggestedIcon: 'text-purple-600',
   },
   {
     // 8. Vintage Gold Ochre / Marais & Vintage Market
-    activePill: 'bg-amber-600/14 border-amber-300/80 text-amber-950',
-    activeClose: 'hover:bg-amber-200/90 text-amber-800',
+    activePill: 'bg-amber-600/15 border-amber-300/80 hover:bg-amber-600/22 text-amber-950',
     suggestedPill: 'bg-amber-600/8 border-amber-300/50 hover:bg-amber-600/18 hover:border-amber-400 text-amber-950',
-    suggestedIcon: 'text-amber-700',
   },
   {
     // 9. Wine Burgundy / Seine Sunset Cruise
-    activePill: 'bg-red-500/14 border-red-300/80 text-red-950',
-    activeClose: 'hover:bg-red-200/90 text-red-800',
+    activePill: 'bg-red-500/15 border-red-300/80 hover:bg-red-500/22 text-red-950',
     suggestedPill: 'bg-red-500/8 border-red-300/50 hover:bg-red-500/18 hover:border-red-400 text-red-950',
-    suggestedIcon: 'text-red-600',
   },
 ]
 
@@ -188,9 +164,10 @@ export function RecommendationPreferencesDialog({
   }
 
   function removeTag(tagToRemove: string) {
+    const cleanedToRemove = cleanTagText(tagToRemove)
     setDraft((prev) => ({
       ...prev,
-      tags: prev.tags.filter((t) => t !== tagToRemove),
+      tags: prev.tags.filter((t) => cleanTagText(t) !== cleanedToRemove),
     }))
   }
 
@@ -235,7 +212,7 @@ export function RecommendationPreferencesDialog({
   }
 
   const availablePresets = PRESET_PREFERENCE_TAGS.filter(
-    (preset) => !activeTags.includes(preset),
+    (preset) => !activeTags.includes(cleanTagText(preset)),
   )
 
   return (
@@ -309,34 +286,32 @@ export function RecommendationPreferencesDialog({
                   偏好池暂为空白
                 </p>
                 <p className="mt-1 text-[11px] text-[var(--stone)]/75">
-                  点击下方候选标签，或用自然语言输入要求让 AI 智能提取汇入
+                  点击下方候选标签加入，或输入补充要求让 AI 智能提炼汇入
                 </p>
               </div>
             ) : (
               <motion.div layout className="flex flex-wrap gap-2">
                 <AnimatePresence>
                   {activeTags.map((tag) => {
-                    const theme = getTagTheme(tag)
+                    const cleanTag = cleanTagText(tag)
+                    const theme = getTagTheme(cleanTag)
                     return (
-                      <motion.div
-                        key={tag}
+                      <motion.button
+                        key={cleanTag}
+                        type="button"
                         layout
                         initial={{ scale: 0.82, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.82, opacity: 0 }}
+                        whileTap={{ scale: 0.93 }}
                         transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.7 }}
-                        className={`group relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border pl-3 pr-1.5 text-xs font-medium leading-none shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md transition-all ${theme.activePill}`}
+                        onClick={() => removeTag(cleanTag)}
+                        title={`点击移出：${cleanTag}`}
+                        aria-label={`移除 ${cleanTag}`}
+                        className={`group relative isolate inline-flex h-8 items-center px-3.5 text-xs font-medium leading-none rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,0.9)] backdrop-blur-md transition-all cursor-pointer ${theme.activePill}`}
                       >
-                        <span className="truncate max-w-[240px] sm:max-w-none">{tag}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          aria-label={`移除 ${tag}`}
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer active:scale-90 ${theme.activeClose}`}
-                        >
-                          <X size={12} strokeWidth={2.4} />
-                        </button>
-                      </motion.div>
+                        <span className="truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
+                      </motion.button>
                     )
                   })}
                 </AnimatePresence>
@@ -357,22 +332,18 @@ export function RecommendationPreferencesDialog({
           <div className="flex flex-wrap gap-2">
             {availablePresets.length > 0 ? (
               availablePresets.map((preset) => {
-                const theme = getTagTheme(preset)
+                const cleanPreset = cleanTagText(preset)
+                const theme = getTagTheme(cleanPreset)
                 return (
                   <button
-                    key={preset}
+                    key={cleanPreset}
                     type="button"
-                    onClick={() => addTag(preset)}
-                    className={`group inline-flex h-8 items-center gap-1.5 rounded-full border border-dashed pl-3 pr-1.5 text-xs font-medium leading-none backdrop-blur-sm transition-all active:scale-95 cursor-pointer shadow-2xs ${theme.suggestedPill}`}
+                    onClick={() => addTag(cleanPreset)}
+                    title={`点击加入：${cleanPreset}`}
+                    aria-label={`加入 ${cleanPreset}`}
+                    className={`group inline-flex h-8 items-center px-3.5 text-xs font-medium leading-none rounded-full border border-dashed backdrop-blur-sm transition-all active:scale-93 cursor-pointer shadow-2xs ${theme.suggestedPill}`}
                   >
-                    <span>{preset}</span>
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
-                      <Plus
-                        size={12}
-                        strokeWidth={2.4}
-                        className={`transition-transform group-hover:rotate-90 shrink-0 ${theme.suggestedIcon}`}
-                      />
-                    </span>
+                    <span>{cleanPreset}</span>
                   </button>
                 )
               })
