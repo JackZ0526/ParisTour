@@ -8,6 +8,7 @@ export const glassCapsuleToneClass = {
   blue: 'border-[#aabcca]/70 bg-[#e8eff3]/75',
   gold: 'border-[#d4bd91]/75 bg-[#f3ead8]/80',
   violet: 'border-[#b6accd]/70 bg-[#ede9f5]/75',
+  rose: 'border-[#f2bebe]/75 bg-[#fdf2f2]/80',
   neutral: 'border-white/80 bg-white/55',
 } as const
 

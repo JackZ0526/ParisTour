@@ -202,13 +202,13 @@ export function ProfileTab({
               </div>
             </div>
 
-            {/* Logout Button */}
+            {/* Logout Button: High-End 3D Frosted Glass French Rosé Capsule */}
             <button
               type="button"
               onClick={onSignOut}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200/70 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-red-600/90 shadow-xs backdrop-blur-md transition-all hover:bg-red-50 hover:border-red-300 hover:text-red-700 active:scale-95"
+              className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.rose} inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-red-600/90 transition-all hover:bg-[#fde8e8]/95 hover:border-red-300/90 hover:text-red-700 active:scale-95 cursor-pointer`}
             >
-              <LogOut size={13} strokeWidth={2} />
+              <LogOut size={13} strokeWidth={2.2} />
               <span>退出</span>
             </button>
           </div>
