@@ -220,6 +220,8 @@ export default function App() {
       if (nextTab === activeTab) return
 
       tabScrollPositionsRef.current[activeTab] = window.scrollY
+      setHasInteractedDay(false)
+      setHasInteractedPane(false)
       setActiveTab(nextTab)
     },
     [activeTab],

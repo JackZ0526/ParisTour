@@ -26,6 +26,7 @@ export function DayTabButton({
   onSelect,
 }: DayTabButtonProps) {
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const isMountedRef = useRef(false)
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
 
   const placeholderTitle = /^第\s*\d+\s*天$/.test(title.trim())
@@ -33,6 +34,10 @@ export function DayTabButton({
   const streamingTitle = pending && Boolean(title) && !placeholderTitle
 
   useLayoutEffect(() => {
+    if (!pending && !streamingTitle) {
+      if (box !== null) setBox(null)
+      return
+    }
     const button = buttonRef.current
     if (!button) return
 
@@ -51,7 +56,17 @@ export function DayTabButton({
       if (prev && prev.w === nextW && prev.h === nextH) return prev
       return { w: nextW, h: nextH }
     })
-  }, [pending, title, dateLabel, active, streamingTitle])
+  }, [pending, title, dateLabel, active, streamingTitle, box])
+
+  useLayoutEffect(() => {
+    // Delay interaction flag availability to subsequent user actions
+    const timer = window.setTimeout(() => {
+      isMountedRef.current = true
+    }, 50)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [])
 
   const dateLine = `D${dayNumber}${dateLabel ? ` · ${dateLabel}` : ''}`
 
@@ -76,7 +91,7 @@ export function DayTabButton({
           layoutId="active-day-tab-ink"
           className="absolute inset-0 z-0 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] shadow-[0_3px_12px_rgba(179,107,60,0.26),inset_0_1px_1.5px_rgba(255,255,255,0.45)] border border-[#c47c4d]/50 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white/70 before:to-transparent before:content-['']"
           animate={
-            hasInteracted
+            hasInteracted && isMountedRef.current
               ? {
                   scaleX: [1, 1.15, 0.95, 1],
                   scaleY: [1, 0.88, 1.03, 1],
