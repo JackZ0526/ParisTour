@@ -1,10 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
-import {
-  glassCapsuleSurfaceClass,
-  glassCapsuleToneClass,
-} from '../../../shared/styles/glassCapsule'
+import { glassCapsuleToneClass } from '../../../shared/styles/glassCapsule'
 
 interface Props {
   value: string
@@ -96,15 +93,15 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
-          className="flex h-9 w-full items-center justify-between gap-2 px-3 py-1.5 text-left outline-none focus:outline-none focus-visible:outline-none cursor-pointer select-none"
+          className="flex h-9 w-full items-center justify-between gap-2 px-2.5 py-1 text-left outline-none focus:outline-none focus-visible:outline-none cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
-            {/* Time Capsule: In-place transition from plain text to highlight glass capsule */}
+            {/* Time Capsule: Always has identical inline-flex, px, py, rounded-lg, border box model so 10:00 NEVER shifts */}
             <span
-              className={`tabular-nums font-semibold text-sm transition-colors duration-150 ${
+              className={`relative inline-flex items-center rounded-lg border px-2.5 py-0.5 text-sm font-semibold tabular-nums transition-all duration-200 ${
                 open
-                  ? `${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center rounded-lg px-2 py-0.5 text-[var(--copper)] shadow-2xs`
-                  : 'text-[var(--ink)]'
+                  ? `${glassCapsuleToneClass.copper} text-[var(--copper)] shadow-2xs`
+                  : 'border-transparent bg-transparent text-[var(--ink)]'
               }`}
             >
               {open ? formatTime(draftHour, draftMinute) : value}
@@ -127,7 +124,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           </div>
 
           <Clock3
-            className={`h-4 w-4 shrink-0 transition-colors ${
+            className={`h-4 w-4 shrink-0 transition-colors duration-200 ${
               open ? 'text-[var(--copper)]' : 'text-[var(--copper)]/80'
             }`}
             strokeWidth={1.8}
