@@ -74,6 +74,7 @@ import {
   Luggage,
   MapPin,
   MessageSquareQuote,
+  Minus,
   PawPrint,
   Refrigerator,
   ShowerHead,
@@ -248,7 +249,7 @@ function TrashIcon() {
 }
 
 function UnselectIcon() {
-  return <X size={14} strokeWidth={2} aria-hidden />
+  return <Minus size={14} strokeWidth={2} aria-hidden />
 }
 
 function ChevronIcon({ up }: { up?: boolean }) {
