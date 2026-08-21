@@ -1540,7 +1540,7 @@ export function DayTimeline({
                 title={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
                 aria-label={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
                 aria-busy={dayRestoring || dayPending || undefined}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white active:scale-95 disabled:cursor-wait disabled:opacity-60`}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white dark:hover:bg-white/15 dark:hover:text-zinc-100 active:scale-95 disabled:cursor-wait disabled:opacity-60`}
               >
                 <RestoreDayIcon busy={dayRestoring} />
               </button>
@@ -1552,7 +1552,7 @@ export function DayTimeline({
               title={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
               aria-label={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
               aria-busy={dayRegenerating || dayPending || undefined}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white active:scale-95 disabled:cursor-wait disabled:opacity-60`}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white dark:hover:bg-white/15 dark:hover:text-zinc-100 active:scale-95 disabled:cursor-wait disabled:opacity-60`}
             >
               <RegenerateDayIcon busy={dayRegenerating} />
             </button>
@@ -1581,12 +1581,12 @@ export function DayTimeline({
           )}
         </p>
         {dayRegenError && (
-          <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-red-50/60 px-3 py-2 text-left text-xs text-[var(--copper)] backdrop-blur-sm">
+          <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-red-50/60 dark:bg-red-950/40 px-3 py-2 text-left text-xs text-[var(--copper)] backdrop-blur-sm">
             {dayRegenError}
           </p>
         )}
         {(dayPending || dayRegenerating) && (
-          <div className="mt-3 rounded-xl border border-[var(--sage)]/20 bg-white/50 px-3 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-md">
+          <div className="mt-3 rounded-xl border border-[var(--sage)]/20 dark:border-[var(--sage)]/30 bg-white/50 dark:bg-black/30 px-3 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-md">
             <LoadingIndicator
               variant="inline"
               thinkingLabel={
@@ -1612,7 +1612,7 @@ export function DayTimeline({
           </div>
         )}
         <div className="mt-3">
-          <p className="break-words rounded-xl border border-white/70 bg-white/50 px-3.5 py-2 text-xs sm:text-sm text-[var(--stone)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-md">
+          <p className="break-words rounded-xl border border-white/70 dark:border-white/10 bg-white/50 dark:bg-black/30 px-3.5 py-2 text-xs sm:text-sm text-[var(--stone)] dark:text-zinc-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-md">
             <span className="font-medium text-[var(--ink)]">路线导航：</span>
             点击每段交通，在 Google Maps 查看实时路线
           </p>

@@ -83,7 +83,7 @@ export function DayTabButton({
       className={`day-tab-button relative isolate snap-start shrink-0 rounded-full px-3.5 py-2 text-sm outline-none transition-all duration-200 sm:px-4 ${
         active
           ? ''
-          : 'border border-white/75 bg-white/65 shadow-xs hover:border-white hover:bg-white/85 hover:shadow-sm'
+          : 'border border-white/75 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 shadow-xs hover:border-white dark:hover:border-white/20 hover:bg-white/85 dark:hover:bg-[#202b26] hover:shadow-sm'
       }`}
     >
       {active && (

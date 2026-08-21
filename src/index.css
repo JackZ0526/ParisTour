@@ -1628,6 +1628,15 @@ body.timeline-dragging {
     0 3px 12px rgba(28, 36, 32, 0.06);
 }
 
+.dark .timeline-route-link--transit {
+  color: #8ec3dc;
+  border-color: rgba(69, 137, 166, 0.35);
+  background: linear-gradient(180deg, rgba(23, 79, 103, 0.42), rgba(15, 52, 68, 0.52));
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.08),
+    0 3px 12px rgba(0, 0, 0, 0.35);
+}
+
 .timeline-route-link--walking {
   color: #315f4a;
   border-color: rgba(70, 126, 94, 0.3);
@@ -1636,6 +1645,15 @@ body.timeline-dragging {
     inset 0 1px 1.5px rgba(255, 255, 255, 0.96),
     inset 0 -1px 1px rgba(255, 255, 255, 0.58),
     0 3px 12px rgba(28, 36, 32, 0.06);
+}
+
+.dark .timeline-route-link--walking {
+  color: #8ebfa8;
+  border-color: rgba(70, 126, 94, 0.35);
+  background: linear-gradient(180deg, rgba(38, 74, 57, 0.42), rgba(24, 48, 37, 0.52));
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.08),
+    0 3px 12px rgba(0, 0, 0, 0.35);
 }
 
 .timeline-route-link::before {
@@ -1684,6 +1702,12 @@ body.timeline-dragging {
       0 5px 14px rgba(28, 36, 32, 0.1);
   }
 
+  .dark .timeline-route-link--transit:hover {
+    color: #b3def0;
+    border-color: rgba(69, 137, 166, 0.55);
+    background: linear-gradient(180deg, rgba(23, 79, 103, 0.55), rgba(15, 52, 68, 0.65));
+  }
+
   .timeline-route-link--walking:hover {
     color: #244f3b;
     border-color: rgba(62, 116, 84, 0.44);
@@ -1691,6 +1715,12 @@ body.timeline-dragging {
       inset 0 1px 1.5px rgba(255, 255, 255, 0.98),
       inset 0 -1px 1px rgba(255, 255, 255, 0.62),
       0 5px 14px rgba(28, 36, 32, 0.1);
+  }
+
+  .dark .timeline-route-link--walking:hover {
+    color: #b5ded0;
+    border-color: rgba(70, 126, 94, 0.55);
+    background: linear-gradient(180deg, rgba(38, 74, 57, 0.55), rgba(24, 48, 37, 0.65));
   }
 
   .timeline-route-link:hover::before {

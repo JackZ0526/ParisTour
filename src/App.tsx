@@ -783,7 +783,7 @@ export default function App() {
             >
               {/* Top Quick Itinerary Summary Strip */}
               {itineraryReady && (
-                <div className="flex items-center justify-between gap-2.5 rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-colors sm:px-4 sm:py-3">
+                <div className="flex items-center justify-between gap-2.5 rounded-2xl border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/80 px-3 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-colors sm:px-4 sm:py-3">
                   <div
                     className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,black_calc(100%-12px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_calc(100%-12px),transparent_100%)]"
                     aria-label="行程摘要"
@@ -804,7 +804,7 @@ export default function App() {
                     </span>
                     {datesReady && tripDates?.startDate && tripDates.endDate && (
                       <span
-                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.dates} font-medium text-[var(--stone)]`}
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.dates} font-medium text-[var(--stone)] dark:text-sky-300`}
                         title="旅行日期"
                       >
                         <CalendarDays size={13} strokeWidth={2} aria-hidden />
@@ -815,7 +815,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleSelectPlace(SELECTED_HOTEL_PLACE_ID)}
-                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.hotel} max-w-[12rem] font-medium text-[var(--stone)] transition-colors hover:bg-[#eee1c6]/90 active:scale-95`}
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.hotel} max-w-[12rem] font-medium text-[var(--stone)] dark:text-amber-200 transition-colors hover:bg-[#eee1c6]/90 dark:hover:bg-[#deb881]/25 active:scale-95`}
                         title={`查看酒店详情：${hotel.name}`}
                       >
                         <HotelIcon size={13} className="shrink-0" strokeWidth={2} aria-hidden />
@@ -824,7 +824,7 @@ export default function App() {
                     )}
                     {(flights.outbound?.flightNumber || flights.returnFlight?.flightNumber) && (
                       <span
-                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.flights} font-medium text-[var(--stone)]`}
+                        className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.flights} font-medium text-[var(--stone)] dark:text-purple-300`}
                         title="往返航班"
                       >
                         <Plane size={13} strokeWidth={2} aria-hidden />
@@ -846,7 +846,7 @@ export default function App() {
                               onClick={() => setConfirmRestoreDefaultOpen(true)}
                               aria-label="恢复默认推荐"
                               title="恢复默认推荐"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-white active:scale-95"
                             >
                               <History size={15} strokeWidth={1.8} aria-hidden />
                             </button>
@@ -856,7 +856,7 @@ export default function App() {
                             onClick={handleResetAll}
                             aria-label="重新生成全部"
                             title="重新生成全部"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-zinc-900 active:scale-95"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-white active:scale-95"
                           >
                             <Sparkles size={15} strokeWidth={1.8} aria-hidden />
                           </button>
