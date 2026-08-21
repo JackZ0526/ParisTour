@@ -2464,6 +2464,11 @@ export function HotelPicker({
                       key={hotel.id}
                       transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
                       onPointerDown={(e) => onCandidatePointerDown(hotel.id, e)}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('[data-hotel-no-drag]')) return
+                        if (dragRef.current || suppressClickRef.current) return
+                        openHotelCard(hotel)
+                      }}
                       className={`group relative cursor-pointer text-left touch-none transition-[border-color,opacity,box-shadow] duration-200 [transition-timing-function:var(--timeline-ease)] ${glassCardSurfaceClass} ${
                         dragHotelId === hotel.id
                           ? 'pointer-events-none !border-transparent opacity-0'
