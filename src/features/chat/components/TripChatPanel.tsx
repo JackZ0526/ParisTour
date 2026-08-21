@@ -2145,7 +2145,7 @@ export function TripChatPanel({
           </div>
 
           <form
-            className="relative flex items-center gap-2 border-t border-white/85 bg-white/50 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95"
+            className="relative flex items-center gap-2 border-t border-white/85 bg-white/50 p-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95"
             onSubmit={(e) => {
               e.preventDefault()
               void submit(input)
