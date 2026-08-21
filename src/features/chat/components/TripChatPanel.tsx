@@ -2145,7 +2145,7 @@ export function TripChatPanel({
           </div>
 
           <form
-            className="flex items-center gap-2 border-t border-white/85 bg-white/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
+            className="relative flex items-center gap-2 border-t border-white/85 bg-white/50 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white before:to-transparent before:opacity-95"
             onSubmit={(e) => {
               e.preventDefault()
               void submit(input)
@@ -2160,29 +2160,38 @@ export function TripChatPanel({
               aria-busy={busy || undefined}
               enterKeyHint="send"
               autoComplete="off"
-              className="min-w-0 flex-1 rounded-full border border-white/90 bg-white/80 px-3.5 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/70 shadow-[inset_0_1px_2.5px_rgba(0,0,0,0.04),0_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white focus:shadow-[0_0_0_2px_rgba(181,106,60,0.12),inset_0_1px_2px_rgba(0,0,0,0.02)]"
+              className="min-w-0 flex-1 rounded-full border border-white/90 bg-white/85 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.02)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white focus:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14),inset_0_1px_2px_rgba(0,0,0,0.02)] disabled:bg-white/60 disabled:text-[var(--stone)]/60"
             />
-            <button
-              type="submit"
-              disabled={busy || !input.trim() || !open}
-              tabIndex={open ? undefined : -1}
-              aria-busy={busy || undefined}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] shadow-[0_3px_10px_rgba(0,0,0,0.18)] transition-all hover:bg-black active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-            >
-              {busy ? (
-                <>
-                  <ButtonSpinner
-                    mode="thinking"
-                    task="tripChat"
-                    userText={busyUserText || input}
-                    thinkingEnabled={requestThinkingEnabled}
-                  />
-                  {chatBusy.label({ thinking: '思考中', generating: '回答中' })}
-                </>
-              ) : (
-                '发送'
-              )}
-            </button>
+            {busy ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 px-3.5 py-2 text-xs font-medium text-white shadow-[0_3px_12px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.35)] backdrop-blur-md select-none"
+              >
+                <ButtonSpinner
+                  mode="thinking"
+                  task="tripChat"
+                  userText={busyUserText || input}
+                  thinkingEnabled={requestThinkingEnabled}
+                />
+                <span className="tracking-wide">
+                  {chatBusy.label({ thinking: '思考中…', generating: '回答中…' })}
+                </span>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim() || !open}
+                tabIndex={open ? undefined : -1}
+                className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+                  input.trim() && open
+                    ? 'border border-white/20 bg-[var(--ink)] text-white shadow-[0_4px_14px_rgba(35,42,38,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md hover:bg-black hover:scale-[1.03] hover:shadow-[0_6px_18px_rgba(35,42,38,0.32)] active:scale-95 cursor-pointer'
+                    : 'border border-white/70 bg-white/60 text-[var(--stone)]/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
+                }`}
+              >
+                发送
+              </button>
+            )}
           </form>
         </motion.div>
       </motion.div>
