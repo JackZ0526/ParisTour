@@ -948,7 +948,7 @@ export default function App() {
                     <>
                       <div className="flex flex-col gap-3 sm:gap-3.5">
                         <div
-                          className={`mobile-scroll-edge-fade flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 -mx-1.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                          className={`mobile-scroll-edge-fade mobile-scroll-edge-fade--inset flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 -mx-1.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                             dayRailHasLeftOverflow ? 'has-left-overflow' : ''
                           }`}
                           onScroll={(event) => {
