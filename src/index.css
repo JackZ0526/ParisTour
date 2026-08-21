@@ -775,7 +775,7 @@ select {
 }
 
 .api-meter {
-  --api-meter-rail: 1.85rem;
+  --api-meter-rail: 2.1rem;
   touch-action: none;
   user-select: none;
 }
@@ -783,10 +783,10 @@ select {
 .api-meter-shell {
   position: relative;
   margin-left: max(0.45rem, env(safe-area-inset-left));
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: var(--card);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 252, 247, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.07), inset 0 1px 1.5px rgba(255, 255, 255, 1);
+  backdrop-filter: blur(16px);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -799,7 +799,7 @@ select {
   align-items: center;
   justify-content: flex-start;
   gap: 0.18rem;
-  padding: 0.55rem 0.08rem;
+  padding: 0.5rem 0.1rem;
   box-sizing: border-box;
 }
 
@@ -811,16 +811,16 @@ select {
 }
 
 .api-meter-rail-label {
-  font-size: 7px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   line-height: 1;
   color: var(--stone);
 }
 
 .api-meter-rail-value {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -832,8 +832,8 @@ select {
   width: 100%;
   flex-direction: column;
   align-items: center;
-  gap: 0.42rem;
-  margin: 0.35rem 0 0;
+  gap: 0.36rem;
+  margin: 0.25rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -842,25 +842,26 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.12rem;
+  gap: 0.1rem;
 }
 
 .api-meter-rail-group-value {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--stone) 65%, transparent);
+  color: color-mix(in srgb, var(--stone) 50%, transparent);
 }
 
 .api-meter-rail-group-value.is-active {
-  color: var(--sage);
+  color: var(--copper);
+  font-weight: 700;
 }
 
 .api-meter-details-panel-inner {
   position: absolute;
   inset: 0;
-  padding: 0.75rem 0.85rem 1rem;
+  padding: 0.75rem 0.85rem 0.9rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -873,29 +874,28 @@ select {
   justify-content: space-between;
   margin-bottom: 0.45rem;
   padding-bottom: 0.35rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .api-meter-details-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 0.4rem;
+  gap: 0.45rem 0.45rem;
 }
 
 .api-meter-details-grid > li {
-  border-radius: 0.55rem;
-  padding: 0.38rem 0.45rem 0.42rem;
-  background: color-mix(in srgb, var(--mist) 32%, white 68%);
-}
-
-.api-meter-details-grid > li:nth-child(even) {
-  background: color-mix(in srgb, var(--sage) 8%, white 92%);
+  border-radius: 0.75rem;
+  padding: 0.45rem 0.55rem 0.48rem;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(8px);
 }
 
 .dark .api-meter-shell {
   border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(24, 32, 28, 0.95);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  background: rgba(24, 32, 28, 0.92);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 1.5px rgba(255, 255, 255, 0.08);
 }
 
 .dark .api-meter-details-header {
@@ -904,12 +904,12 @@ select {
 
 .dark .api-meter-details-grid > li {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: none;
 }
 
-.dark .api-meter-details-grid > li:nth-child(even) {
-  background: rgba(102, 139, 122, 0.08);
-  border: 1px solid rgba(102, 139, 122, 0.14);
+.dark .api-meter-rail-group-value.is-active {
+  color: var(--copper);
 }
 
 @media (prefers-reduced-motion: reduce) {
