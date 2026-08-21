@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type UIEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
 
@@ -67,7 +67,16 @@ function TimeWheelColumn<T extends number>({
     return list
   }, [items, n])
 
-  // Center scroll position on mount or when value changes externally
+  // Instantaneous silent positioning on mount before paint (NO rolling animation on open)
+  useLayoutEffect(() => {
+    const baseIdx = items.indexOf(value)
+    if (baseIdx >= 0 && containerRef.current) {
+      const targetRepIdx = MIDDLE_SET * n + baseIdx
+      containerRef.current.scrollTop = targetRepIdx * ITEM_HEIGHT
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync external value changes without triggering smooth scroll loops
   useEffect(() => {
     const baseIdx = items.indexOf(value)
     if (baseIdx >= 0 && containerRef.current && !isScrollingRef.current) {
@@ -76,7 +85,7 @@ function TimeWheelColumn<T extends number>({
       const currentBaseIdx = ((currentRepIdx % n) + n) % n
 
       // Only reposition if different from current displayed base index
-      if (currentBaseIdx !== baseIdx || currentScroll === 0) {
+      if (currentBaseIdx !== baseIdx) {
         const targetRepIdx = MIDDLE_SET * n + baseIdx
         containerRef.current.scrollTop = targetRepIdx * ITEM_HEIGHT
       }
@@ -194,7 +203,7 @@ function TimeWheelColumn<T extends number>({
       role="listbox"
       aria-label={ariaLabel}
       style={{ height: `${WHEEL_HEIGHT}px` }}
-      className="relative w-full snap-y snap-mandatory overflow-y-auto scroll-smooth select-none touch-pan-y overscroll-contain outline-none focus-visible:ring-1 focus-visible:ring-[var(--copper)]/30 rounded-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      className="relative w-full snap-y snap-mandatory overflow-y-auto select-none touch-pan-y overscroll-contain outline-none focus-visible:ring-1 focus-visible:ring-[var(--copper)]/30 rounded-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Top spacer (1 item height) to vertically center the first item in the lens */}
       <div style={{ height: `${ITEM_HEIGHT}px` }} aria-hidden />
