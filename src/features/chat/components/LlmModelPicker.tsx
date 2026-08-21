@@ -310,15 +310,15 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             ) : (
               <div>
                 <SectionHeader>思考</SectionHeader>
-                <div className="rounded-xl bg-[var(--mist)]/45 px-3 py-2.5">
-                  <p className="text-[11px] leading-snug text-[var(--stone)]">
+                <div className="rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 shadow-2xs backdrop-blur-md">
+                  <p className="text-xs leading-snug text-[var(--stone)]">
                     当前模型不支持思考强度设置
                   </p>
                 </div>
               </div>
             )}
 
-            <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}>
+            <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
               <SectionHeader>模型</SectionHeader>
               <SettingsRow
                 label={getOpenAIModelShortLabel(model)}
@@ -414,6 +414,12 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         style={{ position: 'absolute', inset: 0 }}
         className="flex flex-col overflow-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
+        {/* Top Specular Streaming Reflection Line */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-95 z-10"
+        />
+
         <AnimatePresence mode="popLayout" initial={false}>
           {panel === 'root' ? (
             <motion.div
@@ -429,15 +435,15 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
                 ) : (
                   <div>
                     <SectionHeader>思考</SectionHeader>
-                    <div className="rounded-xl bg-[var(--mist)]/45 px-3 py-2.5">
-                      <p className="text-[11px] leading-snug text-[var(--stone)]">
+                    <div className="rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 shadow-2xs backdrop-blur-md">
+                      <p className="text-xs leading-snug text-[var(--stone)]">
                         当前模型不支持思考强度设置
                       </p>
                     </div>
                   </div>
                 )}
 
-                <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-[var(--ink)]/8 pt-2.5`}>
+                <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 pt-3`}>
                   <SectionHeader>模型</SectionHeader>
                   <SettingsRow
                     label={getOpenAIModelShortLabel(model)}
@@ -542,7 +548,7 @@ function ThinkingControls({
             transition={{ duration: 0.24, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2.5 ml-1 rounded-xl bg-[var(--mist)]/40 px-2.5 py-2 pl-3">
+            <div className="mt-2.5 rounded-2xl border border-white/80 bg-white/60 p-2.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_4px_rgba(0,0,0,0.02)] backdrop-blur-md">
               <label
                 htmlFor={autoCheckboxId}
                 className={`flex items-start gap-2.5 ${
@@ -557,10 +563,10 @@ function ThinkingControls({
                   size="sm"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-medium leading-snug text-[var(--stone)]">
+                  <span className="block text-xs font-semibold leading-snug text-[var(--ink)]">
                     自动选择强度
                   </span>
-                  <span className="mt-0.5 block text-[10px] leading-snug text-[var(--stone)]/70">
+                  <span className="mt-0.5 block text-[11px] leading-snug text-[var(--stone)]">
                     按当前操作自动选择思考强度
                   </span>
                 </span>
@@ -602,12 +608,12 @@ function ThinkingControls({
             transition={{ duration: 0.24, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[var(--mist)]/35 px-2.5 py-2">
+            <div className="mt-2.5 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/60 px-3 py-2 shadow-2xs backdrop-blur-md">
               <span
                 aria-hidden
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/45"
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/60"
               />
-              <p className="text-[11px] leading-snug text-[var(--stone)]">
+              <p className="text-xs leading-snug text-[var(--stone)]">
                 跳过额外推理，响应更直接
               </p>
             </div>
@@ -646,15 +652,15 @@ function PillSwitch({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
-      className={`relative h-[1.55rem] w-[2.75rem] shrink-0 rounded-full transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] disabled:opacity-50 ${
+      className={`relative h-[1.65rem] w-[2.85rem] shrink-0 rounded-full border border-white/80 p-0.5 transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] backdrop-blur-sm disabled:opacity-50 cursor-pointer ${
         checked
           ? 'bg-[var(--sage)]'
-          : 'bg-[var(--ink)]/14'
+          : 'bg-[var(--ink)]/16'
       }`}
     >
       <span
         aria-hidden
-        className={`absolute top-[2px] left-[2px] h-[calc(1.55rem-4px)] w-[calc(1.55rem-4px)] rounded-full bg-white shadow-[0_1px_3px_rgba(28,36,32,0.22)] transition-transform duration-200 ease-[cubic-bezier(0.34,1.2,0.64,1)] ${
+        className={`block h-5 w-5 rounded-full bg-white shadow-[0_2px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,1)] transition-transform duration-200 ease-[cubic-bezier(0.34,1.2,0.64,1)] ${
           checked ? 'translate-x-[1.2rem]' : 'translate-x-0'
         }`}
       />
@@ -1054,14 +1060,14 @@ function SettingsRow({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-xl px-1.5 py-2 text-left text-sm transition hover:bg-[var(--mist)]/50 disabled:opacity-50"
+      className="flex w-full items-center gap-2.5 rounded-2xl border border-white/80 bg-white/60 px-3 py-2.5 text-left text-sm font-semibold text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 hover:border-white active:scale-98 disabled:opacity-50 cursor-pointer"
     >
       {icon}
-      <span className="min-w-0 flex-1 text-[var(--ink)]">{label}</span>
+      <span className="min-w-0 flex-1">{label}</span>
       {value ? (
-        <span className="max-w-[7rem] truncate text-[var(--stone)]">{value}</span>
+        <span className="max-w-[7rem] truncate text-xs font-normal text-[var(--stone)]">{value}</span>
       ) : null}
-      <ChevronRight aria-hidden className="h-3 w-3 shrink-0 text-[var(--stone)]" strokeWidth={1.75} />
+      <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-[var(--stone)]" strokeWidth={2} />
     </button>
   )
 }
@@ -1077,16 +1083,16 @@ function SubPanel({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1 border-b border-[var(--ink)]/8 px-2 py-2">
+      <div className="flex items-center gap-1 border-b border-white/85 bg-white/40 px-2 py-2 backdrop-blur-md">
         <button
           type="button"
           onClick={onBack}
           aria-label="返回"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink)] transition hover:bg-[var(--mist)]/60"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink)] transition hover:bg-white/80 cursor-pointer"
         >
-          <ChevronLeft aria-hidden className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <ChevronLeft aria-hidden className="h-4 w-4" strokeWidth={2} />
         </button>
-        <p className="text-sm font-medium text-[var(--ink)]">{title}</p>
+        <p className="text-sm font-semibold text-[var(--ink)]">{title}</p>
       </div>
       {children}
     </div>
