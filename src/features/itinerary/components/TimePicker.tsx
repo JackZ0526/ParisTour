@@ -47,6 +47,7 @@ function TimeWheelColumn<T extends number>({
   ariaLabel,
 }: WheelColumnProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const isProgrammaticScrollRef = useRef(false)
   const isScrollingRef = useRef(false)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wheelLockRef = useRef(false)
@@ -67,25 +68,17 @@ function TimeWheelColumn<T extends number>({
     return list
   }, [items, n])
 
-  // Instantaneous silent positioning on mount before paint (NO rolling animation on open)
+  // Instantaneous silent positioning before paint whenever mounted or value changes while idle
   useLayoutEffect(() => {
-    const baseIdx = items.indexOf(value)
-    if (baseIdx >= 0 && containerRef.current) {
-      const targetRepIdx = MIDDLE_SET * n + baseIdx
-      containerRef.current.scrollTop = targetRepIdx * ITEM_HEIGHT
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync external value changes without triggering smooth scroll loops
-  useEffect(() => {
     const baseIdx = items.indexOf(value)
     if (baseIdx >= 0 && containerRef.current && !isScrollingRef.current) {
       const currentScroll = containerRef.current.scrollTop
       const currentRepIdx = Math.round(currentScroll / ITEM_HEIGHT)
       const currentBaseIdx = ((currentRepIdx % n) + n) % n
 
-      // Only reposition if different from current displayed base index
-      if (currentBaseIdx !== baseIdx) {
+      // Only reposition if different from current displayed base index or on initial zero scroll
+      if (currentBaseIdx !== baseIdx || currentScroll === 0) {
+        isProgrammaticScrollRef.current = true
         const targetRepIdx = MIDDLE_SET * n + baseIdx
         containerRef.current.scrollTop = targetRepIdx * ITEM_HEIGHT
       }
@@ -135,6 +128,11 @@ function TimeWheelColumn<T extends number>({
   }, [items, n, onChange])
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    if (isProgrammaticScrollRef.current) {
+      isProgrammaticScrollRef.current = false
+      return
+    }
+
     const target = e.currentTarget
     isScrollingRef.current = true
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
@@ -150,6 +148,7 @@ function TimeWheelColumn<T extends number>({
       isScrollingRef.current = false
       // Silent reset to middle loop if user scrolled too far towards boundaries
       if (containerRef.current && (rawIdx < n * 5 || rawIdx > n * (REPEAT_COUNT - 5))) {
+        isProgrammaticScrollRef.current = true
         const resetIdx = MIDDLE_SET * n + normalizedIdx
         containerRef.current.scrollTop = resetIdx * ITEM_HEIGHT
       }
@@ -243,24 +242,47 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
   const [draftMinute, setDraftMinute] = useState(parsed.minute)
   const rootRef = useRef<HTMLDivElement>(null)
 
+  // Synchronize draft state when value prop changes
   useEffect(() => {
-    if (!open) return
     const next = parseTime(value)
     setDraftHour(next.hour)
     setDraftMinute(next.minute)
-  }, [open, value])
+  }, [value])
+
+  const handleCancel = () => {
+    const next = parseTime(value)
+    setDraftHour(next.hour)
+    setDraftMinute(next.minute)
+    setOpen(false)
+  }
+
+  const handleConfirm = () => {
+    onChange(formatTime(draftHour, draftMinute))
+    setOpen(false)
+  }
+
+  const handleToggle = () => {
+    if (!open) {
+      const next = parseTime(value)
+      setDraftHour(next.hour)
+      setDraftMinute(next.minute)
+      setOpen(true)
+    } else {
+      handleCancel()
+    }
+  }
 
   useEffect(() => {
     if (!open) return
     function onPointerDown(event: PointerEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false)
+        handleCancel()
       }
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        setOpen(false)
+        handleCancel()
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
@@ -269,7 +291,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open])
+  }, [open, value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const minuteOptions = MINUTES.includes(draftMinute)
     ? MINUTES
@@ -300,7 +322,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
           id={id}
           aria-haspopup="dialog"
           aria-expanded={open}
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={handleToggle}
           className="flex h-9 w-full items-center justify-between gap-2 px-2.5 py-1 text-left outline-none focus:outline-none focus-visible:outline-none cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
@@ -401,17 +423,14 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
               <div className="mt-2.5 flex justify-end gap-2 border-t border-[var(--mist)]/70 pt-2.5">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={handleCancel}
                   className="rounded-full border border-black/10 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[var(--stone)] transition hover:bg-white hover:text-[var(--ink)] shadow-2xs active:scale-95 cursor-pointer"
                 >
                   取消
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    onChange(formatTime(draftHour, draftMinute))
-                    setOpen(false)
-                  }}
+                  onClick={handleConfirm}
                   className="rounded-full bg-[var(--ink)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] transition hover:bg-black shadow-[0_3px_10px_rgba(0,0,0,0.15)] active:scale-95 cursor-pointer"
                 >
                   完成
