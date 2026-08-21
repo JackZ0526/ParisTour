@@ -35,21 +35,41 @@ export const DEEPSEEK_MODEL_OPTIONS = [
     id: 'deepseek-v4-flash',
     label: 'DeepSeek V4 Flash',
     shortLabel: 'V4 Flash',
+    description: '极速响应 · 日常问答推荐',
     provider: 'deepseek' as const,
   },
   {
     id: 'deepseek-v4-pro',
     label: 'DeepSeek V4 Pro',
     shortLabel: 'V4 Pro',
+    description: '深度推理 · 复杂行程规划',
     provider: 'deepseek' as const,
   },
 ] as const
 
 /** GPT-5.6 variants kept in the picker (older GPT-5.5/5.4 dropped). */
 export const OPENAI_ONLY_MODEL_OPTIONS = [
-  { id: 'gpt-5.6-luna', label: 'GPT-5.6 luna', shortLabel: '5.6 luna', provider: 'openai' as const },
-  { id: 'gpt-5.6-sol', label: 'GPT-5.6 sol', shortLabel: '5.6 sol', provider: 'openai' as const },
-  { id: 'gpt-5.6-terra', label: 'GPT-5.6 terra', shortLabel: '5.6 terra', provider: 'openai' as const },
+  {
+    id: 'gpt-5.6-luna',
+    label: 'GPT-5.6 luna',
+    shortLabel: '5.6 luna',
+    description: '轻量平衡 · 快速微调',
+    provider: 'openai' as const,
+  },
+  {
+    id: 'gpt-5.6-sol',
+    label: 'GPT-5.6 sol',
+    shortLabel: '5.6 sol',
+    description: '高阶智能 · 综合能力强',
+    provider: 'openai' as const,
+  },
+  {
+    id: 'gpt-5.6-terra',
+    label: 'GPT-5.6 terra',
+    shortLabel: '5.6 terra',
+    description: '旗舰推理 · 复杂逻辑规划',
+    provider: 'openai' as const,
+  },
 ] as const
 
 /** Selectable chat models for the FAB picker. */

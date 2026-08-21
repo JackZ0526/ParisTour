@@ -1069,7 +1069,7 @@ function ModelSettingsPanel({
                   <ModelOption
                     key={option.id}
                     label={option.shortLabel}
-                    detail={option.label}
+                    detail={option.description}
                     selected={option.id === model}
                     disabled={disabled}
                     icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
@@ -1082,7 +1082,7 @@ function ModelSettingsPanel({
                   <ModelOption
                     key={option.id}
                     label={option.shortLabel}
-                    detail={option.label}
+                    detail={option.description}
                     selected={option.id === model}
                     disabled={disabled}
                     icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}
