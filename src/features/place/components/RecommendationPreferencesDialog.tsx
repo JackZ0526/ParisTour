@@ -319,8 +319,8 @@ export function RecommendationPreferencesDialog({
                   </p>
                 </div>
               ) : (
-                <motion.div layout className="flex flex-wrap gap-2">
-                  <AnimatePresence>
+                <div className="flex flex-wrap gap-2">
+                  <AnimatePresence initial={false}>
                     {activeTags.map((tag) => {
                       const cleanTag = cleanTagText(tag)
                       const theme = getTagTheme(cleanTag)
@@ -328,12 +328,16 @@ export function RecommendationPreferencesDialog({
                         <motion.button
                           key={cleanTag}
                           type="button"
-                          layout
-                          initial={{ scale: 0.82, opacity: 0 }}
+                          layout="position"
+                          initial={{ scale: 0.85, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.82, opacity: 0 }}
+                          exit={{ scale: 0.85, opacity: 0 }}
                           whileTap={{ scale: 0.93 }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.7 }}
+                          transition={{
+                            layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                            scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
+                            opacity: { duration: 0.16 },
+                          }}
                           onClick={() => removeTag(cleanTag)}
                           title={`点击移出：${cleanTag}`}
                           aria-label={`移除 ${cleanTag}`}
@@ -344,7 +348,7 @@ export function RecommendationPreferencesDialog({
                       )
                     })}
                   </AnimatePresence>
-                </motion.div>
+                </div>
               )}
             </div>
           </section>
