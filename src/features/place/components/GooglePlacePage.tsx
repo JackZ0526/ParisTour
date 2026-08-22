@@ -1916,7 +1916,7 @@ export function GooglePlacePage({
                 href={displayWebsite}
                 target="_blank"
                 rel="noreferrer"
-                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] dark:text-emerald-300 underline-offset-2 transition-all hover:bg-[#dce9df]/90 dark:hover:bg-[#668b7a]/25 hover:border-[#a8bcae] dark:hover:border-[#668b7a]/40 hover:underline active:scale-95 cursor-pointer`}
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] dark:text-emerald-300 transition-all hover:bg-[#dce9df]/90 dark:hover:bg-[#668b7a]/25 hover:border-[#a8bcae] dark:hover:border-[#668b7a]/40 active:scale-95 cursor-pointer`}
               >
                 官网
               </a>
