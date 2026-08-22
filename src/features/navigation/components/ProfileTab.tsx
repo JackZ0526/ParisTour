@@ -490,10 +490,12 @@ export function ProfileTab({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
               <Sparkles size={16} className="text-[var(--copper)] shrink-0" />
-              <span>AI 智能偏好配置</span>
+              <span>{locale === 'en' ? 'AI Preferences' : 'AI 智能偏好配置'}</span>
             </div>
             <p className="mt-0.5 text-xs text-[var(--stone)] dark:text-zinc-400 leading-relaxed">
-              个性化行程偏好体系；这些倾向将直接引导 AI 生成专属巴黎路线与地点推荐。
+              {locale === 'en'
+                ? 'Personalized preferences that guide AI routes and recommendations.'
+                : '个性化行程偏好体系；这些倾向将直接引导 AI 生成专属路线与地点推荐。'}
             </p>
           </div>
         </div>
@@ -506,7 +508,7 @@ export function ProfileTab({
               <Timer size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">每日出发</p>
+              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">{locale === 'en' ? 'Daily departure' : '每日出发'}</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
                 {recommendationPreferences?.dayStartTime || '10:00'}
               </p>
@@ -519,11 +521,11 @@ export function ProfileTab({
               <Tag size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">生效偏好</p>
+              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">{locale === 'en' ? 'Active tags' : '生效偏好'}</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
                 {recommendationPreferences?.tags?.length
-                  ? `${recommendationPreferences.tags.length} 项标签生效`
-                  : '未设置标签'}
+                  ? (locale === 'en' ? `${recommendationPreferences.tags.length} active` : `${recommendationPreferences.tags.length} 项标签生效`)
+                  : (locale === 'en' ? 'None set' : '未设置标签')}
               </p>
             </div>
           </div>
@@ -546,13 +548,13 @@ export function ProfileTab({
             })}
             {recommendationPreferences.tags.length > 10 && (
               <span className="inline-flex h-7.5 items-center rounded-full border border-black/8 dark:border-white/10 bg-white/60 dark:bg-white/10 px-2.5 text-[11px] font-semibold text-[var(--stone)] dark:text-zinc-300 shadow-2xs">
-                +{recommendationPreferences.tags.length - 10} 项
+                +{recommendationPreferences.tags.length - 10} {locale === 'en' ? 'more' : '项'}
               </span>
             )}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-3 text-center text-xs text-[var(--stone)] dark:text-zinc-400">
-            暂未设置偏好标签，点击下方按钮定制专属巴黎路线偏好
+            {locale === 'en' ? 'No preference tags set yet. Tap below to customize your preferences.' : '暂未设置偏好标签，点击下方按钮定制专属路线偏好'}
           </div>
         )}
 
@@ -561,7 +563,7 @@ export function ProfileTab({
           <div className="flex items-start gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/50 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-md">
             <MessageSquare size={13} className="mt-0.5 shrink-0 text-[var(--copper)]/80" />
             <p className="text-xs text-[var(--stone)] dark:text-zinc-300 leading-relaxed line-clamp-2">
-              <span className="font-medium text-[var(--ink)]">补充要求：</span>
+              <span className="font-medium text-[var(--ink)]">{locale === 'en' ? 'Extra notes: ' : '补充要求：'}</span>
               {recommendationPreferences.extraNotes}
             </p>
           </div>
@@ -574,7 +576,7 @@ export function ProfileTab({
           className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] dark:from-white/12 dark:to-white/[0.07] dark:border dark:border-white/18 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white dark:text-zinc-100 shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] dark:shadow-[0_8px_22px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.15),inset_0_-1px_1px_rgba(0,0,0,0.4)] transition-all hover:-translate-y-px hover:brightness-110 dark:hover:border-white/25 active:translate-y-0 active:scale-[0.99] cursor-pointer"
         >
           <SlidersHorizontal size={14} />
-          <span>打开偏好设置详细面板</span>
+          <span>{locale === 'en' ? 'Open Preferences' : '打开偏好设置详细面板'}</span>
           <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5 text-white/70" />
         </button>
       </div>

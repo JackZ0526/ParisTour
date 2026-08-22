@@ -340,11 +340,11 @@ export const en: I18nSchema = {
   },
   cloud: {
     backupTitle: 'Backup & Data Export',
-    backupSubtitle: 'Export your trip data to a JSON file or restore from local backup',
+    backupSubtitle: 'Export trip data as JSON, or restore from local backup',
     exportJson: 'Export JSON Backup',
     importJson: 'Import from File',
     shareTitle: 'Collaborate & Share',
-    shareSubtitle: 'Invite friends to plan together in realtime, or generate a read-only share link',
+    shareSubtitle: 'Invite friends to plan in real time, or share a read-only link',
     inviteMember: 'Invite Collaborator',
     inviteEmailPlaceholder: 'Enter friend’s email',
     sendInvite: 'Send Invite',
