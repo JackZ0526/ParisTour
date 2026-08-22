@@ -146,10 +146,16 @@ export function buildRerecommendMessage(rejected: PendingPlaceConfirm, excluded:
   ].join('')
 }
 
-export function friendlyChatError(err: unknown): string {
+import { type Locale } from '../../../shared/i18n'
+
+export function friendlyChatError(err: unknown, locale: Locale = 'zh-CN'): string {
+  const fallback =
+    locale === 'en'
+      ? 'Chat assistant encountered an error. Please try again later.'
+      : '对话助手出错了，请稍后再试。'
   if (err instanceof Error) {
     // Already a user-facing message in most cases; trim instead of rewrapping.
-    return err.message || '对话助手出错了，请稍后再试。'
+    return err.message || fallback
   }
-  return '对话助手出错了，请稍后再试。'
+  return fallback
 }

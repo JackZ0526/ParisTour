@@ -20,7 +20,7 @@ import {
   glassCardSurfaceClass,
   glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
-import { useTranslation } from '../../../shared/i18n'
+import { useTranslation, type Locale } from '../../../shared/i18n'
 
 interface Props {
   tripId: string
@@ -29,7 +29,7 @@ interface Props {
   onRestored: () => void
 }
 
-function backupSummary(backup: TripSnapshotBackup): string {
+function backupSummary(backup: TripSnapshotBackup, locale: Locale = 'zh-CN'): string {
   const snapshot = backup.snapshot
   const days = snapshot.itinerary?.days?.length || 0
   const stops =
@@ -45,14 +45,14 @@ function backupSummary(backup: TripSnapshotBackup): string {
   const inbound = snapshot.flights?.returnFlight?.flightNumber
   if (outbound || inbound) parts.push([outbound, inbound].filter(Boolean).join(' / '))
   if (snapshot.hotel?.selected?.name) parts.push(snapshot.hotel.selected.name)
-  if (days) parts.push(`${days} 天 · ${stops} 个行程点`)
-  return parts.length ? parts.join(' · ') : '空行程或初始化存档'
+  if (days) parts.push(locale === 'en' ? `${days} Days · ${stops} Stops` : `${days} 天 · ${stops} 个行程点`)
+  return parts.length ? parts.join(' · ') : (locale === 'en' ? 'Empty trip or initialized snapshot' : '空行程或初始化存档')
 }
 
-function formatBackupTime(value: string): string {
+function formatBackupTime(value: string, locale: Locale = 'zh-CN'): string {
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return value
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -85,7 +85,7 @@ function BackupListSkeleton() {
 }
 
 export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [backups, setBackups] = useState<TripSnapshotBackup[]>([])
   const [loading, setLoading] = useState(false)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -101,7 +101,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
         if (active) setBackups(data)
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : '加载备份失败')
+        if (active) setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to load backups' : '加载备份失败'))
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -109,7 +109,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
     return () => {
       active = false
     }
-  }, [open, tripId])
+  }, [open, tripId, locale])
 
   const [pendingRestoreBackup, setPendingRestoreBackup] = useState<TripSnapshotBackup | null>(null)
 
@@ -123,7 +123,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
       onRestored()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '恢复存档失败')
+      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to restore snapshot' : '恢复存档失败'))
       setRestoringId(null)
     } finally {
       setPendingRestoreBackup(null)
@@ -222,11 +222,11 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                               {isLatest ? t('cloud.latestSnapshot') : t('cloud.snapshotNumber', { number: backups.length - index })}
                             </span>
                             <span className="text-[11px] text-[var(--stone)] dark:text-zinc-400 truncate">
-                              · {formatBackupTime(backup.createdAt)}
+                              · {formatBackupTime(backup.createdAt, locale)}
                             </span>
                           </div>
                           <p className="mt-0.5 truncate text-[11px] sm:text-xs text-[var(--stone)]/85 dark:text-zinc-300">
-                            {backupSummary(backup)}
+                            {backupSummary(backup, locale)}
                           </p>
                         </div>
                       </div>

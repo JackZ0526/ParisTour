@@ -222,12 +222,16 @@ export function FlightPanel({
     await Promise.all([
       outNo.trim()
         ? loadOne('outbound', outNo, true).catch((e) => {
-            errors.push(`去程：${e instanceof Error ? e.message : '失败'}`)
+            errors.push(
+              `${locale === 'en' ? 'Outbound: ' : '去程：'}${e instanceof Error ? e.message : (locale === 'en' ? 'Failed' : '失败')}`,
+            )
           })
         : Promise.resolve(),
       inNo.trim()
         ? loadOne('return', inNo, true).catch((e) => {
-            errors.push(`返程：${e instanceof Error ? e.message : '失败'}`)
+            errors.push(
+              `${locale === 'en' ? 'Return: ' : '返程：'}${e instanceof Error ? e.message : (locale === 'en' ? 'Failed' : '失败')}`,
+            )
           })
         : Promise.resolve(),
     ])
@@ -243,7 +247,7 @@ export function FlightPanel({
       await loadOne(direction, number)
       setShowSearchForm(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '查询失败')
+      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Flight search failed' : '查询失败'))
     } finally {
       setBusy(null)
     }

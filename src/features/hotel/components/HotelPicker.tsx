@@ -1662,7 +1662,7 @@ export function HotelPicker({
 
   async function bootstrapRecommendations() {
     if (!isLlmConfigured()) {
-      setError('暂时无法生成酒店推荐，请使用下方自定义地址。')
+      setError(locale === 'en' ? 'Unable to generate hotel recommendations. Please enter a custom address below.' : '暂时无法生成酒店推荐，请使用下方自定义地址。')
       return
     }
 
@@ -1680,7 +1680,7 @@ export function HotelPicker({
       setOthersCollapsed(false)
       persistHotelState(llmCards, null, { othersCollapsed: false })
     } catch (e) {
-      setError(e instanceof Error ? e.message : '推荐酒店失败')
+      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Failed to recommend hotels' : '推荐酒店失败'))
     } finally {
       setRefreshing(false)
     }
@@ -1688,14 +1688,18 @@ export function HotelPicker({
 
   async function runFreshRecommendations(preferences?: string) {
     if (!isLlmConfigured()) {
-      setError('暂时无法生成酒店推荐，请使用下方自定义地址。')
+      setError(locale === 'en' ? 'Unable to generate hotel recommendations. Please enter a custom address below.' : '暂时无法生成酒店推荐，请使用下方自定义地址。')
       return
     }
 
     const prefs = preferences?.trim() || undefined
     setRefreshPanel(null)
     setRefreshing(true)
-    setRefreshHint(prefs ? '正在按你的喜好重新推荐酒店…' : '交给命运：正在挑选一批新酒店…')
+    setRefreshHint(
+      prefs
+        ? (locale === 'en' ? 'Finding new hotels tailored to your preferences…' : '正在按你的喜好重新推荐酒店…')
+        : (locale === 'en' ? 'Surprise me: Finding a fresh batch of hotels…' : '交给命运：正在挑选一批新酒店…')
+    )
     setError(null)
     try {
       const result = await refreshHotelCandidates({
@@ -1724,7 +1728,7 @@ export function HotelPicker({
       setOthersCollapsed(false)
       setPreferText('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : '推荐酒店失败')
+      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Failed to recommend hotels' : '推荐酒店失败'))
     } finally {
       setRefreshing(false)
       setRefreshHint(null)
@@ -1744,7 +1748,7 @@ export function HotelPicker({
       setPopupHotelId(null)
       setPendingCustom(hydrateHotelAdvisorFromCache(card))
     } catch (e) {
-      setError(e instanceof Error ? e.message : '解析失败')
+      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Failed to resolve location' : '解析失败'))
     } finally {
       setLoading(false)
     }

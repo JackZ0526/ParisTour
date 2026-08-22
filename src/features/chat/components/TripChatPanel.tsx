@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
+import { useTranslation } from '../../../shared/i18n'
 import { createPortal } from 'react-dom'
 import {
   fetchGooglePlaceDetails,
@@ -265,6 +266,7 @@ export function TripChatPanel({
   const isDesktop = useMediaQuery('(min-width: 640px)')
   useBodyScrollLock(open && !isDesktop)
   const { isDark } = useTheme()
+  const { locale } = useTranslation()
   const { model, thinkingMode } = useLlmSettings()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1120,7 +1122,7 @@ export function TripChatPanel({
   async function rerecommendPending(rejected: PendingPlaceConfirm) {
     if (busy || confirmBusy || rejected.status === 'rerecommending') return
     if (!isLlmConfigured()) {
-      setError('对话助手暂不可用，请稍后再试。')
+      setError(locale === 'en' ? 'Chat assistant is temporarily unavailable. Please try again later.' : '对话助手暂不可用，请稍后再试。')
       return
     }
 
@@ -1308,15 +1310,15 @@ export function TripChatPanel({
             ...prev.slice(0, -1),
             {
               ...last,
-              content: `${last.content.trim()}\n\n（重新推荐中断：${
-                err instanceof Error ? err.message : '请稍后再试'
-              }）`,
+              content: `${last.content.trim()}\n\n（${
+                locale === 'en' ? 'Recommendation interrupted: ' : '重新推荐中断：'
+              }${err instanceof Error ? err.message : (locale === 'en' ? 'Please try again later' : '请稍后再试')}）`,
             },
           ]
         }
         return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
       })
-      setError(err instanceof Error ? err.message : '重新推荐失败，请稍后再试。')
+      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to re-recommend, please try again later.' : '重新推荐失败，请稍后再试。'))
       setOpen(true)
       clearWorkPipeline()
     } finally {
@@ -1673,7 +1675,7 @@ export function TripChatPanel({
     const message = text.trim()
     if (!message || busy) return
     if (!isLlmConfigured()) {
-      setError('对话助手暂不可用，请稍后再试。')
+      setError(locale === 'en' ? 'Chat assistant is temporarily unavailable. Please try again later.' : '对话助手暂不可用，请稍后再试。')
       return
     }
 
@@ -1834,16 +1836,16 @@ export function TripChatPanel({
             ...prev.slice(0, -1),
             {
               ...last,
-              content: `${last.content.trim()}\n\n（回答中断：${
-                err instanceof Error ? err.message : '请稍后再试'
-              }）`,
+              content: `${last.content.trim()}\n\n（${
+                locale === 'en' ? 'Response interrupted: ' : '回答中断：'
+              }${err instanceof Error ? err.message : (locale === 'en' ? 'Please try again later' : '请稍后再试')}）`,
             },
           ]
         }
         // Drop empty assistant placeholder when nothing streamed.
         return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
       })
-      setError(friendlyChatError(err))
+      setError(friendlyChatError(err, locale))
       clearWorkPipeline()
     } finally {
       if (abortRef.current === ac) {

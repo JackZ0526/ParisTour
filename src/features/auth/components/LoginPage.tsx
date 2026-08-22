@@ -31,7 +31,7 @@ function clearAuthDeepLink() {
 }
 
 export function LoginPage() {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const deepLink = useMemo(() => readAuthDeepLink(), [])
   const { signIn, signUp, status, error: authError } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>(deepLink.mode)
@@ -44,8 +44,12 @@ export function LoginPage() {
   const [info, setInfo] = useState<string | null>(() =>
     deepLink.email
       ? deepLink.mode === 'signup'
-        ? '你收到了行程邀请。请用该邮箱注册后即可查看分享的行程。'
-        : '你收到了行程邀请。请登录后即可查看分享的行程。'
+        ? (locale === 'en'
+            ? 'You received a trip invitation. Sign up with this email to view the shared trip.'
+            : '你收到了行程邀请。请用该邮箱注册后即可查看分享的行程。')
+        : (locale === 'en'
+            ? 'You received a trip invitation. Sign in to view the shared trip.'
+            : '你收到了行程邀请。请登录后即可查看分享的行程。')
       : null,
   )
 
@@ -74,17 +78,19 @@ export function LoginPage() {
         const { needsEmailConfirm } = await signUp(email, password)
         if (needsEmailConfirm) {
           setInfo(
-            `注册成功。请打开邮箱 ${email.trim().toLowerCase()}，点击确认链接后再登录。若未收到邮件，请检查垃圾箱。`,
+            locale === 'en'
+              ? `Sign up successful. Please check ${email.trim().toLowerCase()} and click the confirmation link before signing in. Check your spam folder if not received.`
+              : `注册成功。请打开邮箱 ${email.trim().toLowerCase()}，点击确认链接后再登录。若未收到邮件，请检查垃圾箱。`,
           )
         } else {
-          setInfo('注册成功，可直接登录。')
+          setInfo(locale === 'en' ? 'Sign up successful. You can now sign in.' : '注册成功，可直接登录。')
         }
         setMode('signin')
         setHasSwitched(true)
         clearAuthDeepLink()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Operation failed' : '操作失败'))
     } finally {
       setBusy(false)
     }
@@ -115,17 +121,19 @@ export function LoginPage() {
 
         {/* French editorial heading */}
         <h1 className="font-display mt-3 text-3xl font-normal tracking-tight text-[var(--ink)] sm:text-4xl">
-          邀请制登录
+          {locale === 'en' ? 'Invite-only Access' : '邀请制登录'}
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-[var(--stone)] dark:text-zinc-400">
-          需受邀邮箱才能注册与使用。登录后可打开你的行程，也可查看他人分享给你的行程。
+          {locale === 'en'
+            ? 'An invited email is required. Sign in to access your itinerary and collaborative trips.'
+            : '需受邀邮箱才能注册与使用。登录后可打开你的行程，也可查看他人分享给你的行程。'}
         </p>
 
         {/* Not allowlisted notice banner */}
         {status === 'not_allowlisted' && (
           <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[var(--copper)]/30 dark:border-[#d48354]/35 bg-[#f6e8de]/70 dark:bg-[#341d14]/70 p-3 text-xs leading-relaxed text-[var(--ink)] dark:text-[#f8dcd0] shadow-sm backdrop-blur-md">
             <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[var(--copper)] dark:text-[#e09164]" />
-            <span>该邮箱尚未获邀请。请联系行程主人添加你的邮箱邀请。</span>
+            <span>{locale === 'en' ? 'This email has not been invited yet. Please contact the trip owner for an invitation.' : '该邮箱尚未获邀请。请联系行程主人添加你的邮箱邀请。'}</span>
           </div>
         )}
 
@@ -133,7 +141,7 @@ export function LoginPage() {
         <div
           className="relative mt-6 inline-flex rounded-full border border-white/80 dark:border-white/12 bg-white/70 dark:bg-black/35 p-1 shadow-sm dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] backdrop-blur-xl text-sm"
           role="tablist"
-          aria-label="登录或注册"
+          aria-label={locale === 'en' ? 'Sign in or sign up' : '登录或注册'}
         >
           <button
             type="button"

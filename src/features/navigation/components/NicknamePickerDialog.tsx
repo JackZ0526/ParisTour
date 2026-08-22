@@ -17,7 +17,7 @@ type Props = {
 const MAX_NICKNAME_LENGTH = 24
 
 export function NicknamePickerDialog({ open, onClose, email }: Props) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const titleId = useId()
   const { user } = useAuth()
   const { nickname, setNickname } = useUserNickname(email)
@@ -36,7 +36,11 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
     e.preventDefault()
     const clean = draft.trim()
     if (clean.length > MAX_NICKNAME_LENGTH) {
-      setError(`昵称不能超过 ${MAX_NICKNAME_LENGTH} 个字符`)
+      setError(
+        locale === 'en'
+          ? `Nickname cannot exceed ${MAX_NICKNAME_LENGTH} characters`
+          : `昵称不能超过 ${MAX_NICKNAME_LENGTH} 个字符`,
+      )
       return
     }
 
@@ -49,7 +53,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
       }
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存昵称失败')
+      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to save nickname' : '保存昵称失败'))
     } finally {
       setSaving(false)
     }
@@ -59,7 +63,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
     setDraft('')
   }
 
-  const defaultDisplayName = email ? email.split('@')[0] : '旅人'
+  const defaultDisplayName = email ? email.split('@')[0] : (locale === 'en' ? 'Traveler' : '旅人')
 
   return (
     <BottomSheet

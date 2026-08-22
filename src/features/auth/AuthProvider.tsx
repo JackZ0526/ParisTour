@@ -62,7 +62,10 @@ function localDebugTrip(): AccessibleTrip {
   }
 }
 
+import { getLocale } from '../../shared/i18n'
+
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
+  const locale = getLocale()
   const msg = (err.message || '').trim()
   const code = (err.code || '').toLowerCase()
   const lower = msg.toLowerCase()
@@ -71,28 +74,34 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
     code === 'email_not_confirmed' ||
     /email not confirmed/i.test(lower)
   ) {
-    return '邮箱尚未确认。请打开注册时收到的确认邮件，点击链接后再登录。'
+    return locale === 'en'
+      ? 'Email not confirmed yet. Please click the link in your confirmation email before signing in.'
+      : '邮箱尚未确认。请打开注册时收到的确认邮件，点击链接后再登录。'
   }
   if (
     code === 'invalid_credentials' ||
     /invalid login credentials/i.test(lower) ||
     /invalid email or password/i.test(lower)
   ) {
-    return '邮箱或密码不正确。若刚注册，请先确认邮箱后再试。'
+    return locale === 'en'
+      ? 'Incorrect email or password. If you just registered, please confirm your email first.'
+      : '邮箱或密码不正确。若刚注册，请先确认邮箱后再试。'
   }
   if (code === 'user_already_exists' || /already registered|already been registered/i.test(lower)) {
-    return '该邮箱已注册，请直接登录。'
+    return locale === 'en' ? 'This email is already registered. Please sign in.' : '该邮箱已注册，请直接登录。'
   }
   if (/rate limit|too many requests|over_email_send_rate_limit/i.test(lower) || code === 'over_email_send_rate_limit') {
-    return '邮件发送过于频繁（Supabase 免费邮箱约每小时 2 封）。请约 1 小时后再试，或在 Dashboard 关闭「Confirm email」。'
+    return locale === 'en'
+      ? 'Email sending limit reached. Please try again in about an hour.'
+      : '邮件发送过于频繁（Supabase 免费邮箱约每小时 2 封）。请约 1 小时后再试，或在 Dashboard 关闭「Confirm email」。'
   }
   if (/password/i.test(lower) && /weak|at least|characters/i.test(lower)) {
-    return '密码不符合要求（至少 6 位）。'
+    return locale === 'en' ? 'Password must be at least 6 characters.' : '密码不符合要求（至少 6 位）。'
   }
   if (/signup.*disabled|signups not allowed/i.test(lower)) {
-    return '当前不允许注册，请联系管理员。'
+    return locale === 'en' ? 'Signups are currently disabled. Please contact the administrator.' : '当前不允许注册，请联系管理员。'
   }
-  return msg || '登录失败，请稍后重试。'
+  return msg || (locale === 'en' ? 'Operation failed, please try again later.' : '登录失败，请稍后重试。')
 }
 
 async function hydrateAccountThemePreference(userId: string): Promise<void> {
@@ -190,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAllowlisted(false)
         setTrips([])
         setActiveTripId(null)
-        setError('该邮箱尚未获邀请，暂时无法使用。')
+        setError(getLocale() === 'en' ? 'This email has not been invited yet.' : '该邮箱尚未获邀请，暂时无法使用。')
         setStatus('not_allowlisted')
         try {
           await getSupabase().auth.signOut({ scope: 'local' })
@@ -226,13 +235,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (!isCurrentBootstrap()) return
         console.error(err)
+        const defaultMsg = getLocale() === 'en' ? 'Failed to load trip' : '加载行程失败'
         const msg =
           err && typeof err === 'object' && 'message' in err
             ? String((err as { message: unknown }).message)
             : err instanceof Error
               ? err.message
-              : '加载行程失败'
-        setError(msg || '加载行程失败')
+              : defaultMsg
+        setError(msg || defaultMsg)
         setStatus('ready')
         setTripReady(true)
       }
@@ -330,7 +340,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
-      const msg = '该邮箱尚未获邀请，无法登录。'
+      const msg = getLocale() === 'en' ? 'This email has not been invited yet. Unable to sign in.' : '该邮箱尚未获邀请，无法登录。'
       setError(msg)
       throw new Error(msg)
     }
@@ -353,12 +363,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
-      const msg = '该邮箱尚未获邀请，无法注册。'
+      const msg = getLocale() === 'en' ? 'This email has not been invited yet. Unable to sign up.' : '该邮箱尚未获邀请，无法注册。'
       setError(msg)
       throw new Error(msg)
     }
     if (password.length < 6) {
-      throw new Error('密码至少 6 位。')
+      throw new Error(getLocale() === 'en' ? 'Password must be at least 6 characters.' : '密码至少 6 位。')
     }
     const sb = getSupabase()
     const { data, error: authError } = await sb.auth.signUp({
