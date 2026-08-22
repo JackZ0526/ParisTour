@@ -1846,7 +1846,7 @@ export function GooglePlacePage({
                 type="button"
                 onClick={refreshTripadvisorPhotos}
                 disabled={tripadvisorPhotosRefreshing}
-                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.neutral} text-xs font-medium text-[var(--stone)] transition-colors hover:text-[var(--sage)] disabled:cursor-wait disabled:opacity-60`}
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.neutral} text-xs font-medium text-[var(--stone)] dark:text-zinc-300 transition-colors hover:text-[var(--sage)] dark:hover:text-emerald-300 hover:bg-white/80 dark:hover:bg-white/15 disabled:cursor-wait disabled:opacity-60 active:scale-95 cursor-pointer`}
                 aria-label="重新获取图片"
                 title="清除失败缓存并重新获取图片"
               >
@@ -1866,7 +1866,7 @@ export function GooglePlacePage({
             <div className="flex flex-wrap gap-2 text-sm">
             {cachedGoogleRating != null && (
               <span
-                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.gold}`}
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.gold} text-[var(--ink)] dark:text-amber-200`}
                 title="生成行程时缓存的 Google 评分"
               >
                 <PlaceSourceMark source="google" />
@@ -1879,7 +1879,7 @@ export function GooglePlacePage({
             )}
             {displayRating != null && (
               <span
-                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage}`}
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} text-[var(--ink)] dark:text-emerald-200`}
                 title="Tripadvisor 评分"
               >
                 <PlaceSourceMark source="tripadvisor" />
@@ -1894,7 +1894,7 @@ export function GooglePlacePage({
               <PlaceChipShimmer label="价格" />
             )}
             {priceLevelLabel && (
-              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.blue} text-[var(--stone)]`}>
+              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.blue} text-[var(--stone)] dark:text-zinc-300`}>
                 {priceLevelLabel}
               </span>
             )}
@@ -1902,12 +1902,12 @@ export function GooglePlacePage({
               <PlaceChipShimmer label="菜系" />
             )}
             {displayCuisine && (
-              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} text-[var(--stone)]`}>
+              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} text-[var(--stone)] dark:text-zinc-300`}>
                 {displayCuisine}
               </span>
             )}
             {displayPhone && (
-              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.violet} text-[var(--stone)]`}>
+              <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.violet} text-[var(--stone)] dark:text-zinc-300`}>
                 {displayPhone}
               </span>
             )}
@@ -1916,7 +1916,7 @@ export function GooglePlacePage({
                 href={displayWebsite}
                 target="_blank"
                 rel="noreferrer"
-                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] underline-offset-2 transition-colors hover:bg-[#dce9df]/90 hover:underline`}
+                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] dark:text-emerald-300 underline-offset-2 transition-all hover:bg-[#dce9df]/90 dark:hover:bg-[#668b7a]/25 hover:border-[#a8bcae] dark:hover:border-[#668b7a]/40 hover:underline active:scale-95 cursor-pointer`}
               >
                 官网
               </a>
@@ -1931,20 +1931,20 @@ export function GooglePlacePage({
                 href={googleMapsPlaceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={`group ${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} max-w-full text-sm text-[var(--stone)] transition-colors hover:bg-[#f1ded0]/90 hover:text-[var(--sage)]`}
+                className={`group ${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} max-w-full text-sm text-[var(--stone)] dark:text-zinc-300 transition-all hover:bg-[#f1ded0]/90 dark:hover:bg-[#d48354]/20 hover:text-[var(--copper)] dark:hover:text-[var(--copper)] hover:border-[#d7a98a] dark:hover:border-[#d48354]/45 active:scale-[0.99] cursor-pointer`}
                 title="在 Google 地图中查看"
               >
-                <MapPin size={14} strokeWidth={1.9} className="shrink-0" aria-hidden />
+                <MapPin size={14} strokeWidth={1.9} className="shrink-0 text-[var(--copper)]/85 dark:text-[var(--copper)] transition-colors" aria-hidden />
                 <span className="min-w-0 leading-snug">{displayAddress}</span>
                 <ExternalLink
                   size={14}
                   strokeWidth={1.9}
-                  className="ml-0.5 shrink-0 text-[var(--stone)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  className="ml-0.5 shrink-0 text-[var(--stone)]/80 dark:text-zinc-400 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--copper)] dark:group-hover:text-[var(--copper)]"
                   aria-hidden
                 />
               </a>
             </div>
-            )}
+          )}
           {!providerOwnsSummary && showTripadvisorAddressShimmer && (
             <div className="space-y-1" aria-busy>
               <span className="block h-3.5 w-[72%] rounded-full day-tab-shimmer" aria-hidden />

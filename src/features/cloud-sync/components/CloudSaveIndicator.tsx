@@ -56,14 +56,14 @@ function FloppyIcon({ spinning }: { spinning?: boolean }) {
 }
 
 export function CloudSaveIndicator() {
-  // In localhost dev mode, cloud saves are disabled — nothing to show.
-  if (!isCloudSyncEnabled()) return null
+  const isEnabled = isCloudSyncEnabled()
 
   const [saveStatus, setSaveStatus] = useState<CloudSaveStatus>(() => getCloudSaveStatus())
   const [saveError, setSaveError] = useState<string | null>(() => getCloudSaveError())
   const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>(() => getCloudSyncStatus())
 
   useEffect(() => {
+    if (!isEnabled) return
     const unsubSave = subscribeCloudSaveStatus(() => {
       setSaveStatus(getCloudSaveStatus())
       setSaveError(getCloudSaveError())
@@ -75,7 +75,10 @@ export function CloudSaveIndicator() {
       unsubSave()
       unsubSync()
     }
-  }, [])
+  }, [isEnabled])
+
+  // In localhost dev mode, cloud saves are disabled — nothing to show.
+  if (!isEnabled) return null
 
   // Prefer showing local save feedback; otherwise show inbound sync.
   const kind: ToastKind | null =

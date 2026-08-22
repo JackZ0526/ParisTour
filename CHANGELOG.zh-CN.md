@@ -18,9 +18,32 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.8.1] - 2026-08-22
+
+### 新增
+
+- 新增用户昵称设置与跨设备云端同步，顶部行程切换胶囊及协作菜单优先展示所有者/协作者昵称。
+- 头像上传支持交互式自由缩放与拖拽裁剪定位（`AvatarCropper`）。
+- 分享协作弹窗（`ShareDialog`）接入 Supabase Realtime，支持实时同步协作者最新头像与昵称。
+- 增加行程分享列表缓存机制，优化 JWT 负载与批量用户信息加载性能。
+
+### 变更
+
+- 登录页深色模式重构升级，采用精致磨砂玻璃质感与轻奢金色微光强调。
+- 头像裁剪弹窗在明暗模式下增强视口边框、缩放滑块及操作按钮对比度与悬停态反馈。
+- 协作弹窗内同伴昵称与邮箱改为单行自适应排版。
+- 精简头像选择弹窗内的重复提示文本与冗余说明卡片。
+
+### 修复
+
+- 修复头像裁剪与重置后的云端保存同步链路，采用 profile 健壮 upsert 机制确保多端即时更新。
+- 修复批量加载同伴 profile 时的 RLS 策略与查询效率。
 - 修复协作者权限切换导致成员列表及相邻移除按钮闪烁的问题，并保持邀请按钮在发送过程中的宽度稳定。
 - 将下拉关闭手势限制为移动端底部抽屉专用，桌面端弹窗不再响应拖拽。
 - 将 Supabase 行程初始化移出认证事件回调，并在创建主行程前验证当前用户，避免登录死锁及误判产生的 RLS 错误。
+- 修复地点详情页 Google 地图地址胶囊及操作按钮在深色模式下的 hover 对比度与高亮样式。
+- 完善发版脚本，要求发版时必须包含双语更新日志。
+
 
 ## [0.8.0] - 2026-08-21
 
@@ -476,7 +499,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...HEAD
+- [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
 - [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0
 - [0.7.0]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...v0.7.0
 - [0.6.0]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...v0.6.0

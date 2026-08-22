@@ -19,9 +19,39 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.8.1] - 2026-08-22
+
+### Added
+
+- display owner nickname instead of email handle in top capsule and menus
+- add live profiles realtime updates to ShareDialog
+- add cross-device nicknames, companions avatar sync, shares cache, and fix auth jwt bloat
+- let users choose crop position on upload
+
+### Changed
+
+- polish login page dark mode with refined frosted glass and luxury accents
+- display companion nickname and email inline on one line
+- streamline duplicate cropper instruction text
+- ensure hover text turns ink black in light mode for AvatarCropper actions
+- refine cropper viewport borders, zoom controls, and action button contrast for dark mode
+- remove redundant image format and privacy note card from AvatarPickerDialog
+
+### Fixed
+
+- use robust profile upsert for instant cross-device avatar sync
+- connect cloud persistence on avatar crop/reset in AvatarPickerDialog
+- enhance batch companions profile loading and update schema RLS
+- stabilize session trip bootstrap
+- limit pull-down dismiss to mobile
+- keep remove action visually stable
+- stabilize share dialog updates
+- require bilingual changelog notes
 - Prevent collaborator role toggles from flashing the member list or adjacent remove actions, and keep the invite button width stable while sending.
 - Restrict pull-down-to-dismiss gestures to mobile bottom sheets; desktop dialogs no longer respond to dragging.
 - Defer Supabase trip bootstrap work outside auth-state callbacks and verify the active user before creating a primary trip, preventing login deadlocks and false RLS failures.
+- Refine hover contrast and dark mode styling for Google Maps address capsule and action buttons.
+
 
 ## [0.8.0] - 2026-08-21
 
@@ -531,7 +561,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...HEAD
+- [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
 - [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0
 - [0.7.0]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...v0.7.0
 - [0.6.0]: https://github.com/JackZ0526/ParisTour/compare/v0.5.0...v0.6.0
