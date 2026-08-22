@@ -121,10 +121,92 @@ export function useUserAvatar(email?: string): {
 }
 
 /**
- * Crops a selected image file to square, scales down to max 256x256,
- * and encodes it as a lightweight WebP/JPEG dataUrl (~15-30KB).
+ * Square crop region expressed in source-image pixel coordinates.
+ * The avatar pipeline reads pixels from (sx, sy) of size `size × size`.
  */
-export function processAvatarImage(file: File): Promise<string> {
+export interface AvatarCrop {
+  /** Source-image X of the crop's top-left corner (px). */
+  sx: number
+  /** Source-image Y of the crop's top-left corner (px). */
+  sy: number
+  /** Square crop side length in source-image pixels. */
+  size: number
+}
+
+/**
+ * Decodes an image source (dataUrl or blob URL) into an HTMLImageElement.
+ * Used by the crop preview to display the original at full fidelity.
+ */
+export function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('解析图片失败'))
+    img.src = src
+  })
+}
+
+const AVATAR_OUTPUT_SIZE = 256
+const AVATAR_WEBP_QUALITY = 0.88
+
+function clampCropToImage(crop: AvatarCrop, imgWidth: number, imgHeight: number): AvatarCrop {
+  const maxSize = Math.max(1, Math.min(imgWidth, imgHeight))
+  const size = Math.min(Math.max(1, crop.size), maxSize)
+  const sx = Math.min(Math.max(0, crop.sx), imgWidth - size)
+  const sy = Math.min(Math.max(0, crop.sy), imgHeight - size)
+  return { sx, sy, size }
+}
+
+function defaultCenterCrop(imgWidth: number, imgHeight: number): AvatarCrop {
+  const size = Math.min(imgWidth, imgHeight)
+  return {
+    sx: (imgWidth - size) / 2,
+    sy: (imgHeight - size) / 2,
+    size,
+  }
+}
+
+function encodeCanvas(canvas: HTMLCanvasElement): string {
+  try {
+    const webp = canvas.toDataURL('image/webp', AVATAR_WEBP_QUALITY)
+    if (webp.startsWith('data:image/webp')) return webp
+  } catch {
+    /* fall through to JPEG */
+  }
+  return canvas.toDataURL('image/jpeg', AVATAR_WEBP_QUALITY)
+}
+
+/**
+ * Crops a loaded image to the given region and encodes it as a lightweight
+ * WebP/JPEG dataUrl (~15-30KB). Synchronous; the caller owns the img element.
+ */
+export function encodeAvatarCrop(img: HTMLImageElement, crop: AvatarCrop): string {
+  const w = img.naturalWidth || img.width
+  const h = img.naturalHeight || img.height
+  const c = clampCropToImage(crop, w, h)
+  const canvas = document.createElement('canvas')
+  canvas.width = AVATAR_OUTPUT_SIZE
+  canvas.height = AVATAR_OUTPUT_SIZE
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('无法创建图像画布上下文')
+  }
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, c.sx, c.sy, c.size, c.size, 0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE)
+
+  return encodeCanvas(canvas)
+}
+
+/**
+ * Crops a selected image file to a square, scales down to 256x256, and
+ * encodes it as a lightweight WebP/JPEG dataUrl (~15-30KB).
+ *
+ * If `crop` is omitted, defaults to a center-square crop — preserving the
+ * historical behavior for callers that don't need user-driven positioning.
+ */
+export function processAvatarImage(file: File, crop?: AvatarCrop): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('请选择有效的图片文件 (JPG / PNG / WebP)'))
@@ -143,14 +225,13 @@ export function processAvatarImage(file: File): Promise<string> {
       const img = new Image()
       img.onerror = () => reject(new Error('解析图片失败'))
       img.onload = () => {
-        const size = Math.min(img.width, img.height)
-        const sx = (img.width - size) / 2
-        const sy = (img.height - size) / 2
+        const w = img.naturalWidth || img.width
+        const h = img.naturalHeight || img.height
+        const finalCrop = crop ? clampCropToImage(crop, w, h) : defaultCenterCrop(w, h)
 
-        const targetSize = Math.min(size, 256)
         const canvas = document.createElement('canvas')
-        canvas.width = targetSize
-        canvas.height = targetSize
+        canvas.width = AVATAR_OUTPUT_SIZE
+        canvas.height = AVATAR_OUTPUT_SIZE
 
         const ctx = canvas.getContext('2d')
         if (!ctx) {
@@ -160,20 +241,9 @@ export function processAvatarImage(file: File): Promise<string> {
 
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, targetSize, targetSize)
+        ctx.drawImage(img, finalCrop.sx, finalCrop.sy, finalCrop.size, finalCrop.size, 0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE)
 
-        // Prefer WebP with fallback to JPEG
-        let dataUrl = ''
-        try {
-          dataUrl = canvas.toDataURL('image/webp', 0.88)
-          if (!dataUrl.startsWith('data:image/webp')) {
-            dataUrl = canvas.toDataURL('image/jpeg', 0.88)
-          }
-        } catch {
-          dataUrl = canvas.toDataURL('image/jpeg', 0.88)
-        }
-
-        resolve(dataUrl)
+        resolve(encodeCanvas(canvas))
       }
       img.src = src
     }
