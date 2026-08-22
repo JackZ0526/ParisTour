@@ -297,7 +297,7 @@ export function AvatarCropper({
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
+          className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 hover:text-[var(--ink)] dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
         >
           <X size={13} />
           <span>取消</span>
@@ -306,7 +306,7 @@ export function AvatarCropper({
           <button
             type="button"
             onClick={onRepick}
-            className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 hover:text-[var(--ink)] dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
           >
             <span>重新选择</span>
           </button>
