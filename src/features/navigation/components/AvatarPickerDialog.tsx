@@ -4,7 +4,6 @@ import {
   AlertCircle,
   Camera,
   Check,
-  ImageIcon,
   LoaderCircle,
   RotateCcw,
   Sparkles,
@@ -270,17 +269,6 @@ export function AvatarPickerDialog({
             </div>
           </div>
         )}
-
-        {/* 2. Format & Security Note Card */}
-        <div className="rounded-2xl border border-[var(--mist)]/80 dark:border-white/10 bg-white/40 dark:bg-white/5 p-4 backdrop-blur-md space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--ink)]">
-            <ImageIcon size={14} className="text-[var(--copper)]" />
-            <span>图片格式与隐私说明</span>
-          </div>
-          <p className="text-[11px] text-[var(--stone)] leading-relaxed">
-            支持 JPG、PNG、WebP、HEIC 等格式。上传后可拖动、缩放自由选择裁切位置，系统会在浏览器本地裁剪为高清视网膜微晶规格（约 20KB），无需消耗额外上传流量，刷新或离线均可稳定展示。
-          </p>
-        </div>
       </div>
     </BottomSheet>
   )
