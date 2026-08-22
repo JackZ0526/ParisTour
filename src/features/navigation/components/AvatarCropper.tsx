@@ -192,11 +192,10 @@ export function AvatarCropper({
     <div className="flex flex-col items-center gap-4">
       <div
         ref={viewportRef}
-        className="relative overflow-hidden rounded-3xl border border-white/80 shadow-[0_12px_36px_rgba(0,0,0,0.12),inset_0_1.5px_2px_rgba(255,255,255,1)] select-none touch-none"
+        className="relative overflow-hidden rounded-3xl border border-white/80 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.12),inset_0_1.5px_2px_rgba(255,255,255,1)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.55),inset_0_1.5px_2px_rgba(255,255,255,0.08)] select-none touch-none bg-[#0f1115] dark:bg-[#0b0e0c]"
         style={{
           width: VIEWPORT_SIZE,
           height: VIEWPORT_SIZE,
-          background: '#0f1115',
           cursor: img ? (dragRef.current ? 'grabbing' : 'grab') : 'default',
         }}
         onPointerDown={handlePointerDown}
@@ -205,6 +204,12 @@ export function AvatarCropper({
         onPointerCancel={endDrag}
         onWheel={handleWheel}
       >
+        {/* Top subtle highlight refraction line */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-6 top-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/50 dark:via-white/20 to-transparent"
+        />
+
         {/* Image layer — sized in pixels, positioned via left/top + offset */}
         {img && (
           <img
@@ -233,7 +238,7 @@ export function AvatarCropper({
 
         {/* Crop frame border (no fill, just a thin ring) */}
         <div
-          className="absolute inset-0 pointer-events-none ring-1 ring-white/70"
+          className="absolute inset-0 pointer-events-none ring-1 ring-white/60 dark:ring-white/25"
           style={{ borderRadius: cropFrameRadius }}
         />
 
@@ -251,17 +256,17 @@ export function AvatarCropper({
       </div>
 
       {/* Hint */}
-      <p className="text-[11px] text-[var(--stone)]">
+      <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400 font-medium tracking-tight">
         {isReady ? '拖动图片调整位置，滚轮或点击按钮缩放' : ' '}
       </p>
 
       {/* Zoom controls */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => zoomByButton(1 / ZOOM_STEP)}
           disabled={!isReady || scale <= MIN_SCALE}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/5 text-[var(--stone)] hover:bg-white dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/10 text-[var(--stone)] dark:text-zinc-200 hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white dark:hover:border-white/20 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="缩小"
         >
           <ZoomOut size={15} />
@@ -270,7 +275,7 @@ export function AvatarCropper({
           type="button"
           onClick={() => zoomByButton(ZOOM_STEP)}
           disabled={!isReady || scale >= MAX_SCALE}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/5 text-[var(--stone)] hover:bg-white dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/10 text-[var(--stone)] dark:text-zinc-200 hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white dark:hover:border-white/20 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="放大"
         >
           <ZoomIn size={15} />
@@ -279,7 +284,7 @@ export function AvatarCropper({
           type="button"
           onClick={handleReset}
           disabled={!isReady}
-          className="inline-flex h-9 items-center gap-1 rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/5 px-3 text-[11px] font-medium text-[var(--stone)] hover:bg-white dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/10 px-3.5 text-[11px] font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white dark:hover:border-white/20 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="重置"
         >
           <RotateCcw size={12} />
@@ -288,11 +293,11 @@ export function AvatarCropper({
       </div>
 
       {/* Action row */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-2.5 text-xs font-medium text-[var(--stone)] hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+          className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
         >
           <X size={13} />
           <span>取消</span>
@@ -301,7 +306,7 @@ export function AvatarCropper({
           <button
             type="button"
             onClick={onRepick}
-            className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-2.5 text-xs font-medium text-[var(--stone)] hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
           >
             <span>重新选择</span>
           </button>
@@ -310,7 +315,7 @@ export function AvatarCropper({
           type="button"
           onClick={handleConfirm}
           disabled={!isReady}
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(35,42,38,0.2),inset_0_1px_1.5px_rgba(255,255,255,0.3)] transition-all hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(35,42,38,0.2),inset_0_1px_1.5px_rgba(255,255,255,0.3)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25)] transition-all hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
         >
           <Check size={14} />
           <span>确认裁切</span>
