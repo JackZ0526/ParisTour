@@ -192,6 +192,7 @@ export function AvatarCropper({
     <div className="flex flex-col items-center gap-4">
       <div
         ref={viewportRef}
+        data-sheet-no-drag
         className="relative overflow-hidden rounded-3xl border border-white/80 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.12),inset_0_1.5px_2px_rgba(255,255,255,1)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.55),inset_0_1.5px_2px_rgba(255,255,255,0.08)] select-none touch-none bg-[#0f1115] dark:bg-[#0b0e0c]"
         style={{
           width: VIEWPORT_SIZE,
@@ -203,6 +204,7 @@ export function AvatarCropper({
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onWheel={handleWheel}
+        onTouchStart={(e) => e.stopPropagation()}
       >
         {/* Top subtle highlight refraction line */}
         <span

@@ -60,6 +60,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 
     const isFormInteractive = (target: HTMLElement | null): boolean => {
       if (!target) return false
+      if (target.closest('[data-sheet-no-drag]')) return true
       const tag = target.tagName.toLowerCase()
       return (
         tag === 'input' ||

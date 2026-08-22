@@ -1321,6 +1321,54 @@ export function applyAccessibleTripLocally(trip: AccessibleTrip) {
 }
 
 
+const SHARES_STORAGE_PREFIX = 'paris-tour-shares-cache-v1:'
+
+export function getCachedTripShares(tripId: string): TripShareRow[] | null {
+  if (!tripId) return null
+  try {
+    const raw = localStorage.getItem(`${SHARES_STORAGE_PREFIX}${tripId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as TripShareRow[]) : null
+  } catch {
+    return null
+  }
+}
+
+export function setCachedTripShares(tripId: string, shares: TripShareRow[]): void {
+  if (!tripId) return
+  try {
+    localStorage.setItem(`${SHARES_STORAGE_PREFIX}${tripId}`, JSON.stringify(shares))
+  } catch (err) {
+    console.warn('[tripCloud] failed to cache trip shares:', err)
+  }
+}
+
+export function invalidateCachedTripShares(tripId: string): void {
+  if (!tripId) return
+  try {
+    localStorage.removeItem(`${SHARES_STORAGE_PREFIX}${tripId}`)
+  } catch {
+    /* ignore */
+  }
+}
+
+export function sharesAreEqual(a: TripShareRow[], b: TripShareRow[]): boolean {
+  if (a.length !== b.length) return false
+  const sortedA = [...a].sort((x, y) => x.id.localeCompare(y.id))
+  const sortedB = [...b].sort((x, y) => x.id.localeCompare(y.id))
+  for (let i = 0; i < sortedA.length; i++) {
+    if (
+      sortedA[i].id !== sortedB[i].id ||
+      sortedA[i].invitee_email !== sortedB[i].invitee_email ||
+      sortedA[i].role !== sortedB[i].role
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
 export async function listTripShares(tripId: string): Promise<TripShareRow[]> {
   const sb = getSupabase()
   const { data, error } = await sb
@@ -1329,7 +1377,9 @@ export async function listTripShares(tripId: string): Promise<TripShareRow[]> {
     .eq('trip_id', tripId)
     .order('created_at', { ascending: true })
   if (error) throw error
-  return (data || []) as TripShareRow[]
+  const res = (data || []) as TripShareRow[]
+  setCachedTripShares(tripId, res)
+  return res
 }
 
 export async function upsertTripShare(

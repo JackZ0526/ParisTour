@@ -10,14 +10,25 @@ import {
   Users,
 } from 'lucide-react'
 import {
+  getCachedTripShares,
   listTripShares,
   removeTripShare,
   sendShareInviteEmail,
+  sharesAreEqual,
   updateTripShareRole,
   upsertTripShare,
   type TripShareRole,
   type TripShareRow,
 } from '../services/tripCloud'
+import {
+  batchLoadProfileAvatars,
+} from '../../auth/services/avatarPreferenceCloud'
+import {
+  batchLoadProfileNicknames,
+} from '../../auth/services/nicknamePreferenceCloud'
+import { getUserAvatar, type UserAvatar } from '../../auth/services/avatarStore'
+import { getUserNickname } from '../../auth/services/nicknameStore'
+import { UserAvatarView } from '../../../shared/components/UserAvatarView'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
@@ -102,7 +113,9 @@ function RoleToggle({
 
 export function ShareDialog({ tripId, open, onClose }: Props) {
   const titleId = useId()
-  const [shares, setShares] = useState<TripShareRow[]>([])
+  const [shares, setShares] = useState<TripShareRow[]>(() => getCachedTripShares(tripId) || [])
+  const [companionAvatars, setCompanionAvatars] = useState<Record<string, UserAvatar>>({})
+  const [companionNicknames, setCompanionNicknames] = useState<Record<string, string>>({})
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<TripShareRole>('viewer')
   const [loadingList, setLoadingList] = useState(false)
@@ -117,7 +130,16 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     setError(null)
     try {
       const list = await listTripShares(tripId)
-      setShares(list)
+      setShares((prev) => (sharesAreEqual(prev, list) ? prev : list))
+      const emails = list.map((s) => s.invitee_email)
+      if (emails.length) {
+        void batchLoadProfileAvatars(emails).then((avatars) => {
+          setCompanionAvatars((prev) => ({ ...prev, ...avatars }))
+        })
+        void batchLoadProfileNicknames(emails).then((nicknames) => {
+          setCompanionNicknames((prev) => ({ ...prev, ...nicknames }))
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载成员失败')
     } finally {
@@ -127,12 +149,28 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return
-    void reload()
+    const cached = getCachedTripShares(tripId)
+    if (cached) {
+      setShares(cached)
+      const emails = cached.map((s) => s.invitee_email)
+      const localAvatars: Record<string, UserAvatar> = {}
+      const localNicknames: Record<string, string> = {}
+      for (const e of emails) {
+        localAvatars[e.toLowerCase()] = getUserAvatar(e)
+        const n = getUserNickname(e)
+        if (n) localNicknames[e.toLowerCase()] = n
+      }
+      setCompanionAvatars(localAvatars)
+      setCompanionNicknames(localNicknames)
+      void reload(false)
+    } else {
+      void reload(true)
+    }
     setEmail('')
     setRole('viewer')
     setError(null)
     setInfo(null)
-  }, [open, reload])
+  }, [open, tripId, reload])
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -342,24 +380,39 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   transition={{ duration: 0.18 }}
                   className="space-y-2.5"
                 >
-                  {shares.map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-[#202b26] hover:shadow-xs"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 font-display text-sm font-semibold text-[var(--sage)] dark:text-[#88b3a0] shadow-inner">
-                          {s.invitee_email.slice(0, 1).toUpperCase()}
+                  {shares.map((s) => {
+                    const normEmail = s.invitee_email.toLowerCase()
+                    const compAvatar = companionAvatars[normEmail]
+                    const compNickname = companionNicknames[normEmail]
+
+                    return (
+                      <li
+                        key={s.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-3.5 shadow-2xs backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-[#202b26] hover:shadow-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <UserAvatarView
+                            avatar={compAvatar}
+                            email={s.invitee_email}
+                            name={compNickname}
+                            size="md"
+                            shape="squircle"
+                            className="shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-xs sm:text-sm font-semibold text-[var(--ink)]">
+                              {compNickname || s.invitee_email}
+                            </p>
+                            {compNickname && (
+                              <p className="truncate text-[11px] text-[var(--stone)] dark:text-zinc-400">
+                                {s.invitee_email}
+                              </p>
+                            )}
+                            <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400">
+                              {s.role === 'editor' ? '✨ 可共同编辑行程内容' : '👁️ 仅查看，不可修改'}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-xs sm:text-sm font-medium text-[var(--ink)]">
-                            {s.invitee_email}
-                          </p>
-                          <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400">
-                            {s.role === 'editor' ? '✨ 可共同编辑行程内容' : '👁️ 仅查看，不可修改'}
-                          </p>
-                        </div>
-                      </div>
                       <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5 dark:border-white/10">
                         <RoleToggle
                           name={`role-${s.id}`}
@@ -378,7 +431,8 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                         </button>
                       </div>
                     </li>
-                  ))}
+                  )
+                })}
                 </motion.ul>
               )}
             </AnimatePresence>

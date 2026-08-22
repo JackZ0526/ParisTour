@@ -42,6 +42,7 @@ import { TopNavSegment } from './features/navigation/components/TopNavSegment'
 import { ProfileTab } from './features/navigation/components/ProfileTab'
 import { UserAvatarView } from './shared/components/UserAvatarView'
 import { useUserAvatar } from './features/auth/services/avatarStore'
+import { useUserNickname } from './features/auth/services/nicknameStore'
 import type { AppTab } from './features/navigation/types'
 const TripMap = React.lazy(() =>
   import('./features/map/components/TripMap').then((m) => ({ default: m.TripMap })),
@@ -146,6 +147,7 @@ export default function App() {
     tripSyncEpoch,
   } = useAuth()
   const { avatar } = useUserAvatar(email)
+  const { nickname } = useUserNickname(email)
   const readOnly = !canEdit
   const {
     shareOpen,
@@ -729,12 +731,13 @@ export default function App() {
                 <UserAvatarView
                   avatar={avatar}
                   email={email}
+                  name={nickname}
                   size="sm"
                   shape="circle"
                   className="border border-white/90 dark:border-white/20"
                 />
                 <span className="hidden max-w-[130px] truncate text-xs font-medium text-[var(--ink)] sm:inline-block">
-                  {email}
+                  {nickname || email}
                 </span>
                 {role && (
                   <span

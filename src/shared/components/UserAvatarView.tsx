@@ -3,8 +3,9 @@ import { User } from 'lucide-react'
 import type { UserAvatar } from '../../features/auth/services/avatarStore'
 
 export interface UserAvatarViewProps {
-  avatar: UserAvatar
-  email?: string
+  avatar?: UserAvatar | null
+  email?: string | null
+  name?: string | null
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   shape?: 'circle' | 'squircle'
   className?: string
@@ -37,6 +38,7 @@ const SIZE_CONFIGS = {
 export function UserAvatarView({
   avatar,
   email,
+  name,
   size = 'md',
   shape = 'squircle',
   className = '',
@@ -47,7 +49,7 @@ export function UserAvatarView({
   const radiusClass = shape === 'circle' ? 'rounded-full' : config.squircleRadius
 
   // 1. Uploaded Custom Photo (Image)
-  if (avatar.type === 'image' && avatar.value && !imageError) {
+  if (avatar?.type === 'image' && avatar.value && !imageError) {
     return (
       <div
         className={`relative overflow-hidden flex shrink-0 items-center justify-center border border-white/90 bg-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md select-none ${config.container} ${radiusClass} ${className}`}
@@ -64,7 +66,8 @@ export function UserAvatarView({
   }
 
   // 2. Default Initial Letter Fallback (Paris Frosted Copper Glass)
-  const letter = (avatar.value || (email ? email.charAt(0) : 'P')).toUpperCase()
+  const initialSource = (name && name.trim()) || (email && email.trim()) || 'P'
+  const letter = initialSource.charAt(0).toUpperCase()
   return (
     <div
       className={`relative overflow-hidden flex shrink-0 items-center justify-center font-display font-semibold tracking-tight border border-white/90 bg-gradient-to-br from-[#f8f1eb] via-white to-[#f4e6dc] text-[var(--copper)] shadow-[0_4px_16px_rgba(181,106,60,0.12),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md select-none ${config.container} ${radiusClass} ${className}`}

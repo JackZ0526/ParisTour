@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Compass,
+  Edit3,
   Hotel,
   Laptop,
   LogOut,
@@ -28,6 +29,8 @@ import {
 import { UserAvatarView } from '../../../shared/components/UserAvatarView'
 import { useUserAvatar } from '../../auth/services/avatarStore'
 import { AvatarPickerDialog } from './AvatarPickerDialog'
+import { useUserNickname } from '../../auth/services/nicknameStore'
+import { NicknamePickerDialog } from './NicknamePickerDialog'
 import { useTheme } from '../../../shared/services/themeStore'
 import {
   BASE_TAG_PILL,
@@ -121,6 +124,8 @@ export function ProfileTab({
   const cloudSync = useLiveCloudSync()
   const { avatar } = useUserAvatar(email)
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
+  const { nickname } = useUserNickname(email)
+  const [nicknamePickerOpen, setNicknamePickerOpen] = useState(false)
   const { themePreference, setThemePreference } = useTheme()
   const [hasThemeInteracted, setHasThemeInteracted] = useState(false)
 
@@ -175,6 +180,7 @@ export function ProfileTab({
                     <UserAvatarView
                       avatar={avatar}
                       email={email}
+                      name={nickname}
                       size="lg"
                       shape="squircle"
                       className="group-hover:shadow-[0_10px_25px_rgba(181,106,60,0.25)] transition-shadow duration-200"
@@ -208,9 +214,25 @@ export function ProfileTab({
 
                 {/* User Account Info */}
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate font-display text-base sm:text-lg font-semibold text-[var(--ink)] tracking-tight">
-                    {email}
-                  </h2>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <h2 className="truncate font-display text-base sm:text-lg font-semibold text-[var(--ink)] tracking-tight">
+                      {nickname || email}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setNicknamePickerOpen(true)}
+                      className="inline-flex items-center justify-center rounded-full p-1 text-[var(--stone)] hover:text-[var(--copper)] transition-colors active:scale-95 cursor-pointer"
+                      title="修改个性昵称"
+                      aria-label="修改个性昵称"
+                    >
+                      <Edit3 size={13} strokeWidth={2} />
+                    </button>
+                  </div>
+                  {nickname && (
+                    <p className="truncate text-xs text-[var(--stone)] dark:text-zinc-400">
+                      {email}
+                    </p>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <span
                       className={`${glassCapsuleSurfaceClass} inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-medium ${
@@ -642,6 +664,13 @@ export function ProfileTab({
       <AvatarPickerDialog
         open={avatarPickerOpen}
         onClose={() => setAvatarPickerOpen(false)}
+        email={email}
+      />
+
+      {/* Nickname Customization Modal */}
+      <NicknamePickerDialog
+        open={nicknamePickerOpen}
+        onClose={() => setNicknamePickerOpen(false)}
         email={email}
       />
     </motion.div>

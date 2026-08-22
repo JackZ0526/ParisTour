@@ -38,6 +38,12 @@ import {
   saveProfileThemePreference,
 } from './services/themePreferenceCloud'
 import {
+  hydrateAccountAvatar,
+} from './services/avatarPreferenceCloud'
+import {
+  hydrateAccountNickname,
+} from './services/nicknamePreferenceCloud'
+import {
   AuthContext,
   type AuthContextValue,
   type AuthStatus,
@@ -142,72 +148,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   tripReadyRef.current = tripReady
   sessionUserIdRef.current = session?.user?.id ?? null
 
+  const isBootstrappingRef = useRef(false)
+
   const bootstrapSession = useCallback(async (next: Session | null) => {
-    setTripReady(false)
-    setSession(next)
-
-    if (!next?.user) {
-      setAllowlisted(false)
-      setTrips([])
-      setActiveTripId(null)
-      setStatus((prev) => (prev === 'not_allowlisted' ? 'not_allowlisted' : 'signed_out'))
+    if (isBootstrappingRef.current && next?.user?.id && next.user.id === sessionUserIdRef.current) {
       return
     }
-
-    setError(null)
-
-    const userEmail = (next.user.email || '').toLowerCase()
-    let listed = false
+    isBootstrappingRef.current = true
     try {
-      listed =
-        (await getProfileAllowlisted(next.user.id)) ||
-        (await isEmailAllowlisted(userEmail))
-    } catch (err) {
-      console.warn(err)
-      listed = false
-    }
+      setTripReady(false)
+      setSession(next)
 
-    if (!listed) {
-      setAllowlisted(false)
-      setTrips([])
-      setActiveTripId(null)
-      setError('该邮箱尚未获邀请，暂时无法使用。')
-      setStatus('not_allowlisted')
+      if (!next?.user) {
+        setAllowlisted(false)
+        setTrips([])
+        setActiveTripId(null)
+        setStatus((prev) => (prev === 'not_allowlisted' ? 'not_allowlisted' : 'signed_out'))
+        return
+      }
+
+      setError(null)
+
+      // 1. One-time recovery: purge any bloated base64 from auth user_metadata on Supabase
+      const metaAvatar = next.user.user_metadata?.avatar_url
+      if (typeof metaAvatar === 'string' && metaAvatar.startsWith('data:')) {
+        try {
+          await getSupabase().auth.updateUser({
+            data: { avatar_url: null },
+          })
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const userEmail = (next.user.email || '').toLowerCase()
+      let listed = false
       try {
-        await getSupabase().auth.signOut({ scope: 'local' })
-      } catch {
-        /* ignore */
+        listed =
+          (await getProfileAllowlisted(next.user.id)) ||
+          (await isEmailAllowlisted(userEmail))
+      } catch (err) {
+        console.warn(err)
+        listed = false
       }
-      return
-    }
 
-    setAllowlisted(true)
-    try {
-      const [accessible] = await Promise.all([
-        listAccessibleTrips(next.user.id, userEmail),
-        hydrateAccountThemePreference(next.user.id),
-      ])
-      setTrips(accessible)
-      const preferred = pickPreferredTrip(accessible, next.user.id)
-      if (preferred) {
-        applyAccessibleTripLocally(preferred)
-        setActiveTripId(preferred.id)
-        rememberLastTripId(next.user.id, preferred.id)
+      if (!listed) {
+        setAllowlisted(false)
+        setTrips([])
+        setActiveTripId(null)
+        setError('该邮箱尚未获邀请，暂时无法使用。')
+        setStatus('not_allowlisted')
+        try {
+          await getSupabase().auth.signOut({ scope: 'local' })
+        } catch {
+          /* ignore */
+        }
+        return
       }
-      setStatus('ready')
-      setTripReady(true)
-      setBootKey((k) => k + 1)
-    } catch (err) {
-      console.error(err)
-      const msg =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : err instanceof Error
-            ? err.message
-            : '加载行程失败'
-      setError(msg || '加载行程失败')
-      setStatus('ready')
-      setTripReady(true)
+
+      setAllowlisted(true)
+      try {
+        // 2. Synchronously load accessible trips to guarantee 'owner' / activeTrip setup
+        const accessible = await listAccessibleTrips(next.user.id, userEmail)
+        setTrips(accessible)
+        const preferred = pickPreferredTrip(accessible, next.user.id)
+        if (preferred) {
+          applyAccessibleTripLocally(preferred)
+          setActiveTripId(preferred.id)
+          rememberLastTripId(next.user.id, preferred.id)
+        }
+        setStatus('ready')
+        setTripReady(true)
+        setBootKey((k) => k + 1)
+
+        // 3. Safe, non-blocking background hydration of user preferences
+        void Promise.allSettled([
+          hydrateAccountThemePreference(next.user.id),
+          hydrateAccountAvatar(next.user.id, userEmail),
+          hydrateAccountNickname(next.user.id, userEmail),
+        ])
+      } catch (err) {
+        console.error(err)
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : err instanceof Error
+              ? err.message
+              : '加载行程失败'
+        setError(msg || '加载行程失败')
+        setStatus('ready')
+        setTripReady(true)
+      }
+    } finally {
+      isBootstrappingRef.current = false
     }
   }, [])
 
@@ -240,13 +273,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = sb.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'INITIAL_SESSION') return
-      const resumeSignedIn =
-        event === 'SIGNED_IN' &&
-        nextSession?.user?.id &&
+      const isSameUserReady =
+        Boolean(nextSession?.user?.id) &&
         statusRef.current === 'ready' &&
         tripReadyRef.current &&
-        sessionUserIdRef.current === nextSession.user.id
-      if (event === 'TOKEN_REFRESHED' || resumeSignedIn) {
+        sessionUserIdRef.current === nextSession?.user?.id
+      const resumeSignedIn = event === 'SIGNED_IN' && isSameUserReady
+
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || resumeSignedIn) {
         setSession(nextSession)
         return
       }
