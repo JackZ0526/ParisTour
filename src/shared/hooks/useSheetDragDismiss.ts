@@ -14,11 +14,13 @@ export interface UseSheetDragDismissReturn<T extends HTMLElement = HTMLDivElemen
 }
 
 /**
- * High-performance gesture arbiter for bottom sheets.
+ * High-performance mobile gesture arbiter for bottom sheets.
  *
  * Architecture:
  * - Operates on an inner `dragY` MotionValue layer so outer entrance/exit transitions
  *   (`initial: { y: '100%' } -> animate: { y: 0 }`) run completely unhindered.
+ * - Only accepts touch gestures below the 640px mobile breakpoint. Centered
+ *   desktop dialogs never attach mouse dragging or react to touch dragging.
  * - Attaches a non-passive `touchmove` listener directly to the sheet DOM node.
  * - When content is at top (`scrollTop <= 0`) and user drags downward:
  *   Calls `e.preventDefault()` to totally suppress browser rubber-band bounce,
@@ -54,6 +56,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     let lastY = 0
     let lastTime = 0
     let velocityY = 0
+    const mobileSheetQuery = window.matchMedia('(max-width: 639px)')
 
     const isFormInteractive = (target: HTMLElement | null): boolean => {
       if (!target) return false
@@ -101,6 +104,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 
     // --- Touch handling (Mobile) ---
     const onTouchStart = (e: TouchEvent) => {
+      if (!mobileSheetQuery.matches) return
       if (e.touches.length !== 1) return
       const touch = e.touches[0]
       const target = touch.target as HTMLElement | null
@@ -116,6 +120,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     }
 
     const onTouchMove = (e: TouchEvent) => {
+      if (!mobileSheetQuery.matches) return
       if (e.touches.length !== 1) return
       const touch = e.touches[0]
       const deltaY = touch.clientY - startY
@@ -156,84 +161,22 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     }
 
     const onTouchEnd = () => {
+      if (!mobileSheetQuery.matches) return
       if (isDragging) {
         settleOnRelease(velocityY)
       }
-    }
-
-    // --- Mouse handling (Desktop) ---
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-      const target = e.target as HTMLElement | null
-      if (isFormInteractive(target)) return
-      if (target?.closest('button, a, [role="button"], input, textarea, select')) return
-
-      const scrollAncestor = findScrollableAncestor(target)
-      if (scrollAncestor && scrollAncestor.scrollTop > 0) return
-
-      startY = e.clientY
-      startX = e.clientX
-      lastY = e.clientY
-      lastTime = performance.now()
-      velocityY = 0
-      isDragging = false
-
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const deltaY = moveEvent.clientY - startY
-        const deltaX = moveEvent.clientX - startX
-
-        const now = performance.now()
-        const dt = now - lastTime
-        if (dt > 4 && dt < 120) {
-          const instantVelocity = ((moveEvent.clientY - lastY) / dt) * 1000
-          velocityY = velocityY ? velocityY * 0.35 + instantVelocity * 0.65 : instantVelocity
-        }
-        lastY = moveEvent.clientY
-        lastTime = now
-
-        if (!isDragging) {
-          if (Math.abs(deltaY) < 4 && Math.abs(deltaX) < 4) return
-          if (deltaY > 4 && deltaY > Math.abs(deltaX)) {
-            isDragging = true
-          } else {
-            return
-          }
-        }
-
-        if (isDragging) {
-          const currentDelta = moveEvent.clientY - startY
-          if (currentDelta > 0) {
-            dragY.set(currentDelta)
-          } else {
-            dragY.set(currentDelta * 0.15)
-          }
-        }
-      }
-
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove)
-        window.removeEventListener('mouseup', onMouseUp)
-        if (isDragging) {
-          settleOnRelease(velocityY)
-        }
-      }
-
-      window.addEventListener('mousemove', onMouseMove)
-      window.addEventListener('mouseup', onMouseUp)
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: false })
     el.addEventListener('touchend', onTouchEnd, { passive: true })
     el.addEventListener('touchcancel', onTouchEnd, { passive: true })
-    el.addEventListener('mousedown', onMouseDown)
 
     return () => {
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
       el.removeEventListener('touchcancel', onTouchEnd)
-      el.removeEventListener('mousedown', onMouseDown)
     }
   }, [onClose, threshold, velocityThreshold, dragY])
 

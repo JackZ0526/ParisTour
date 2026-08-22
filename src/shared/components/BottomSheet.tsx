@@ -27,8 +27,8 @@ export interface BottomSheetProps {
  * Architecture:
  * - Outer motion.div: Handles 420ms iOS quintic slide-up entrance and exit transitions
  *   via useEnterExit('sheet-bottom').
- * - Inner motion.div: Handles real-time pull-down gesture displacement (dragY), velocity
- *   physics, and rubberband overscroll suppression without style collision.
+ * - Inner motion.div: Handles mobile-only pull-down gesture displacement (dragY),
+ *   velocity physics, and rubberband overscroll suppression without style collision.
  * - Backdrop: Fades independently via useEnterExit('fade').
  */
 export function BottomSheet({
