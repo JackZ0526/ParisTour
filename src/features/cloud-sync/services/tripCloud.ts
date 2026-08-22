@@ -308,6 +308,14 @@ export async function ensurePrimaryTrip(userId: string): Promise<TripRow> {
     }
   }
 
+  // A temporarily missing/rotating auth token makes RLS hide existing trips.
+  // Verify the token with Auth before attempting a primary-trip insert, so a
+  // session race can never be mistaken for a brand-new account.
+  const { data: authData, error: authError } = await sb.auth.getUser()
+  if (authError || authData.user?.id !== userId) {
+    throw new Error('登录会话尚未完成云端验证，请刷新页面后重新登录。现有行程数据不会受影响。')
+  }
+
   const empty = emptyTripSnapshot()
   const { data: created, error: insertError } = await sb
     .from('trips')

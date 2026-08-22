@@ -21,6 +21,7 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 - Prevent collaborator role toggles from flashing the member list or adjacent remove actions, and keep the invite button width stable while sending.
 - Restrict pull-down-to-dismiss gestures to mobile bottom sheets; desktop dialogs no longer respond to dragging.
+- Defer Supabase trip bootstrap work outside auth-state callbacks and verify the active user before creating a primary trip, preventing login deadlocks and false RLS failures.
 
 ## [0.8.0] - 2026-08-21
 

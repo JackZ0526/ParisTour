@@ -148,13 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   tripReadyRef.current = tripReady
   sessionUserIdRef.current = session?.user?.id ?? null
 
-  const isBootstrappingRef = useRef(false)
+  const activeBootstrapUserIdRef = useRef<string | null | undefined>(undefined)
+  const bootstrapSequenceRef = useRef(0)
 
   const bootstrapSession = useCallback(async (next: Session | null) => {
-    if (isBootstrappingRef.current && next?.user?.id && next.user.id === sessionUserIdRef.current) {
+    const nextUserId = next?.user?.id ?? null
+    if (activeBootstrapUserIdRef.current === nextUserId) {
       return
     }
-    isBootstrappingRef.current = true
+    const sequence = ++bootstrapSequenceRef.current
+    activeBootstrapUserIdRef.current = nextUserId
+    const isCurrentBootstrap = () => bootstrapSequenceRef.current === sequence
+
     try {
       setTripReady(false)
       setSession(next)
@@ -169,18 +174,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setError(null)
 
-      // 1. One-time recovery: purge any bloated base64 from auth user_metadata on Supabase
-      const metaAvatar = next.user.user_metadata?.avatar_url
-      if (typeof metaAvatar === 'string' && metaAvatar.startsWith('data:')) {
-        try {
-          await getSupabase().auth.updateUser({
-            data: { avatar_url: null },
-          })
-        } catch {
-          /* ignore */
-        }
-      }
-
       const userEmail = (next.user.email || '').toLowerCase()
       let listed = false
       try {
@@ -191,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn(err)
         listed = false
       }
+      if (!isCurrentBootstrap()) return
 
       if (!listed) {
         setAllowlisted(false)
@@ -208,8 +202,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setAllowlisted(true)
       try {
-        // 2. Synchronously load accessible trips to guarantee 'owner' / activeTrip setup
+        // Load trips before any preference write that may refresh the auth token.
         const accessible = await listAccessibleTrips(next.user.id, userEmail)
+        if (!isCurrentBootstrap()) return
         setTrips(accessible)
         const preferred = pickPreferredTrip(accessible, next.user.id)
         if (preferred) {
@@ -221,13 +216,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTripReady(true)
         setBootKey((k) => k + 1)
 
-        // 3. Safe, non-blocking background hydration of user preferences
+        // Safe, non-blocking background hydration. Avatar metadata cleanup may
+        // refresh the token, so it deliberately runs after RLS-protected trips.
         void Promise.allSettled([
           hydrateAccountThemePreference(next.user.id),
           hydrateAccountAvatar(next.user.id, userEmail),
           hydrateAccountNickname(next.user.id, userEmail),
         ])
       } catch (err) {
+        if (!isCurrentBootstrap()) return
         console.error(err)
         const msg =
           err && typeof err === 'object' && 'message' in err
@@ -240,7 +237,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTripReady(true)
       }
     } finally {
-      isBootstrappingRef.current = false
+      if (isCurrentBootstrap()) {
+        activeBootstrapUserIdRef.current = undefined
+      }
     }
   }, [])
 
@@ -271,6 +270,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setStatus('signed_out')
       })
 
+    let bootstrapTimer: number | null = null
+    const scheduleBootstrap = (nextSession: Session | null) => {
+      if (bootstrapTimer !== null) window.clearTimeout(bootstrapTimer)
+      bootstrapTimer = window.setTimeout(() => {
+        bootstrapTimer = null
+        if (!cancelled) void bootstrapSession(nextSession)
+      }, 0)
+    }
+
     const { data: sub } = sb.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'INITIAL_SESSION') return
       const isSameUserReady =
@@ -284,11 +292,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(nextSession)
         return
       }
-      void bootstrapSession(nextSession)
+      // Supabase warns that awaiting or starting client API calls directly in
+      // this callback can deadlock auth. Defer all database work until the
+      // auth handler has returned and released its internal lock.
+      scheduleBootstrap(nextSession)
     })
 
     return () => {
       cancelled = true
+      if (bootstrapTimer !== null) window.clearTimeout(bootstrapTimer)
       sub.subscription.unsubscribe()
     }
   }, [bootstrapSession])
