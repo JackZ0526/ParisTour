@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertCircle,
   CheckCircle2,
+  LoaderCircle,
   Mail,
   Trash2,
   UserPlus,
@@ -62,6 +63,7 @@ function RoleToggle({
             disabled={disabled}
             aria-pressed={active}
             onClick={() => {
+              if (active || disabled) return
               setHasInteracted(true)
               onChange(opt.id)
             }}
@@ -69,7 +71,7 @@ function RoleToggle({
               active
                 ? 'text-[var(--paper)] dark:text-white'
                 : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
-            } disabled:opacity-50`}
+            } disabled:cursor-default`}
           >
             {active && (
               <motion.div
@@ -104,12 +106,14 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<TripShareRole>('viewer')
   const [loadingList, setLoadingList] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
-  const reload = useCallback(async () => {
-    setLoadingList(true)
+  const reload = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoadingList(true)
     setError(null)
     try {
       const list = await listTripShares(tripId)
@@ -117,7 +121,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载成员失败')
     } finally {
-      setLoadingList(false)
+      if (showLoading) setLoadingList(false)
     }
   }, [tripId])
 
@@ -134,15 +138,15 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     e.preventDefault()
     const target = email.trim().toLowerCase()
     if (!target) return
-    setBusy(true)
+    setInviteBusy(true)
     setError(null)
     setInfo(null)
     try {
       await upsertTripShare(tripId, target, role)
       setEmail('')
-      await reload()
-      const sent = await sendShareInviteEmail(tripId, target, role)
-      if (sent) {
+      await reload(false)
+      const mail = await sendShareInviteEmail(tripId, target, role)
+      if (mail.sent) {
         setInfo(`已添加 ${target}，并已发送邀请邮件。`)
       } else {
         setInfo(`已添加 ${target}。受邀人可直接用此邮箱登录查看。`)
@@ -150,7 +154,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : '添加成员失败')
     } finally {
-      setBusy(false)
+      setInviteBusy(false)
     }
   }
 
@@ -159,31 +163,43 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
   async function executeRemove() {
     if (!pendingRemoveShare) return
     const shareId = pendingRemoveShare.id
-    setBusy(true)
+    setRemoveBusy(true)
     setError(null)
     setInfo(null)
     try {
       await removeTripShare(shareId)
-      await reload()
+      setShares((current) => current.filter((share) => share.id !== shareId))
     } catch (err) {
       setError(err instanceof Error ? err.message : '移除成员失败')
     } finally {
-      setBusy(false)
+      setRemoveBusy(false)
       setPendingRemoveShare(null)
     }
   }
 
   async function onRoleChange(shareId: string, next: TripShareRole) {
-    setBusy(true)
+    const previous = shares.find((share) => share.id === shareId)?.role
+    if (!previous || previous === next || updatingRoleId) return
+
+    setUpdatingRoleId(shareId)
+    setShares((current) =>
+      current.map((share) =>
+        share.id === shareId ? { ...share, role: next } : share,
+      ),
+    )
     setError(null)
     setInfo(null)
     try {
       await updateTripShareRole(shareId, next)
-      await reload()
     } catch (err) {
+      setShares((current) =>
+        current.map((share) =>
+          share.id === shareId ? { ...share, role: previous } : share,
+        ),
+      )
       setError(err instanceof Error ? err.message : '修改权限失败')
     } finally {
-      setBusy(false)
+      setUpdatingRoleId(null)
     }
   }
 
@@ -245,15 +261,20 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
             />
           </div>
           <div className="flex items-center justify-between gap-2 pt-0.5">
-            <RoleToggle value={role} onChange={setRole} disabled={busy} name="newRole" />
+            <RoleToggle value={role} onChange={setRole} disabled={inviteBusy} name="newRole" />
             <button
               type="submit"
-              disabled={busy || !email.trim()}
-              className="group relative isolate inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] dark:from-[var(--copper)] dark:to-[#9a542b] px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] dark:shadow-[0_4px_14px_rgba(212,131,84,0.3)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              disabled={inviteBusy || !email.trim()}
+              aria-busy={inviteBusy}
+              className="group relative isolate inline-flex w-28 shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] dark:from-[var(--copper)] dark:to-[#9a542b] py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_14px_rgba(179,107,60,0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] dark:shadow-[0_4px_14px_rgba(212,131,84,0.3)] transition-[filter,opacity,transform] hover:brightness-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 dark:via-white/30 to-transparent" />
-              <UserPlus size={14} strokeWidth={2.2} />
-              <span>{busy ? '发送中…' : '发送邀请'}</span>
+              {inviteBusy ? (
+                <LoaderCircle size={14} strokeWidth={2.2} className="animate-spin" />
+              ) : (
+                <UserPlus size={14} strokeWidth={2.2} />
+              )}
+              <span>{inviteBusy ? '发送中…' : '发送邀请'}</span>
             </button>
           </div>
         </form>
@@ -343,12 +364,12 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                         <RoleToggle
                           name={`role-${s.id}`}
                           value={s.role}
-                          disabled={busy}
+                          disabled={updatingRoleId !== null || removeBusy}
                           onChange={(next) => void onRoleChange(s.id, next)}
                         />
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={updatingRoleId !== null || removeBusy}
                           onClick={() => setPendingRemoveShare(s)}
                           className="inline-flex items-center gap-1 rounded-full border border-red-200/60 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/40 hover:bg-red-100/80 dark:hover:bg-red-900/50 px-2.5 py-1 text-xs font-medium text-red-600/90 dark:text-red-300 transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
                         >
@@ -369,6 +390,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
         open={Boolean(pendingRemoveShare)}
         onClose={() => setPendingRemoveShare(null)}
         onConfirm={executeRemove}
+        busy={removeBusy}
         title="移除协作者"
         description={`确定移除「${pendingRemoveShare?.invitee_email || '该成员'}」对当前行程的协作权限吗？`}
         confirmText="移除"
