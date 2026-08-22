@@ -264,7 +264,7 @@ export function ProfileTab({
                     {cloudSync.enabled && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-[var(--stone)] dark:text-zinc-400 truncate">
                         <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>{cloudSync.isBusy ? '云端同步中' : '云端已加密同步'}</span>
+                        <span>{cloudSync.isBusy ? (locale === 'en' ? 'Syncing to cloud…' : '云端同步中') : (locale === 'en' ? 'Encrypted cloud sync' : '云端已加密同步')}</span>
                       </span>
                     )}
                   </div>
@@ -387,22 +387,28 @@ export function ProfileTab({
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <div className="truncate text-xs font-semibold text-[var(--ink)]">
-                              {t.isPrimary ? '我的主行程' : t.title || '行程规划'}
+                              {t.isPrimary ? (locale === 'en' ? 'Primary Trip' : '我的主行程') : t.title || (locale === 'en' ? 'Itinerary' : '行程规划')}
                             </div>
                             {t.isPrimary && (
                               <span className="shrink-0 rounded bg-[var(--copper)]/15 px-1 py-0.2 text-[9px] font-bold text-[var(--copper)]">
-                                默认
+                                {locale === 'en' ? 'Default' : '默认'}
                               </span>
                             )}
                           </div>
                           <div className="truncate text-[11px] text-[var(--stone)] dark:text-zinc-400">
                             {isItemShared
-                              ? `来自 ${
-                                  (t.ownerEmail ? getUserNickname(t.ownerEmail) : '') ||
-                                  t.ownerName ||
-                                  (t.ownerEmail ? formatOwnerHandle(t.ownerEmail) : '他人')
-                                }`
-                              : '自己创建'}
+                              ? (locale === 'en'
+                                  ? `From ${
+                                      (t.ownerEmail ? getUserNickname(t.ownerEmail) : '') ||
+                                      t.ownerName ||
+                                      (t.ownerEmail ? formatOwnerHandle(t.ownerEmail) : 'Others')
+                                    }`
+                                  : `来自 ${
+                                      (t.ownerEmail ? getUserNickname(t.ownerEmail) : '') ||
+                                      t.ownerName ||
+                                      (t.ownerEmail ? formatOwnerHandle(t.ownerEmail) : '他人')
+                                    }`)
+                              : (locale === 'en' ? 'Created by you' : '自己创建')}
                           </div>
                         </div>
                       </div>
@@ -416,7 +422,11 @@ export function ProfileTab({
                                 : 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300 border border-zinc-200/50 dark:border-white/15'
                           }`}
                         >
-                          {t.role === 'owner' ? '拥有者' : t.role === 'editor' ? '协作' : '只读'}
+                          {t.role === 'owner'
+                            ? (locale === 'en' ? 'Owner' : '拥有者')
+                            : t.role === 'editor'
+                              ? (locale === 'en' ? 'Editor' : '协作')
+                              : (locale === 'en' ? 'Read-only' : '只读')}
                         </span>
                         {isActive && (
                           <Check size={14} strokeWidth={2.5} className="text-[var(--copper)]" />

@@ -13,7 +13,7 @@ import {
 import { formatOwnerHandle, type AccessibleTrip } from '../services/tripCloud'
 import { getUserNickname, useUserNickname } from '../../auth/services/nicknameStore'
 import { glassBackdropSurfaceClass, glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
-import { useTranslation } from '../../../shared/i18n'
+import { useTranslation, type Locale } from '../../../shared/i18n'
 
 export interface TripSelectorCapsuleProps {
   trips: AccessibleTrip[]
@@ -23,22 +23,24 @@ export interface TripSelectorCapsuleProps {
 }
 
 /**
- * Format relative time in Chinese (e.g. "刚刚", "10分钟前", "昨天")
+ * Format relative time (e.g. "刚刚" / "Just now", "10分钟前" / "10m ago")
  */
-function formatRelativeTime(isoString?: string): string {
+function formatRelativeTime(isoString?: string, locale: Locale = 'zh-CN'): string {
   if (!isoString) return ''
   try {
     const date = new Date(isoString)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
-    if (diffMins < 1) return '刚刚'
-    if (diffMins < 60) return `${diffMins}分钟前`
+    if (diffMins < 1) return locale === 'en' ? 'Just now' : '刚刚'
+    if (diffMins < 60) return locale === 'en' ? `${diffMins}m ago` : `${diffMins}分钟前`
     const diffHours = Math.floor(diffMins / 60)
-    if (diffHours < 24) return `${diffHours}小时前`
+    if (diffHours < 24) return locale === 'en' ? `${diffHours}h ago` : `${diffHours}小时前`
     const diffDays = Math.floor(diffHours / 24)
-    if (diffDays < 30) return `${diffDays}天前`
-    return `${date.getMonth() + 1}月${date.getDate()}日`
+    if (diffDays < 30) return locale === 'en' ? `${diffDays}d ago` : `${diffDays}天前`
+    return locale === 'en'
+      ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : `${date.getMonth() + 1}月${date.getDate()}日`
   } catch {
     return ''
   }
@@ -50,7 +52,7 @@ export function TripSelectorCapsule({
   onSelectTrip,
   className = '',
 }: TripSelectorCapsuleProps) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
@@ -259,11 +261,11 @@ export function TripSelectorCapsule({
                               isActive ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink)]'
                             }`}
                           >
-                            {trip.isPrimary ? '我的主行程' : trip.title || '行程规划'}
+                            {trip.isPrimary ? (locale === 'en' ? 'Primary Trip' : '我的主行程') : trip.title || (locale === 'en' ? 'Itinerary' : '行程规划')}
                           </span>
                           {trip.isPrimary && (
                             <span className="shrink-0 rounded bg-[var(--copper)]/15 px-1 py-0.2 text-[9px] font-bold text-[var(--copper)]">
-                              默认
+                              {locale === 'en' ? 'Default' : '默认'}
                             </span>
                           )}
                         </div>
@@ -271,19 +273,25 @@ export function TripSelectorCapsule({
                         <div className="flex items-center gap-1 text-[10.5px] text-[var(--stone)] dark:text-zinc-400 mt-0.5">
                           <span>
                             {isItemShared
-                              ? `来自 ${
-                                  (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
-                                  trip.ownerName ||
-                                  (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
-                                }`
-                              : '自己创建'}
+                              ? (locale === 'en'
+                                  ? `From ${
+                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                      trip.ownerName ||
+                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : 'Others')
+                                    }`
+                                  : `来自 ${
+                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                      trip.ownerName ||
+                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
+                                    }`)
+                              : (locale === 'en' ? 'Created by you' : '自己创建')}
                           </span>
                           {trip.updatedAt && (
                             <>
                               <span>·</span>
                               <span className="inline-flex items-center gap-0.5">
                                 <Clock size={9} className="opacity-60" />
-                                {formatRelativeTime(trip.updatedAt)}
+                                {formatRelativeTime(trip.updatedAt, locale)}
                               </span>
                             </>
                           )}
@@ -303,10 +311,10 @@ export function TripSelectorCapsule({
                         }`}
                       >
                         {trip.role === 'owner'
-                          ? '拥有者'
+                          ? (locale === 'en' ? 'Owner' : '拥有者')
                           : trip.role === 'editor'
-                            ? '协作'
-                            : '只读'}
+                            ? (locale === 'en' ? 'Editor' : '协作')
+                            : (locale === 'en' ? 'Read-only' : '只读')}
                       </span>
 
                       {isActive && (
