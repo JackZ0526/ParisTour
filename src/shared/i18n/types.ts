@@ -187,6 +187,21 @@ export interface I18nSchema {
     loadingHotels: string
     viewDetails: string
     bookingReviews: string
+    popularFacilities: string
+    reviewScores: string
+    policiesAndInfo: string
+    checkInOut: string
+    languagesSpoken: string
+    paymentMethods: string
+    importantInfo: string
+    collapseInfo: string
+    expandAllInfo: string
+    reviewsCount: string
+    openInBooking: string
+    sustainableStay: string
+    bookingDisclaimer: string
+    retryMatch: string
+    noFacilities: string
   }
   flight: {
     title: string

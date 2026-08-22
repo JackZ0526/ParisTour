@@ -6,6 +6,7 @@ import {
 } from '../../chat/services/translate'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import { ShimmerLines } from '../../../shared/components/ShimmerLines'
+import { useTranslation } from '../../../shared/i18n'
 
 type TranslateFn = (
   texts: string[],
@@ -16,6 +17,7 @@ function useBatchTranslation(
   texts: string[],
   translateFn: TranslateFn = translateTextsToChinese,
 ) {
+  const { locale } = useTranslation()
   const sourceKey = JSON.stringify([
     ...new Set(texts.map((text) => text.trim()).filter(Boolean)),
   ])
@@ -23,13 +25,20 @@ function useBatchTranslation(
     () => JSON.parse(sourceKey) as string[],
     [sourceKey],
   )
-  const needsTranslate = originals.some((text) => !looksChinese(text)) && isLlmConfigured()
+  const needsTranslate =
+    locale === 'zh-CN' && originals.some((text) => !looksChinese(text)) && isLlmConfigured()
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [translating, setTranslating] = useState(needsTranslate)
   const [translationFailed, setTranslationFailed] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    if (locale !== 'zh-CN') {
+      setTranslations({})
+      setTranslating(false)
+      setTranslationFailed(false)
+      return
+    }
     const needTranslate = originals.filter((text) => !looksChinese(text))
     if (!needTranslate.length || !isLlmConfigured()) {
       setTranslations({})
@@ -69,7 +78,7 @@ function useBatchTranslation(
     return () => {
       cancelled = true
     }
-  }, [originals, retryCount, translateFn])
+  }, [originals, retryCount, translateFn, locale])
 
   const hasTranslation = originals.some((text) => translations[text])
   const pending = Boolean(needsTranslate && translating && !hasTranslation && !translationFailed)

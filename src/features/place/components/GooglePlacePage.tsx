@@ -405,7 +405,7 @@ export function GooglePlacePage({
   onAdvisorFacts,
   onClose,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLookupReady, setGoogleLookupReady] = useState(false)
@@ -1234,9 +1234,9 @@ export function GooglePlacePage({
 
   // When Google / trip data has no Chinese display name, LLM-translate the original.
   useEffect(() => {
-    if (!open) {
+    if (!open || locale !== 'zh-CN') {
       setLlmZh(null)
-      setNameZhPhase('idle')
+      setNameZhPhase(open ? 'done' : 'idle')
       return
     }
 
@@ -1245,6 +1245,8 @@ export function GooglePlacePage({
       nameLocal,
       details?.name,
       details?.nameOriginal,
+      undefined,
+      { locale },
     )
     if (looksChinese(base.title)) {
       setLlmZh(null)
@@ -1294,7 +1296,7 @@ export function GooglePlacePage({
     return () => {
       cancelled = true
     }
-  }, [open, name, nameLocal, details?.name, details?.nameOriginal])
+  }, [open, name, nameLocal, details?.name, details?.nameOriginal, locale])
 
   const advisorReviews = useMemo(
     () =>
@@ -1395,13 +1397,17 @@ export function GooglePlacePage({
     nameLocal,
     details?.name,
     details?.nameOriginal,
+    undefined,
+    { locale },
   )
-  const cachedZh = peekPlaceNameZh(originalLabel)
+  const cachedZh = locale === 'zh-CN' ? peekPlaceNameZh(originalLabel) : null
   const effectiveLlmZh =
-    llmZh ||
-    (cachedZh && looksChinese(cachedZh) ? cachedZh : null) ||
-    null
-  const needsLlmZh = !looksChinese(official.title) && isLlmConfigured()
+    locale === 'zh-CN'
+      ? llmZh ||
+        (cachedZh && looksChinese(cachedZh) ? cachedZh : null) ||
+        null
+      : null
+  const needsLlmZh = locale === 'zh-CN' && !looksChinese(official.title) && isLlmConfigured()
   // Empty Chinese slot + translate animation until first streamed chars (or done).
   const showNameLoader = needsLlmZh && !effectiveLlmZh && nameZhPhase !== 'done'
   const nameStreaming = nameZhPhase === 'loading' && Boolean(effectiveLlmZh)
@@ -1412,6 +1418,7 @@ export function GooglePlacePage({
     details?.name,
     details?.nameOriginal,
     effectiveLlmZh || undefined,
+    { locale },
   )
   // While streaming, prefer the live partial even before placeTitleLines accepts it as CJK.
   const title = showNameLoader

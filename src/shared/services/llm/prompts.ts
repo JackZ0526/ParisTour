@@ -43,7 +43,7 @@ export const COMMON_RULES = `<common_rules>
 
 <output_format>
 - 严格只输出一个 JSON 对象；不要 markdown；不要 \`\`\`json\`\`\` fence；不要解释。
-- 字段顺序（流式友好）：先 reply（用户可见的中文），再 actions。
+- 字段顺序（流式友好）：先 reply（用户可见的对话回复，语言必须遵循系统设定的语言指令），再 actions。
 - reply 与 actions 的语义必须一致：答应"已加入/已替换"必须有对应 action。
 </output_format>
 

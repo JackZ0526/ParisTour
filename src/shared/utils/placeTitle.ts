@@ -1,3 +1,5 @@
+import { getLocale, type Locale } from '../i18n'
+
 function hasCjk(text: string) {
   return /[\u3400-\u9fff]/.test(text)
 }
@@ -306,6 +308,7 @@ export type PlaceChineseOptions = {
    * Official Chinese then comes only from Google or `llmZh`.
    */
   excludePropCjk?: boolean
+  locale?: Locale
 }
 
 export type PlaceTitleLines = {
@@ -328,6 +331,7 @@ export function placeTitleLines(
   llmZh?: string,
   options?: PlaceChineseOptions,
 ): PlaceTitleLines {
+  const currentLocale = options?.locale || getLocale()
   const propCandidates = options?.excludePropCjk
     ? []
     : [name, nameLocal].map(trimLabel).filter(Boolean)
@@ -347,6 +351,14 @@ export function placeTitleLines(
   const original =
     [...propCandidates, ...googleCandidates].find((s) => !hasCjk(s)) ||
     candidates.find((s) => officialZh && !labelsEqual(s, officialZh))
+
+  if (currentLocale === 'en') {
+    const title = original || candidates[0] || 'Place details'
+    const subtitle = [...propCandidates, ...googleCandidates].find(
+      (s) => !labelsEqual(s, title) && !hasCjk(s),
+    )
+    return subtitle ? { title, subtitle } : { title }
+  }
 
   const llm = trimLabel(llmZh)
   if (!officialZh && llm && hasCjk(llm)) {
@@ -399,6 +411,10 @@ export function placeChineseLabel(
   llmZh?: string,
   options?: PlaceChineseOptions,
 ): { zh?: string; isLlmTranslated?: boolean } {
+  const currentLocale = options?.locale || getLocale()
+  if (currentLocale === 'en') {
+    return {}
+  }
   const propCandidates = options?.excludePropCjk
     ? []
     : [name, nameLocal].map(trimLabel).filter(Boolean)

@@ -30,6 +30,7 @@ import {
   buildPrompt,
   jsonContract,
 } from '../../../shared/services/llm/prompts'
+import { getLocale, getLlmLanguageInstruction } from '../../../shared/i18n'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
   | { type: 'select_place'; placeName: string }
@@ -443,8 +444,13 @@ function systemPrompt(ctx: TripChatContext, plan: TripChatRequestPlan): string {
   // thing the model sees, and the trip-state snapshot is framed as DATA not
   // instructions (handled by COMMON_RULES.data_isolation).
   // -----------------------------------------------------------------------
-  const role = `你是行程助手，帮助用户了解与调整「${destName}」行程与住宿。
-用简洁中文回复。可以介绍地点/酒店、解释节奏、建议改动，并在需要时输出可执行操作。`
+  const activeLocale = getLocale()
+  const langRule = getLlmLanguageInstruction()
+  const role = activeLocale === 'en'
+    ? `You are an AI trip assistant helping the user understand and customize their "${destName}" itinerary and accommodations.
+${langRule} Introduce places and hotels, explain pacing, suggest improvements, and output actionable operations when needed.`
+    : `你是行程助手，帮助用户了解与调整「${destName}」行程与住宿。
+${langRule} 可以介绍地点/酒店、解释节奏、建议改动，并在需要时输出可执行操作。`
 
   const contextParts: string[] = []
   if (dates.season) {

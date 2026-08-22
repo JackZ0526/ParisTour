@@ -1,3 +1,5 @@
+import { getLocale, type Locale } from '../../../shared/i18n'
+
 export const PROPERTY_TYPE_LABELS: Record<string, string> = {
   hotel: '酒店',
   hotels: '酒店',
@@ -13,6 +15,23 @@ export const PROPERTY_TYPE_LABELS: Record<string, string> = {
   apartment: '公寓',
   apartments: '公寓',
   'serviced apartment': '服务式公寓',
+}
+
+export const PROPERTY_TYPE_EN_LABELS: Record<string, string> = {
+  hotel: 'Hotel',
+  hotels: 'Hotel',
+  aparthotel: 'Aparthotel',
+  aparthotels: 'Aparthotel',
+  hostel: 'Hostel',
+  hostels: 'Hostel',
+  guesthouse: 'Guesthouse',
+  'bed and breakfast': 'Bed & Breakfast',
+  motel: 'Motel',
+  resort: 'Resort',
+  villa: 'Villa',
+  apartment: 'Apartment',
+  apartments: 'Apartment',
+  'serviced apartment': 'Serviced Apartment',
 }
 
 export const FACILITY_LABELS: Record<string, string> = {
@@ -110,8 +129,18 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   'bank transfer': '银行转账',
 }
 
-export function localizePropertyType(value: string): string {
+export function localizePropertyType(value: string, locale?: Locale | unknown): string {
+  const current = typeof locale === 'string' ? (locale as Locale) : getLocale()
   const key = value.trim().toLowerCase()
+  if (current === 'en') {
+    const direct = PROPERTY_TYPE_EN_LABELS[key]
+    if (direct) return direct
+    if (key.endsWith('s')) {
+      const singular = PROPERTY_TYPE_EN_LABELS[key.slice(0, -1)]
+      if (singular) return singular
+    }
+    return value.charAt(0).toUpperCase() + value.slice(1)
+  }
   const direct = PROPERTY_TYPE_LABELS[key]
   if (direct) return direct
   if (key.endsWith('s')) {
@@ -121,7 +150,19 @@ export function localizePropertyType(value: string): string {
   return value
 }
 
-export function localizeFacility(value: string): string {
+function toEnglishTitleCase(text: string): string {
+  return text
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+export function localizeFacility(value: string, locale?: Locale | unknown): string {
+  const current = typeof locale === 'string' ? (locale as Locale) : getLocale()
+  if (current === 'en') {
+    // If it's already English, return clean title case or direct value
+    return toEnglishTitleCase(value.trim())
+  }
   return FACILITY_LABELS[value.trim().toLowerCase()] || value
 }
 
@@ -197,8 +238,10 @@ export function localizePaymentMethod(value: string): string {
 
 export function categorizeFacilities(
   facilities: string[],
+  locale?: Locale,
 ): Array<{ category: string; items: string[] }> {
-  const localized = dedupeFacilities(facilities).map(localizeFacility)
+  const current = locale || getLocale()
+  const localized = dedupeFacilities(facilities).map((f) => localizeFacility(f, current))
   const buckets = new Map<string, string[]>()
   const uncategorized: string[] = []
 
@@ -229,10 +272,38 @@ export function categorizeFacilities(
   return ordered
 }
 
-export function hotelScoreText(score?: number): string {
+export function hotelScoreText(score?: number, locale?: Locale): string {
   if (score == null) return ''
+  const current = locale || getLocale()
+  if (current === 'en') {
+    if (score >= 9) return 'Wonderful'
+    if (score >= 8) return 'Very good'
+    if (score >= 7) return 'Good'
+    return 'Pleasant'
+  }
   if (score >= 9) return '好极了'
   if (score >= 8) return '非常好'
   if (score >= 7) return '好'
   return '令人愉悦'
+}
+
+const REVIEW_SCORE_EN_MAP: Record<string, string> = {
+  员工服务: 'Staff',
+  设施服务: 'Facilities',
+  清洁程度: 'Cleanliness',
+  舒适程度: 'Comfort',
+  性价比: 'Value for money',
+  位置: 'Location',
+  '免费 Wi-Fi': 'Free WiFi',
+  'Wi-Fi': 'WiFi',
+  早餐: 'Breakfast',
+  步行便利: 'Walking score',
+}
+
+export function localizeReviewScoreLabel(label: string, locale?: Locale): string {
+  const current = locale || getLocale()
+  if (current === 'en') {
+    return REVIEW_SCORE_EN_MAP[label] || toEnglishTitleCase(label)
+  }
+  return label
 }

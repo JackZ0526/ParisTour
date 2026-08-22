@@ -19,6 +19,7 @@ import {
   placeTitleLines,
 } from '../../../shared/utils/placeTitle'
 import { ActivityBars } from '../../../shared/components/LoadingIndicator'
+import { useTranslation } from '../../../shared/i18n'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
 
@@ -87,8 +88,9 @@ export function PlaceName({
   enrichFromGoogle = false,
   zhIsLlmTranslated = false,
 }: Props) {
+  const { locale } = useTranslation()
   const excludePropCjk = zhIsLlmTranslated
-  const chineseOpts = excludePropCjk ? EXCLUDE_PROP_CJK_OPTIONS : undefined
+  const chineseOpts = excludePropCjk ? { ...EXCLUDE_PROP_CJK_OPTIONS, locale } : { locale }
   const locationLat = location?.lat
   const locationLng = location?.lng
   const cached = peekGooglePlaceDetails(name, nameLocal, location)
@@ -101,6 +103,7 @@ export function PlaceName({
       : null,
   )
   const [llmZh, setLlmZh] = useState<string | null>(() => {
+    if (locale !== 'zh-CN') return null
     const seedName = googleName || cached?.name
     const seedOriginal = googleOriginal || cached?.nameOriginal
     if (
@@ -187,7 +190,7 @@ export function PlaceName({
 
   // LLM Chinese for itinerary: after Google (when enriching), peek cache, then translate.
   useEffect(() => {
-    if (mode !== 'originalWithZh') return
+    if (mode !== 'originalWithZh' || locale !== 'zh-CN') return
     if (!googleReady) return
 
     const official = placeChineseLabel(

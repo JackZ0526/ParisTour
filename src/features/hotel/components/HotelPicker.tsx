@@ -52,6 +52,7 @@ import {
   localizeFacility,
   localizePaymentMethod,
   localizePropertyType,
+  localizeReviewScoreLabel,
 } from '../utils/hotelDisplay'
 import {
   Accessibility,
@@ -559,12 +560,14 @@ function ReviewScoreBars({
     return () => clearTimeout(timeout)
   }, [animate, items.length, itemsKey, topLabel])
 
+  const { locale } = useTranslation()
+
   return (
     <div ref={containerRef} className={layoutClassName}>
       {items.map((item, index) => (
         <ReviewScoreBarItem
           key={item.label}
-          label={item.label}
+          label={localizeReviewScoreLabel(item.label, locale)}
           score={item.score}
           start={animate}
           delayMs={index * REVIEW_SCORE_ANIM_STAGGER_MS}
@@ -593,6 +596,7 @@ function BookingHotelFacts({
   onIdentityRetry: () => void
   onRetry: () => void
 }) {
+  const { t, locale } = useTranslation()
   const [policiesExpanded, setPoliciesExpanded] = useState(false)
   const [locationRevealed, setLocationRevealed] = useState(false)
   const [policiesRevealed, setPoliciesRevealed] = useState(false)
@@ -604,12 +608,16 @@ function BookingHotelFacts({
   const hasLocationDetails = Boolean(hotel.locationDescription)
   const factsPending = identityLoading || loading
   const locationNeedsTranslate = Boolean(
-    hotel.locationDescription &&
+    locale === 'zh-CN' &&
+      hotel.locationDescription &&
       !looksChinese(hotel.locationDescription) &&
       isLlmConfigured(),
   )
-  const policiesNeedTranslate =
-    policies.some((policy) => !looksChinese(policy)) && isLlmConfigured()
+  const policiesNeedTranslate = Boolean(
+    locale === 'zh-CN' &&
+      policies.some((policy) => !looksChinese(policy)) &&
+      isLlmConfigured(),
+  )
   const showLocationShimmer =
     (factsPending && !hasLocationDetails) || (locationNeedsTranslate && !locationRevealed)
   const showPolicySkeleton =
@@ -663,7 +671,7 @@ function BookingHotelFacts({
                         {'★'.repeat(starCount)}
                       </span>
                     )}
-                    {hotel.propertyType ? localizePropertyType(hotel.propertyType) : '酒店'}
+                    {hotel.propertyType ? localizePropertyType(hotel.propertyType, locale) : (locale === 'en' ? 'Hotel' : '酒店')}
                   </span>
                 )}
                 {factsPending && !hotel.propertyType && starCount === 0 && (
@@ -682,8 +690,12 @@ function BookingHotelFacts({
             {hotel.rating != null && (
               <div className="flex shrink-0 items-center gap-2 text-right">
                 <div>
-                  <p className="text-sm font-semibold">{hotelScoreText(hotel.rating)}</p>
-                  {hotel.reviewCount != null && <p className="text-[11px] text-[var(--stone)]">{hotel.reviewCount.toLocaleString('zh-CN')} 条住客点评</p>}
+                  <p className="text-sm font-semibold">{hotelScoreText(hotel.rating, locale)}</p>
+                  {hotel.reviewCount != null && (
+                    <p className="text-[11px] text-[var(--stone)]">
+                      {t('hotel.reviewsCount', { count: hotel.reviewCount.toLocaleString(locale === 'en' ? 'en-US' : 'zh-CN') })}
+                    </p>
+                  )}
                 </div>
                 <span className="flex h-10 min-w-10 items-center justify-center rounded-[10px_10px_10px_2px] bg-[#003b95] dark:bg-[#0051ba] px-2 text-sm font-semibold text-white">
                   {hotel.rating.toFixed(1)}
@@ -695,7 +707,7 @@ function BookingHotelFacts({
           {hotel.sustainability && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
-                可持续住宿 · {hotel.sustainability}
+                {t('hotel.sustainableStay')} · {hotel.sustainability}
               </span>
             </div>
           )}
@@ -724,7 +736,7 @@ function BookingHotelFacts({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-md border border-[var(--mist)] bg-white/70 dark:bg-white/10 px-2.5 py-1.5 text-xs font-medium text-[#003b95]/85 dark:text-[#7bb5ff] transition hover:border-[#003b95]/20 hover:bg-[#003b95]/5 dark:hover:bg-white/15 hover:text-[#003b95] dark:hover:text-[#5fa2f8]"
               >
-                前往{' '}
+                {locale === 'en' ? 'Book on ' : '前往 '}
                 <span>
                   <span className="text-[#003580] dark:text-[#5fa2f8]">Booking</span>
                   <span className="text-[#006ce4] dark:text-[#7bb5ff]">.com</span>
@@ -794,23 +806,23 @@ function BookingHotelFacts({
 
         {popularFacilities.length ? (
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
-            <BookingSectionHeader icon={Building2} title="热门设施" />
+            <BookingSectionHeader icon={Building2} title={t('hotel.popularFacilities')} />
             <div className="flex flex-wrap gap-x-5 gap-y-3">
               {popularFacilities.map((facility) => (
                 <span key={facility} className="inline-flex items-center gap-2 text-sm">
                   <FacilityItemIcon facility={facility} />
-                  {localizeFacility(facility)}
+                  {localizeFacility(facility, locale)}
                 </span>
               ))}
             </div>
           </div>
         ) : !factsPending && !error && hotel.bookingDetailsLoaded ? (
-          <p className="text-xs text-[var(--stone)]">该酒店没有返回可展示的设施信息。</p>
+          <p className="text-xs text-[var(--stone)]">{t('hotel.noFacilities')}</p>
         ) : null}
 
         {reviewScores.length > 0 && (
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
-            <BookingSectionHeader icon={BarChart3} title="住客评分细项" />
+            <BookingSectionHeader icon={BarChart3} title={t('hotel.reviewScores')} />
             <ReviewScoreBars
               items={reviewScores}
               layoutClassName={
@@ -826,15 +838,15 @@ function BookingHotelFacts({
         {(hotel.checkIn || hotel.checkOut || visibleLanguages.length > 0 || policies.length > 0 || paymentMethods.length > 0) && (
           <div className={showPolicySkeleton && !hotel.checkIn && !hotel.checkOut && !visibleLanguages.length && !paymentMethods.length ? 'hidden' : undefined}>
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
-            <BookingSectionHeader icon={Info} title="住宿规定与实用信息" />
+            <BookingSectionHeader icon={Info} title={t('hotel.policiesAndInfo')} />
             <div className="divide-y divide-[var(--mist)] text-sm">
-              {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">入住与退房</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
-              {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">服务语言</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
-              {paymentMethods.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">付款方式</span><span className="text-[var(--ink)]/80">{paymentMethods.join('、')}</span></div>}
+              {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{t('hotel.checkInOut')}</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
+              {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{t('hotel.languagesSpoken')}</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
+              {paymentMethods.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{t('hotel.paymentMethods')}</span><span className="text-[var(--ink)]/80">{paymentMethods.join('、')}</span></div>}
               {policies.length > 0 && (
                 <div className={showPolicySkeleton ? 'hidden' : 'py-3'}>
                   <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
-                    <span className="font-medium">重要须知</span>
+                    <span className="font-medium">{t('hotel.importantInfo')}</span>
                     <HotelExpandablePolicyList
                       policies={policies}
                       expanded={policiesExpanded}
@@ -848,7 +860,7 @@ function BookingHotelFacts({
                       onClick={() => setPoliciesExpanded((current) => !current)}
                       className="mt-2 text-xs font-medium text-[var(--sage)] hover:underline"
                     >
-                      {policiesExpanded ? '收起须知' : `展开全部 ${policies.length} 条须知`}
+                      {policiesExpanded ? t('hotel.collapseInfo') : t('hotel.expandAllInfo', { count: policies.length })}
                     </button>
                   )}
                 </div>
@@ -859,7 +871,7 @@ function BookingHotelFacts({
         )}
 
         <p className="text-[11px] leading-relaxed text-[var(--stone)]">
-          房型、实时价格、早餐与取消政策会随日期变化，请前往 Booking.com 确认当前可订状态。
+          {t('hotel.bookingDisclaimer')}
         </p>
       </div>
     </section>
@@ -877,17 +889,21 @@ function BookingReviewsPanel({
   error: string | null
   onRetry: () => void
 }) {
+  const { t, locale } = useTranslation()
   const [reviewsRevealed, setReviewsRevealed] = useState(false)
   const reviews = (hotel.reviews || []).map((review) => ({
     text: review.negativeText
-      ? `${review.text}\n\n不足：${review.negativeText}`
+      ? `${review.text}\n\n${locale === 'en' ? 'Cons: ' : '不足：'}${review.negativeText}`
       : review.text,
     rating: review.rating,
     author: review.author,
     relativeTime: review.relativeTime,
   }))
-  const reviewsNeedTranslate =
-    reviews.some((review) => !looksChinese(review.text)) && isLlmConfigured()
+  const reviewsNeedTranslate = Boolean(
+    locale === 'zh-CN' &&
+      reviews.some((review) => !looksChinese(review.text)) &&
+      isLlmConfigured(),
+  )
   const showReviewShimmer = loading || (reviewsNeedTranslate && !reviewsRevealed)
   const reviewsKey = reviews.map((review) => review.text).join('\n---\n')
 
@@ -899,7 +915,7 @@ function BookingReviewsPanel({
     <section className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
       <BookingSectionHeader
         icon={MessageSquareQuote}
-        title="住客精选评论"
+        title={t('hotel.bookingReviews')}
       />
       {showReviewShimmer && (
         <div className="space-y-3" aria-busy>

@@ -13,6 +13,7 @@ import type { HotelDetailCopy, HotelRecommendation } from '../types'
 import { generateText, isLlmConfigured } from './_service'
 import { callOpenAIMessagesStream } from '../transport'
 import { extractPartialJsonStringField } from '../stream'
+import { getLocale, getLlmLanguageInstruction } from '../../../i18n'
 
 export type { HotelDetailCopy, HotelRecommendation }
 
@@ -51,19 +52,26 @@ export async function generateHotelDetailCopy(input: {
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
+  const activeLocale = getLocale()
+  const langRule = getLlmLanguageInstruction()
   const system = buildPrompt(
-    '旅行住宿顾问。为酒店详情页写一段简洁的中文推荐理由。',
+    activeLocale === 'en'
+      ? 'Travel accommodation advisor. Write a concise recommendation memo for the hotel detail page.'
+      : '旅行住宿顾问。为酒店详情页写一段简洁的推荐理由。',
     null,
     `<hard_rules>
-- 只输出 reason 一个字段，3–5 句连贯中文，不要分标题或小标题。
+- ${langRule}
+- 只输出 reason 一个字段，3–5 句连贯文案，不要分标题或小标题。
 - 综合 hotel 资料与 featuredReviews：区位、评分细项、设施亮点、住客好评/差评要点。
-- 可轻点与 trip / userPreferences 的匹配，但不要写成单独的「行程关系」段落。
-- 不要复述 Booking 英文原文；不要编造房价；不要把卢浮宫/凡尔赛周边当唯一卖点。
+- 可轻点与 trip / userPreferences 的匹配，但不要写成单独的段落。
+- 不要编造房价；不要把卢浮宫/凡尔赛周边当唯一卖点。
 - 若无精选评论，仅依据酒店资料写推荐理由。
 </hard_rules>`,
     jsonContract(
       '{ reason: "string" }',
-      '{ "reason": "玛黑区步行可达蓬皮杜与孚日广场，Booking 住客普遍称赞位置与员工服务；地铁 3、4 号线方便衔接本次右岸经典日与迪士尼安排，适合追求在地体验的旅客。" }',
+      activeLocale === 'en'
+        ? '{ "reason": "Located in Le Marais within walking distance of Centre Pompidou and Place des Vosges, guests praise its central location and attentive staff. Convenient metro connections make exploring the city seamless." }'
+        : '{ "reason": "玛黑区步行可达蓬皮杜与孚日广场，Booking 住客普遍称赞位置与员工服务；地铁 3、4 号线方便衔接本次右岸经典日与迪士尼安排，适合追求在地体验的旅客。" }',
     ),
   )
   const user = JSON.stringify({

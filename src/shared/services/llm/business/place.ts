@@ -30,6 +30,7 @@ import type {
 } from '../types'
 import { generateText, isLlmConfigured } from './_service'
 import { officialWebsiteFromCandidate } from '../../../../../api/_lib/websitePhotos'
+import { getLocale, getLlmLanguageInstruction, type Locale } from '../../../i18n'
 
 export type {
   RecommendPlaceType,
@@ -245,14 +246,21 @@ export async function generatePlaceDescription(input: {
   address?: string
   googleSummary?: string
 }): Promise<string | null> {
-  const key = `place-desc:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
+  const activeLocale = getLocale()
+  const langRule = getLlmLanguageInstruction()
+  const key = `place-desc:v2:${activeLocale}:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
   return memoizeLlmCall(
     key,
     async () => {
       const system = buildPrompt(
-        '旅行文案助手。用简洁中文为地点写简介。',
+        activeLocale === 'en'
+          ? 'Travel copywriter. Write a concise place introduction.'
+          : '旅行文案助手。用简洁中文为地点写简介。',
         null,
-        '<output_format>2–3 句正文，不要列表，不要夸张营销套话，不要标题。</output_format>',
+        `<hard_rules>
+- ${langRule}
+- <output_format>2–3 句正文，不要列表，不要夸张营销套话，不要标题。</output_format>
+</hard_rules>`,
         CAFE_VS_RESTAURANT_RULE,
       )
       const user = [
@@ -295,9 +303,43 @@ function placeDetailKind(type: string): 'attraction' | 'food' | 'other' {
   return 'other'
 }
 
-function placeDetailHardRules(kind: 'attraction' | 'food' | 'other'): string {
+function placeDetailHardRules(kind: 'attraction' | 'food' | 'other', locale: Locale = getLocale()): string {
+  const langRule = getLlmLanguageInstruction(locale)
+  if (locale === 'en') {
+    if (kind === 'attraction') {
+      return `<hard_rules>
+- ${langRule}
+- intro: Detailed, structured English intro in 2–3 short paragraphs separated by newlines. No subheadings or bullet points.
+  First paragraph explains what the place is, its history, origins, or significance.
+  Second paragraph describes the main highlights, atmosphere, and visitor experience.
+- reason: 2–3 sentences summarizing visit value, visitor review highlights, and route pacing.
+- tripFit: Always output an empty string.
+- Do not fabricate exact ticket prices or hours. Do not mention Tripadvisor/Google in the reason.
+- Field order: Write intro first, then reason.
+</hard_rules>`
+    }
+    if (kind === 'food') {
+      return `<hard_rules>
+- ${langRule}
+- intro: Introduce the restaurant/cafe neighborhood, cuisine type, specialty dishes mentioned in reviews, and price level. 1–2 paragraphs separated by newlines.
+- reason: 2–3 sentences summarizing food reputation, route connection, and value.
+- tripFit: Always output an empty string.
+- Do not fabricate menus or exact prices.
+- Field order: Write intro first, then reason.
+</hard_rules>`
+    }
+    return `<hard_rules>
+- ${langRule}
+- intro: 2–3 sentence introduction explaining what it is and who it suits.
+- reason: 2–3 sentences explaining why it fits today's itinerary.
+- tripFit: Always output an empty string.
+- Field order: Write intro first, then reason.
+</hard_rules>`
+  }
+
   if (kind === 'attraction') {
     return `<hard_rules>
+- ${langRule}
 - intro：详细、结构清晰的中文简介，2–3 小段，段与段用换行分隔，不要小标题或项目符号。
   第一段写清楚这是什么地方，以及历史、建造缘由或相关故事；
   第二段写主要看点、空间气质与参观体验。可吸收 existingDescription 与 listingDescription，不要整段照抄英文。
@@ -310,6 +352,7 @@ function placeDetailHardRules(kind: 'attraction' | 'food' | 'other'): string {
   }
   if (kind === 'food') {
     return `<hard_rules>
+- ${langRule}
 - intro：介绍这家餐厅/咖啡馆的位置或片区、菜系或品类、资料或评论里提到的特色菜/招牌、以及价格档（只用 priceLevel；没有则不要编造具体欧元数字）。1–2 小段，换行分段，不要小标题。
 - reason：2–3 句。综合评论口碑、与当天行程的衔接（餐点时段与路线）、以及性价比。不要罗列评论原文。
 - tripFit：固定输出空字符串（地点详情页不展示此项）。
@@ -319,6 +362,7 @@ function placeDetailHardRules(kind: 'attraction' | 'food' | 'other'): string {
 </hard_rules>`
   }
   return `<hard_rules>
+- ${langRule}
 - intro：2–3 句中文简介，写清这是什么、氛围与适合谁。
 - reason：2–3 句，结合当天行程说明为何值得安排。
 - tripFit：固定输出空字符串。
@@ -327,7 +371,17 @@ function placeDetailHardRules(kind: 'attraction' | 'food' | 'other'): string {
 </hard_rules>`
 }
 
-function placeDetailExample(kind: 'attraction' | 'food' | 'other'): string {
+function placeDetailExample(kind: 'attraction' | 'food' | 'other', locale: Locale = getLocale()): string {
+  if (locale === 'en') {
+    if (kind === 'attraction') {
+      return '{ "intro": "The Arc de Triomphe is an iconic monument commissioned by Napoleon to celebrate French victories, standing proudly at the center of Place Charles de Gaulle with twelve grand avenues radiating outward.\\n\\nClimbing to the top offers panoramic views over the Champs-Élysées and La Défense. The Tomb of the Unknown Soldier and its eternal flame below add historical reverence to the visit.", "reason": "Serving as a visual anchor for the Right Bank classic day, it ties together urban scale and iconic vistas. Visitors appreciate the view, making it a great spacer between museums.", "tripFit": "" }'
+    }
+    if (kind === 'food') {
+      return '{ "intro": "Sphère is located in the 8th arrondissement, offering refined contemporary French dining with a focus on seasonal vegetables and seafood starters. Price level sits around €€, perfect for a sit-down meal between daytime stops.", "reason": "Diners consistently praise the stable execution and quiet ambiance. Fitting neatly into today\'s lunch slot, it keeps the pace relaxed before afternoon sights.", "tripFit": "" }'
+    }
+    return '{ "intro": "A classic riverside spot ideal for taking in the city atmosphere at a leisurely pace.", "reason": "Conveniently along today\'s route, serving as a brief and relaxing transition stop.", "tripFit": "" }'
+  }
+
   if (kind === 'attraction') {
     return '{ "intro": "凯旋门是拿破仑为纪念法国军队胜利下令建造的纪念碑，矗立在星形广场中央，十二条大道从这里向外辐射。门身上的浮雕与阵亡将士名字，把帝国战争的荣耀与代价刻在同一座石头上。\\n\\n登顶可以把香榭丽舍与拉德芳斯尽收眼底；地面的无名战士墓与长明火，让参观不只是看景，也是一次对历史的停留。", "reason": "作为右岸经典日的视觉锚点，它把轴线、城市尺度和仪式感一次讲清楚。游客普遍觉得登顶视野值得排队，安排在当天博物馆之间也能把节奏拉开。", "tripFit": "" }'
   }
@@ -364,14 +418,17 @@ export async function generatePlaceDetailCopy(input: {
 }): Promise<HotelDetailCopy | null> {
   if (!isLlmConfigured()) return null
 
+  const activeLocale = getLocale()
   const kind = placeDetailKind(input.type)
   const system = buildPrompt(
-    '旅行顾问。为地点详情页写中文点评。',
+    activeLocale === 'en'
+      ? 'Travel advisor. Write an engaging place review.'
+      : '旅行顾问。为地点详情页写中文点评。',
     null,
-    placeDetailHardRules(kind),
+    placeDetailHardRules(kind, activeLocale),
     jsonContract(
       '{ intro: "string", reason: "string", tripFit: "" }',
-      placeDetailExample(kind),
+      placeDetailExample(kind, activeLocale),
     ),
   )
   const user = JSON.stringify({
