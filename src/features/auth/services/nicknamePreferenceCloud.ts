@@ -61,10 +61,22 @@ export async function saveProfileNickname(
   // 1. Update profiles table if available
   try {
     const sb = getSupabase()
-    await sb
-      .from('profiles')
-      .update({ display_name: clean })
-      .eq('id', userId)
+    const { data: userData } = await sb.auth.getUser()
+    const email = userData?.user?.email || ''
+
+    if (email) {
+      const { error } = await sb
+        .from('profiles')
+        .upsert(
+          { id: userId, email: email.toLowerCase(), display_name: clean },
+          { onConflict: 'id' },
+        )
+      if (error) {
+        await sb.from('profiles').update({ display_name: clean }).eq('id', userId)
+      }
+    } else {
+      await sb.from('profiles').update({ display_name: clean }).eq('id', userId)
+    }
   } catch (err) {
     console.warn('[nicknameCloud] profile table update ignored:', err)
   }

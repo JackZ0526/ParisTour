@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { getSupabaseMock, isCloudSyncEnabledMock } = vi.hoisted(() => ({
   getSupabaseMock: vi.fn(),
@@ -97,14 +97,25 @@ describe('account nickname cloud storage', () => {
   it('writes nickname to both profiles and auth metadata', async () => {
     const eq = vi.fn().mockResolvedValue({ error: null })
     const update = vi.fn(() => ({ eq }))
-    const from = vi.fn(() => ({ update }))
+    const upsert = vi.fn().mockResolvedValue({ error: null })
+    const from = vi.fn(() => ({ update, upsert }))
     const updateUser = vi.fn().mockResolvedValue({ data: {}, error: null })
-    getSupabaseMock.mockReturnValue({ from, auth: { updateUser } })
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: { email: 'traveler@paris.fr' } },
+    })
+    getSupabaseMock.mockReturnValue({ from, auth: { updateUser, getUser } })
 
     await saveProfileNickname('user-1', '左岸漫步者')
 
     expect(from).toHaveBeenCalledWith('profiles')
-    expect(update).toHaveBeenCalledWith({ display_name: '左岸漫步者' })
+    expect(upsert).toHaveBeenCalledWith(
+      {
+        id: 'user-1',
+        email: 'traveler@paris.fr',
+        display_name: '左岸漫步者',
+      },
+      { onConflict: 'id' },
+    )
     expect(updateUser).toHaveBeenCalledWith({
       data: { display_name: '左岸漫步者', name: '左岸漫步者' },
     })

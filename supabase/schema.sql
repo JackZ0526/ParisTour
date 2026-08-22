@@ -67,6 +67,14 @@ create policy "profiles_update_own"
   using (id = auth.uid())
   with check (id = auth.uid());
 
+drop policy if exists "profiles_insert_own" on public.profiles;
+
+create policy "profiles_insert_own"
+  on public.profiles
+  for insert
+  to authenticated
+  with check (id = auth.uid());
+
 -- ---------------------------------------------------------------------------
 -- Trips (is_primary reserves multi-trip upgrade path)
 -- ---------------------------------------------------------------------------

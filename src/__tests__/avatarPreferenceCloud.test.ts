@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { getSupabaseMock, isCloudSyncEnabledMock } = vi.hoisted(() => ({
   getSupabaseMock: vi.fn(),
@@ -72,8 +72,11 @@ describe('account avatar cloud storage', () => {
   it('writes avatar to profiles table and does not write to auth metadata', async () => {
     const eq = vi.fn().mockResolvedValue({ error: null })
     const update = vi.fn(() => ({ eq }))
-    const from = vi.fn(() => ({ update }))
-    const getUser = vi.fn().mockResolvedValue({ data: { user: null } })
+    const upsert = vi.fn().mockResolvedValue({ error: null })
+    const from = vi.fn(() => ({ update, upsert }))
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: { email: 'traveler@paris.fr' } },
+    })
     getSupabaseMock.mockReturnValue({ from, auth: { getUser } })
 
     await saveProfileAvatar('user-1', {
@@ -82,7 +85,14 @@ describe('account avatar cloud storage', () => {
     })
 
     expect(from).toHaveBeenCalledWith('profiles')
-    expect(update).toHaveBeenCalledWith({ avatar_url: 'data:image/webp;base64,new-avatar' })
+    expect(upsert).toHaveBeenCalledWith(
+      {
+        id: 'user-1',
+        email: 'traveler@paris.fr',
+        avatar_url: 'data:image/webp;base64,new-avatar',
+      },
+      { onConflict: 'id' },
+    )
   })
 
   it('hydrates cloud avatar to local storage if cloud has custom avatar', async () => {

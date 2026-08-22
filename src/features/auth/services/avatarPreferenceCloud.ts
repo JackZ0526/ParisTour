@@ -48,10 +48,22 @@ export async function saveProfileAvatar(
   // 1. Update profiles table
   try {
     const sb = getSupabase()
-    await sb
-      .from('profiles')
-      .update({ avatar_url: avatarUrl })
-      .eq('id', userId)
+    const { data: userData } = await sb.auth.getUser()
+    const email = userData?.user?.email || ''
+
+    if (email) {
+      const { error } = await sb
+        .from('profiles')
+        .upsert(
+          { id: userId, email: email.toLowerCase(), avatar_url: avatarUrl },
+          { onConflict: 'id' },
+        )
+      if (error) {
+        await sb.from('profiles').update({ avatar_url: avatarUrl }).eq('id', userId)
+      }
+    } else {
+      await sb.from('profiles').update({ avatar_url: avatarUrl }).eq('id', userId)
+    }
   } catch (err) {
     console.warn('[avatarCloud] profile table update ignored:', err)
   }
