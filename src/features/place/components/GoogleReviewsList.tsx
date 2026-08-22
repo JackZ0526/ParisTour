@@ -8,6 +8,7 @@ import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
 } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   reviews: GoogleReview[]
@@ -20,12 +21,14 @@ interface Props {
 
 export function GoogleReviewsList({
   reviews,
-  sourceLabel = 'Google 评论',
+  sourceLabel,
   source,
   showHeader = true,
   showShimmer = true,
   onPendingChange,
 }: Props) {
+  const { t, locale } = useTranslation()
+  const resolvedSourceLabel = sourceLabel || t('place.reviews')
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [showOriginal, setShowOriginal] = useState<Record<number, boolean>>({})
   const [translationFailed, setTranslationFailed] = useState(false)
@@ -35,7 +38,7 @@ export function GoogleReviewsList({
       reviews.map((r) => r.text.trim()).filter((t) => t && !looksChinese(t)),
     [reviews],
   )
-  const needsTranslate = nonChinese.length > 0 && isLlmConfigured()
+  const needsTranslate = locale === 'zh-CN' && nonChinese.length > 0 && isLlmConfigured()
   const [translating, setTranslating] = useState(needsTranslate)
 
   const reviewKey = useMemo(
@@ -54,7 +57,7 @@ export function GoogleReviewsList({
       .map((r) => r.text.trim())
       .filter((t) => t && !looksChinese(t))
 
-    if (!nonChinese.length || !isLlmConfigured()) {
+    if (locale !== 'zh-CN' || !nonChinese.length || !isLlmConfigured()) {
       setTranslations({})
       setTranslating(false)
       setTranslationFailed(false)
@@ -91,8 +94,7 @@ export function GoogleReviewsList({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewKey, retryCount])
+  }, [reviewKey, retryCount, locale])
 
   if (!reviews.length) return null
 
@@ -104,7 +106,7 @@ export function GoogleReviewsList({
             {source === 'google' || source === 'tripadvisor' ? (
               <PlaceSourceMark source={source} showLabel={false} />
             ) : null}
-            {sourceLabel}
+            {resolvedSourceLabel}
           </p>
         )}
         {translationFailed && !translating && (
@@ -113,7 +115,7 @@ export function GoogleReviewsList({
             onClick={() => setRetryCount((count) => count + 1)}
             className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
           >
-            翻译暂不可用，点击重试
+            {t('place.translationUnavailableRetry')}
           </button>
         )}
       </div>
@@ -137,7 +139,7 @@ export function GoogleReviewsList({
                 {review.relativeTime && <span>{review.relativeTime}</span>}
                 {isTranslated && !showingOriginal && (
                   <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.blue} inline-flex items-center px-2 py-0.5 text-[var(--stone)]`}>
-                    已翻译
+                    {t('place.translatedBadge')}
                   </span>
                 )}
               </div>
@@ -155,7 +157,7 @@ export function GoogleReviewsList({
                     }
                     className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
                   >
-                    {showingOriginal ? '查看译文' : '查看原文'}
+                    {showingOriginal ? t('place.viewTranslation') : t('place.viewOriginal')}
                   </button>
                 </div>
               )}

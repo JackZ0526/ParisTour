@@ -1514,10 +1514,10 @@ export function GooglePlacePage({
               reviews={displayReviews}
               sourceLabel={
                 rapidApiReviewsActive
-                  ? 'Google 评论'
+                  ? (locale === 'en' ? 'Google Reviews' : 'Google 评论')
                   : tripadvisorRoute
-                    ? 'Tripadvisor 评论'
-                    : reviewSourceLabel
+                    ? (locale === 'en' ? 'Tripadvisor Reviews' : 'Tripadvisor 评论')
+                    : (reviewSourceLabel || t('place.reviews'))
               }
               source={
                 rapidApiReviewsActive

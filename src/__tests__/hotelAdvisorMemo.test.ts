@@ -52,9 +52,9 @@ describe('hotelAdvisorMemo', () => {
         bookingHotelId: '12345',
       }),
     ).toEqual([
-      'hotel-detail:v2:booking:12345',
-      'hotel-detail:v2:name:padam hôtel',
-      'hotel-detail:v2:hotel-111-abc',
+      'hotel-detail:v3:zh-CN:booking:12345',
+      'hotel-detail:v3:zh-CN:name:padam hôtel',
+      'hotel-detail:v3:zh-CN:hotel-111-abc',
     ])
   })
 

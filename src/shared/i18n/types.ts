@@ -182,6 +182,7 @@ export interface I18nSchema {
     selectedHotelLabel: string
     rating: string
     advisorReview: string
+    advisorReviewLoading: string
     regenerateAdvisor: string
     retryMatching: string
     loadingHotels: string
@@ -191,6 +192,8 @@ export interface I18nSchema {
     reviewScores: string
     policiesAndInfo: string
     checkInOut: string
+    checkInAfter: string
+    checkOutBefore: string
     languagesSpoken: string
     paymentMethods: string
     importantInfo: string
@@ -202,6 +205,17 @@ export interface I18nSchema {
     bookingDisclaimer: string
     retryMatch: string
     noFacilities: string
+    dismiss: string
+    eliminate: string
+    restoreCandidate: string
+    preferencesPrompt: string
+    preferencesHint: string
+    preferencesPlaceholder: string
+    back: string
+    recommendByPrefs: string
+    recommending: string
+    thinkingRecommendation: string
+    verifyingRecommendation: string
   }
   flight: {
     title: string
@@ -253,6 +267,11 @@ export interface I18nSchema {
     preferencesSubtitle: string
     savePreferences: string
     customPreferencesPlaceholder: string
+    translatedBadge: string
+    viewOriginal: string
+    viewTranslation: string
+    translationUnavailableRetry: string
+    reviews: string
     extractingTags: string
     dayStartTime: string
     activeTagPool: string

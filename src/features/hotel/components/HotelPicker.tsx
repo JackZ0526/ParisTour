@@ -38,7 +38,7 @@ import {
   glassCardSurfaceClass,
   glassGoldCardSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
-import { useTranslation } from '../../../shared/i18n'
+import { useTranslation, getLocale, type Locale } from '../../../shared/i18n'
 import {
   fetchBookingHotelFeaturedReviews,
   fetchBookingHotelDetails,
@@ -281,8 +281,19 @@ const LANGUAGE_LABELS: Record<string, string> = {
   'pt-pt': '葡萄牙语',
 }
 
-function localizeLanguage(value: string): string {
-  return LANGUAGE_LABELS[value.trim().toLowerCase()] || value
+const LANGUAGE_EN_LABELS: Record<string, string> = {
+  en: 'English', fr: 'French', es: 'Spanish', pt: 'Portuguese', de: 'German',
+  'en-gb': 'English', 'en-us': 'English', it: 'Italian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic', ru: 'Russian',
+  'pt-pt': 'Portuguese',
+}
+
+function localizeLanguage(value: string, locale?: Locale): string {
+  const current = locale || getLocale()
+  const key = value.trim().toLowerCase()
+  if (current === 'en') {
+    return LANGUAGE_EN_LABELS[key] || value.charAt(0).toUpperCase() + value.slice(1)
+  }
+  return LANGUAGE_LABELS[key] || value
 }
 
 function BookingSectionHeader({
@@ -601,7 +612,7 @@ function BookingHotelFacts({
   const [locationRevealed, setLocationRevealed] = useState(false)
   const [policiesRevealed, setPoliciesRevealed] = useState(false)
   const popularFacilities = hotel.facilities || []
-  const visibleLanguages = (hotel.languages || []).map(localizeLanguage)
+  const visibleLanguages = (hotel.languages || []).map((l) => localizeLanguage(l, locale))
   const reviewScores = (hotel.reviewScores || []).filter((item) => item.score > 0)
   const policies = hotel.policies || []
   const paymentMethods = (hotel.paymentMethods || []).map(localizePaymentMethod)
@@ -623,6 +634,8 @@ function BookingHotelFacts({
   const showPolicySkeleton =
     (factsPending && policies.length === 0) || (policiesNeedTranslate && !policiesRevealed)
   const policiesKey = policies.join('\n---\n')
+
+  const listSeparator = locale === 'en' ? ', ' : '、'
 
   useLayoutEffect(() => {
     setLocationRevealed(!locationNeedsTranslate)
@@ -840,9 +853,28 @@ function BookingHotelFacts({
           <div className="rounded-2xl border border-[var(--mist)] bg-white/60 dark:bg-[#18201c]/70 p-4">
             <BookingSectionHeader icon={Info} title={t('hotel.policiesAndInfo')} />
             <div className="divide-y divide-[var(--mist)] text-sm">
-              {(hotel.checkIn || hotel.checkOut) && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{t('hotel.checkInOut')}</span><span className="text-[var(--ink)]/80">{hotel.checkIn ? `${hotel.checkIn} 后入住` : ''}{hotel.checkIn && hotel.checkOut ? ' · ' : ''}{hotel.checkOut ? `${hotel.checkOut} 前退房` : ''}</span></div>}
-              {visibleLanguages.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{t('hotel.languagesSpoken')}</span><span className="text-[var(--ink)]/80">{visibleLanguages.join('、')}</span></div>}
-              {paymentMethods.length > 0 && <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]"><span className="font-medium">{t('hotel.paymentMethods')}</span><span className="text-[var(--ink)]/80">{paymentMethods.join('、')}</span></div>}
+              {(hotel.checkIn || hotel.checkOut) && (
+                <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]">
+                  <span className="font-medium">{t('hotel.checkInOut')}</span>
+                  <span className="text-[var(--ink)]/80">
+                    {hotel.checkIn ? t('hotel.checkInAfter', { time: hotel.checkIn }) : ''}
+                    {hotel.checkIn && hotel.checkOut ? ' · ' : ''}
+                    {hotel.checkOut ? t('hotel.checkOutBefore', { time: hotel.checkOut }) : ''}
+                  </span>
+                </div>
+              )}
+              {visibleLanguages.length > 0 && (
+                <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]">
+                  <span className="font-medium">{t('hotel.languagesSpoken')}</span>
+                  <span className="text-[var(--ink)]/80">{visibleLanguages.join(listSeparator)}</span>
+                </div>
+              )}
+              {paymentMethods.length > 0 && (
+                <div className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]">
+                  <span className="font-medium">{t('hotel.paymentMethods')}</span>
+                  <span className="text-[var(--ink)]/80">{paymentMethods.join(listSeparator)}</span>
+                </div>
+              )}
               {policies.length > 0 && (
                 <div className={showPolicySkeleton ? 'hidden' : 'py-3'}>
                   <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
@@ -967,7 +999,7 @@ export function HotelPicker({
   onDetailChange,
   openSelectedDetailToken = 0,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [customQuery, setCustomQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -1373,14 +1405,21 @@ export function HotelPicker({
     const card = popupCandidate
     const bypass = hotelStoryRegenToken > 0
 
-    if (!bypass && card.tripFit?.trim() && card.hotelAdvisorVersion === 2) {
-      rememberHotelAdvisorCopy(card, card.tripFit)
+    const isValidForLocale = (text?: string) => {
+      if (!text?.trim()) return false
+      if (locale === 'en' && looksChinese(text)) return false
+      if (locale === 'zh-CN' && !looksChinese(text)) return false
+      return true
+    }
+
+    if (!bypass && card.tripFit?.trim() && isValidForLocale(card.tripFit) && card.hotelAdvisorVersion === 2) {
+      rememberHotelAdvisorCopy(card, card.tripFit, locale)
       return
     }
 
     if (!bypass) {
-      const hydrated = hydrateHotelAdvisorFromCache(card)
-      if (hydrated.tripFit?.trim() && hydrated.hotelAdvisorVersion === 2) {
+      const hydrated = hydrateHotelAdvisorFromCache(card, locale)
+      if (hydrated.tripFit?.trim() && isValidForLocale(hydrated.tripFit) && hydrated.hotelAdvisorVersion === 2) {
         if (hydrated.tripFit !== card.tripFit) {
           const enrich = (h: HotelCandidate): HotelCandidate =>
             h.id === card.id ? hydrated : h
@@ -2673,12 +2712,18 @@ export function HotelPicker({
                 reason:
                   storyLoadingId === popupCandidate.id
                     ? streamingAdvisorReason ||
-                      (hotelStoryRegenToken > 0 ? undefined : popupCandidate.tripFit)
-                    : popupCandidate.tripFit,
+                      (hotelStoryRegenToken > 0
+                        ? undefined
+                        : (locale === 'en' && looksChinese(popupCandidate.tripFit || '')
+                            ? undefined
+                            : popupCandidate.tripFit))
+                    : (locale === 'en' && looksChinese(popupCandidate.tripFit || '')
+                        ? undefined
+                        : popupCandidate.tripFit),
                 loading: storyLoadingId === popupCandidate.id,
                 labels: {
-                  title: '行程顾问点评',
-                  loadingText: '正在结合酒店资料与住客评论生成推荐理由…',
+                  title: t('hotel.advisorReview'),
+                  loadingText: t('hotel.advisorReviewLoading'),
                 },
                 onRegenerate: isLlmConfigured()
                   ? () => setHotelStoryRegenToken((n) => n + 1)
@@ -2701,7 +2746,7 @@ export function HotelPicker({
                     onClick={dismissPendingCustom}
                     className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 flex-1 sm:flex-none`}
                   >
-                    放弃
+                    {t('hotel.dismiss')}
                   </button>
                 ) : (
                   <button
@@ -2710,7 +2755,7 @@ export function HotelPicker({
                     className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-red-700 hover:bg-red-50/70 active:scale-95 flex-1 sm:flex-none`}
                   >
                     <Trash2 size={13} strokeWidth={1.8} className="shrink-0" />
-                    移出候选
+                    {t('hotel.removeFromCandidate')}
                   </button>
                 )}
                 <button
@@ -2718,7 +2763,7 @@ export function HotelPicker({
                   onClick={decideConsider}
                   className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 flex-1 sm:flex-none`}
                 >
-                  {decidingCustom ? '仅加入候选' : '保留备选'}
+                  {decidingCustom ? (locale === 'en' ? 'Add as Candidate' : '仅加入候选') : (locale === 'en' ? 'Keep in Candidates' : '保留备选')}
                 </button>
               </div>
 
@@ -2728,7 +2773,7 @@ export function HotelPicker({
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--ink)]/90 bg-[var(--ink)] px-5 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22)] transition-all hover:bg-[var(--ink)]/95 active:scale-95 w-full sm:w-auto"
               >
                 <Bed size={15} strokeWidth={2} className="shrink-0 text-[var(--gold)]" />
-                设为当前住宿
+                {t('hotel.chooseThisHotel')}
               </button>
             </div>
           ) : undefined
