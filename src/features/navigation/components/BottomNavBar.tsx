@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CalendarDays, Luggage, User } from 'lucide-react'
 import type { AppTab } from '../types'
+import { useTranslation } from '../../../shared/i18n'
 
 export interface BottomNavBarProps {
   activeTab: AppTab
@@ -9,22 +10,23 @@ export interface BottomNavBarProps {
   itineraryReady?: boolean
 }
 
-const TABS: Array<{
-  id: AppTab
-  label: string
-  Icon: typeof CalendarDays
-}> = [
-  { id: 'logistics', label: '出行', Icon: Luggage },
-  { id: 'itinerary', label: '行程', Icon: CalendarDays },
-  { id: 'profile', label: '我的', Icon: User },
-]
-
 export function BottomNavBar({
   activeTab,
   onSelectTab,
   itineraryReady,
 }: BottomNavBarProps) {
+  const { t } = useTranslation()
   const [hasInteracted, setHasInteracted] = useState(false)
+
+  const tabs: Array<{
+    id: AppTab
+    label: string
+    Icon: typeof CalendarDays
+  }> = [
+    { id: 'logistics', label: t('nav.logistics'), Icon: Luggage },
+    { id: 'itinerary', label: t('nav.itinerary'), Icon: CalendarDays },
+    { id: 'profile', label: t('nav.profile'), Icon: User },
+  ]
   return (
     <aside
       aria-label="悬浮导航栏"
@@ -58,7 +60,7 @@ export function BottomNavBar({
           className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 dark:via-white/10 to-transparent opacity-75"
         />
 
-        {TABS.map(({ id, label, Icon }) => {
+        {tabs.map(({ id, label, Icon }) => {
           const isActive = activeTab === id
           return (
             <motion.button

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CalendarDays, Luggage, User } from 'lucide-react'
 import type { AppTab } from '../types'
+import { useTranslation } from '../../../shared/i18n'
 
 export interface TopNavSegmentProps {
   activeTab: AppTab
@@ -10,27 +11,28 @@ export interface TopNavSegmentProps {
   className?: string
 }
 
-const TABS: Array<{
-  id: AppTab
-  label: string
-  Icon: typeof CalendarDays
-}> = [
-  { id: 'logistics', label: '出行预订', Icon: Luggage },
-  { id: 'itinerary', label: '每日行程', Icon: CalendarDays },
-  { id: 'profile', label: '我的', Icon: User },
-]
-
 export function TopNavSegment({
   activeTab,
   onSelectTab,
   itineraryReady,
   className = '',
 }: TopNavSegmentProps) {
+  const { t } = useTranslation()
   const [hasInteracted, setHasInteracted] = useState(false)
+
+  const tabs: Array<{
+    id: AppTab
+    label: string
+    Icon: typeof CalendarDays
+  }> = [
+    { id: 'logistics', label: t('nav.logistics'), Icon: Luggage },
+    { id: 'itinerary', label: t('nav.itineraryDaily'), Icon: CalendarDays },
+    { id: 'profile', label: t('nav.profile'), Icon: User },
+  ]
   return (
     <div
       role="tablist"
-      aria-label="主要导航"
+      aria-label={t('nav.itinerary')}
       className={`relative inline-flex items-center overflow-hidden rounded-full bg-white/45 dark:bg-[#151c18]/75 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45),inset_0_1px_1.5px_0_rgba(255,255,255,0.15),inset_0_-1px_1px_0_rgba(0,0,0,0.5)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors ${className}`}
     >
       {/* Liquid Glass Flowing Gradient Border (流光折射渐变发丝描边) */}
@@ -56,7 +58,7 @@ export function TopNavSegment({
         className="pointer-events-none absolute inset-x-12 bottom-0 z-20 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/60 dark:via-white/10 to-transparent opacity-75"
       />
 
-      {TABS.map(({ id, label, Icon }) => {
+      {tabs.map(({ id, label, Icon }) => {
         const isActive = activeTab === id
         return (
           <button

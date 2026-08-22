@@ -10,6 +10,7 @@ import {
   Edit3,
   Hotel,
   Laptop,
+  Languages,
   LogOut,
   MapPin,
   MessageSquare,
@@ -32,6 +33,7 @@ import { AvatarPickerDialog } from './AvatarPickerDialog'
 import { useUserNickname, getUserNickname } from '../../auth/services/nicknameStore'
 import { NicknamePickerDialog } from './NicknamePickerDialog'
 import { useTheme } from '../../../shared/services/themeStore'
+import { useTranslation, type Locale } from '../../../shared/i18n'
 import {
   BASE_TAG_PILL,
   DEFAULT_RECOMMENDATION_PREFERENCES,
@@ -128,15 +130,17 @@ export function ProfileTab({
   const [nicknamePickerOpen, setNicknamePickerOpen] = useState(false)
   const { themePreference, setThemePreference } = useTheme()
   const [hasThemeInteracted, setHasThemeInteracted] = useState(false)
+  const { t, locale, setLocale } = useTranslation()
+  const [hasLanguageInteracted, setHasLanguageInteracted] = useState(false)
 
   const roleLabel =
     role === 'owner'
-      ? '拥有者'
+      ? t('auth.roleOwner')
       : role === 'editor'
-        ? '协作成员'
+        ? t('auth.roleEditor')
         : role === 'viewer'
-          ? '只读成员'
-          : '个人账户'
+          ? t('auth.roleViewer')
+          : t('auth.anonymous')
 
   return (
     <motion.div
@@ -264,7 +268,7 @@ export function ProfileTab({
                 className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.rose} inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-red-600/90 dark:text-red-300 transition-all hover:bg-[#fde8e8]/95 dark:hover:bg-red-500/20 hover:border-red-300/90 dark:hover:border-red-400/40 hover:text-red-700 dark:hover:text-red-200 active:scale-95 cursor-pointer`}
               >
                 <LogOut size={13} strokeWidth={2.2} />
-                <span>退出</span>
+                <span>{t('auth.logout')}</span>
               </button>
             </div>
 
@@ -276,9 +280,9 @@ export function ProfileTab({
                     <CalendarDays size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">规划天数</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">{t('profile.tripStatsDays')}</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
-                      {tripStats.daysCount > 0 ? `${tripStats.daysCount} 天行程` : '未生成'}
+                      {tripStats.daysCount > 0 ? `${tripStats.daysCount} ${t('common.days')}` : t('itinerary.datesPending')}
                     </p>
                   </div>
                 </div>
@@ -288,9 +292,9 @@ export function ProfileTab({
                     <MapPin size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">游玩地点</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">{t('profile.tripStatsPlaces')}</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
-                      {tripStats.placesCount} 处景点
+                      {t('profile.placesCount', { count: tripStats.placesCount })}
                     </p>
                   </div>
                 </div>
@@ -300,9 +304,9 @@ export function ProfileTab({
                     <Hotel size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">入住酒店</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">{t('profile.tripStatsHotel')}</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
-                      {tripStats.hotelReady ? '已安排' : '待配置'}
+                      {tripStats.hotelReady ? t('profile.hotelArranged') : t('profile.hotelPending')}
                     </p>
                   </div>
                 </div>
@@ -312,9 +316,9 @@ export function ProfileTab({
                     <Plane size={14} strokeWidth={2.2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">往返航班</p>
+                    <p className="text-[10px] text-[var(--stone)] dark:text-zinc-400 truncate">{t('profile.tripStatsFlights')}</p>
                     <p className="text-xs font-semibold text-[var(--ink)] truncate">
-                      {tripStats.flightsReady ? '已录入' : '待确认'}
+                      {tripStats.flightsReady ? t('profile.flightsEntered') : t('profile.flightsPending')}
                     </p>
                   </div>
                 </div>
@@ -328,17 +332,17 @@ export function ProfileTab({
           <div className="flex items-center justify-between border-b border-[var(--mist)]/60 pb-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
               <Compass size={16} className="text-[var(--copper)]" />
-              <span>行程管理与多行程切换</span>
+              <span>{t('profile.tripManagement')}</span>
             </div>
             {trips.length > 1 && (
-              <span className="text-xs text-[var(--stone)]">共 {trips.length} 个行程</span>
+              <span className="text-xs text-[var(--stone)]">{t('profile.allTrips', { count: trips.length })}</span>
             )}
           </div>
 
           {/* Multi-trip selector cards */}
           {trips.length > 1 && (
             <div className="space-y-2">
-              <label className="text-xs font-medium text-[var(--stone)]">当前可访问的行程（点击快速切换）</label>
+              <label className="text-xs font-medium text-[var(--stone)]">{t('profile.currentTripsLabel')}</label>
               <div className="grid grid-cols-1 gap-2">
                 {trips.map((t) => {
                   const isActive = t.id === activeTripId
@@ -428,8 +432,8 @@ export function ProfileTab({
                     <Share2 size={17} strokeWidth={2} />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-[var(--ink)]">分享与协作</div>
-                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">邀请同伴共同规划</div>
+                    <div className="text-sm font-medium text-[var(--ink)]">{t('cloud.shareTitle')}</div>
+                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">{t('cloud.shareSubtitle')}</div>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-[var(--stone)] dark:text-zinc-400 transition-transform group-hover:translate-x-0.5" />
@@ -447,8 +451,8 @@ export function ProfileTab({
                     <Archive size={17} strokeWidth={2} />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-[var(--ink)]">备份与存档</div>
-                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">导出或恢复行程快照</div>
+                    <div className="text-sm font-medium text-[var(--ink)]">{t('cloud.backupTitle')}</div>
+                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">{t('cloud.backupSubtitle')}</div>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-[var(--stone)] dark:text-zinc-400 transition-transform group-hover:translate-x-0.5" />
@@ -562,19 +566,19 @@ export function ProfileTab({
         <div className="flex items-center justify-between border-b border-[var(--mist)]/60 dark:border-white/10 pb-3">
           <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
             <Palette size={16} className="text-[var(--copper)]" />
-            <span>外观主题 · 色彩模式</span>
+            <span>{t('profile.themeTitle')}</span>
           </div>
           <span className="text-xs text-[var(--stone)] dark:text-zinc-400">
-            {themePreference === 'system' ? '跟随系统' : themePreference === 'dark' ? '午夜深色' : '日间浅色'}
+            {themePreference === 'system' ? t('auth.themeSystem') : themePreference === 'dark' ? t('auth.themeDark') : t('auth.themeLight')}
           </span>
         </div>
 
         <div className="relative grid grid-cols-3 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
           {(
             [
-              { id: 'light', label: '浅色日间', Icon: Sun, activeColor: 'text-amber-600 dark:text-amber-300' },
-              { id: 'dark', label: '深色午夜', Icon: Moon, activeColor: 'text-indigo-500 dark:text-amber-200' },
-              { id: 'system', label: '跟随系统', Icon: Laptop, activeColor: 'text-[var(--copper)] dark:text-amber-200' },
+              { id: 'light', label: t('auth.themeLight'), Icon: Sun, activeColor: 'text-amber-600 dark:text-amber-300' },
+              { id: 'dark', label: t('auth.themeDark'), Icon: Moon, activeColor: 'text-indigo-500 dark:text-amber-200' },
+              { id: 'system', label: t('auth.themeSystem'), Icon: Laptop, activeColor: 'text-[var(--copper)] dark:text-amber-200' },
             ] as const
           ).map(({ id, label, Icon, activeColor }) => {
             const isActive = themePreference === id
@@ -638,16 +642,88 @@ export function ProfileTab({
       </div>
 
       {/* ========================================================================= */}
-      {/* Row 4: Danger Zone Card (Placed at Bottom)                                */}
+      {/* Row 4: Interface Language Selector (界面语言 · 多语言切换)                 */}
+      {/* ========================================================================= */}
+      <div className={`appearance-theme-card rounded-3xl ${glassCardSurfaceClass} p-5 sm:p-6 space-y-3.5 transition-colors`}>
+        <div className="flex items-center justify-between border-b border-[var(--mist)]/60 dark:border-white/10 pb-3">
+          <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
+            <Languages size={16} className="text-[var(--copper)]" />
+            <span>{t('profile.languageTitle')}</span>
+          </div>
+          <span className="text-xs text-[var(--stone)] dark:text-zinc-400">
+            {locale === 'zh-CN' ? '简体中文' : 'English'}
+          </span>
+        </div>
+
+        <div className="relative grid grid-cols-2 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
+          {(
+            [
+              { id: 'zh-CN', label: '🇨🇳 简体中文' },
+              { id: 'en', label: '🇬🇧 English' },
+            ] as const
+          ).map(({ id, label }) => {
+            const isActive = locale === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setHasLanguageInteracted(true)
+                  setLocale(id as Locale)
+                }}
+                className="relative isolate flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="language-preference-pill"
+                    className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
+                    animate={
+                      hasLanguageInteracted
+                        ? {
+                            scaleX: [1, 1.12, 0.96, 1],
+                            scaleY: [1, 0.9, 1.03, 1],
+                          }
+                        : undefined
+                    }
+                    transition={{
+                      layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                      scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                      scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                    }}
+                  >
+                    {/* Top specular light reflection highlight */}
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
+                    />
+                  </motion.div>
+                )}
+                <span
+                  className={`relative z-10 transition-colors ${
+                    isActive
+                      ? 'text-[var(--ink)] dark:text-white font-bold'
+                      : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  {label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* Row 5: Danger Zone Card (Placed at Bottom)                                */}
       {/* ========================================================================= */}
       {!readOnly && onClearAll && (
         <div className="rounded-3xl border border-red-200/80 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/20 p-5 shadow-[0_8px_30px_rgba(239,68,68,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] backdrop-blur-xl space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
             <Trash2 size={16} />
-            <span>重置与数据清空</span>
+            <span>{t('profile.clearAllTitle')}</span>
           </div>
           <p className="text-xs text-[var(--stone)] dark:text-zinc-400">
-            清空当前行程的所有日期、酒店及自定义景点排期并重置为初始状态。请谨慎操作。
+            {t('profile.clearAllDesc')}
           </p>
           <button
             type="button"
@@ -655,14 +731,14 @@ export function ProfileTab({
             className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50/80 px-4 py-2 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-100 active:scale-95 cursor-pointer dark:border-red-800/60 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/60"
           >
             <Trash2 size={14} />
-            <span>清空当前行程全部数据</span>
+            <span>{t('profile.clearAllBtn')}</span>
           </button>
         </div>
       )}
 
       {/* System Footer Info Note */}
       <div className="text-center pt-1 text-[11px] text-[var(--stone)]/60 space-y-0.5 -mb-2">
-        <p>Paris Tour v0.7.0 · Supabase 端到端加密安全同步</p>
+        <p>Paris Tour v0.8.1 · Supabase {t('auth.cloudSyncActive')}</p>
         <p>Made with ❤️ for Paris Explorers</p>
       </div>
 

@@ -38,6 +38,7 @@ import {
   glassCardSurfaceClass,
   glassGoldCardSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 import {
   fetchBookingHotelFeaturedReviews,
   fetchBookingHotelDetails,
@@ -950,6 +951,7 @@ export function HotelPicker({
   onDetailChange,
   openSelectedDetailToken = 0,
 }: Props) {
+  const { t } = useTranslation()
   const [customQuery, setCustomQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -2152,7 +2154,7 @@ export function HotelPicker({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-xl leading-tight text-[var(--ink)] sm:text-2xl">
-                  住宿选择
+                  {t('hotel.title')}
                 </h2>
                 <span
                   className={`${glassCapsuleSurfaceClass} ${
@@ -2165,7 +2167,7 @@ export function HotelPicker({
                       : 'text-[var(--stone)] dark:text-zinc-300'
                   }`}
                 >
-                  {isHotelSelected(selected) ? '已选择' : '待选择'}
+                  {isHotelSelected(selected) ? t('hotel.selected') : t('hotel.unselected')}
                 </span>
               </div>
             </div>
@@ -2178,7 +2180,7 @@ export function HotelPicker({
         <div className="flex items-center gap-1.5">
           <Bed size={14} className="text-[var(--copper)]" />
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--copper)]">
-            当前住宿
+            {t('hotel.currentHotel')}
           </p>
         </div>
         <div className="mt-2.5 space-y-4">

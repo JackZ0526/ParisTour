@@ -13,6 +13,7 @@ import {
 import { formatOwnerHandle, type AccessibleTrip } from '../services/tripCloud'
 import { getUserNickname, useUserNickname } from '../../auth/services/nicknameStore'
 import { glassBackdropSurfaceClass, glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 export interface TripSelectorCapsuleProps {
   trips: AccessibleTrip[]
@@ -49,6 +50,7 @@ export function TripSelectorCapsule({
   onSelectTrip,
   className = '',
 }: TripSelectorCapsuleProps) {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
@@ -201,10 +203,10 @@ export function TripSelectorCapsule({
               {/* Popover Header */}
               <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--mist)]/50 pb-2">
                 <span className="text-[10px] font-bold tracking-[0.16em] uppercase text-[var(--stone)]">
-                  行程空间切换
+                  {t('cloud.tripSelector')}
                 </span>
                 <span className="text-[10.5px] text-[var(--stone)]/80">
-                  共 {trips.length} 个行程
+                  {t('profile.allTrips', { count: trips.length })}
                 </span>
               </div>
 

@@ -27,6 +27,7 @@ import {
 import { DateRangePicker } from '../../itinerary/components/DateRangePicker'
 import { Calendar, Plane, PlaneTakeoff, PlaneLanding, RefreshCw, Edit3, ArrowRight, Trash2, X } from 'lucide-react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   tripDates: TripDateRange | null
@@ -86,6 +87,7 @@ export function LogisticsTravelSection({
   const [inbound, setInbound] = useState<FlightInfo | null>(seed.returnFlight)
   const [busy, setBusy] = useState<'outbound' | 'return' | 'both' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation()
 
   // Independent edit states
   const [editingOutbound, setEditingOutbound] = useState(false)
@@ -195,7 +197,7 @@ export function LogisticsTravelSection({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-xl leading-tight text-[var(--ink)] sm:text-2xl">
-                  日期与往返航班
+                  {t('flight.travelSectionTitle')}
                 </h2>
                 <span
                   className={`${glassCapsuleSurfaceClass} ${
@@ -206,7 +208,7 @@ export function LogisticsTravelSection({
                     hasDates && outbound && inbound ? 'text-[var(--sage)]' : 'text-[var(--stone)]'
                   }`}
                 >
-                  {hasDates && outbound && inbound ? '已就绪' : '待完善'}
+                  {hasDates && outbound && inbound ? t('flight.ready') : t('flight.pending')}
                 </span>
               </div>
             </div>
@@ -222,14 +224,14 @@ export function LogisticsTravelSection({
                 <div className="flex items-center gap-1.5">
                   <Calendar size={14} className="text-[var(--copper)]" />
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--copper)]">
-                    旅行日期
+                    {t('itinerary.tripDates')}
                   </span>
                 </div>
                 {tripDates && !readOnly && (
                   <button
                     type="button"
-                    title="清空日期"
-                    aria-label="清空日期"
+                    title={t('itinerary.clearDates')}
+                    aria-label={t('itinerary.clearDates')}
                     onClick={() => setConfirmClearDatesOpen(true)}
                     className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-red-700 transition-colors active:scale-95`}
                   >
@@ -242,7 +244,7 @@ export function LogisticsTravelSection({
                 <DateRangePicker
                   value={tripDates}
                   onChange={commitDates}
-                  placeholder="出发 – 返程"
+                  placeholder={t('itinerary.placeholderDateRange')}
                 />
               </div>
 
@@ -250,18 +252,18 @@ export function LogisticsTravelSection({
                 {tripDates ? (
                   <div className="space-y-1.5">
                     <p className="text-sm font-medium text-[var(--ink)]">
-                      {formatTripDayLabel(startDate)} 至 {formatTripDayLabel(endDate)}
+                      {formatTripDayLabel(startDate)} – {formatTripDayLabel(endDate)}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} px-2.5 py-0.5 text-[11px] font-semibold text-[var(--copper)]`}>
-                        共 {dayCount} 天 / {nightCount} 晚
+                        {t('itinerary.daysCount', { count: dayCount })} / {t('itinerary.nightsCount', { count: nightCount })}
                       </span>
-                      <span className="text-[var(--stone)]">巴黎时间 (CET)</span>
+                      <span className="text-[var(--stone)]">CET</span>
                     </div>
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--stone)] leading-relaxed">
-                    选择出发与返程日期。航班次日抵达时，游玩开始日会自动按到达日对齐。
+                    {t('itinerary.datesDesc')}
                   </p>
                 )}
               </div>
