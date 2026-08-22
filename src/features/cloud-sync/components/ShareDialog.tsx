@@ -26,8 +26,9 @@ import {
 import {
   batchLoadProfileNicknames,
 } from '../../auth/services/nicknamePreferenceCloud'
-import { getUserAvatar, type UserAvatar } from '../../auth/services/avatarStore'
-import { getUserNickname } from '../../auth/services/nicknameStore'
+import { getUserAvatar, setUserAvatar, type UserAvatar } from '../../auth/services/avatarStore'
+import { getUserNickname, setUserNickname } from '../../auth/services/nicknameStore'
+import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import { UserAvatarView } from '../../../shared/components/UserAvatarView'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
@@ -171,6 +172,41 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
     setError(null)
     setInfo(null)
   }, [open, tripId, reload])
+
+  // Live Realtime updates for companion avatars & nicknames while dialog is open
+  useEffect(() => {
+    if (!open || !isCloudSyncEnabled()) return
+    const sb = getSupabase()
+    const channel = sb
+      .channel(`profiles-live-${tripId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        (payload) => {
+          const row = payload.new as { email?: string; display_name?: string; avatar_url?: string }
+          if (row?.email) {
+            const norm = row.email.trim().toLowerCase()
+            if (row.display_name !== undefined) {
+              const cleanNick = row.display_name?.trim() || ''
+              setCompanionNicknames((prev) => ({ ...prev, [norm]: cleanNick }))
+              setUserNickname(cleanNick, norm)
+            }
+            if (row.avatar_url !== undefined) {
+              const avatar: UserAvatar = row.avatar_url
+                ? { type: 'image', value: row.avatar_url }
+                : { type: 'initial', value: norm.charAt(0).toUpperCase() }
+              setCompanionAvatars((prev) => ({ ...prev, [norm]: avatar }))
+              setUserAvatar(avatar, norm)
+            }
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void sb.removeChannel(channel)
+    }
+  }, [open, tripId])
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
