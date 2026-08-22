@@ -737,24 +737,24 @@ function BookingHotelFacts({
 
       <div className="space-y-4">
         {identityError && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
             <span>{identityError}</span>
             <button
               type="button"
               onClick={onIdentityRetry}
-              className="font-medium underline underline-offset-2"
+              className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
             >
               重试匹配
             </button>
           </div>
         )}
         {error && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
             <span>{error}</span>
             <button
               type="button"
               onClick={onRetry}
-              className="font-medium underline underline-offset-2"
+              className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
             >
               重试
             </button>
@@ -911,12 +911,12 @@ function BookingReviewsPanel({
         </div>
       )}
       {error && !loading && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           <span>{error}</span>
           <button
             type="button"
             onClick={onRetry}
-            className="font-medium underline underline-offset-2"
+            className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
           >
             重试
           </button>
@@ -2160,7 +2160,9 @@ export function HotelPicker({
                       ? glassCapsuleToneClass.gold
                       : glassCapsuleToneClass.neutral
                   } px-2.5 py-0.5 text-[11px] font-medium ${
-                    isHotelSelected(selected) ? 'text-amber-900' : 'text-[var(--stone)]'
+                    isHotelSelected(selected)
+                      ? 'text-amber-900 dark:text-amber-200'
+                      : 'text-[var(--stone)] dark:text-zinc-300'
                   }`}
                 >
                   {isHotelSelected(selected) ? '已选择' : '待选择'}
