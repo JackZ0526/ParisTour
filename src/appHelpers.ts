@@ -140,8 +140,18 @@ export function seasonEyebrow(startDate?: string | null, destination?: string): 
   return 'Winter Escape'
 }
 
-export function destinationLabel(destination: string): string {
-  return destination.trim() || '目的地'
+import { getLocale, type Locale } from './shared/i18n'
+import { tripCityFromDestination } from './features/destination/services/tripCity'
+
+export function destinationLabel(destination: string, locale: Locale = getLocale()): string {
+  const trimmed = destination.trim()
+  if (locale === 'en') {
+    if (trimmed) {
+      return tripCityFromDestination(trimmed).nameEn
+    }
+    return 'Destination'
+  }
+  return trimmed || '目的地'
 }
 
 export function chineseDayCount(n: number): string {
