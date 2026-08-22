@@ -77,6 +77,7 @@ import {
 } from '../services/placeSource'
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { ShimmerLines } from '../../../shared/components/ShimmerLines'
+import { useTranslation } from '../../../shared/i18n'
 import {
   fetchWikimediaPlacePhoto,
   peekWikimediaPlacePhoto,
@@ -404,6 +405,7 @@ export function GooglePlacePage({
   onAdvisorFacts,
   onClose,
 }: Props) {
+  const { t } = useTranslation()
   const [details, setDetails] = useState<GooglePlaceDetails | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLookupReady, setGoogleLookupReady] = useState(false)
@@ -1918,7 +1920,7 @@ export function GooglePlacePage({
                 rel="noreferrer"
                 className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] dark:text-emerald-300 transition-all hover:bg-[#dce9df]/90 dark:hover:bg-[#668b7a]/25 hover:border-[#a8bcae] dark:hover:border-[#668b7a]/40 active:scale-95 cursor-pointer`}
               >
-                官网
+                {t('place.website')}
               </a>
             )}
           </div>
@@ -1932,7 +1934,7 @@ export function GooglePlacePage({
                 target="_blank"
                 rel="noreferrer"
                 className={`group ${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} max-w-full text-sm text-[var(--stone)] dark:text-zinc-300 transition-all hover:bg-[#f1ded0]/90 dark:hover:bg-[#d48354]/20 hover:text-[var(--copper)] dark:hover:text-[var(--copper)] hover:border-[#d7a98a] dark:hover:border-[#d48354]/45 active:scale-[0.99] cursor-pointer`}
-                title="在 Google 地图中查看"
+                title={t('place.viewInGoogleMaps')}
               >
                 <MapPin size={14} strokeWidth={1.9} className="shrink-0 text-[var(--copper)]/85 dark:text-[var(--copper)] transition-colors" aria-hidden />
                 <span className="min-w-0 leading-snug">{displayAddress}</span>
@@ -1959,7 +1961,7 @@ export function GooglePlacePage({
               <div className={`space-y-3 rounded-2xl ${glassSageCardSurfaceClass} p-4`}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-[0.16em] text-[var(--sage)] font-semibold">
-                    {displayNarrative.labels?.title || '行程顾问点评'}
+                    {displayNarrative.labels?.title || t('place.advisorNoteTitle')}
                   </p>
                   {displayNarrative.onRegenerate &&
                     (displayNarrative.intro ||
@@ -1970,8 +1972,8 @@ export function GooglePlacePage({
                         type="button"
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--sage)] transition hover:bg-white dark:hover:bg-white/15 hover:shadow-sm active:scale-95 disabled:opacity-60`}
                         disabled={Boolean(displayNarrative.loading || displayNarrative.regenerating)}
-                        aria-label={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
-                        title={displayNarrative.regenerating ? '正在重新生成' : '重新生成点评'}
+                        aria-label={displayNarrative.regenerating ? t('common.loading') : t('place.regenerateNote')}
+                        title={displayNarrative.regenerating ? t('common.loading') : t('place.regenerateNote')}
                         onClick={displayNarrative.onRegenerate}
                       >
                         <RotateCw
@@ -1997,9 +1999,9 @@ export function GooglePlacePage({
                   <>
                 {displayNarrative.loading && !displayNarrative.intro && !displayNarrative.reason && (
                   <LoadingIndicator
-                    thinkingLabel="正在思考简介与推荐理由…"
+                    thinkingLabel="Thinking…"
                     generatingLabel={
-                      displayNarrative.labels?.loadingText || '正在生成简介与推荐理由…'
+                      displayNarrative.labels?.loadingText || 'Loading…'
                     }
                     showDots
                     size="sm"
@@ -2010,7 +2012,7 @@ export function GooglePlacePage({
                 {displayNarrative.intro && (
                   <div>
                     <p className="text-sm font-medium">
-                      {displayNarrative.labels?.intro || '简介'}
+                      {displayNarrative.labels?.intro || t('place.intro')}
                     </p>
                     <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-[var(--ink)]/90">
                       {displayNarrative.intro}
@@ -2028,7 +2030,7 @@ export function GooglePlacePage({
                 {displayNarrative.reason && (
                   <div>
                     <p className="text-sm font-medium">
-                      {displayNarrative.labels?.reason || '为什么推荐'}
+                      {displayNarrative.labels?.reason || t('place.whyRecommend')}
                     </p>
                     <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-[var(--ink)]/90">
                       {displayNarrative.reason}
@@ -2044,7 +2046,7 @@ export function GooglePlacePage({
                 {displayNarrative.tripFit && (
                   <div>
                     <p className="text-sm font-medium">
-                      {displayNarrative.labels?.tripFit || '与行程 / 要求的关系'}
+                      {displayNarrative.labels?.tripFit || t('place.fitReason')}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]/90">
                       {displayNarrative.tripFit}

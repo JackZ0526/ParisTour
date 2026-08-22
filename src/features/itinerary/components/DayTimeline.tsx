@@ -61,6 +61,7 @@ import {
 } from '../../map/services/googleMapsDirectionsUrl'
 import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
+import { useTranslation } from '../../../shared/i18n'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -561,6 +562,7 @@ export function DayTimeline({
   readOnly = false,
   direction = 1,
 }: Props) {
+  const { t } = useTranslation()
   const [addOpen, setAddOpen] = useState(false)
   const [drag, setDrag] = useState<DragSession | null>(null)
   const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
@@ -1613,8 +1615,8 @@ export function DayTimeline({
         )}
         <div className="mt-3">
           <p className="break-words rounded-xl border border-white/70 dark:border-white/10 bg-white/50 dark:bg-black/30 px-3.5 py-2 text-xs sm:text-sm text-[var(--stone)] dark:text-zinc-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-md">
-            <span className="font-medium text-[var(--ink)]">路线导航：</span>
-            点击每段交通，在 Google Maps 查看实时路线
+            <span className="font-medium text-[var(--ink)]">{t('itinerary.directionsLabel')}：</span>
+            {t('itinerary.directionsDesc')}
           </p>
         </div>
       </motion.div>
@@ -1628,13 +1630,13 @@ export function DayTimeline({
         >
           <span
             className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
-            title="机场"
-            aria-label="机场"
+            title={t('itinerary.fromAirport')}
+            aria-label={t('itinerary.fromAirport')}
           >
             <PlaneIcon />
           </span>
           <div className="min-w-0 flex-1">
-            <span className="text-xs text-[var(--stone)]">今日起点</span>
+            <span className="text-xs text-[var(--stone)]">{t('itinerary.dayOriginStart')}</span>
             <p className="mt-1 font-medium">{dayOrigin.label}</p>
           </div>
         </motion.div>
@@ -1656,7 +1658,7 @@ export function DayTimeline({
               routeUrl={firstRouteUrl}
               routeMode={firstRouteMode}
               originCue={
-                dayOrigin.kind === 'airport' ? '从机场' : '从酒店'
+                dayOrigin.kind === 'airport' ? t('itinerary.fromAirport') : t('itinerary.fromHotel')
               }
               fallbackLabel={`${googleMapsTravelModeLabel(firstRouteMode)} · Google Maps`}
             />
@@ -2247,7 +2249,7 @@ export function DayTimeline({
           variants={timelineItemVariants}
           className="rounded-2xl border border-dashed border-[var(--stone)]/30 dark:border-white/10 bg-white/45 dark:bg-white/5 px-4 py-6 text-center text-sm text-[var(--stone)] dark:text-zinc-400 backdrop-blur-md shadow-sm dark:shadow-none"
         >
-          {readOnly ? '本日还没有地点。' : '本日还没有地点，点击下方添加。'}
+          {readOnly ? t('itinerary.emptyTimelineReadOnly') : t('itinerary.emptyTimelineClickAdd')}
         </motion.p>
       )}
 
@@ -2261,7 +2263,7 @@ export function DayTimeline({
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-[var(--sage)]/50 dark:border-[var(--sage)]/50 bg-white/50 dark:bg-[#1d2822]/90 px-4 py-3 text-sm font-medium text-[var(--sage)] dark:text-emerald-300 shadow-sm dark:shadow-[0_8px_24px_rgba(0,0,0,0.36),inset_0_1px_1px_rgba(255,255,255,0.1)] backdrop-blur-md transition-all hover:-translate-y-px hover:bg-white/80 dark:hover:bg-[#25332b] hover:border-[var(--sage)] dark:hover:border-[var(--sage)] hover:shadow active:translate-y-0 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
             >
               <Plus size={15} strokeWidth={2} aria-hidden />
-              添加地点
+              {t('place.addPlace')}
             </button>
           </motion.div>
 
@@ -2290,9 +2292,10 @@ export function DayTimeline({
             open={confirmRegenDayOpen}
             onClose={() => setConfirmRegenDayOpen(false)}
             onConfirm={onResetDay}
-            title={`重新生成第 ${day.day} 天行程`}
-            description={`确定要重新生成第 ${day.day} 天（${day.title}）的行程吗？当天的排期与景点将被重新规划。`}
-            confirmText="重新生成"
+            title={t('itinerary.regenDayTitle', { day: day.day })}
+            description={t('itinerary.regenDayDesc', { day: day.day, title: day.title })}
+            confirmText={t('itinerary.regenerate')}
+            cancelText={t('common.cancel')}
             tone="sage"
             icon="refresh"
           />
@@ -2302,9 +2305,10 @@ export function DayTimeline({
               open={confirmRestoreDayOpen}
               onClose={() => setConfirmRestoreDayOpen(false)}
               onConfirm={onRestoreDayDefault}
-              title={`恢复第 ${day.day} 天默认推荐`}
-              description={`确定将第 ${day.day} 天（${day.title}）恢复为初始默认推荐吗？当天的个性化调整将被重置。`}
-              confirmText="恢复默认"
+              title={t('itinerary.restoreDayTitle', { day: day.day })}
+              description={t('itinerary.restoreDayDesc', { day: day.day, title: day.title })}
+              confirmText={t('common.reset')}
+              cancelText={t('common.cancel')}
               tone="warning"
               icon="history"
             />
@@ -2319,17 +2323,17 @@ export function DayTimeline({
                 setPendingDeleteStop(null)
               }
             }}
-            title="删除地点"
+            title={t('itinerary.deleteStop')}
             description={
               <span>
-                确定从第 {day.day} 天行程中删除{' '}
+                {t('itinerary.confirmDeleteStop')}{' '}
                 <strong className="font-semibold text-[var(--ink)]">
-                  「{pendingDeleteStop?.name || '此地点'}」
-                </strong>{' '}
-                吗？
+                  {pendingDeleteStop?.name ? `(${pendingDeleteStop.name})` : ''}
+                </strong>
               </span>
             }
-            confirmText="删除"
+            confirmText={t('common.delete')}
+            cancelText={t('common.cancel')}
             tone="danger"
             icon="trash"
           />

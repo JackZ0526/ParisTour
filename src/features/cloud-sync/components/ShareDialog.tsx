@@ -34,6 +34,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 type Props = {
   tripId: string
@@ -52,18 +53,19 @@ function RoleToggle({
   disabled?: boolean
   name: string
 }) {
+  const { t } = useTranslation()
   const [hasInteracted, setHasInteracted] = useState(false)
 
   return (
     <div
       className="relative inline-flex rounded-full border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/10 p-1 shadow-sm backdrop-blur-xl"
       role="group"
-      aria-label="权限"
+      aria-label="role"
     >
       {(
         [
-          { id: 'viewer', label: '只读' },
-          { id: 'editor', label: '可编辑' },
+          { id: 'viewer', label: t('auth.roleViewer') },
+          { id: 'editor', label: t('auth.roleEditor') },
         ] as const
       ).map((opt) => {
         const active = value === opt.id
@@ -113,6 +115,7 @@ function RoleToggle({
 }
 
 export function ShareDialog({ tripId, open, onClose }: Props) {
+  const { t } = useTranslation()
   const titleId = useId()
   const [shares, setShares] = useState<TripShareRow[]>(() => getCachedTripShares(tripId) || [])
   const [companionAvatars, setCompanionAvatars] = useState<Record<string, UserAvatar>>({})
@@ -290,10 +293,10 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <h2 id={titleId} className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
-              分享与协作
+              {t('cloud.shareTitle')}
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-              邀请旅伴一起查看或编辑行程；所有改动将通过云端实时安全同步。
+              {t('cloud.shareSubtitle')}
             </p>
           </div>
           <CloseIconButton onClick={onClose} className="hidden sm:flex" />
@@ -321,7 +324,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
         <form onSubmit={onAdd} className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/50 dark:bg-white/5 p-4 shadow-sm backdrop-blur-md space-y-3">
           <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)]">
             <UserPlus size={14} className="text-[var(--copper)]" />
-            <span>邀请新成员</span>
+            <span>{t('cloud.inviteMember')}</span>
           </label>
           <div className="relative w-full">
             <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--stone)] dark:text-zinc-400" />
@@ -348,7 +351,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
               ) : (
                 <UserPlus size={14} strokeWidth={2.2} />
               )}
-              <span>{inviteBusy ? '发送中…' : '发送邀请'}</span>
+              <span>{inviteBusy ? t('common.loading') : t('cloud.sendInvite')}</span>
             </button>
           </div>
         </form>
@@ -358,10 +361,10 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
           <div className="flex items-center justify-between">
             <h3 className="text-xs sm:text-sm font-semibold text-[var(--ink)] flex items-center gap-1.5">
               <Users size={14} className="text-[var(--sage)]" />
-              <span>已加入旅伴</span>
+              <span>{t('auth.roleCollaborator')}</span>
             </h3>
             <span className="text-xs text-[var(--stone)] dark:text-zinc-400">
-              {loadingList ? '加载中…' : `共 ${shares.length} 人`}
+              {loadingList ? t('common.loading') : `${shares.length}`}
             </span>
           </div>
 
@@ -402,9 +405,9 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
                     <Users size={20} strokeWidth={1.8} />
                   </div>
-                  <p className="text-sm font-medium text-[var(--ink)]">暂无共享协作者</p>
+                  <p className="text-sm font-medium text-[var(--ink)]">{t('cloud.shareTitle')}</p>
                   <p className="text-xs text-[var(--stone)] dark:text-zinc-400 max-w-xs mx-auto">
-                    在上方输入同伴邮箱，即可一键邀请旅伴实时同步并共同规划巴黎之旅
+                    {t('cloud.shareSubtitle')}
                   </p>
                 </motion.div>
               ) : (
@@ -449,7 +452,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                               )}
                             </p>
                             <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400">
-                              {s.role === 'editor' ? '可共同编辑行程内容' : '仅查看，不可修改'}
+                              {s.role === 'editor' ? t('auth.roleEditor') : t('auth.roleViewer')}
                             </p>
                           </div>
                         </div>
@@ -467,7 +470,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                           className="inline-flex items-center gap-1 rounded-full border border-red-200/60 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/40 hover:bg-red-100/80 dark:hover:bg-red-900/50 px-2.5 py-1 text-xs font-medium text-red-600/90 dark:text-red-300 transition-colors disabled:cursor-default cursor-pointer active:scale-95"
                         >
                           <Trash2 size={12} />
-                          <span>移除</span>
+                          <span>{t('common.delete')}</span>
                         </button>
                       </div>
                     </li>
@@ -485,9 +488,10 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
         onClose={() => setPendingRemoveShare(null)}
         onConfirm={executeRemove}
         busy={removeBusy}
-        title="移除协作者"
-        description={`确定移除「${pendingRemoveShare?.invitee_email || '该成员'}」对当前行程的协作权限吗？`}
-        confirmText="移除"
+        title={t('cloud.removeMember')}
+        description={`${pendingRemoveShare?.invitee_email || ''}`}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         tone="danger"
         icon="trash"
       />

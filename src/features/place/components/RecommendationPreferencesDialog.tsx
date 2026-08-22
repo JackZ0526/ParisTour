@@ -29,6 +29,7 @@ import {
   glassCapsuleToneClass,
   glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   open: boolean
@@ -44,12 +45,13 @@ export function RecommendationPreferencesButton({
   onClick: () => void
   className?: string
 }) {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="推荐偏好"
-      title="推荐偏好"
+      aria-label={t('place.preferencesTitle')}
+      title={t('place.preferencesTitle')}
       className={className}
     >
       <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} aria-hidden />
@@ -63,6 +65,7 @@ export function RecommendationPreferencesDialog({
   onSave,
   onClose,
 }: Props) {
+  const { t } = useTranslation()
   const titleId = useId()
   const [draft, setDraft] = useState<RecommendationPreferences>(value)
   const [naturalInput, setNaturalInput] = useState('')
@@ -182,10 +185,10 @@ export function RecommendationPreferencesDialog({
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <h2 id={titleId} className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
-                推荐偏好
+                {t('place.preferencesTitle')}
               </h2>
               <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-                个性化行程偏好池；这些倾向将直接引导 AI 生成专属巴黎路线与地点推荐。
+                {t('place.preferencesSubtitle')}
               </p>
             </div>
             <CloseIconButton onClick={onClose} className="hidden sm:flex" />
@@ -198,7 +201,7 @@ export function RecommendationPreferencesDialog({
           <section className="relative z-30 rounded-3xl border border-white/80 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 p-3.5 sm:p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] mb-2">
               <Clock size={14} className="text-[var(--copper)]" />
-              <span>通常开始时间</span>
+              <span>{t('place.dayStartTime')}</span>
             </div>
             <TimePicker
               value={draft.dayStartTime}
@@ -214,18 +217,18 @@ export function RecommendationPreferencesDialog({
               <div className="flex items-center gap-1.5">
                 <Tag size={14} className="text-[var(--copper)]" />
                 <span className="text-xs font-semibold text-[var(--ink)]">
-                  已选偏好池
+                  {t('place.activeTagPool')}
                 </span>
                 <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--copper)]">
-                  {activeTags.length} 项生效
+                  {t('place.activeTagsCount', { count: activeTags.length })}
                 </span>
               </div>
               {activeTags.length > 0 && (
                 <button
                   type="button"
                   onClick={clearAllTags}
-                  title="清空偏好池"
-                  aria-label="清空偏好池"
+                  title={t('common.reset')}
+                  aria-label={t('common.reset')}
                   className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white dark:hover:bg-white/10 hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40 cursor-pointer`}
                 >
                   <Trash2 size={14} strokeWidth={1.8} aria-hidden />
@@ -236,10 +239,7 @@ export function RecommendationPreferencesDialog({
             {activeTags.length === 0 ? (
               <div className="flex min-h-[64px] flex-col items-center justify-center text-center rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-2.5">
                 <p className="text-xs font-medium text-[var(--stone)]">
-                  偏好池暂为空白
-                </p>
-                <p className="mt-0.5 text-[11px] text-[var(--stone)]/75">
-                  点击下方候选标签加入，或输入补充要求让 AI 智能提炼汇入
+                  {t('place.preferencesSubtitle')}
                 </p>
               </div>
             ) : (
@@ -252,8 +252,8 @@ export function RecommendationPreferencesDialog({
                       key={cleanTag}
                       type="button"
                       onClick={() => removeTag(cleanTag)}
-                      title={`点击移出：${cleanTag}`}
-                      aria-label={`移除 ${cleanTag}`}
+                      title={`Remove: ${cleanTag}`}
+                      aria-label={`Remove ${cleanTag}`}
                       className={`${BASE_TAG_PILL} active:scale-95 ${theme.activePill}`}
                     >
                       <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
@@ -269,10 +269,10 @@ export function RecommendationPreferencesDialog({
             <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Sparkles size={14} className="text-[var(--copper)]" />
-                <span>推荐偏好候选</span>
+                <span>{t('place.candidateTagsTitle')}</span>
               </span>
               <span className="text-[10.5px] font-normal text-[var(--stone)]">
-                点击加入偏好池
+                {t('place.clickToAdd')}
               </span>
             </div>
 
@@ -286,8 +286,8 @@ export function RecommendationPreferencesDialog({
                       key={cleanPreset}
                       type="button"
                       onClick={() => addTag(cleanPreset)}
-                      title={`点击加入：${cleanPreset}`}
-                      aria-label={`加入 ${cleanPreset}`}
+                      title={`Add: ${cleanPreset}`}
+                      aria-label={`Add ${cleanPreset}`}
                       className={`${BASE_TAG_PILL} active:scale-95 ${theme.suggestedPill}`}
                     >
                       <span className="relative z-10">{cleanPreset}</span>
@@ -296,7 +296,7 @@ export function RecommendationPreferencesDialog({
                 })
               ) : (
                 <p className="text-xs text-[var(--stone)]/70 italic py-1">
-                  已添加所有预设推荐偏好
+                  {t('place.allPresetsAdded')}
                 </p>
               )}
             </div>
@@ -307,10 +307,7 @@ export function RecommendationPreferencesDialog({
             <label className="flex items-center justify-between text-xs font-semibold text-[var(--ink)]">
               <span className="flex items-center gap-1.5">
                 <Wand2 size={14} className="text-[var(--copper)]" />
-                <span>补充要求 · AI 智能提炼标签</span>
-              </span>
-              <span className="text-[10.5px] font-normal text-[var(--stone)]">
-                自然语言描述
+                <span>{t('place.naturalLanguagePrompt')}</span>
               </span>
             </label>
 
@@ -327,7 +324,7 @@ export function RecommendationPreferencesDialog({
                   }}
                   disabled={isExtracting}
                   rows={2}
-                  placeholder="例如：喜欢小众咖啡馆和复古市集，晚餐想吃生蚝，不希望太费体力……"
+                  placeholder={t('place.customPreferencesPlaceholder')}
                   className="w-full resize-none rounded-2xl border border-white/90 dark:border-white/10 bg-white/90 dark:bg-black/25 p-3 text-xs sm:text-sm text-[var(--ink)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white dark:focus:bg-black/40 backdrop-blur-md placeholder:text-[var(--stone)]/60"
                 />
               </div>
@@ -336,10 +333,7 @@ export function RecommendationPreferencesDialog({
                 <p className="text-xs text-red-600 dark:text-red-400 px-1">{extractError}</p>
               )}
 
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-[var(--stone)]">
-                  支持回车快速提炼
-                </span>
+              <div className="flex items-center justify-end gap-2">
                 <button
                   type="submit"
                   disabled={isExtracting || !naturalInput.trim()}
@@ -349,12 +343,12 @@ export function RecommendationPreferencesDialog({
                   {isExtracting ? (
                     <>
                       <LoaderCircle size={13} strokeWidth={2.2} className="animate-spin" />
-                      <span>AI 提炼中…</span>
+                      <span>{t('place.extractingTags')}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles size={13} strokeWidth={2.2} />
-                      <span>智能提炼</span>
+                      <span>{t('place.extractTagsBtn')}</span>
                     </>
                   )}
                 </button>
@@ -371,7 +365,7 @@ export function RecommendationPreferencesDialog({
             className="inline-flex items-center gap-1 rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/10 px-3.5 py-1.5 text-xs font-medium text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white dark:hover:bg-white/20 shadow-2xs transition-all active:scale-95 cursor-pointer"
           >
             <RotateCcw size={12} />
-            <span>恢复默认</span>
+            <span>{t('common.reset')}</span>
           </button>
           <div className="flex items-center gap-2">
             <button
@@ -379,7 +373,7 @@ export function RecommendationPreferencesDialog({
               onClick={onClose}
               className="rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/10 px-4 py-1.5 text-xs font-medium text-[var(--stone)] hover:text-[var(--ink)] hover:bg-white dark:hover:bg-white/20 shadow-2xs transition-all active:scale-95 cursor-pointer"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -391,7 +385,7 @@ export function RecommendationPreferencesDialog({
             >
               <span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/40 to-transparent" />
               <Check size={13} strokeWidth={2.2} />
-              <span>保存偏好配置</span>
+              <span>{t('place.savePreferences')}</span>
             </button>
           </div>
         </footer>
@@ -418,11 +412,11 @@ export function RecommendationPreferencesDialog({
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="extracted-dialog-title"
-                  initial={{ opacity: 0, scale: 0.93, y: 14 }}
+                  initial={{ opacity: 0, scale: 0.94, y: 8 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.93, y: 8 }}
-                  transition={{ type: 'spring', stiffness: 450, damping: 30 }}
-                  className={`relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-3xl ${glassModalSurfaceClass} p-5 sm:p-6 shadow-[0_24px_60px_rgba(0,0,0,0.22),inset_0_1px_2px_rgba(255,255,255,1)]`}
+                  exit={{ opacity: 0, scale: 0.94, y: 8 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/80 dark:border-white/15 bg-white/90 dark:bg-[#1c2420]/95 p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.24),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
@@ -432,10 +426,10 @@ export function RecommendationPreferencesDialog({
                       </div>
                       <div className="min-w-0 pt-0.5">
                         <h3 id="extracted-dialog-title" className="font-display text-base sm:text-lg font-semibold text-[var(--ink)] tracking-tight">
-                          AI 智能提炼完成
+                          {t('place.extractedSuccessTitle')}
                         </h3>
                         <p className="mt-0.5 text-xs text-[var(--stone)] leading-relaxed">
-                          已为您提炼出以下偏好标签：
+                          {t('place.extractedSuccessDesc')}
                         </p>
                       </div>
                     </div>
@@ -467,7 +461,7 @@ export function RecommendationPreferencesDialog({
                       onClick={handleDiscardExtracted}
                       className="min-h-[34px] rounded-full border border-black/8 dark:border-white/10 bg-white/70 dark:bg-white/10 px-3.5 py-1 text-xs font-medium text-[var(--stone)] dark:text-zinc-300 shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95 cursor-pointer"
                     >
-                      放弃
+                      {t('place.discard')}
                     </button>
 
                     <button
@@ -475,7 +469,7 @@ export function RecommendationPreferencesDialog({
                       onClick={handleAddToCandidatePool}
                       className="min-h-[34px] rounded-full border border-black/10 dark:border-white/10 bg-white/85 dark:bg-white/15 px-4 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/25 active:scale-95 cursor-pointer"
                     >
-                      加入候选池
+                      {t('place.addToCandidates')}
                     </button>
 
                     <button
@@ -484,7 +478,7 @@ export function RecommendationPreferencesDialog({
                       className="group relative isolate inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[var(--ink)] px-4.5 py-1 text-xs font-semibold text-[var(--paper)] shadow-[0_4px_14px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] transition-all hover:bg-black active:scale-95 cursor-pointer"
                     >
                       <Sparkles size={12} className="text-amber-300" />
-                      <span>加入已选池</span>
+                      <span>{t('place.addToActive')}</span>
                     </button>
                   </div>
                 </motion.div>

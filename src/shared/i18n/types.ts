@@ -93,6 +93,7 @@ export interface I18nSchema {
     cloudSyncActive: string
     cloudSyncBusy: string
     roleOwner: string
+    roleCollaborator: string
     roleEditor: string
     roleViewer: string
     companion: string
@@ -153,6 +154,15 @@ export interface I18nSchema {
     dragToReorder: string
     openInGoogleMaps: string
     directionsLabel: string
+    directionsDesc: string
+    fromAirport: string
+    fromHotel: string
+    emptyTimelineReadOnly: string
+    emptyTimelineClickAdd: string
+    regenDayTitle: string
+    regenDayDesc: string
+    restoreDayTitle: string
+    restoreDayDesc: string
     viewRoute: string
     stopNotes: string
     customTime: string
@@ -229,6 +239,19 @@ export interface I18nSchema {
     savePreferences: string
     customPreferencesPlaceholder: string
     extractingTags: string
+    dayStartTime: string
+    activeTagPool: string
+    activeTagsCount: string
+    candidateTagsTitle: string
+    clickToAdd: string
+    allPresetsAdded: string
+    naturalLanguagePrompt: string
+    extractTagsBtn: string
+    extractedSuccessTitle: string
+    extractedSuccessDesc: string
+    discard: string
+    addToCandidates: string
+    addToActive: string
   }
   chat: {
     title: string
@@ -268,6 +291,11 @@ export interface I18nSchema {
     tripName: string
     deleteTrip: string
     confirmDeleteTrip: string
+    latestSnapshot: string
+    snapshotNumber: string
+    restoreSnapshot: string
+    confirmRestoreSnapshot: string
+    restoring: string
   }
 }
 

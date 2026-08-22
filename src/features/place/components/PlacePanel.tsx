@@ -18,6 +18,7 @@ import {
 } from '../services/placeAdvisorFacts'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { GooglePlacePage } from './GooglePlacePage'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   placeId: string | null
@@ -34,13 +35,6 @@ interface Props {
   onClose: () => void
 }
 
-const PLACE_LABELS = {
-  title: '行程顾问点评',
-  intro: '地点简介',
-  reason: '为什么推荐',
-  loadingText: '正在生成地点简介与推荐理由…',
-}
-
 export function PlacePanel({
   placeId,
   customPlaces = {},
@@ -50,6 +44,7 @@ export function PlacePanel({
   onGoogleIdentityResolved,
   onClose,
 }: Props) {
+  const { t } = useTranslation()
   const [story, setStory] = useState<HotelDetailCopy | null>(null)
   const [storyLoading, setStoryLoading] = useState(false)
   const [regenToken, setRegenToken] = useState(0)
@@ -218,7 +213,11 @@ export function PlacePanel({
                 story?.reason ||
                 (!storyLoading ? stopNote || undefined : undefined),
               loading: storyLoading,
-              labels: PLACE_LABELS,
+              labels: {
+                title: t('place.advisorNoteTitle'),
+                intro: t('place.intro'),
+                reason: t('place.whyRecommend'),
+              },
               onRegenerate: isLlmConfigured()
                 ? () => setRegenToken((n) => n + 1)
                 : undefined,

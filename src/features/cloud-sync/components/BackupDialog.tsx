@@ -20,6 +20,7 @@ import {
   glassCardSurfaceClass,
   glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   tripId: string
@@ -84,6 +85,7 @@ function BackupListSkeleton() {
 }
 
 export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
+  const { t } = useTranslation()
   const [backups, setBackups] = useState<TripSnapshotBackup[]>([])
   const [loading, setLoading] = useState(false)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -145,10 +147,10 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
-              存档备份
+              {t('cloud.backupTitle')}
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-              自动保留最近 5 份快照，可随时一键回退恢复。
+              {t('cloud.backupSubtitle')}
             </p>
           </div>
           <CloseIconButton onClick={onClose} className="hidden sm:flex" />
@@ -217,13 +219,8 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs sm:text-sm font-semibold text-[var(--ink)]">
-                              {isLatest ? '最新快照' : `快照 #${backups.length - index}`}
+                              {isLatest ? t('cloud.latestSnapshot') : t('cloud.snapshotNumber', { number: backups.length - index })}
                             </span>
-                            {isLatest && (
-                              <span className="inline-flex items-center rounded-full border border-[var(--copper)]/25 dark:border-[var(--copper)]/40 bg-[var(--copper)]/10 dark:bg-[var(--copper)]/20 px-1.5 py-0.2 text-[9.5px] font-semibold text-[var(--copper)]">
-                                当前
-                              </span>
-                            )}
                             <span className="text-[11px] text-[var(--stone)] dark:text-zinc-400 truncate">
                               · {formatBackupTime(backup.createdAt)}
                             </span>
@@ -239,9 +236,9 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                           type="button"
                           disabled={Boolean(restoringId)}
                           onClick={() => void restore(backup)}
-                          aria-label="恢复此版本"
+                          aria-label={t('cloud.restoreSnapshot')}
                           aria-busy={isRestoringThis || undefined}
-                          title={isRestoringThis ? '正在恢复…' : '恢复此版本'}
+                          title={isRestoringThis ? t('cloud.restoring') : t('cloud.restoreSnapshot')}
                           className="group relative isolate flex h-8.5 w-8.5 items-center justify-center rounded-full border border-white/90 dark:border-white/10 bg-white/80 dark:bg-white/10 text-[var(--stone)] dark:text-zinc-300 shadow-2xs backdrop-blur-md transition-all hover:border-[var(--copper)]/40 dark:hover:border-[var(--copper)]/50 hover:bg-white dark:hover:bg-[var(--copper)]/20 hover:text-[var(--copper)] dark:hover:text-[var(--copper)] hover:shadow-xs active:scale-95 disabled:opacity-40 cursor-pointer"
                         >
                           {isRestoringThis ? (
@@ -277,9 +274,9 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
                   <Archive size={20} strokeWidth={1.8} />
                 </div>
-                <p className="text-sm font-medium text-[var(--ink)]">暂无历史快照存档</p>
+                <p className="text-sm font-medium text-[var(--ink)]">{t('cloud.backupTitle')}</p>
                 <p className="text-xs text-[var(--stone)] max-w-xs mx-auto">
-                  当您对行程进行修改并自动保存时，系统将自动保留版本快照供您随时回溯。
+                  {t('cloud.backupSubtitle')}
                 </p>
               </motion.div>
             )}
@@ -291,9 +288,10 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
         open={Boolean(pendingRestoreBackup)}
         onClose={() => setPendingRestoreBackup(null)}
         onConfirm={executeRestore}
-        title="恢复云端存档"
-        description={`确定恢复此快照（${pendingRestoreBackup ? formatBackupTime(pendingRestoreBackup.createdAt) : ''}）吗？当前未保存的本地改动将被覆盖。`}
-        confirmText="恢复备份"
+        title={t('cloud.restoreSnapshot')}
+        description={t('cloud.confirmRestoreSnapshot')}
+        confirmText={t('cloud.restoreSnapshot')}
+        cancelText={t('common.cancel')}
         tone="warning"
         icon="history"
       />

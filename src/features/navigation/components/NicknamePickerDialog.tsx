@@ -1,4 +1,4 @@
-﻿import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Check, Edit3, Loader2, Sparkles, X } from 'lucide-react'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
@@ -6,6 +6,7 @@ import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 import { useUserNickname } from '../../auth/services/nicknameStore'
 import { saveProfileNickname } from '../../auth/services/nicknamePreferenceCloud'
 import { useAuth } from '../../auth/authContext'
+import { useTranslation } from '../../../shared/i18n'
 
 type Props = {
   open: boolean
@@ -16,6 +17,7 @@ type Props = {
 const MAX_NICKNAME_LENGTH = 24
 
 export function NicknamePickerDialog({ open, onClose, email }: Props) {
+  const { t } = useTranslation()
   const titleId = useId()
   const { user } = useAuth()
   const { nickname, setNickname } = useUserNickname(email)
@@ -75,10 +77,10 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
               className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight flex items-center gap-2"
             >
               <Edit3 size={22} className="text-[var(--copper)]" />
-              <span>设置个性昵称</span>
+              <span>{t('auth.editNickname')}</span>
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-              取一个好听的名字，将在行程协作、旅伴列表和顶部导航栏中优先展示。
+              {t('auth.nicknamePlaceholder')}
             </p>
           </div>
           <CloseIconButton onClick={onClose} className="hidden sm:flex" />
@@ -94,7 +96,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
 
         <div className="space-y-2">
           <label className="block text-xs font-semibold text-[var(--ink)]">
-            你的昵称
+            {t('auth.nickname')}
           </label>
           <div className="relative">
             <input
@@ -102,7 +104,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
               maxLength={MAX_NICKNAME_LENGTH}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder={`默认使用邮箱前缀（${defaultDisplayName}）`}
+              placeholder={t('auth.nicknamePlaceholder')}
               autoFocus
               className="w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/85 dark:bg-white/5 px-4 py-3 text-sm text-[var(--ink)] dark:text-zinc-100 placeholder:text-[var(--stone)]/60 dark:placeholder:text-zinc-500 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] outline-none transition focus:border-[var(--copper)] focus:bg-white dark:focus:bg-white/10 backdrop-blur-md pr-16"
             />
@@ -111,14 +113,13 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
                 type="button"
                 onClick={handleClear}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
-                title="清空"
+                title={t('common.reset')}
               >
                 <X size={16} />
               </button>
             )}
           </div>
           <div className="flex items-center justify-between px-1 text-[11px] text-[var(--stone)] dark:text-zinc-400">
-            <span>支持中英文、数字与符号</span>
             <span>
               {draft.length} / {MAX_NICKNAME_LENGTH}
             </span>
@@ -128,7 +129,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
         <div className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/50 dark:bg-white/5 p-4 shadow-sm backdrop-blur-md space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)]">
             <Sparkles size={14} className="text-[var(--copper)]" />
-            <span>显示预览效果</span>
+            <span>{t('auth.nickname')}</span>
           </div>
           <div className="flex items-center gap-3 rounded-xl bg-white/60 dark:bg-white/5 p-3 border border-white/60 dark:border-white/5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--copper)]/20 to-[var(--sage)]/20 text-base font-bold text-[var(--copper)]">
@@ -152,7 +153,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
             disabled={saving}
             className="rounded-full border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 px-4 py-2 text-xs font-medium text-[var(--ink)] dark:text-zinc-200 transition hover:bg-white/80 dark:hover:bg-white/10 active:scale-95 cursor-pointer disabled:cursor-not-allowed"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -164,7 +165,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
             ) : (
               <Check size={14} strokeWidth={2.2} />
             )}
-            <span>{saving ? '保存中…' : '保存设置'}</span>
+            <span>{saving ? t('common.loading') : t('common.save')}</span>
           </button>
         </div>
       </form>

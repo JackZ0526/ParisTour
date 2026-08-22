@@ -3,6 +3,7 @@ import { Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucid
 import { motion } from 'framer-motion'
 import { useAuth } from '../authContext'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 function readAuthDeepLink(): { mode: 'signin' | 'signup'; email: string } {
   try {
@@ -30,6 +31,7 @@ function clearAuthDeepLink() {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const deepLink = useMemo(() => readAuthDeepLink(), [])
   const { signIn, signUp, status, error: authError } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>(deepLink.mode)
@@ -170,7 +172,7 @@ export function LoginPage() {
                   : 'text-[var(--stone)] dark:text-zinc-400 hover:text-[var(--ink)] dark:hover:text-zinc-200'
               }`}
             >
-              登录
+              {t('auth.signIn')}
             </span>
           </button>
           <button
@@ -211,7 +213,7 @@ export function LoginPage() {
                   : 'text-[var(--stone)] dark:text-zinc-400 hover:text-[var(--ink)] dark:hover:text-zinc-200'
               }`}
             >
-              注册
+              {t('auth.signUp')}
             </span>
           </button>
         </div>
@@ -219,7 +221,7 @@ export function LoginPage() {
         {/* Login / Register Form */}
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <label className="block space-y-1.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-300">
-            <span>邮箱</span>
+            <span>{t('auth.email')}</span>
             <input
               type="text"
               inputMode="email"
@@ -234,7 +236,7 @@ export function LoginPage() {
           </label>
 
           <div className="block space-y-1.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-300">
-            <span>密码</span>
+            <span>{t('auth.password')}</span>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -243,13 +245,13 @@ export function LoginPage() {
                 minLength={mode === 'signup' ? 6 : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'signup' ? '至少 6 位字符' : '请输入登录密码'}
+                placeholder={t('auth.passwordPlaceholder')}
                 className="w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/30 py-3 pl-4 pr-12 text-sm text-[var(--ink)] dark:text-white shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.5)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/45 dark:placeholder:text-zinc-500 focus:border-[var(--copper)]/60 dark:focus:border-[var(--copper)] focus:bg-white dark:focus:bg-black/45 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)] dark:focus:shadow-[0_0_0_3px_rgba(181,106,60,0.22)] outline-none"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 aria-pressed={showPassword}
                 className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl text-[var(--stone)] dark:text-zinc-400 transition hover:bg-[var(--mist)]/60 dark:hover:bg-white/10 hover:text-[var(--ink)] dark:hover:text-white active:scale-95 cursor-pointer"
               >
@@ -293,12 +295,12 @@ export function LoginPage() {
             {busy ? (
               <>
                 <Loader2 size={16} className="animate-spin text-[var(--gold)] dark:text-white" />
-                <span>请稍候…</span>
+                <span>{t('auth.signingIn')}</span>
               </>
             ) : mode === 'signin' ? (
-              '进入行程'
+              t('auth.signIn')
             ) : (
-              '创建账号'
+              t('auth.signUp')
             )}
           </button>
         </form>
