@@ -72,7 +72,7 @@ export const en: I18nSchema = {
     cropReset: 'Reset Position',
     theme: 'Appearance',
     themeLight: 'Daylight',
-    themeDark: 'Midnight Dark',
+    themeDark: 'Midnight',
     themeSystem: 'System',
     language: 'Language',
     cloudSyncActive: 'Encrypted Cloud Sync',
