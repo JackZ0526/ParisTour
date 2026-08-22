@@ -7,7 +7,9 @@ import {
   Check,
   ChevronRight,
   Compass,
+  Crown,
   Edit3,
+  Eye,
   Hotel,
   Laptop,
   Languages,
@@ -247,7 +249,15 @@ export function ProfileTab({
                             : `${glassCapsuleToneClass.neutral} text-[var(--stone)]`
                       }`}
                     >
-                      <span>{role === 'owner' ? '👑' : role === 'editor' ? '🤝' : '👁️'}</span>
+                      <span>
+                        {role === 'owner' ? (
+                          <Crown size={12} strokeWidth={2.2} />
+                        ) : role === 'editor' ? (
+                          <Users size={12} strokeWidth={2.2} />
+                        ) : (
+                          <Eye size={12} strokeWidth={2.2} />
+                        )}
+                      </span>
                       <span>{roleLabel}</span>
                     </span>
 
@@ -658,8 +668,8 @@ export function ProfileTab({
         <div className="relative grid grid-cols-2 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
           {(
             [
-              { id: 'zh-CN', label: '🇨🇳 简体中文' },
-              { id: 'en', label: '🇬🇧 English' },
+              { id: 'zh-CN', label: '简体中文' },
+              { id: 'en', label: 'English' },
             ] as const
           ).map(({ id, label }) => {
             const isActive = locale === id
@@ -739,7 +749,7 @@ export function ProfileTab({
       {/* System Footer Info Note */}
       <div className="text-center pt-1 text-[11px] text-[var(--stone)]/60 space-y-0.5 -mb-2">
         <p>Paris Tour v0.8.1 · Supabase {t('auth.cloudSyncActive')}</p>
-        <p>Made with ❤️ for Paris Explorers</p>
+        <p>Tour · Travel Planning & Guide</p>
       </div>
 
       {/* Avatar Customization Modal */}

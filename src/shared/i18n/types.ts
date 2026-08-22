@@ -8,12 +8,11 @@ export interface LocaleOption {
   id: Locale
   label: string
   nativeName: string
-  flag: string
 }
 
 export const SUPPORTED_LOCALES: LocaleOption[] = [
-  { id: 'zh-CN', label: '简体中文', nativeName: '简体中文', flag: '🇨🇳' },
-  { id: 'en', label: 'English', nativeName: 'English', flag: '🇬🇧' },
+  { id: 'zh-CN', label: '简体中文', nativeName: '简体中文' },
+  { id: 'en', label: 'English', nativeName: 'English' },
 ]
 
 export interface I18nSchema {

@@ -296,7 +296,7 @@ export function RecommendationPreferencesDialog({
                 })
               ) : (
                 <p className="text-xs text-[var(--stone)]/70 italic py-1">
-                  已添加所有预设推荐偏好 ✨
+                  已添加所有预设推荐偏好
                 </p>
               )}
             </div>

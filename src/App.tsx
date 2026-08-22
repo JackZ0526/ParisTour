@@ -1191,7 +1191,7 @@ export default function App() {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm">📅</span>
+                          <CalendarDays size={16} className="text-[var(--copper)] shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium truncate">旅行日期</p>
                             <p className="text-[10.5px] text-[var(--stone)] truncate">
@@ -1221,7 +1221,7 @@ export default function App() {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm">✈️</span>
+                          <Plane size={16} className="text-[var(--copper)] shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium truncate">往返航班</p>
                             <p className="text-[10.5px] text-[var(--stone)] truncate">
@@ -1255,7 +1255,7 @@ export default function App() {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm">🏨</span>
+                          <HotelIcon size={16} className="text-[var(--copper)] shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium truncate">入住酒店</p>
                             <p className="text-[10.5px] text-[var(--stone)] truncate">
@@ -1331,43 +1331,52 @@ export default function App() {
                     <span
                       className={`${glassCapsuleSurfaceClass} ${
                         tripDates ? glassCapsuleToneClass.blue : glassCapsuleToneClass.neutral
-                      } px-3 py-1 text-xs ${tripDates ? 'text-sky-800 dark:text-sky-300 font-medium' : 'text-[var(--stone)]'}`}
+                      } px-3 py-1 text-xs inline-flex items-center gap-1.5 ${tripDates ? 'text-sky-800 dark:text-sky-300 font-medium' : 'text-[var(--stone)]'}`}
                     >
-                      {tripDates
-                        ? `📅 ${tripDates.startDate} → ${tripDates.endDate} (${daysBetween(tripDates.startDate, tripDates.endDate)}天)`
-                        : '📅 日期待选'}
+                      <CalendarDays size={12} className="shrink-0" />
+                      <span>
+                        {tripDates
+                          ? `${tripDates.startDate} → ${tripDates.endDate} (${daysBetween(tripDates.startDate, tripDates.endDate)}天)`
+                          : '日期待选'}
+                      </span>
                     </span>
                     <span
                       className={`${glassCapsuleSurfaceClass} ${
                         flights.outbound || flights.returnFlight
                           ? glassCapsuleToneClass.violet
                           : glassCapsuleToneClass.neutral
-                      } px-3 py-1 text-xs ${
+                      } px-3 py-1 text-xs inline-flex items-center gap-1.5 ${
                         flights.outbound || flights.returnFlight
                           ? 'text-purple-900 dark:text-purple-300 font-medium'
                           : 'text-[var(--stone)]'
                       }`}
                     >
-                      {flights.outbound && flights.returnFlight
-                        ? `✈️ 航班已录入 (${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber})`
-                        : flights.outbound
-                          ? `✈️ 去程 ${flights.outbound.flightNumber}`
-                          : flights.returnFlight
-                            ? `✈️ 返程 ${flights.returnFlight.flightNumber}`
-                            : '✈️ 航班待查'}
+                      <Plane size={12} className="shrink-0" />
+                      <span>
+                        {flights.outbound && flights.returnFlight
+                          ? `航班已录入 (${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber})`
+                          : flights.outbound
+                            ? `去程 ${flights.outbound.flightNumber}`
+                            : flights.returnFlight
+                              ? `返程 ${flights.returnFlight.flightNumber}`
+                              : '航班待查'}
+                      </span>
                     </span>
                     <span
                       className={`${glassCapsuleSurfaceClass} ${
                         isHotelSelected(hotel)
                           ? glassCapsuleToneClass.gold
                           : glassCapsuleToneClass.neutral
-                      } px-3 py-1 text-xs ${
+                      } px-3 py-1 text-xs inline-flex items-center gap-1.5 ${
                         isHotelSelected(hotel)
                           ? 'text-amber-900 dark:text-amber-200 font-medium'
                           : 'text-[var(--stone)]'
                       }`}
                     >
-                      {isHotelSelected(hotel) ? `🏨 住宿：${hotel.name}` : '🏨 住宿待定'}
+                      <HotelIcon size={12} className="shrink-0" />
+                      <span>
+                        {isHotelSelected(hotel) ? `住宿：${hotel.name}` : '住宿待定'}
+                      </span>
                     </span>
                     {itineraryReady && (
                       <span

@@ -449,7 +449,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                               )}
                             </p>
                             <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400">
-                              {s.role === 'editor' ? '✨ 可共同编辑行程内容' : '👁️ 仅查看，不可修改'}
+                              {s.role === 'editor' ? '可共同编辑行程内容' : '仅查看，不可修改'}
                             </p>
                           </div>
                         </div>
