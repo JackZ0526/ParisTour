@@ -17,6 +17,7 @@ export {
   subscribeCloudSaveStatus,
   subscribeCloudSyncStatus,
   subscribeTripRealtime,
+  formatOwnerHandle,
   type AccessibleTrip,
   type CloudSaveStatus,
   type CloudSyncStatus,

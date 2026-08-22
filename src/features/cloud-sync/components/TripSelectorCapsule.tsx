@@ -10,7 +10,8 @@ import {
   Sparkles,
   Loader2,
 } from 'lucide-react'
-import type { AccessibleTrip } from '../services/tripCloud'
+import { formatOwnerHandle, type AccessibleTrip } from '../services/tripCloud'
+import { getUserNickname, useUserNickname } from '../../auth/services/nicknameStore'
 import { glassBackdropSurfaceClass, glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 
 export interface TripSelectorCapsuleProps {
@@ -103,12 +104,15 @@ export function TripSelectorCapsule({
   }
 
   // Determine current capsule label & badge
+  const activeOwnerNick = useUserNickname(activeTrip?.ownerEmail).nickname
+  const activeOwnerLabel = activeOwnerNick || activeTrip?.ownerName || (activeTrip?.ownerEmail ? formatOwnerHandle(activeTrip.ownerEmail) : '他人')
+
   const displayTitle = activeTrip
     ? activeTrip.role === 'owner'
       ? activeTrip.isPrimary
         ? '我的主行程'
         : activeTrip.title || '我的行程'
-      : `来自 ${activeTrip.ownerName || '他人'}`
+      : `来自 ${activeOwnerLabel}`
     : '行程空间'
 
   return (
@@ -265,7 +269,11 @@ export function TripSelectorCapsule({
                         <div className="flex items-center gap-1 text-[10.5px] text-[var(--stone)] dark:text-zinc-400 mt-0.5">
                           <span>
                             {isItemShared
-                              ? `来自 ${trip.ownerName || '他人'}`
+                              ? `来自 ${
+                                  (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                  trip.ownerName ||
+                                  (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
+                                }`
                               : '自己创建'}
                           </span>
                           {trip.updatedAt && (

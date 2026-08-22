@@ -29,7 +29,7 @@ import {
 import { UserAvatarView } from '../../../shared/components/UserAvatarView'
 import { useUserAvatar } from '../../auth/services/avatarStore'
 import { AvatarPickerDialog } from './AvatarPickerDialog'
-import { useUserNickname } from '../../auth/services/nicknameStore'
+import { useUserNickname, getUserNickname } from '../../auth/services/nicknameStore'
 import { NicknamePickerDialog } from './NicknamePickerDialog'
 import { useTheme } from '../../../shared/services/themeStore'
 import {
@@ -39,7 +39,7 @@ import {
   getTagTheme,
   type RecommendationPreferences,
 } from '../../place/services/recommendationPreferences'
-import type { AccessibleTrip } from '../../cloud-sync'
+import { formatOwnerHandle, type AccessibleTrip } from '../../cloud-sync'
 import {
   getCloudSaveStatus,
   getCloudSyncStatus,
@@ -382,7 +382,13 @@ export function ProfileTab({
                             )}
                           </div>
                           <div className="truncate text-[11px] text-[var(--stone)] dark:text-zinc-400">
-                            {isItemShared ? `来自 ${t.ownerName || '他人'}` : '自己创建'}
+                            {isItemShared
+                              ? `来自 ${
+                                  (t.ownerEmail ? getUserNickname(t.ownerEmail) : '') ||
+                                  t.ownerName ||
+                                  (t.ownerEmail ? formatOwnerHandle(t.ownerEmail) : '他人')
+                                }`
+                              : '自己创建'}
                           </div>
                         </div>
                       </div>

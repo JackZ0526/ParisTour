@@ -22,6 +22,7 @@ import {
 } from './tripSnapshot'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { sanitizeMapRouteCache } from '../../map/services/mapRouteCache'
+import { getUserNickname } from '../../auth/services/nicknameStore'
 
 export type TripRole = 'owner' | 'viewer' | 'editor'
 
@@ -60,6 +61,12 @@ export type AccessibleTrip = {
 
 export function formatOwnerHandle(email?: string | null): string {
   if (!email) return '他人'
+  try {
+    const nick = getUserNickname(email)
+    if (nick && nick.trim()) return nick.trim()
+  } catch {
+    /* ignore */
+  }
   const prefix = email.split('@')[0]?.trim() || ''
   return prefix ? `@${prefix}` : '他人'
 }
@@ -407,6 +414,35 @@ export async function listAccessibleTrips(
       snapshot: snapshotFromCloudRow(t),
       label: `来自 ${ownerName} · ${perm}`,
     })
+  }
+
+  // Batch resolve owner nicknames for shared trips from cloud profiles
+  const ownerEmails = Array.from(
+    new Set(out.map((t) => t.ownerEmail).filter(Boolean) as string[]),
+  )
+  if (ownerEmails.length) {
+    try {
+      const { batchLoadProfileNicknames } = await import(
+        '../../auth/services/nicknamePreferenceCloud'
+      )
+      const nickMap = await batchLoadProfileNicknames(ownerEmails)
+      for (const trip of out) {
+        if (trip.ownerEmail) {
+          const nick =
+            nickMap[trip.ownerEmail.toLowerCase()] ||
+            getUserNickname(trip.ownerEmail)
+          if (nick) {
+            trip.ownerName = nick
+            if (trip.role !== 'owner') {
+              const perm = trip.role === 'editor' ? '可编辑' : '只读'
+              trip.label = `来自 ${nick} · ${perm}`
+            }
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   return out
