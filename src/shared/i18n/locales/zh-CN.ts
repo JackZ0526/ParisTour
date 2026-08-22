@@ -233,9 +233,9 @@ export const zhCN: I18nSchema = {
     eliminateCandidateDesc: '确定将「{name}」从候选列表中淘汰移除吗？',
   },
   flight: {
-    title: '往返航班',
-    outbound: '去程航班',
-    inbound: '返程航班',
+    title: '航班与日期',
+    outbound: '去程',
+    inbound: '返程',
     flightNumber: '航班号',
     flightNumberPlaceholder: '如 AF111 / CA933',
     airline: '航空公司',

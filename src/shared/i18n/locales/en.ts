@@ -234,8 +234,8 @@ export const en: I18nSchema = {
   },
   flight: {
     title: 'Flights & Dates',
-    outbound: 'Outbound Flight',
-    inbound: 'Return Flight',
+    outbound: 'Outbound',
+    inbound: 'Return',
     flightNumber: 'Flight Number',
     flightNumberPlaceholder: 'e.g. AF111 / CA933',
     airline: 'Airline',

@@ -358,9 +358,9 @@ export function LogisticsTravelSection({
                     >
                     <div>
                       <div className="flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1.5 text-[var(--sage)] font-semibold text-xs uppercase tracking-wider">
-                          <PlaneTakeoff size={14} />
-                          <span>{t('flight.outbound')} · {outbound.flightNumber}</span>
+                        <div className="flex min-w-0 items-center gap-1.5 text-[var(--sage)] font-semibold text-xs uppercase tracking-wider whitespace-nowrap">
+                          <PlaneTakeoff size={14} className="shrink-0" />
+                          <span className="truncate">{t('flight.outbound')} · {outbound.flightNumber}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-2.5 py-0.5 text-[11px] font-medium text-[var(--sage)]`}>
@@ -573,9 +573,9 @@ export function LogisticsTravelSection({
                     >
                     <div>
                       <div className="flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1.5 text-purple-900 dark:text-purple-300 font-semibold text-xs uppercase tracking-wider">
-                          <PlaneLanding size={14} />
-                          <span>{t('flight.inbound')} · {inbound.flightNumber}</span>
+                        <div className="flex min-w-0 items-center gap-1.5 text-purple-900 dark:text-purple-300 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">
+                          <PlaneLanding size={14} className="shrink-0" />
+                          <span className="truncate">{t('flight.inbound')} · {inbound.flightNumber}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[11px] font-medium text-purple-900 dark:text-purple-300`}>
