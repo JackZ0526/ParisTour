@@ -371,7 +371,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                           type="button"
                           disabled={updatingRoleId !== null || removeBusy}
                           onClick={() => setPendingRemoveShare(s)}
-                          className="inline-flex items-center gap-1 rounded-full border border-red-200/60 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/40 hover:bg-red-100/80 dark:hover:bg-red-900/50 px-2.5 py-1 text-xs font-medium text-red-600/90 dark:text-red-300 transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
+                          className="inline-flex items-center gap-1 rounded-full border border-red-200/60 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/40 hover:bg-red-100/80 dark:hover:bg-red-900/50 px-2.5 py-1 text-xs font-medium text-red-600/90 dark:text-red-300 transition-colors disabled:cursor-default cursor-pointer active:scale-95"
                         >
                           <Trash2 size={12} />
                           <span>移除</span>

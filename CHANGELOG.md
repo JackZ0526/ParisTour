@@ -19,7 +19,7 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
-- Prevent collaborator role toggles from flashing the member list, and keep the invite button width stable while sending.
+- Prevent collaborator role toggles from flashing the member list or adjacent remove actions, and keep the invite button width stable while sending.
 
 ## [0.8.0] - 2026-08-21
 
