@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { lookupFlight, meaningfulFlightStatus } from '../services/flightLookup'
 import { purgeNonApiFlightCache } from '../services/flightCache'
@@ -10,6 +10,7 @@ import {
 } from '../services/flightSelection'
 import {
   daysBetween,
+  nightsFromDayCount,
   formatTripDayLabel,
   saveTripDates,
   type TripDateRange,
@@ -27,7 +28,7 @@ import {
 import { DateRangePicker } from '../../itinerary/components/DateRangePicker'
 import { Calendar, Plane, PlaneTakeoff, PlaneLanding, RefreshCw, Edit3, ArrowRight, Trash2, X } from 'lucide-react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
-import { useTranslation } from '../../../shared/i18n'
+import { useTranslation, getLocale, type Locale } from '../../../shared/i18n'
 
 interface Props {
   tripDates: TripDateRange | null
@@ -53,7 +54,25 @@ function formatEndpointTime(raw: string | undefined, endpoint?: FlightEndpoint):
   })
 }
 
-function flightSourceLabel(source: FlightInfo['source']): string {
+function flightSourceLabel(source: FlightInfo['source'], locale: Locale = getLocale()): string {
+  if (locale === 'en') {
+    switch (source) {
+      case 'timetable':
+        return 'Timetable'
+      case 'aerodatabox':
+        return 'Live Schedule'
+      case 'recommended':
+        return 'Recommended'
+      case 'live':
+        return 'Live'
+      case 'manual':
+        return 'Manual'
+      case 'llm':
+        return 'Backup Data'
+      default:
+        return 'Source'
+    }
+  }
   switch (source) {
     case 'timetable':
       return '计划时刻'
@@ -79,6 +98,7 @@ export function LogisticsTravelSection({
   onFlightsChange,
   readOnly = false,
 }: Props) {
+  const { t, locale } = useTranslation()
   // Flight Selection State
   const [seed] = useState(() => loadFlightSelection() ?? emptyFlightSelection())
   const [outboundInput, setOutboundInput] = useState(seed.outboundInput)
@@ -87,61 +107,65 @@ export function LogisticsTravelSection({
   const [inbound, setInbound] = useState<FlightInfo | null>(seed.returnFlight)
   const [busy, setBusy] = useState<'outbound' | 'return' | 'both' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { t } = useTranslation()
 
-  // Independent edit states
+  // Card Height Animation & In-Place Editing State
   const [editingOutbound, setEditingOutbound] = useState(false)
   const [editingInbound, setEditingInbound] = useState(false)
   const [outboundCardHeight, setOutboundCardHeight] = useState<number | null>(null)
   const [outboundEditorHeight, setOutboundEditorHeight] = useState<number | null>(null)
   const [inboundCardHeight, setInboundCardHeight] = useState<number | null>(null)
   const [inboundEditorHeight, setInboundEditorHeight] = useState<number | null>(null)
+
+  // Confirm Dialog State for Date Clearing
   const [confirmClearDatesOpen, setConfirmClearDatesOpen] = useState(false)
 
+  // Synchronize state when external tripDates or defaults change
   const startDate = tripDates?.startDate || ''
   const endDate = tripDates?.endDate || ''
   const hasDates = Boolean(startDate && endDate)
-  const destTrimmed = destination.trim()
-
-  const nightCount = useMemo(() => {
-    if (!startDate || !endDate) return 0
-    const days = daysBetween(startDate, endDate)
-    return Math.max(0, days - 1)
-  }, [startDate, endDate])
-
-  const dayCount = useMemo(() => {
-    if (!startDate || !endDate) return 0
-    return daysBetween(startDate, endDate)
-  }, [startDate, endDate])
+  const dayCount = hasDates ? daysBetween(startDate, endDate) : 0
+  const nightCount = hasDates ? nightsFromDayCount(dayCount) : 0
 
   function commitDates(range: TripDateRange | null) {
-    if (readOnly) return
-    onTripDatesChange(range)
+    if (!range?.startDate || !range?.endDate) {
+      onTripDatesChange?.(null)
+      saveTripDates(null)
+      return
+    }
+    onTripDatesChange?.(range)
     saveTripDates(range)
   }
 
-  useEffect(() => {
-    purgeNonApiFlightCache()
-  }, [])
+  function syncFlight(selection: PersistedFlightSelection) {
+    saveFlightSelection(selection)
+    onFlightsChange?.(selection)
+  }
 
-  useEffect(() => {
-    onFlightsChange?.({ outbound, returnFlight: inbound })
-  }, [outbound, inbound, onFlightsChange])
-
-  useEffect(() => {
-    saveFlightSelection({
-      outbound,
+  function setOutboundAndPersist(info: FlightInfo | null, inputVal = outboundInput) {
+    setOutbound(info)
+    syncFlight({
+      outbound: info,
       returnFlight: inbound,
-      outboundInput,
+      outboundInput: inputVal,
       returnInput,
     })
-  }, [outbound, inbound, outboundInput, returnInput])
+  }
+
+  function setInboundAndPersist(info: FlightInfo | null, inputVal = returnInput) {
+    setInbound(info)
+    syncFlight({
+      outbound,
+      returnFlight: info,
+      outboundInput,
+      returnInput: inputVal,
+    })
+  }
 
   function travelFor(direction: 'outbound' | 'return') {
     return {
       startDate: tripDates?.startDate || null,
       endDate: tripDates?.endDate || null,
-      destination: destTrimmed || null,
+      destination: destination.trim() || null,
       direction,
     }
   }
@@ -150,15 +174,22 @@ export function LogisticsTravelSection({
     direction: 'outbound' | 'return',
     flightNumber: string,
     forceRefresh = false,
-  ): Promise<void> {
+  ) {
     const trimmed = flightNumber.trim()
     if (!trimmed) {
-      throw new Error('请先输入航班号')
+      throw new Error(locale === 'en' ? 'Please enter a flight number' : '请先输入航班号')
     }
-    const travel = travelFor(direction)
-    const info = await lookupFlight(trimmed, travel, { forceRefresh })
-    if (direction === 'outbound') setOutbound(info)
-    else setInbound(info)
+    setBusy(direction)
+    setError(null)
+    try {
+      const info = await lookupFlight(trimmed, travelFor(direction), { forceRefresh })
+      if (direction === 'outbound') setOutboundAndPersist(info, trimmed)
+      else setInboundAndPersist(info, trimmed)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Flight search failed' : '查询失败'))
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function query(direction: 'outbound' | 'return') {
@@ -166,15 +197,19 @@ export function LogisticsTravelSection({
     setError(null)
     try {
       const number = direction === 'outbound' ? outboundInput : returnInput
-      await loadOne(direction, number)
+      await loadOne(direction, number, true)
       if (direction === 'outbound') setEditingOutbound(false)
       else setEditingInbound(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '查询失败')
+      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Flight search failed' : '查询失败'))
     } finally {
       setBusy(null)
     }
   }
+
+  useEffect(() => {
+    purgeNonApiFlightCache()
+  }, [])
 
   return (
     <section className="relative z-20 space-y-4">
@@ -184,11 +219,7 @@ export function LogisticsTravelSection({
         </p>
       )}
 
-      {/* ========================================================================= */}
-      {/* 方案 2 深度优化版: 日期与往返航班综合舱                                   */}
-      {/* ========================================================================= */}
       <article className={`relative z-20 rounded-3xl ${glassCardSurfaceClass} !overflow-visible p-5 sm:p-7 shadow-[0_8px_32px_rgba(0,0,0,0.03)] transition-all`}>
-        {/* Top Header Bar */}
         <div className="flex items-center justify-between border-b border-black/5 pb-3.5 sm:pb-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--copper)]/15 to-[var(--gold)]/10 text-[var(--copper)] shadow-inner">
@@ -215,9 +246,7 @@ export function LogisticsTravelSection({
           </div>
         </div>
 
-        {/* Card Body: 2-Column Split (Left: Date 4 cols, Right: Flights 8 cols) */}
         <div className="mt-4 grid gap-6 lg:grid-cols-12 lg:items-stretch">
-          {/* Left Column: Date & Duration (4/12) */}
           <div className="relative z-30 flex flex-col justify-between space-y-4 lg:col-span-4">
             <div>
               <div className="flex items-center justify-between">
@@ -252,7 +281,7 @@ export function LogisticsTravelSection({
                 {tripDates ? (
                   <div className="space-y-1.5">
                     <p className="text-sm font-medium text-[var(--ink)]">
-                      {formatTripDayLabel(startDate)} – {formatTripDayLabel(endDate)}
+                      {formatTripDayLabel(startDate, locale)} – {formatTripDayLabel(endDate, locale)}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} px-2.5 py-0.5 text-[11px] font-semibold text-[var(--copper)]`}>
@@ -271,35 +300,25 @@ export function LogisticsTravelSection({
 
             <div className="hidden lg:block pt-2 text-[11px] text-[var(--stone)]">
               {hasDates && outbound && inbound ? (
-                <span className="text-[var(--sage)] font-medium">✓ 日期与往返航班均已就绪</span>
+                <span className="text-[var(--sage)] font-medium">✓ {locale === 'en' ? 'Dates and roundtrip flights are set' : '日期与往返航班均已就绪'}</span>
               ) : (
-                <span>建议优先选定旅行日期，随后查询各航段时刻</span>
+                <span>{locale === 'en' ? 'Select dates first to align flight schedules' : '建议优先选定旅行日期，随后查询各航段时刻'}</span>
               )}
             </div>
           </div>
 
-          {/* Right Column: Outbound & Return Flight Cards (8/12) */}
-          <div className="flex flex-col justify-between space-y-4 lg:col-span-8 lg:border-l lg:border-black/5 lg:pl-6">
+          <div className="flex flex-col justify-between space-y-4 lg:col-span-8">
             <div>
-              <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Plane size={14} className="text-[var(--sage)]" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--stone)]">
-                    往返航班时刻
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sage)]">
+                    {t('flight.title')}
                   </span>
                 </div>
-                {(!outbound || !inbound) && (
-                  <span className="text-xs text-[var(--copper)] font-medium">
-                    {hasDates ? '分别输入航班号查询计划时刻' : '请先选定旅行日期'}
-                  </span>
-                )}
               </div>
 
-              {/* Flights Grid (2 Cards Side-by-Side) */}
-              <div className="grid gap-3.5 sm:grid-cols-2">
-                {/* ========================================================================= */}
-                {/* 1. Outbound Ticket Card / Input Form                                      */}
-                {/* ========================================================================= */}
+              <div className="mt-2.5 grid gap-4 sm:grid-cols-2">
                 <motion.div
                   initial={false}
                   animate={{
@@ -338,22 +357,21 @@ export function LogisticsTravelSection({
                       }`}
                     >
                     <div>
-                      {/* Outbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1.5 text-[var(--sage)] font-semibold text-xs uppercase tracking-wider">
                           <PlaneTakeoff size={14} />
-                          <span>去程 · {outbound.flightNumber}</span>
+                          <span>{t('flight.outbound')} · {outbound.flightNumber}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-2.5 py-0.5 text-[11px] font-medium text-[var(--sage)]`}>
-                            {flightSourceLabel(outbound.source)}
+                            {flightSourceLabel(outbound.source, locale)}
                           </span>
                           {!readOnly && (
                             <>
                               <button
                                 type="button"
-                                title="修改去程航班"
-                                aria-label="修改去程航班"
+                                title={t('flight.editOutbound')}
+                                aria-label={t('flight.editOutbound')}
                                 onClick={() => setEditingOutbound(true)}
                                 className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-[var(--ink)] active:scale-95 transition-colors`}
                               >
@@ -361,8 +379,8 @@ export function LogisticsTravelSection({
                               </button>
                               <button
                                 type="button"
-                                title="刷新去程时刻"
-                                aria-label="刷新去程时刻"
+                                title={t('flight.refreshOutbound')}
+                                aria-label={t('flight.refreshOutbound')}
                                 disabled={busy === 'outbound'}
                                 onClick={() => void loadOne('outbound', outbound.flightNumber, true)}
                                 className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-[var(--sage)] active:scale-95 transition-colors disabled:opacity-50`}
@@ -375,12 +393,12 @@ export function LogisticsTravelSection({
                       </div>
 
                       <p className="mt-1.5 text-base font-semibold text-[var(--ink)]">
-                        {outbound.airline || '航班计划'}
+                        {outbound.airline || (locale === 'en' ? 'Flight Schedule' : '航班计划')}
                       </p>
 
                       <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 dark:bg-black/30 p-3 border border-white/80 dark:border-white/10 text-sm backdrop-blur-sm shadow-xs">
                         <div className="col-span-2">
-                          <p className="text-xs text-[var(--stone)]">出发</p>
+                          <p className="text-xs text-[var(--stone)]">{t('flight.departure')}</p>
                           <p className="font-bold text-base text-[var(--ink)]">
                             {outbound.from?.code || '—'}
                           </p>
@@ -404,7 +422,7 @@ export function LogisticsTravelSection({
                         </div>
 
                         <div className="col-span-2 text-right">
-                          <p className="text-xs text-[var(--stone)]">到达</p>
+                          <p className="text-xs text-[var(--stone)]">{t('flight.arrival')}</p>
                           <p className="font-bold text-base text-[var(--ink)]">
                             {outbound.to?.code || '—'}
                           </p>
@@ -421,15 +439,14 @@ export function LogisticsTravelSection({
                     </div>
 
                     <div className="mt-3 flex items-center justify-between text-xs text-[var(--stone)]">
-                      <span>{outbound.aircraft ? `机型 ${outbound.aircraft}` : '直飞航班'}</span>
+                      <span>{outbound.aircraft ? (locale === 'en' ? `Aircraft ${outbound.aircraft}` : `机型 ${outbound.aircraft}`) : t('flight.directFlight')}</span>
                       <span className="text-[var(--sage)] font-medium">
-                        {meaningfulFlightStatus(outbound.status) || '计划正常'}
+                        {meaningfulFlightStatus(outbound.status) || t('flight.onSchedule')}
                       </span>
                     </div>
                     </motion.div>
                   )}
 
-                  {/* Outbound Input Form */}
                   <motion.div
                     initial={false}
                     animate={{ opacity: outbound && !editingOutbound ? 0 : 1 }}
@@ -458,19 +475,19 @@ export function LogisticsTravelSection({
                         <div className="flex items-center gap-2">
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sage)]">
                             <PlaneTakeoff size={14} />
-                            <span>去程航班</span>
+                            <span>{t('flight.outbound')}</span>
                           </span>
                           {outbound && (
                             <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-2.5 py-0.5 text-[10px] font-medium text-[var(--sage)]`}>
-                              修改中
+                              {t('flight.editing')}
                             </span>
                           )}
                         </div>
                         {outbound && (
                           <button
                             type="button"
-                            title="取消修改"
-                            aria-label="取消修改"
+                            title={t('common.cancel')}
+                            aria-label={t('common.cancel')}
                             onClick={() => setEditingOutbound(false)}
                             className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-[var(--ink)] active:scale-95 transition-colors`}
                           >
@@ -479,16 +496,18 @@ export function LogisticsTravelSection({
                         )}
                       </div>
                       <p className="mt-1 text-[11px] text-[var(--stone)]">
-                        {hasDates ? `按 ${startDate} 查询出发时刻` : '请先选定行程日期'}
+                        {hasDates
+                          ? t('flight.searchOutboundByDate', { date: startDate })
+                          : t('flight.pickDatesFirst')}
                       </p>
 
                       <div className="mt-4 flex gap-2">
                         <input
                           value={outboundInput}
                           onChange={(e) => setOutboundInput(e.target.value.toUpperCase())}
-                          aria-label="去程航班号"
+                          aria-label={t('flight.outboundNumber')}
                           className="min-w-0 w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-[var(--sage)]/60 focus:bg-white/90 dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(91,113,98,0.09)]"
-                          placeholder="去程航班号 例如 AF375"
+                          placeholder={t('flight.outboundPlaceholder')}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && outboundInput.trim() && hasDates && busy === null) {
                               e.preventDefault()
@@ -504,20 +523,17 @@ export function LogisticsTravelSection({
                           className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 dark:bg-[var(--copper)] text-[var(--paper)] dark:text-white px-4 py-2.5 text-sm font-medium shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] dark:hover:bg-[var(--copper)]/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'outbound' && <ButtonSpinner />}
-                          {busy === 'outbound' ? '查询中' : '查询'}
+                          {busy === 'outbound' ? t('common.loading') : (locale === 'en' ? 'Search' : '查询')}
                         </button>
                       </div>
                     </div>
 
                     <div className="pt-3 text-[11px] leading-relaxed text-[var(--stone)]">
-                      支持主要航司航班号，自动解析起降时间
+                      {t('flight.flightSearchHint')}
                     </div>
                   </motion.div>
                 </motion.div>
 
-                {/* ========================================================================= */}
-                {/* 2. Inbound Ticket Card / Input Form                                       */}
-                {/* ========================================================================= */}
                 <motion.div
                   initial={false}
                   animate={{
@@ -556,22 +572,21 @@ export function LogisticsTravelSection({
                       }`}
                     >
                     <div>
-                      {/* Inbound Card Top Actions */}
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1.5 text-purple-900 dark:text-purple-300 font-semibold text-xs uppercase tracking-wider">
                           <PlaneLanding size={14} />
-                          <span>返程 · {inbound.flightNumber}</span>
+                          <span>{t('flight.inbound')} · {inbound.flightNumber}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[11px] font-medium text-purple-900 dark:text-purple-300`}>
-                            {flightSourceLabel(inbound.source)}
+                            {flightSourceLabel(inbound.source, locale)}
                           </span>
                           {!readOnly && (
                             <>
                               <button
                                 type="button"
-                                title="修改返程航班"
-                                aria-label="修改返程航班"
+                                title={t('flight.editInbound')}
+                                aria-label={t('flight.editInbound')}
                                 onClick={() => setEditingInbound(true)}
                                 className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-[var(--ink)] active:scale-95 transition-colors`}
                               >
@@ -579,8 +594,8 @@ export function LogisticsTravelSection({
                               </button>
                               <button
                                 type="button"
-                                title="刷新返程时刻"
-                                aria-label="刷新返程时刻"
+                                title={t('flight.refreshInbound')}
+                                aria-label={t('flight.refreshInbound')}
                                 disabled={busy === 'return'}
                                 onClick={() => void loadOne('return', inbound.flightNumber, true)}
                                 className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-purple-900 dark:hover:text-purple-300 active:scale-95 transition-colors disabled:opacity-50`}
@@ -593,12 +608,12 @@ export function LogisticsTravelSection({
                       </div>
 
                       <p className="mt-1.5 text-base font-semibold text-[var(--ink)]">
-                        {inbound.airline || '航班计划'}
+                        {inbound.airline || (locale === 'en' ? 'Flight Schedule' : '航班计划')}
                       </p>
 
                       <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 dark:bg-black/30 p-3 border border-white/80 dark:border-white/10 text-sm backdrop-blur-sm shadow-xs">
                         <div className="col-span-2">
-                          <p className="text-xs text-[var(--stone)]">出发</p>
+                          <p className="text-xs text-[var(--stone)]">{t('flight.departure')}</p>
                           <p className="font-bold text-base text-[var(--ink)]">
                             {inbound.from?.code || '—'}
                           </p>
@@ -622,7 +637,7 @@ export function LogisticsTravelSection({
                         </div>
 
                         <div className="col-span-2 text-right">
-                          <p className="text-xs text-[var(--stone)]">到达</p>
+                          <p className="text-xs text-[var(--stone)]">{t('flight.arrival')}</p>
                           <p className="font-bold text-base text-[var(--ink)]">
                             {inbound.to?.code || '—'}
                           </p>
@@ -639,15 +654,14 @@ export function LogisticsTravelSection({
                     </div>
 
                     <div className="mt-3 flex items-center justify-between text-xs text-[var(--stone)]">
-                      <span>{inbound.aircraft ? `机型 ${inbound.aircraft}` : '直飞航班'}</span>
+                      <span>{inbound.aircraft ? (locale === 'en' ? `Aircraft ${inbound.aircraft}` : `机型 ${inbound.aircraft}`) : t('flight.directFlight')}</span>
                       <span className="text-purple-900 dark:text-purple-300 font-medium">
-                        {meaningfulFlightStatus(inbound.status) || '计划正常'}
+                        {meaningfulFlightStatus(inbound.status) || t('flight.onSchedule')}
                       </span>
                     </div>
                     </motion.div>
                   )}
 
-                  {/* Inbound Input Form */}
                   <motion.div
                     initial={false}
                     animate={{ opacity: inbound && !editingInbound ? 0 : 1 }}
@@ -676,19 +690,19 @@ export function LogisticsTravelSection({
                         <div className="flex items-center gap-2">
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 dark:text-purple-300">
                             <PlaneLanding size={14} />
-                            <span>返程航班</span>
+                            <span>{t('flight.inbound')}</span>
                           </span>
                           {inbound && (
                             <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.violet} px-2.5 py-0.5 text-[10px] font-medium text-purple-900 dark:text-purple-300`}>
-                              修改中
+                              {t('flight.editing')}
                             </span>
                           )}
                         </div>
                         {inbound && (
                           <button
                             type="button"
-                            title="取消修改"
-                            aria-label="取消修改"
+                            title={t('common.cancel')}
+                            aria-label={t('common.cancel')}
                             onClick={() => setEditingInbound(false)}
                             className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} h-8 w-8 inline-flex items-center justify-center text-[var(--stone)] hover:text-[var(--ink)] active:scale-95 transition-colors`}
                           >
@@ -697,16 +711,18 @@ export function LogisticsTravelSection({
                         )}
                       </div>
                       <p className="mt-1 text-[11px] text-[var(--stone)]">
-                        {hasDates ? `按 ${endDate} 查询返程时刻` : '请先选定行程日期'}
+                        {hasDates
+                          ? t('flight.searchInboundByDate', { date: endDate })
+                          : t('flight.pickDatesFirst')}
                       </p>
 
                       <div className="mt-4 flex gap-2">
                         <input
                           value={returnInput}
                           onChange={(e) => setReturnInput(e.target.value.toUpperCase())}
-                          aria-label="返程航班号"
+                          aria-label={t('flight.inboundNumber')}
                           className="min-w-0 w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/70 focus:border-purple-400/60 focus:bg-white/90 dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(109,78,150,0.08)]"
-                          placeholder="返程航班号 例如 AF374"
+                          placeholder={t('flight.inboundPlaceholder')}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && returnInput.trim() && hasDates && busy === null) {
                               e.preventDefault()
@@ -722,13 +738,13 @@ export function LogisticsTravelSection({
                           className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 dark:bg-[var(--copper)] text-[var(--paper)] dark:text-white px-4 py-2.5 text-sm font-medium shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] dark:hover:bg-[var(--copper)]/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'return' && <ButtonSpinner />}
-                          {busy === 'return' ? '查询中' : '查询'}
+                          {busy === 'return' ? t('common.loading') : (locale === 'en' ? 'Search' : '查询')}
                         </button>
                       </div>
                     </div>
 
                     <div className="pt-3 text-[11px] leading-relaxed text-[var(--stone)]">
-                      支持主要航司航班号，自动解析起降时间
+                      {t('flight.flightSearchHint')}
                     </div>
                   </motion.div>
                 </motion.div>

@@ -8,6 +8,7 @@ import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
 } from '../../../shared/styles/glassCapsule'
+import { useTranslation, type Locale } from '../../../shared/i18n'
 
 export interface DateRangeValue {
   startDate: string
@@ -22,7 +23,13 @@ interface Props {
   id?: string
 }
 
-const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'] as const
+const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'] as const
+const WEEKDAYS_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] as const
+
+const MONTH_LONG_EN = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 function toIso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -45,18 +52,27 @@ function daysInMonth(y: number, m: number): number {
   return new Date(y, m + 1, 0).getDate()
 }
 
-function monthLabel(y: number, m: number): string {
+function monthLabel(y: number, m: number, locale: Locale): string {
+  if (locale === 'en') {
+    return `${MONTH_LONG_EN[m]} ${y}`
+  }
   return `${y}年${m + 1}月`
 }
 
-function formatRangeTrigger(start: string, end: string): string {
+function formatRangeTrigger(start: string, end: string, locale: Locale): string {
   const a = parseIso(start)
   const b = parseIso(end)
-  if (!a || !b) return `${formatTripDayLabel(start)} – ${formatTripDayLabel(end)}`
-  if (a.y === b.y) {
-    return `${formatTripDayLabel(start)} – ${formatTripDayLabel(end)}`
+  if (!a || !b) return `${formatTripDayLabel(start, locale)} – ${formatTripDayLabel(end, locale)}`
+  if (locale === 'en') {
+    if (a.y === b.y) {
+      return `${formatTripDayLabel(start, 'en')} – ${formatTripDayLabel(end, 'en')}, ${a.y}`
+    }
+    return `${formatTripDayLabel(start, 'en')}, ${a.y} – ${formatTripDayLabel(end, 'en')}, ${b.y}`
   }
-  return `${a.y}年${formatTripDayLabel(start)} – ${b.y}年${formatTripDayLabel(end)}`
+  if (a.y === b.y) {
+    return `${formatTripDayLabel(start, 'zh-CN')} – ${formatTripDayLabel(end, 'zh-CN')}`
+  }
+  return `${a.y}年${formatTripDayLabel(start, 'zh-CN')} – ${b.y}年${formatTripDayLabel(end, 'zh-CN')}`
 }
 
 /**
@@ -67,9 +83,11 @@ export function DateRangePicker({
   value,
   onChange,
   label,
-  placeholder = '出发 – 返程',
+  placeholder,
   id: idProp,
 }: Props) {
+  const { locale } = useTranslation()
+  const defaultPlaceholder = locale === 'en' ? 'Depart – Return' : '出发 – 返程'
   const autoId = useId()
   const id = idProp ?? autoId
   const rootRef = useRef<HTMLDivElement>(null)
@@ -200,13 +218,13 @@ export function DateRangePicker({
   }
 
   const displayText = hasCommitted
-    ? formatRangeTrigger(committedStart, committedEnd)
-    : placeholder
+    ? formatRangeTrigger(committedStart, committedEnd, locale)
+    : (placeholder || defaultPlaceholder)
 
   const hint = pickingEnd
-    ? '再点一次选择返程日期'
+    ? (locale === 'en' ? 'Click again to select return date' : '再点一次选择返程日期')
     : open
-      ? '先选出发日期，再选返程'
+      ? (locale === 'en' ? 'Select departure date, then return date' : '先选出发日期，再选返程')
       : null
 
   const reduce = useReducedMotion()
@@ -233,6 +251,8 @@ export function DateRangePicker({
       opacity: 0,
     }),
   }
+
+  const weekdays = locale === 'en' ? WEEKDAYS_EN : WEEKDAYS_ZH
 
   return (
     <div ref={rootRef} className={`relative block text-sm ${open ? 'z-50' : 'z-30'}`}>
@@ -264,7 +284,7 @@ export function DateRangePicker({
         {open && (
           <motion.div
             role="dialog"
-            aria-label={label ? `${label}日历` : '选择行程日期'}
+            aria-label={label ? `${label}` : (locale === 'en' ? 'Select trip dates' : '选择行程日期')}
             initial={popoverAnim.initial}
             animate={popoverAnim.animate}
             exit={popoverAnim.exit}
@@ -275,18 +295,18 @@ export function DateRangePicker({
             <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
               <button
                 type="button"
-                aria-label="上一个月"
+                aria-label={locale === 'en' ? 'Previous month' : '上一个月'}
                 onClick={() => shiftMonth(-1)}
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/10 text-[var(--stone)] shadow-xs transition-colors hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95"
               >
                 <ChevronLeft size={15} aria-hidden />
               </button>
               <p className="font-display text-base font-semibold tracking-wide text-[var(--ink)]">
-                {monthLabel(viewY, viewM)}
+                {monthLabel(viewY, viewM, locale)}
               </p>
               <button
                 type="button"
-                aria-label="下一个月"
+                aria-label={locale === 'en' ? 'Next month' : '下一个月'}
                 onClick={() => shiftMonth(1)}
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/10 text-[var(--stone)] shadow-xs transition-colors hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95"
               >
@@ -296,7 +316,7 @@ export function DateRangePicker({
 
             {/* Weekdays Row */}
             <div className="mb-1.5 grid grid-cols-7 text-center text-[11px] font-semibold text-[var(--stone)]">
-              {WEEKDAYS.map((w) => (
+              {weekdays.map((w) => (
                 <div key={w} className="py-1">
                   {w}
                 </div>
@@ -407,11 +427,11 @@ export function DateRangePicker({
               <span className="inline-flex items-center gap-2">
                 <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--copper)] font-medium`}>
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--copper)]" />
-                  出发
+                  {locale === 'en' ? 'Depart' : '出发'}
                 </span>
                 <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--sage)] font-medium`}>
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
-                  返程
+                  {locale === 'en' ? 'Return' : '返程'}
                 </span>
               </span>
               {hint && <span className="font-medium text-[var(--ink)]">{hint}</span>}

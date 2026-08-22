@@ -112,6 +112,7 @@ function TranslationStatus({
   translationFailed: boolean
   onRetry: () => void
 }) {
+  const { locale } = useTranslation()
   if (translating || !translationFailed) return null
 
   return (
@@ -120,7 +121,7 @@ function TranslationStatus({
       onClick={onRetry}
       className="text-xs text-[var(--sage)] underline-offset-2 hover:underline"
     >
-      翻译暂不可用，点击重试
+      {locale === 'en' ? 'Translation unavailable, click to retry' : '翻译暂不可用，点击重试'}
     </button>
   )
 }

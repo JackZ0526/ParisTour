@@ -147,7 +147,7 @@ export default function App() {
     refreshTrips,
     tripSyncEpoch,
   } = useAuth()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const { avatar } = useUserAvatar(email)
   const { nickname } = useUserNickname(email)
   const readOnly = !canEdit
@@ -657,7 +657,7 @@ export default function App() {
                   {destinationBrand.title}
                 </h1>
                 <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)] mt-0.5">
-                  <span className="shrink-0">{chineseDayCount(numberOfDays)}行程规划</span>
+                  <span className="shrink-0">{locale === 'en' ? `${numberOfDays}-Day Plan` : `${chineseDayCount(numberOfDays)}行程规划`}</span>
                   {(trips.length > 1 || (activeTrip && activeTrip.role !== 'owner')) && (
                     <>
                       <span className="text-[var(--stone)]/40">·</span>

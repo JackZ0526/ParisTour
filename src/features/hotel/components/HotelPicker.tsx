@@ -630,7 +630,7 @@ function BookingHotelFacts({
   const visibleLanguages = (hotel.languages || []).map((l) => localizeLanguage(l, locale))
   const reviewScores = (hotel.reviewScores || []).filter((item) => item.score > 0)
   const policies = hotel.policies || []
-  const paymentMethods = (hotel.paymentMethods || []).map(localizePaymentMethod)
+  const paymentMethods = (hotel.paymentMethods || []).map((m) => localizePaymentMethod(m, locale))
   const hasLocationDetails = Boolean(hotel.locationDescription)
   const factsPending = identityLoading || loading
   const locationNeedsTranslate = Boolean(
@@ -785,7 +785,7 @@ function BookingHotelFacts({
               onClick={onIdentityRetry}
               className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
             >
-              重试匹配
+              {locale === 'en' ? 'Retry Matching' : '重试匹配'}
             </button>
           </div>
         )}
@@ -797,7 +797,7 @@ function BookingHotelFacts({
               onClick={onRetry}
               className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
             >
-              重试
+              {locale === 'en' ? 'Retry' : '重试'}
             </button>
           </div>
         )}
@@ -982,7 +982,7 @@ function BookingReviewsPanel({
             onClick={onRetry}
             className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
           >
-            重试
+            {locale === 'en' ? 'Retry' : '重试'}
           </button>
         </div>
       )}
@@ -990,7 +990,7 @@ function BookingReviewsPanel({
         <div className={showReviewShimmer ? 'hidden' : undefined}>
           <GoogleReviewsList
             reviews={reviews}
-            sourceLabel="Booking.com 精选评论"
+            sourceLabel={locale === 'en' ? 'Booking.com Featured Reviews' : 'Booking.com 精选评论'}
             showHeader={false}
             showShimmer={false}
             onPendingChange={(pending) => setReviewsRevealed(!pending)}
@@ -998,7 +998,7 @@ function BookingReviewsPanel({
         </div>
       )}
       {!loading && !error && hotel.bookingReviewsLoaded && !reviews.length && (
-        <p className="text-sm text-[var(--stone)]">暂无可展示的精选住客评论。</p>
+        <p className="text-sm text-[var(--stone)]">{locale === 'en' ? 'No featured guest reviews available to display.' : '暂无可展示的精选住客评论。'}</p>
       )}
     </section>
   )
@@ -2806,17 +2806,28 @@ export function HotelPicker({
             setPendingDeleteHotel(null)
           }
         }}
-        title="删除自定义酒店"
+        title={t('hotel.deleteCustomHotelTitle')}
         description={
           <span>
-            确定删除自定义酒店{' '}
-            <strong className="font-semibold text-[var(--ink)]">
-              「{pendingDeleteHotel?.name || '此酒店'}」
-            </strong>{' '}
-            吗？
+            {locale === 'en' ? (
+              <>
+                Are you sure you want to delete custom hotel{' '}
+                <strong className="font-semibold text-[var(--ink)]">
+                  "{pendingDeleteHotel?.name || 'this hotel'}"
+                </strong>?
+              </>
+            ) : (
+              <>
+                确定删除自定义酒店{' '}
+                <strong className="font-semibold text-[var(--ink)]">
+                  「{pendingDeleteHotel?.name || '此酒店'}」
+                </strong>{' '}
+                吗？
+              </>
+            )}
           </span>
         }
-        confirmText="删除"
+        confirmText={t('common.delete')}
         tone="danger"
         icon="trash"
       />
@@ -2830,17 +2841,29 @@ export function HotelPicker({
             setPendingEliminateHotel(null)
           }
         }}
-        title="淘汰候选酒店"
+        title={t('hotel.eliminateCandidateTitle')}
         description={
           <span>
-            确定将{' '}
-            <strong className="font-semibold text-[var(--ink)]">
-              「{pendingEliminateHotel?.name || '此酒店'}」
-            </strong>{' '}
-            从候选列表中淘汰移除吗？
+            {locale === 'en' ? (
+              <>
+                Are you sure you want to remove{' '}
+                <strong className="font-semibold text-[var(--ink)]">
+                  "{pendingEliminateHotel?.name || 'this hotel'}"
+                </strong>{' '}
+                from candidate list?
+              </>
+            ) : (
+              <>
+                确定将{' '}
+                <strong className="font-semibold text-[var(--ink)]">
+                  「{pendingEliminateHotel?.name || '此酒店'}」
+                </strong>{' '}
+                从候选列表中淘汰移除吗？
+              </>
+            )}
           </span>
         }
-        confirmText="淘汰移除"
+        confirmText={t('hotel.removeFromCandidate')}
         tone="warning"
         icon="alert"
       />

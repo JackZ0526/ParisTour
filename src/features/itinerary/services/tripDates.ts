@@ -88,16 +88,30 @@ export function nightsFromDayCount(dayCount: number): number {
   return Math.max(0, dayCount - 1)
 }
 
-/** e.g. 「6个白天 · 5晚」 */
-export function formatDayNightLabel(dayCount: number): string {
+import { getLocale, type Locale } from '../../../shared/i18n'
+
+const MONTH_NAMES_EN = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+/** e.g. 「6个白天 · 5晚」 or 「6 Days · 5 Nights」 */
+export function formatDayNightLabel(dayCount: number, locale: Locale = getLocale()): string {
   const n = Math.max(0, dayCount)
-  return `${n}个白天 · ${nightsFromDayCount(n)}晚`
+  const nights = nightsFromDayCount(n)
+  if (locale === 'en') {
+    return `${n} ${n === 1 ? 'Day' : 'Days'} · ${nights} ${nights === 1 ? 'Night' : 'Nights'}`
+  }
+  return `${n}个白天 · ${nights}晚`
 }
 
-/** Format for UI, e.g. 9月15日 */
-export function formatTripDayLabel(isoDate: string): string {
+/** Format for UI, e.g. 9月15日 or Sep 15 */
+export function formatTripDayLabel(isoDate: string, locale: Locale = getLocale()): string {
   const d = new Date(`${isoDate}T12:00:00`)
   if (Number.isNaN(d.getTime())) return isoDate
+  if (locale === 'en') {
+    return `${MONTH_NAMES_EN[d.getMonth()]} ${d.getDate()}`
+  }
   return `${d.getMonth() + 1}月${d.getDate()}日`
 }
 

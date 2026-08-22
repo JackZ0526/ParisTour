@@ -232,8 +232,16 @@ export function dedupeFacilities(facilities: string[]): string[] {
   return [...buckets.values()]
 }
 
-export function localizePaymentMethod(value: string): string {
-  return PAYMENT_METHOD_LABELS[value.trim().toLowerCase()] || value
+export function localizePaymentMethod(value: string, locale?: Locale): string {
+  const current = locale || getLocale()
+  const key = value.trim().toLowerCase()
+  if (current === 'en') {
+    if (key === 'cash') return 'Cash'
+    if (key === 'bank transfer') return 'Bank Transfer'
+    if (key === 'unionpay') return 'UnionPay'
+    return PAYMENT_METHOD_LABELS[key] || toEnglishTitleCase(value)
+  }
+  return PAYMENT_METHOD_LABELS[key] || value
 }
 
 export function categorizeFacilities(

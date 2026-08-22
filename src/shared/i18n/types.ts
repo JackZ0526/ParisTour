@@ -242,6 +242,10 @@ export interface I18nSchema {
     dropToSelectDesc: string
     releaseToSelect: string
     cancelCurrentSelection: string
+    deleteCustomHotelTitle: string
+    deleteCustomHotelDesc: string
+    eliminateCandidateTitle: string
+    eliminateCandidateDesc: string
   }
   flight: {
     title: string
@@ -252,6 +256,8 @@ export interface I18nSchema {
     airline: string
     departureTime: string
     arrivalTime: string
+    departure: string
+    arrival: string
     terminal: string
     seat: string
     enterFlight: string
@@ -263,6 +269,22 @@ export interface I18nSchema {
     searchingFlight: string
     saveFlight: string
     travelSectionTitle: string
+    editOutbound: string
+    editInbound: string
+    refreshOutbound: string
+    refreshInbound: string
+    aircraft: string
+    directFlight: string
+    onSchedule: string
+    editing: string
+    outboundNumber: string
+    inboundNumber: string
+    outboundPlaceholder: string
+    inboundPlaceholder: string
+    searchOutboundByDate: string
+    searchInboundByDate: string
+    pickDatesFirst: string
+    flightSearchHint: string
   }
   place: {
     title: string
