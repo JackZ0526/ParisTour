@@ -99,36 +99,41 @@ const DETAIL_CONFIRM_MISSING_NOTE = '行程未改动：请在详情页确认是�
 function getModelBrandTheme(modelId: string) {
   if (isDeepSeekModel(modelId)) {
     return {
-      capsule: 'border-[#bed0fd]/75 bg-[#eff4ff]/85 text-[#2554eb]',
-      dot: 'text-[#2554eb]/35',
-      subtext: 'text-[#2554eb]/80',
+      capsule:
+        'border-[#bed0fd]/75 dark:border-[#3b82f6]/30 bg-[#eff4ff]/85 dark:bg-[#3b82f6]/12 text-[#2554eb] dark:text-[#60a5fa]',
+      dot: 'text-[#2554eb]/35 dark:text-[#60a5fa]/40',
+      subtext: 'text-[#2554eb]/80 dark:text-[#93c5fd]',
     }
   }
   if (/^gpt-/i.test(modelId)) {
     return {
-      capsule: 'border-[#a7e8d0]/75 bg-[#eef9f5]/85 text-[#0c7a5f]',
-      dot: 'text-[#0c7a5f]/35',
-      subtext: 'text-[#0c7a5f]/80',
+      capsule:
+        'border-[#a7e8d0]/75 dark:border-[#10b981]/30 bg-[#eef9f5]/85 dark:bg-[#10b981]/12 text-[#0c7a5f] dark:text-[#34d399]',
+      dot: 'text-[#0c7a5f]/35 dark:text-[#34d399]/40',
+      subtext: 'text-[#0c7a5f]/80 dark:text-[#6ee7b7]',
     }
   }
   if (/^claude/i.test(modelId)) {
     return {
-      capsule: 'border-[#fed7aa]/75 bg-[#fff7ed]/85 text-[#c25e3e]',
-      dot: 'text-[#c25e3e]/35',
-      subtext: 'text-[#c25e3e]/80',
+      capsule:
+        'border-[#fed7aa]/75 dark:border-[#f97316]/30 bg-[#fff7ed]/85 dark:bg-[#f97316]/12 text-[#c25e3e] dark:text-[#fb923c]',
+      dot: 'text-[#c25e3e]/35 dark:text-[#fb923c]/40',
+      subtext: 'text-[#c25e3e]/80 dark:text-[#fdba74]',
     }
   }
   if (/^gemini/i.test(modelId)) {
     return {
-      capsule: 'border-[#c7d2fe]/75 bg-[#eef2ff]/85 text-[#4f46e5]',
-      dot: 'text-[#4f46e5]/35',
-      subtext: 'text-[#4f46e5]/80',
+      capsule:
+        'border-[#c7d2fe]/75 dark:border-[#818cf8]/30 bg-[#eef2ff]/85 dark:bg-[#818cf8]/12 text-[#4f46e5] dark:text-[#a5b4fc]',
+      dot: 'text-[#4f46e5]/35 dark:text-[#a5b4fc]/40',
+      subtext: 'text-[#4f46e5]/80 dark:text-[#c7d2fe]',
     }
   }
   return {
-    capsule: 'border-white/90 bg-white/80 text-[var(--ink)]',
-    dot: 'text-zinc-300',
-    subtext: 'text-[var(--stone)]',
+    capsule:
+      'border-white/90 dark:border-white/15 bg-white/80 dark:bg-white/10 text-[var(--ink)] dark:text-zinc-200',
+    dot: 'text-zinc-300 dark:text-zinc-500',
+    subtext: 'text-[var(--stone)] dark:text-zinc-400',
   }
 }
 const TRIP_CHAT_BACKDROP_Z = 2040
