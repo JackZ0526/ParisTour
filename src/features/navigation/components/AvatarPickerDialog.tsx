@@ -15,6 +15,8 @@ import { AvatarCropper } from './AvatarCropper'
 import {
   useUserAvatar,
 } from '../../auth/services/avatarStore'
+import { saveProfileAvatar } from '../../auth/services/avatarPreferenceCloud'
+import { useAuth } from '../../auth/authContext'
 import {
   glassCardSurfaceClass,
   glassModalSurfaceClass,
@@ -33,6 +35,7 @@ export function AvatarPickerDialog({
   onClose,
   email,
 }: AvatarPickerDialogProps) {
+  const { user } = useAuth()
   const { avatar, setAvatar, resetAvatar } = useUserAvatar(email)
   const [isReading, setIsReading] = useState(false)
   const [pendingDataUrl, setPendingDataUrl] = useState<string | null>(null)
@@ -80,7 +83,11 @@ export function AvatarPickerDialog({
   }
 
   const handleCropConfirm = (dataUrl: string) => {
-    setAvatar({ type: 'image', value: dataUrl })
+    const nextAvatar = { type: 'image' as const, value: dataUrl }
+    setAvatar(nextAvatar)
+    if (user?.id) {
+      void saveProfileAvatar(user.id, nextAvatar)
+    }
     setPendingDataUrl(null)
     setUploadError(null)
     setSuccessToast(true)
@@ -98,7 +105,11 @@ export function AvatarPickerDialog({
   }
 
   const handleResetDefault = () => {
+    const nextAvatar = { type: 'initial' as const, value: '' }
     resetAvatar()
+    if (user?.id) {
+      void saveProfileAvatar(user.id, nextAvatar)
+    }
     setUploadError(null)
     setSuccessToast(false)
   }

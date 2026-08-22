@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
 import type { UserAvatar } from '../../features/auth/services/avatarStore'
 
@@ -45,6 +45,10 @@ export function UserAvatarView({
   alt = '用户头像',
 }: UserAvatarViewProps) {
   const [imageError, setImageError] = useState(false)
+
+  useEffect(() => {
+    setImageError(false)
+  }, [avatar?.value])
   const config = SIZE_CONFIGS[size]
   const radiusClass = shape === 'circle' ? 'rounded-full' : config.squircleRadius
 
