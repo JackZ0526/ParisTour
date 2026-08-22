@@ -1,4 +1,4 @@
-﻿import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
+import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import {
   getUserAvatar,
   setUserAvatar,
@@ -122,34 +122,38 @@ export async function batchLoadProfileAvatars(
   const result: Record<string, UserAvatar> = {}
   if (!emails.length) return result
 
-  const missingEmails: string[] = []
-  for (const email of emails) {
+  const cleanEmails = Array.from(
+    new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
+  )
+  if (!cleanEmails.length) return result
+
+  // 1. Preload from local cache
+  for (const email of cleanEmails) {
     const local = getUserAvatar(email)
     if (local.type === 'image' && local.value) {
-      result[email.toLowerCase()] = local
-    } else {
-      missingEmails.push(email.trim().toLowerCase())
+      result[email] = local
     }
   }
 
-  if (!missingEmails.length || !isCloudSyncEnabled()) {
+  if (!isCloudSyncEnabled()) {
     return result
   }
 
+  // 2. Fetch fresh avatars from profiles table
   try {
     const sb = getSupabase()
     const { data, error } = await sb
       .from('profiles')
       .select('email, avatar_url')
-      .in('email', missingEmails)
+      .in('email', cleanEmails)
 
     if (!error && Array.isArray(data)) {
       for (const row of data) {
         if (row?.email && typeof row.avatar_url === 'string' && row.avatar_url) {
           const avatar: UserAvatar = { type: 'image', value: row.avatar_url }
-          const normEmail = row.email.toLowerCase()
+          const normEmail = row.email.trim().toLowerCase()
           result[normEmail] = avatar
-          setUserAvatar(avatar, row.email)
+          setUserAvatar(avatar, normEmail)
         }
       }
     }

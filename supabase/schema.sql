@@ -35,6 +35,12 @@ alter table public.profiles
   add column if not exists theme_preference text not null default 'system';
 
 alter table public.profiles
+  add column if not exists display_name text;
+
+alter table public.profiles
+  add column if not exists avatar_url text;
+
+alter table public.profiles
   drop constraint if exists profiles_theme_preference_check;
 
 alter table public.profiles
@@ -45,11 +51,14 @@ create index if not exists profiles_email_idx on public.profiles (lower(email));
 
 alter table public.profiles enable row level security;
 
-create policy "profiles_select_own"
+drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_select_authenticated" on public.profiles;
+
+create policy "profiles_select_authenticated"
   on public.profiles
   for select
   to authenticated
-  using (id = auth.uid());
+  using (true);
 
 create policy "profiles_update_own"
   on public.profiles
