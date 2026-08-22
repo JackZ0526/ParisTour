@@ -46,6 +46,8 @@ export interface I18nSchema {
     optional: string
     actions: string
     readOnlyBanner: string
+    disclaimer: string
+    custom: string
   }
   nav: {
     logistics: string
@@ -135,6 +137,8 @@ export interface I18nSchema {
     daysCount: string
     datesConfigured: string
     infoReady: string
+    infoReadySubtitle: string
+    viewDailyItinerary: string
     generateItinerary: string
     generatingItinerary: string
     regenerate: string
@@ -216,6 +220,28 @@ export interface I18nSchema {
     recommending: string
     thinkingRecommendation: string
     verifyingRecommendation: string
+    bestPick: string
+    custom: string
+    generatingCard: string
+    generateCard: string
+    parsingAddressGenerating: string
+    otherCandidates: string
+    hotelCandidates: string
+    refreshSelection: string
+    refreshSelectionPrompt: string
+    refreshingSelection: string
+    expand: string
+    collapse: string
+    tellPreferences: string
+    tellPreferencesDesc: string
+    refreshDirectly: string
+    refreshDirectlyDesc: string
+    emptySlotTitle: string
+    emptySlotDesc: string
+    dropToSelectTitle: string
+    dropToSelectDesc: string
+    releaseToSelect: string
+    cancelCurrentSelection: string
   }
   flight: {
     title: string

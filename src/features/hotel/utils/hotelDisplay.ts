@@ -307,3 +307,36 @@ export function localizeReviewScoreLabel(label: string, locale?: Locale): string
   }
   return label
 }
+
+const ORDINAL_SUFFIX: Record<number, string> = {
+  1: '1st',
+  2: '2nd',
+  3: '3rd',
+}
+
+export function formatHotelArea(area?: string, locale?: Locale): string {
+  if (!area?.trim()) return ''
+  const current = locale || getLocale()
+  const raw = area.trim()
+
+  if (current !== 'en') {
+    return raw
+  }
+
+  if (raw === '巴黎市区') {
+    return 'Paris Central'
+  }
+
+  const match = raw.match(/^(\d{1,2})区(?:\s*\(\s*([^/)]+?)(?:\s*\/\s*[^)]+)?\))?/i)
+  if (match) {
+    const num = Number(match[1])
+    const ord = ORDINAL_SUFFIX[num] || `${num}th`
+    const frName = match[2]?.trim()
+    if (frName) {
+      return `${ord} Arr. (${frName})`
+    }
+    return `${ord} Arrondissement`
+  }
+
+  return raw
+}

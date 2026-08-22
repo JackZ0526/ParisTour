@@ -13,7 +13,7 @@ import type { HotelDetailCopy, HotelRecommendation } from '../types'
 import { generateText, isLlmConfigured } from './_service'
 import { callOpenAIMessagesStream } from '../transport'
 import { extractPartialJsonStringField } from '../stream'
-import { getLocale, getLlmLanguageInstruction } from '../../../i18n'
+import { getLocale, getLlmLanguageInstruction, type Locale } from '../../../i18n'
 
 export type { HotelDetailCopy, HotelRecommendation }
 
@@ -143,7 +143,7 @@ export async function generateHotelDetailCopy(input: {
   }
 }
 
-/** One-line Chinese blurb for a custom hotel picker card. */
+/** One-line blurb for a custom hotel picker card. */
 export async function generateHotelCardBlurb(input: {
   name: string
   area?: string
@@ -154,15 +154,28 @@ export async function generateHotelCardBlurb(input: {
   propertyType?: string
   rating?: number
   facilities?: string[]
+  locale?: Locale
   onPartial?: (blurb: string) => void
   signal?: AbortSignal
 }): Promise<string | null> {
   if (!isLlmConfigured()) return null
+  const locale = input.locale || getLocale()
+  const isEn = locale === 'en'
 
   const system = buildPrompt(
-    '旅行住宿顾问。为酒店候选项卡片写一句中文简介。',
+    isEn
+      ? 'Travel accommodation advisor. Write a single concise English summary sentence for the hotel candidate card.'
+      : '旅行住宿顾问。为酒店候选项卡片写一句中文简介。',
     null,
-    `<hard_rules>
+    isEn
+      ? `<hard_rules>
+- Output strictly in English.
+- Output exactly one field "blurb": exactly 1 fluent English sentence, about 12–25 words, no bullet points.
+- Highlight the 1–2 most recognizable features: district/neighborhood, star rating, or key facilities/metro proximity.
+- Do not invent rates, ratings, or distances.
+- Avoid meta descriptions like "custom hotel" or "recommendation reason".
+</hard_rules>`
+      : `<hard_rules>
 - 只输出 blurb 一个字段：恰好 1 句中文，约 18–40 字，不要句号堆砌，不要分点。
 - 抓住最有辨识度的 1–2 个点：区位/星级/一两个设施或交通，不要翻译或压缩 Booking 英文长简介。
 - 不要编造房价、评分或距离；资料没有的信息不要写。
@@ -170,7 +183,9 @@ export async function generateHotelCardBlurb(input: {
 </hard_rules>`,
     jsonContract(
       '{ blurb: "string" }',
-      '{ "blurb": "特罗卡德罗四星酒店，步行可到埃菲尔铁塔，住客评分很高。" }',
+      isEn
+        ? '{ "blurb": "4-star boutique hotel in Trocadéro within walking distance of the Eiffel Tower." }'
+        : '{ "blurb": "特罗卡德罗四星酒店，步行可到埃菲尔铁塔，住客评分很高。" }',
     ),
   )
   const user = JSON.stringify({

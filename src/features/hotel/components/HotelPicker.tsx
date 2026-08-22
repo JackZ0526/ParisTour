@@ -48,6 +48,7 @@ import {
   resolveBookingHotelIdentity,
 } from '../services/bookingHotels'
 import {
+  formatHotelArea,
   hotelScoreText,
   localizeFacility,
   localizePaymentMethod,
@@ -141,10 +142,12 @@ function pointInRect(x: number, y: number, rect: DOMRect) {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 }
 
-function needsCustomCardBlurb(hotel: HotelCandidate): boolean {
+function needsCustomCardBlurb(hotel: HotelCandidate, locale: Locale = getLocale()): boolean {
   if (hotel.source !== 'custom') return false
   const reason = hotel.reason?.trim() || ''
   if (!reason) return true
+  if (locale === 'en' && looksChinese(reason)) return true
+  if (locale === 'zh-CN' && !looksChinese(reason)) return true
   return /^替换[「『"]/.test(reason)
 }
 
@@ -159,8 +162,18 @@ function HotelCardFace({
   blurbLoading?: boolean
   variant?: 'candidate' | 'selected'
 }) {
+  const { t, locale } = useTranslation()
   const customText = (blurb || hotel.reason || '').trim()
-  const showCustomShimmer = hotel.source === 'custom' && blurbLoading && !customText
+  const isCustom = hotel.source === 'custom'
+  const isCustomChineseInEn = isCustom && locale === 'en' && looksChinese(customText)
+  const showCustomShimmer =
+    isCustom &&
+    ((blurbLoading && !customText) ||
+      (isCustomChineseInEn && blurbLoading))
+  const displayCustomText =
+    isCustomChineseInEn
+      ? (hotel.description && !looksChinese(hotel.description) ? hotel.description : '')
+      : customText
 
   return (
     <div
@@ -196,18 +209,18 @@ function HotelCardFace({
             {hotel.area && (
               <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center gap-1 px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--copper)]`}>
                 <MapPin size={10} strokeWidth={2} className="shrink-0" />
-                {hotel.area}
+                {formatHotelArea(hotel.area, locale)}
               </span>
             )}
             {hotel.isBest && (
               <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center gap-1 px-2.5 py-0.5 text-[10.5px] font-medium text-amber-900 dark:text-amber-200`}>
                 <Sparkles size={10} strokeWidth={2} className="shrink-0 text-amber-700 dark:text-amber-300" />
-                最优推荐
+                {t('hotel.bestPick')}
               </span>
             )}
             {hotel.source === 'custom' && (
               <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center px-2 py-0.5 text-[10px] text-[var(--stone)]`}>
-                自定义
+                {t('hotel.custom')}
               </span>
             )}
           </div>
@@ -217,7 +230,9 @@ function HotelCardFace({
           {showCustomShimmer ? (
             <ShimmerLines lines={2} />
           ) : hotel.source === 'custom' ? (
-            <p className="m-0 line-clamp-2 text-xs leading-relaxed text-[var(--stone)]">{customText}</p>
+            displayCustomText ? (
+              <p className="m-0 line-clamp-2 text-xs leading-relaxed text-[var(--stone)]">{displayCustomText}</p>
+            ) : null
           ) : (
             <HotelTranslatedText
               text={hotel.reason || hotel.description}
@@ -1572,7 +1587,7 @@ export function HotelPicker({
     )
 
     for (const hotel of hotels) {
-      if (!needsCustomCardBlurb(hotel)) continue
+      if (!needsCustomCardBlurb(hotel, locale)) continue
       if (cardBlurbInflightRef.current.has(hotel.id)) continue
       if (cardBlurbFailedRef.current.has(hotel.id)) continue
       if (identityLoadingId === hotel.id || detailsLoadingId === hotel.id) continue
@@ -1584,7 +1599,7 @@ export function HotelPicker({
       if (waitingForDetails) continue
 
       cardBlurbInflightRef.current.add(hotel.id)
-      const artifactKey = `hotel-card-blurb:v1:${hotel.bookingHotelId || hotel.name}`
+      const artifactKey = `hotel-card-blurb:v2:${locale}:${hotel.bookingHotelId || hotel.name}`
       void memoizeLlmCall(
         artifactKey,
         () =>
@@ -1598,6 +1613,7 @@ export function HotelPicker({
             propertyType: hotel.propertyType,
             rating: hotel.rating,
             facilities: hotel.facilities,
+            locale,
             onPartial: (blurb) => {
               setCardBlurbStream((current) =>
                 current[hotel.id] === blurb ? current : { ...current, [hotel.id]: blurb },
@@ -2277,8 +2293,8 @@ export function HotelPicker({
                       <button
                         type="button"
                         data-hotel-no-drag
-                        aria-label="取消当前选择"
-                        title="取消当前选择"
+                        aria-label={t('hotel.cancelCurrentSelection')}
+                        title={t('hotel.cancelCurrentSelection')}
                         onClick={(e) => {
                           e.stopPropagation()
                           clearCurrentSelection()
@@ -2291,7 +2307,7 @@ export function HotelPicker({
                     {currentSlotHighlight && (
                       <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-[var(--sage)]/15">
                         <span className="rounded-full bg-[var(--ink)]/80 px-3 py-1 text-sm text-[var(--paper)]">
-                          松开即可选择
+                          {t('hotel.releaseToSelect')}
                         </span>
                       </div>
                     )}
@@ -2304,7 +2320,7 @@ export function HotelPicker({
                         hotel={selectedCandidate}
                         blurb={cardBlurbStream[selectedCandidate.id]}
                         blurbLoading={
-                          needsCustomCardBlurb(selectedCandidate) && isLlmConfigured()
+                          needsCustomCardBlurb(selectedCandidate, locale) && isLlmConfigured()
                         }
                         variant="selected"
                       />
@@ -2327,12 +2343,12 @@ export function HotelPicker({
                     }`}
                   >
                     <p className="font-medium text-base text-[var(--ink)]">
-                      {currentSlotHighlight ? '拖放到这里设为住宿' : '尚未选定住宿'}
+                      {currentSlotHighlight ? t('hotel.dropToSelectTitle') : t('hotel.emptySlotTitle')}
                     </p>
                     <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
                       {currentSlotHighlight
-                        ? '松开鼠标即可选择该酒店并开始行程安排。'
-                        : '可从下方拖拽酒店卡片到此处，或点开详情后选择「就住这儿了」。'}
+                        ? t('hotel.dropToSelectDesc')
+                        : t('hotel.emptySlotDesc')}
                     </p>
                   </motion.div>
                 )}
@@ -2345,14 +2361,14 @@ export function HotelPicker({
                   <div className="flex items-center gap-1.5 text-[var(--copper)]">
                     <MapPin size={14} strokeWidth={1.8} />
                     <p className="text-xs font-semibold uppercase tracking-[0.16em]">
-                      自定义住宿
+                      {t('hotel.customHotel')}
                     </p>
                   </div>
                   <p className="mt-2 text-base font-medium text-[var(--ink)]">
-                    已经订好酒店？
+                    {t('hotel.alreadyBooked')}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-[var(--stone)]">
-                    输入酒店名称或地址，生成详情后再决定是否加入候选。
+                    {t('hotel.customHotelPrompt')}
                   </p>
                 </div>
               </div>
@@ -2361,8 +2377,8 @@ export function HotelPicker({
                 <input
                   value={customQuery}
                   onChange={(e) => setCustomQuery(e.target.value)}
-                  placeholder="例如：25 Rue du Temple, 75004 Paris"
-                  aria-label="自定义酒店名称或地址"
+                  placeholder={t('hotel.customHotelPlaceholder')}
+                  aria-label={t('hotel.customHotelPrompt')}
                   className="w-full rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && customQuery.trim() && !loading) {
@@ -2383,10 +2399,10 @@ export function HotelPicker({
                   }`}
                 >
                   {loading && <ButtonSpinner />}
-                  {loading ? '生成卡片中…' : '生成酒店卡片'}
+                  {loading ? t('hotel.generatingCard') : t('hotel.generateCard')}
                 </button>
                 {loading && (
-                  <LoadingIndicator label="正在解析地址并生成酒店卡片…" showDots size="sm" />
+                  <LoadingIndicator label={t('hotel.parsingAddressGenerating')} showDots size="sm" />
                 )}
               </div>
             </div>
@@ -2399,7 +2415,7 @@ export function HotelPicker({
               <div className="flex items-center gap-1.5">
                 <Sparkles size={14} className="text-[var(--gold)]" />
                 <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--stone)]">
-                  {selectedCandidate ? '其他候选酒店' : '酒店候选项'}
+                  {selectedCandidate ? t('hotel.otherCandidates') : t('hotel.hotelCandidates')}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -2415,7 +2431,7 @@ export function HotelPicker({
                       }
                     }}
                     aria-busy={refreshing || undefined}
-                    aria-label={refreshing ? '正在更换酒店推荐' : '换一批酒店推荐'}
+                    aria-label={refreshing ? t('hotel.refreshingSelection') : t('hotel.refreshSelectionPrompt')}
                     className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--copper)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--copper)]/25 disabled:opacity-50`}
                   >
                     <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
@@ -2425,7 +2441,7 @@ export function HotelPicker({
                         <Sparkles size={12} strokeWidth={1.8} />
                       )}
                     </span>
-                    <span>{refreshing ? '推荐中…' : '换一批'}</span>
+                    <span>{refreshing ? t('hotel.recommending') : t('hotel.refreshSelection')}</span>
                   </button>
                 )}
                 {canToggleOthers && (
@@ -2435,7 +2451,7 @@ export function HotelPicker({
                     className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)]/30`}
                   >
                     <ChevronIcon up={!othersCollapsed} />
-                    {othersCollapsed ? '展开' : '收起'}
+                    {othersCollapsed ? t('hotel.expand') : t('hotel.collapse')}
                   </button>
                 )}
               </div>
@@ -2447,9 +2463,9 @@ export function HotelPicker({
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-base text-[var(--ink)]">换一批推荐</p>
+                        <p className="font-medium text-base text-[var(--ink)]">{t('hotel.refreshSelection')}</p>
                         <p className="mt-1 text-sm text-[var(--stone)]">
-                          按你的喜好定制，或直接再换一批。
+                          {t('hotel.tellPreferencesDesc')}
                         </p>
                       </div>
                       <button
@@ -2458,7 +2474,7 @@ export function HotelPicker({
                         onClick={() => setRefreshPanel(null)}
                         className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
                       >
-                        取消
+                        {t('common.cancel')}
                       </button>
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -2468,9 +2484,9 @@ export function HotelPicker({
                         onClick={() => setRefreshPanel('prefer')}
                         className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:hover:bg-[#1f2824] hover:border-white dark:hover:border-white/20 disabled:opacity-50"
                       >
-                        <p className="font-medium text-[var(--ink)]">说说我的喜好</p>
+                        <p className="font-medium text-[var(--ink)]">{t('hotel.tellPreferences')}</p>
                         <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
-                          填写区位、预算、氛围等要求后再推荐
+                          {t('hotel.tellPreferencesDesc')}
                         </p>
                       </button>
                       <button
@@ -2479,9 +2495,9 @@ export function HotelPicker({
                         onClick={() => void runFreshRecommendations()}
                         className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:hover:bg-[#1f2824] hover:border-white dark:hover:border-white/20 disabled:opacity-50"
                       >
-                        <p className="font-medium text-[var(--ink)]">直接再换一批</p>
+                        <p className="font-medium text-[var(--ink)]">{t('hotel.refreshDirectly')}</p>
                         <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
-                          保留当前条件，重新生成一组推荐
+                          {t('hotel.refreshDirectlyDesc')}
                         </p>
                       </button>
                     </div>
@@ -2490,9 +2506,9 @@ export function HotelPicker({
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-base text-[var(--ink)]">你的喜好与要求</p>
+                        <p className="font-medium text-base text-[var(--ink)]">{t('hotel.preferencesPrompt')}</p>
                         <p className="mt-1 text-sm text-[var(--stone)]">
-                          例如：左岸、地铁方便、中档、安静一点
+                          {t('hotel.preferencesHint')}
                         </p>
                       </div>
                       <button
@@ -2501,14 +2517,14 @@ export function HotelPicker({
                         onClick={() => setRefreshPanel('choose')}
                         className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
                       >
-                        返回
+                        {t('hotel.back')}
                       </button>
                     </div>
                     <textarea
                       value={preferText}
                       onChange={(e) => setPreferText(e.target.value)}
                       rows={3}
-                      placeholder="写下你对住宿的想法…"
+                      placeholder={t('hotel.preferencesPlaceholder')}
                       className="mt-3 w-full resize-none rounded-2xl border border-white/90 dark:border-white/10 bg-white/70 dark:bg-black/35 p-3.5 text-sm text-[var(--ink)] outline-none shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.3)] backdrop-blur-sm transition-all placeholder:text-[var(--stone)]/55 focus:border-[var(--copper)]/60 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_3px_rgba(181,106,60,0.08)]"
                     />
                     <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -2518,7 +2534,7 @@ export function HotelPicker({
                         onClick={() => setRefreshPanel(null)}
                         className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-4 py-2 text-xs text-[var(--stone)] transition-colors active:scale-95 disabled:opacity-50`}
                       >
-                        取消
+                        {t('common.cancel')}
                       </button>
                       <button
                         type="button"
@@ -2532,7 +2548,7 @@ export function HotelPicker({
                         }`}
                       >
                         {refreshing && <ButtonSpinner mode="thinking" task="hotelRecommend" />}
-                        {refreshing ? '推荐中…' : '按喜好推荐'}
+                        {refreshing ? t('hotel.recommending') : t('hotel.recommendByPrefs')}
                       </button>
                     </div>
                   </>
@@ -2543,8 +2559,8 @@ export function HotelPicker({
             {refreshing && (
               <LoadingIndicator
                 variant="block"
-                thinkingLabel={refreshHint || '正在思考酒店推荐…'}
-                generatingLabel={refreshHint || '正在推荐酒店并核对地点信息…'}
+                thinkingLabel={refreshHint || t('hotel.thinkingRecommendation')}
+                generatingLabel={refreshHint || t('hotel.verifyingRecommendation')}
                 showDots
                 size="sm"
                 mode="thinking"

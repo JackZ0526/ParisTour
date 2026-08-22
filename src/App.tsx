@@ -95,6 +95,7 @@ import {
   glassCardSurfaceClass,
 } from './shared/styles/glassCapsule'
 import { ConfirmDialog } from './shared/components/ConfirmDialog'
+import { useTranslation } from './shared/i18n'
 
 const timelineContainerVariants = {
   enter: (_direction: number) => ({
@@ -146,6 +147,7 @@ export default function App() {
     refreshTrips,
     tripSyncEpoch,
   } = useAuth()
+  const { t } = useTranslation()
   const { avatar } = useUserAvatar(email)
   const { nickname } = useUserNickname(email)
   const readOnly = !canEdit
@@ -1382,7 +1384,7 @@ export default function App() {
                       <span
                         className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} px-3 py-1 text-xs text-[var(--sage)] font-semibold`}
                       >
-                        ✓ 出行信息已就绪
+                        ✓ {t('itinerary.infoReady')}
                       </span>
                     )}
                   </div>
@@ -1415,9 +1417,9 @@ export default function App() {
                       <CalendarDays size={18} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-[var(--ink)]">出行信息已就绪</p>
+                      <p className="text-sm font-medium text-[var(--ink)]">{t('itinerary.infoReady')}</p>
                       <p className="mt-0.5 text-xs text-[var(--stone)]">
-                        日期、往返航班与当前住宿均已确认
+                        {t('itinerary.infoReadySubtitle')}
                       </p>
                     </div>
                   </div>
@@ -1426,7 +1428,7 @@ export default function App() {
                     onClick={() => handleSelectTab('itinerary')}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 px-5 py-2.5 text-sm font-medium text-[var(--paper)] shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)]/35 sm:w-auto"
                   >
-                    <span>查看每日行程</span>
+                    <span>{t('itinerary.viewDailyItinerary')}</span>
                     <span aria-hidden>→</span>
                   </button>
                 </div>
@@ -1473,7 +1475,7 @@ export default function App() {
 
         <footer className="rounded-3xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#151c18]/60 px-5 py-4 text-xs text-zinc-500 dark:text-zinc-400 shadow-sm dark:shadow-none backdrop-blur-xl transition-colors">
           <p>
-            航班与营业信息会变动；详情页显示生成时缓存的 Google 评分及 Tripadvisor 详情。自驾日请确认低排放区（Crit’Air）与租车保险。
+            {t('common.disclaimer')}
           </p>
         </footer>
       </main>
