@@ -401,13 +401,17 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                           />
                           <div className="min-w-0">
                             <p className="truncate text-xs sm:text-sm font-semibold text-[var(--ink)]">
-                              {compNickname || s.invitee_email}
+                              {compNickname ? (
+                                <>
+                                  <span>{compNickname}</span>
+                                  <span className="font-normal text-[var(--stone)] dark:text-zinc-400 text-[11px] sm:text-xs ml-1">
+                                    ({s.invitee_email})
+                                  </span>
+                                </>
+                              ) : (
+                                s.invitee_email
+                              )}
                             </p>
-                            {compNickname && (
-                              <p className="truncate text-[11px] text-[var(--stone)] dark:text-zinc-400">
-                                {s.invitee_email}
-                              </p>
-                            )}
                             <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400">
                               {s.role === 'editor' ? '✨ 可共同编辑行程内容' : '👁️ 仅查看，不可修改'}
                             </p>
