@@ -255,11 +255,6 @@ export function AvatarCropper({
         )}
       </div>
 
-      {/* Hint */}
-      <p className="text-[11px] text-[var(--stone)] dark:text-zinc-400 font-medium tracking-tight">
-        {isReady ? '拖动图片调整位置，滚轮或点击按钮缩放' : ' '}
-      </p>
-
       {/* Zoom controls */}
       <div className="flex items-center gap-2">
         <button

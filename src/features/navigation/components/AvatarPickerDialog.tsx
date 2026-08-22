@@ -169,8 +169,8 @@ export function AvatarPickerDialog({
               <h3 className="font-display text-base sm:text-lg font-semibold text-[var(--ink)]">
                 调整裁切位置
               </h3>
-              <p className="mt-1 text-[11px] sm:text-xs text-[var(--stone)] dark:text-zinc-400 leading-relaxed">
-                拖动图片或缩放，框内区域将作为头像。系统会在浏览器本地完成裁剪，无需上传。
+              <p className="mt-1 text-[11px] sm:text-xs text-[var(--stone)] dark:text-zinc-400">
+                拖动或缩放图片，框内区域将保存为头像
               </p>
             </div>
             <AvatarCropper
