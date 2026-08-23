@@ -1,6 +1,7 @@
 export type PlaceType = 'cafe' | 'attraction' | 'restaurant' | 'transport' | 'hotel'
-
-export type WalkLevel = '很少走' | '短步行' | '中等步行'
+export type Pace = 'relaxed' | 'moderate' | 'park' | 'self-drive'
+export type WalkLevel = 'minimal' | 'short' | 'moderate'
+export type Transport = 'transit' | 'walking' | 'driving' | 'cycling'
 
 export interface Coordinates {
   lat: number
@@ -115,7 +116,7 @@ export interface DayPlan {
   day: number
   title: string
   theme: string
-  pace: '轻松' | '适中' | '乐园日' | '自驾日'
+  pace: Pace
   summary: string
   metroHintFromArea: Record<string, string>
   stops: ItineraryStop[]

@@ -1433,7 +1433,7 @@ export function GooglePlacePage({
   )
   const dialogLabel = showNameLoader
     ? `正在翻译「${originalLabel}」`
-    : `${title || originalLabel} ${locale === 'en' ? 'Place Details' : '地点详情'}`
+    : `${title || originalLabel} ${t('place.placeDetailsLabel')}`
   const priceLevelLabel = formatPriceLevelLabel(
     isAttraction
       ? undefined
@@ -1514,9 +1514,9 @@ export function GooglePlacePage({
               reviews={displayReviews}
               sourceLabel={
                 rapidApiReviewsActive
-                  ? (locale === 'en' ? 'Google Reviews' : 'Google 评论')
+                  ? t('place.googleReviews')
                   : tripadvisorRoute
-                    ? (locale === 'en' ? 'Tripadvisor Reviews' : 'Tripadvisor 评论')
+                    ? t('place.tripadvisorReviews')
                     : (reviewSourceLabel || t('place.reviews'))
               }
               source={
@@ -1574,8 +1574,8 @@ export function GooglePlacePage({
               {titleIsLlmTranslated && (
                 <span
                   className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--mist)] text-[var(--stone)]"
-                  title={locale === 'en' ? 'AI-translated name' : '非公认中文名，由 AI 翻译'}
-                  aria-label={locale === 'en' ? 'AI-translated name' : '非公认中文名，由 AI 翻译'}
+                  title={t('place.aiTranslatedName')}
+                  aria-label={t('place.aiTranslatedName')}
                 >
                   <Languages size={14} strokeWidth={1.75} aria-hidden />
                 </span>
@@ -1703,7 +1703,7 @@ export function GooglePlacePage({
                     className="absolute bottom-2 left-2 z-10 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
                     title={`${wikimediaPhoto.attribution || 'Wikimedia Commons'}${wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}`}
                   >
-                    {locale === 'en' ? 'Photo: ' : '图片：'}{wikimediaPhoto.attribution || 'Wikimedia Commons'}
+                    {t('place.photoAttributionPrefix')}{wikimediaPhoto.attribution || 'Wikimedia Commons'}
                     {wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}
                   </a>
                 )}
@@ -1713,7 +1713,7 @@ export function GooglePlacePage({
                   heroReady && (
                     <span
                       className="absolute bottom-2 left-2 z-10"
-                      aria-label={locale === 'en' ? `Photo from ${placeSourceLabel(photoSource)}` : `图片来自 ${placeSourceLabel(photoSource)}`}
+                      aria-label={t('place.photoFromAttribution', { source: placeSourceLabel(photoSource) })}
                     >
                       <PlaceSourceMark source={photoSource} onPhoto />
                     </span>
@@ -1722,7 +1722,7 @@ export function GooglePlacePage({
                   <>
                     <button
                       type="button"
-                      aria-label={locale === 'en' ? 'Previous photo' : '上一张'}
+                      aria-label={t('place.photoPrev')}
                       onClick={() => stepPhoto(-1)}
                       disabled={galleryLength < 2}
                       className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity hover:bg-black/65 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
@@ -1731,7 +1731,7 @@ export function GooglePlacePage({
                     </button>
                     <button
                       type="button"
-                      aria-label={locale === 'en' ? 'Next photo' : '下一张'}
+                      aria-label={t('place.photoNext')}
                       onClick={() => stepPhoto(1)}
                       disabled={bookingGalleryPhotosLoading}
                       className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity hover:bg-black/65 active:scale-95 disabled:opacity-60"
@@ -1856,8 +1856,8 @@ export function GooglePlacePage({
                 onClick={refreshTripadvisorPhotos}
                 disabled={tripadvisorPhotosRefreshing}
                 className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.neutral} text-xs font-medium text-[var(--stone)] dark:text-zinc-300 transition-colors hover:text-[var(--sage)] dark:hover:text-emerald-300 hover:bg-white/80 dark:hover:bg-white/15 disabled:cursor-wait disabled:opacity-60 active:scale-95 cursor-pointer`}
-                aria-label={locale === 'en' ? 'Refresh photos' : '重新获取图片'}
-                title={locale === 'en' ? 'Clear failed cache and reload photos' : '清除失败缓存并重新获取图片'}
+                aria-label={t('place.refreshPhotosTitle')}
+                title={t('place.clearCacheReloadTitle')}
               >
                 <RefreshCw
                   size={14}
@@ -1865,7 +1865,7 @@ export function GooglePlacePage({
                   className={tripadvisorPhotosRefreshing ? 'animate-spin' : undefined}
                   aria-hidden
                 />
-                {locale === 'en' ? 'Refresh Photos' : '重新获取图片'}
+                {t('place.refreshPhotosLabel')}
               </button>
             </div>
           )}
@@ -1876,7 +1876,7 @@ export function GooglePlacePage({
             {cachedGoogleRating != null && (
               <span
                 className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.gold} text-[var(--ink)] dark:text-amber-200`}
-                title={locale === 'en' ? 'Cached Google rating from trip generation' : '生成行程时缓存的 Google 评分'}
+                title={t('place.cachedGoogleRating')}
               >
                 <PlaceSourceMark source="google" />
                 <span>★ {cachedGoogleRating.toFixed(1)}</span>
@@ -1884,12 +1884,12 @@ export function GooglePlacePage({
               </span>
             )}
             {tripadvisorLoading.rating && showTripadvisorChipShimmer && (
-              <PlaceChipShimmer label={locale === 'en' ? 'Rating' : '评分'} />
+              <PlaceChipShimmer label={t('place.ratingChip')} />
             )}
             {displayRating != null && (
               <span
                 className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} text-[var(--ink)] dark:text-emerald-200`}
-                title={locale === 'en' ? 'Tripadvisor rating' : 'Tripadvisor 评分'}
+                title={t('place.tripadvisorRatingTitle')}
               >
                 <PlaceSourceMark source="tripadvisor" />
                 <span className="sr-only">
@@ -1900,7 +1900,7 @@ export function GooglePlacePage({
               </span>
             )}
             {tripadvisorLoading.price && showTripadvisorChipShimmer && (
-              <PlaceChipShimmer label={locale === 'en' ? 'Price' : '价格'} />
+              <PlaceChipShimmer label={t('place.priceChip')} />
             )}
             {priceLevelLabel && (
               <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.blue} text-[var(--stone)] dark:text-zinc-300`}>
@@ -1908,7 +1908,7 @@ export function GooglePlacePage({
               </span>
             )}
             {tripadvisorLoading.cuisine && showTripadvisorChipShimmer && (
-              <PlaceChipShimmer label={locale === 'en' ? 'Cuisine' : '菜系'} />
+              <PlaceChipShimmer label={t('place.cuisineChip')} />
             )}
             {displayCuisine && (
               <span className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.copper} text-[var(--stone)] dark:text-zinc-300`}>
@@ -2106,7 +2106,7 @@ export function GooglePlacePage({
                       rel="noreferrer"
                       className="mt-1.5 inline-flex items-center gap-1 font-medium text-[var(--sage)] underline-offset-2 hover:underline"
                     >
-                      {locale === 'en' ? 'View reviews on Google Maps' : '在 Google 地图查看评价'}
+                      {t('place.viewReviewsOnGoogle')}
                       <ExternalLink size={13} strokeWidth={1.9} aria-hidden />
                     </a>
                   )}
@@ -2116,7 +2116,7 @@ export function GooglePlacePage({
 
           {showMap && (
             <div>
-              <p className="mb-2 text-sm font-medium">{locale === 'en' ? 'Map Location (Embedded)' : '地图位置（本页嵌入）'}</p>
+              <p className="mb-2 text-sm font-medium">{t('place.embeddedMapTitle')}</p>
               <div className="overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 shadow-sm">
                 <iframe
                   title={`${name} map`}

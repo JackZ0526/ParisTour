@@ -7,6 +7,7 @@
  */
 import { useState } from 'react'
 import { Check, ChevronRight, Sparkles } from 'lucide-react'
+import { useTranslation } from '../../../shared/i18n'
 
 function DisclosureChevron({ open }: { open: boolean }) {
   return <ChevronRight aria-hidden strokeWidth={1.6} className={`h-3.5 w-3.5 shrink-0 text-[var(--stone)]/60 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:text-[var(--stone)]/80 ${open ? 'rotate-90' : ''}`} />
@@ -31,6 +32,7 @@ export function ChatReasoningDisclosure({
   onToggle: () => void
   completed?: boolean
 }) {
+  const { t } = useTranslation()
   const trimmed = text.trim()
   if (!trimmed) return null
   return (
@@ -45,7 +47,7 @@ export function ChatReasoningDisclosure({
           {completed ? <CompletedCheckIcon /> : <ThinkingSparkleIcon />}
         </span>
         <span className={`min-w-0 truncate ${completed ? '' : 'chat-step-shimmer'}`}>
-          {completed ? '思考完成' : '思考中'}
+          {completed ? t('chat.thinkingDone') : t('chat.thinkingNow')}
         </span>
         <DisclosureChevron open={open} />
       </button>

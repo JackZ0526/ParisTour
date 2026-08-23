@@ -177,7 +177,7 @@ export function LogisticsTravelSection({
   ) {
     const trimmed = flightNumber.trim()
     if (!trimmed) {
-      throw new Error(locale === 'en' ? 'Please enter a flight number' : '请先输入航班号')
+      throw new Error(t('flight.pleaseEnterFlightNumber'))
     }
     setBusy(direction)
     setError(null)
@@ -186,7 +186,7 @@ export function LogisticsTravelSection({
       if (direction === 'outbound') setOutboundAndPersist(info, trimmed)
       else setInboundAndPersist(info, trimmed)
     } catch (e) {
-      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Flight search failed' : '查询失败'))
+      setError(e instanceof Error ? e.message : t('flight.flightSearchFailed'))
     } finally {
       setBusy(null)
     }
@@ -201,7 +201,7 @@ export function LogisticsTravelSection({
       if (direction === 'outbound') setEditingOutbound(false)
       else setEditingInbound(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Flight search failed' : '查询失败'))
+      setError(e instanceof Error ? e.message : t('flight.flightSearchFailed'))
     } finally {
       setBusy(null)
     }
@@ -300,9 +300,9 @@ export function LogisticsTravelSection({
 
             <div className="hidden lg:block pt-2 text-[11px] text-[var(--stone)]">
               {hasDates && outbound && inbound ? (
-                <span className="text-[var(--sage)] font-medium">✓ {locale === 'en' ? 'Dates and roundtrip flights are set' : '日期与往返航班均已就绪'}</span>
+                <span className="text-[var(--sage)] font-medium">{t('flight.datesRoundtripReady')}</span>
               ) : (
-                <span>{locale === 'en' ? 'Select dates first to align flight schedules' : '建议优先选定旅行日期，随后查询各航段时刻'}</span>
+                <span>{t('flight.suggestPickDates')}</span>
               )}
             </div>
           </div>
@@ -393,7 +393,7 @@ export function LogisticsTravelSection({
                       </div>
 
                       <p className="mt-1.5 text-base font-semibold text-[var(--ink)]">
-                        {outbound.airline || (locale === 'en' ? 'Flight Schedule' : '航班计划')}
+                        {outbound.airline || t('flight.flightSchedule')}
                       </p>
 
                       <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 dark:bg-black/30 p-3 border border-white/80 dark:border-white/10 text-sm backdrop-blur-sm shadow-xs">
@@ -439,7 +439,7 @@ export function LogisticsTravelSection({
                     </div>
 
                     <div className="mt-3 flex items-center justify-between text-xs text-[var(--stone)]">
-                      <span>{outbound.aircraft ? (locale === 'en' ? `Aircraft ${outbound.aircraft}` : `机型 ${outbound.aircraft}`) : t('flight.directFlight')}</span>
+                      <span>{outbound.aircraft ? t('flight.aircraftLabel', { aircraft: outbound.aircraft }) : t('flight.directFlight')}</span>
                       <span className="text-[var(--sage)] font-medium">
                         {meaningfulFlightStatus(outbound.status) || t('flight.onSchedule')}
                       </span>
@@ -523,7 +523,7 @@ export function LogisticsTravelSection({
                           className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 dark:bg-[var(--copper)] text-[var(--paper)] dark:text-white px-4 py-2.5 text-sm font-medium shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] dark:hover:bg-[var(--copper)]/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'outbound' && <ButtonSpinner />}
-                          {busy === 'outbound' ? t('common.loading') : (locale === 'en' ? 'Search' : '查询')}
+                          {busy === 'outbound' ? t('common.loading') : t('flight.searchLabel')}
                         </button>
                       </div>
                     </div>
@@ -608,7 +608,7 @@ export function LogisticsTravelSection({
                       </div>
 
                       <p className="mt-1.5 text-base font-semibold text-[var(--ink)]">
-                        {inbound.airline || (locale === 'en' ? 'Flight Schedule' : '航班计划')}
+                        {inbound.airline || t('flight.flightSchedule')}
                       </p>
 
                       <div className="mt-3 grid grid-cols-5 items-center gap-1 rounded-xl bg-white/60 dark:bg-black/30 p-3 border border-white/80 dark:border-white/10 text-sm backdrop-blur-sm shadow-xs">
@@ -654,7 +654,7 @@ export function LogisticsTravelSection({
                     </div>
 
                     <div className="mt-3 flex items-center justify-between text-xs text-[var(--stone)]">
-                      <span>{inbound.aircraft ? (locale === 'en' ? `Aircraft ${inbound.aircraft}` : `机型 ${inbound.aircraft}`) : t('flight.directFlight')}</span>
+                      <span>{inbound.aircraft ? t('flight.aircraftLabel', { aircraft: inbound.aircraft }) : t('flight.directFlight')}</span>
                       <span className="text-purple-900 dark:text-purple-300 font-medium">
                         {meaningfulFlightStatus(inbound.status) || t('flight.onSchedule')}
                       </span>
@@ -738,7 +738,7 @@ export function LogisticsTravelSection({
                           className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--ink)]/80 bg-[var(--ink)]/90 dark:bg-[var(--copper)] text-[var(--paper)] dark:text-white px-4 py-2.5 text-sm font-medium shadow-[0_4px_14px_rgba(35,42,38,0.14),inset_0_1px_1px_rgba(255,255,255,0.18)] backdrop-blur-md transition-all hover:bg-[var(--ink)] dark:hover:bg-[var(--copper)]/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           {busy === 'return' && <ButtonSpinner />}
-                          {busy === 'return' ? t('common.loading') : (locale === 'en' ? 'Search' : '查询')}
+                          {busy === 'return' ? t('common.loading') : t('flight.searchLabel')}
                         </button>
                       </div>
                     </div>

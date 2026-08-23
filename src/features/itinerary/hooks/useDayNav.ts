@@ -3,6 +3,7 @@ import { getPlace } from '../../place/constants/places'
 import type { DayNavPlan } from '../../map/services/googleNav'
 import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getDayOriginFromHotelFields } from '../utils/dayOrigin'
+import { getLocale, translate } from '../../../shared/i18n'
 
 /** Kept as a compatibility no-op for itinerary reset paths. */
 export function clearDayNavCache() {}
@@ -61,9 +62,17 @@ export function useDayNav(
       walkDistanceMeters: 0,
       walkDurationSeconds: 0,
       walkSummaryText: enabled
-        ? '点击每段交通，在 Google Maps 查看实时路线'
-        : '日期、航班和酒店确认后显示路线入口',
-      hotelToFirstText: '在 Google Maps 查看路线',
+        ? (translate('itinerary.directionsDesc' as never, undefined, getLocale()) ||
+            (getLocale() === 'en'
+              ? 'Click each transit leg to open live routing in Google Maps'
+              : '点击每段交通，在 Google Maps 查看实时路线'))
+        : (translate('itinerary.directionsNotReady' as never, undefined, getLocale()) ||
+            (getLocale() === 'en'
+              ? 'Route links show up after the dates, flight, and hotel are confirmed.'
+              : '日期、航班和酒店确认后显示路线入口')),
+      hotelToFirstText:
+        translate('itinerary.openInGoogleMaps' as never, undefined, getLocale()) ||
+        (getLocale() === 'en' ? 'Open route in Google Maps' : '在 Google Maps 查看路线'),
       lastToDestinationText: '',
       segments: [],
       routePath: [],

@@ -62,10 +62,11 @@ function localDebugTrip(): AccessibleTrip {
   }
 }
 
-import { getLocale } from '../../shared/i18n'
+import { getLocale, translate } from '../../shared/i18n'
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
   const locale = getLocale()
+  const t = (key: Parameters<typeof translate>[0], params?: Parameters<typeof translate>[1]) => translate(key, params, locale)
   const msg = (err.message || '').trim()
   const code = (err.code || '').toLowerCase()
   const lower = msg.toLowerCase()
@@ -88,7 +89,7 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
       : '邮箱或密码不正确。若刚注册，请先确认邮箱后再试。'
   }
   if (code === 'user_already_exists' || /already registered|already been registered/i.test(lower)) {
-    return locale === 'en' ? 'This email is already registered. Please sign in.' : '该邮箱已注册，请直接登录。'
+    return t('auth.alreadyRegistered')
   }
   if (/rate limit|too many requests|over_email_send_rate_limit/i.test(lower) || code === 'over_email_send_rate_limit') {
     return locale === 'en'
@@ -96,12 +97,12 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
       : '邮件发送过于频繁（Supabase 免费邮箱约每小时 2 封）。请约 1 小时后再试，或在 Dashboard 关闭「Confirm email」。'
   }
   if (/password/i.test(lower) && /weak|at least|characters/i.test(lower)) {
-    return locale === 'en' ? 'Password must be at least 6 characters.' : '密码不符合要求（至少 6 位）。'
+    return t('auth.passwordTooShort')
   }
   if (/signup.*disabled|signups not allowed/i.test(lower)) {
-    return locale === 'en' ? 'Signups are currently disabled. Please contact the administrator.' : '当前不允许注册，请联系管理员。'
+    return t('auth.signupsDisabled')
   }
-  return msg || (locale === 'en' ? 'Operation failed, please try again later.' : '登录失败，请稍后重试。')
+  return msg || t('auth.operationFailedRetry')
 }
 
 async function hydrateAccountThemePreference(userId: string): Promise<void> {

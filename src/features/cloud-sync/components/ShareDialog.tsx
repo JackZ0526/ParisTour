@@ -145,7 +145,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
         })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to load members' : '加载成员失败'))
+      setError(err instanceof Error ? err.message : t('cloud.membersLoadFailed'))
     } finally {
       if (showLoading) setLoadingList(false)
     }
@@ -224,12 +224,12 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       await reload(false)
       const mail = await sendShareInviteEmail(tripId, target, role)
       if (mail.sent) {
-        setInfo(locale === 'en' ? `Added ${target} and sent invite email.` : `已添加 ${target}，并已发送邀请邮件。`)
+        setInfo(t('cloud.memberAddedWithInvite', { target }))
       } else {
-        setInfo(locale === 'en' ? `Added ${target}. Invitee can sign in with this email.` : `已添加 ${target}。受邀人可直接用此邮箱登录查看。`)
+        setInfo(t('cloud.memberAddedNoInvite', { target }))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to add member' : '添加成员失败'))
+      setError(err instanceof Error ? err.message : t('cloud.memberAddFailed'))
     } finally {
       setInviteBusy(false)
     }
@@ -247,7 +247,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       await removeTripShare(shareId)
       setShares((current) => current.filter((share) => share.id !== shareId))
     } catch (err) {
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to remove member' : '移除成员失败'))
+      setError(err instanceof Error ? err.message : t('cloud.memberRemoveFailed'))
     } finally {
       setRemoveBusy(false)
       setPendingRemoveShare(null)
@@ -274,7 +274,7 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
           share.id === shareId ? { ...share, role: previous } : share,
         ),
       )
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to update permissions' : '修改权限失败'))
+      setError(err instanceof Error ? err.message : t('cloud.permissionUpdateFailed'))
     } finally {
       setUpdatingRoleId(null)
     }

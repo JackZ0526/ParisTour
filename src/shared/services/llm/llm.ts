@@ -177,6 +177,7 @@ export {
   generateHotelDetailCopy,
   generateHotelCardBlurb,
   recommendHotelsForTrip,
+  regenerateHotelLanguageFields,
   type HotelRecommendation,
 } from './business/hotel'
 

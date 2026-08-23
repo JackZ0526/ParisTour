@@ -82,7 +82,7 @@ function FlightCard({
   info: FlightInfo
   loading?: boolean
 }) {
-  const { locale } = useTranslation()
+  const { t, locale } = useTranslation()
   const status = meaningfulFlightStatus(info.status)
 
   return (
@@ -96,7 +96,7 @@ function FlightCard({
           </h3>
         </div>
         {loading ? (
-          <LoadingIndicator variant="badge" label={locale === 'en' ? 'Searching…' : '查询中…'} size="sm" showDots />
+          <LoadingIndicator variant="badge" label={t('flight.searching')} size="sm" showDots />
         ) : (
           <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-1 text-xs text-[var(--sage)]`}>
             {flightSourceLabel(info.source, locale)}
@@ -108,42 +108,42 @@ function FlightCard({
         aria-busy={loading || undefined}
       >
         <div>
-          <p className="text-xs text-[var(--stone)]">{locale === 'en' ? 'Departure' : '出发'}</p>
+          <p className="text-xs text-[var(--stone)]">{t('flight.departureLabel')}</p>
           <p className="font-medium">
             {info.from?.name || info.from?.city || '—'} ({info.from?.code || '—'})
           </p>
           <p className="text-sm text-[var(--stone)]">
-            {locale === 'en' ? 'Scheduled ' : '计划 '}{formatEndpointTime(info.from?.scheduled, info.from)}
+            {t('flight.scheduled')}{formatEndpointTime(info.from?.scheduled, info.from)}
           </p>
           {info.from?.actual && (
             <p className="text-sm text-[var(--sage)]">
-              {locale === 'en' ? 'Actual / Est. ' : '实际/预计 '}{formatEndpointTime(info.from.actual, info.from)}
+              {t('flight.actualOrEst')}{formatEndpointTime(info.from.actual, info.from)}
             </p>
           )}
-          {info.from?.terminal && <p className="text-xs">{locale === 'en' ? `Terminal ${info.from.terminal}` : `航站楼 ${info.from.terminal}`}</p>}
+          {info.from?.terminal && <p className="text-xs">{t('flight.terminalLabel', { terminal: info.from.terminal })}</p>}
         </div>
         <div>
-          <p className="text-xs text-[var(--stone)]">{locale === 'en' ? 'Arrival' : '到达'}</p>
+          <p className="text-xs text-[var(--stone)]">{t('flight.arrivalLabel')}</p>
           <p className="font-medium">
             {info.to?.name || info.to?.city || '—'} ({info.to?.code || '—'})
           </p>
           <p className="text-sm text-[var(--stone)]">
-            {locale === 'en' ? 'Scheduled ' : '计划 '}{formatEndpointTime(info.to?.scheduled, info.to)}
+            {t('flight.scheduled')}{formatEndpointTime(info.to?.scheduled, info.to)}
           </p>
           {info.to?.actual && (
             <p className="text-sm text-[var(--sage)]">
-              {locale === 'en' ? 'Actual / Est. ' : '实际/预计 '}{formatEndpointTime(info.to.actual, info.to)}
+              {t('flight.actualOrEst')}{formatEndpointTime(info.to.actual, info.to)}
             </p>
           )}
-          {info.to?.terminal && <p className="text-xs">{locale === 'en' ? `Terminal ${info.to.terminal}` : `航站楼 ${info.to.terminal}`}</p>}
+          {info.to?.terminal && <p className="text-xs">{t('flight.terminalLabel', { terminal: info.to.terminal })}</p>}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-sm text-[var(--stone)]">
-        {info.duration && <span>{locale === 'en' ? `Duration ${info.duration}` : `飞行 ${info.duration}`}</span>}
-        {info.aircraft && <span>{locale === 'en' ? `Aircraft ${info.aircraft}` : `机型 ${info.aircraft}`}</span>}
+        {info.duration && <span>{t('flight.durationLabel', { duration: info.duration })}</span>}
+        {info.aircraft && <span>{t('flight.aircraftLabel', { aircraft: info.aircraft })}</span>}
       </div>
       {status && (
-        <p className="mt-2 text-sm text-[var(--stone)]">{locale === 'en' ? `Status: ${status}` : `状态 ${status}`}</p>
+        <p className="mt-2 text-sm text-[var(--stone)]">{t('flight.statusLabel', { status })}</p>
       )}
     </article>
   )
@@ -223,14 +223,14 @@ export function FlightPanel({
       outNo.trim()
         ? loadOne('outbound', outNo, true).catch((e) => {
             errors.push(
-              `${locale === 'en' ? 'Outbound: ' : '去程：'}${e instanceof Error ? e.message : (locale === 'en' ? 'Failed' : '失败')}`,
+              `${t('flight.outboundErrorPrefix')}${e instanceof Error ? e.message : t('flight.flightSearchFailed')}`,
             )
           })
         : Promise.resolve(),
       inNo.trim()
         ? loadOne('return', inNo, true).catch((e) => {
             errors.push(
-              `${locale === 'en' ? 'Return: ' : '返程：'}${e instanceof Error ? e.message : (locale === 'en' ? 'Failed' : '失败')}`,
+              `${t('flight.returnErrorPrefix')}${e instanceof Error ? e.message : t('flight.flightSearchFailed')}`,
             )
           })
         : Promise.resolve(),
@@ -247,7 +247,7 @@ export function FlightPanel({
       await loadOne(direction, number)
       setShowSearchForm(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Flight search failed' : '查询失败'))
+      setError(e instanceof Error ? e.message : t('flight.flightSearchFailed'))
     } finally {
       setBusy(null)
     }
@@ -260,8 +260,8 @@ export function FlightPanel({
           <h2 className="font-display text-2xl sm:text-3xl">{t('flight.title')}</h2>
           <p className="mt-1 max-w-xl text-sm text-[var(--stone)]">
             {readOnly
-              ? (locale === 'en' ? 'Currently in read-only shared mode, flights cannot be modified.' : '当前为只读共享，无法修改航班。')
-              : (locale === 'en' ? 'Enter outbound and return flight numbers to fetch scheduled times.' : '填写去程与返程航班号并查询计划起降时间。')}
+              ? t('flight.readOnlyFlights')
+              : t('flight.enterFlightsHint')}
           </p>
         </div>
         {hasCards && !readOnly && (
@@ -271,7 +271,7 @@ export function FlightPanel({
               onClick={() => setShowSearchForm((prev) => !prev)}
               className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95`}
             >
-              {showSearchForm ? (locale === 'en' ? 'Collapse' : '收起输入') : (locale === 'en' ? 'Edit Flights' : '修改航班号')}
+              {showSearchForm ? t('flight.collapse') : t('flight.editFlights')}
             </button>
             <button
               type="button"
@@ -285,7 +285,7 @@ export function FlightPanel({
               className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--sage)] active:scale-95 disabled:opacity-50`}
             >
               {busy === 'both' && <ButtonSpinner />}
-              {busy === 'both' ? (locale === 'en' ? 'Refreshing…' : '刷新中…') : (locale === 'en' ? 'Refresh Schedule' : '刷新时刻')}
+              {busy === 'both' ? t('common.loading') : t('flight.refreshSchedule')}
             </button>
           </div>
         )}
@@ -306,7 +306,7 @@ export function FlightPanel({
               }`}
             >
               <p className="font-medium text-base text-[var(--ink)]">
-                {locale === 'en' ? 'Enter flight numbers to look up schedule' : '输入我的航班号并查询计划时刻'}
+                {t('flight.flightSchedule')}
               </p>
               <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
                 {locale === 'en'
@@ -320,7 +320,7 @@ export function FlightPanel({
               </p>
               {!hasDates && (
                 <p className="mt-2 text-sm text-[var(--copper)] font-medium">
-                  {locale === 'en' ? 'Please select trip dates first before querying flights.' : '请先选好行程日期，再查询航班。'}
+                  {t('flight.pickDatesFirstFlights')}
                 </p>
               )}
 
@@ -342,7 +342,7 @@ export function FlightPanel({
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[var(--ink)] dark:bg-[var(--copper)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] dark:text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
                     >
                       {busy === 'outbound' && <ButtonSpinner />}
-                      {busy === 'outbound' ? t('common.loading') : (locale === 'en' ? 'Search' : '查询')}
+                      {busy === 'outbound' ? t('common.loading') : t('flight.searchLabel')}
                     </button>
                   </div>
                 </label>
@@ -364,7 +364,7 @@ export function FlightPanel({
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[var(--ink)] dark:bg-[var(--copper)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] dark:text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40"
                     >
                       {busy === 'return' && <ButtonSpinner />}
-                      {busy === 'return' ? t('common.loading') : (locale === 'en' ? 'Search' : '查询')}
+                      {busy === 'return' ? t('common.loading') : t('flight.searchLabel')}
                     </button>
                   </div>
                 </label>
@@ -372,7 +372,7 @@ export function FlightPanel({
 
               {(busy === 'outbound' || busy === 'return' || busy === 'both') && !hasCards && (
                 <div className="mt-4">
-                  <LoadingIndicator label={locale === 'en' ? 'Fetching flight schedules…' : '正在查询航班计划时刻…'} showDots size="sm" />
+                  <LoadingIndicator label={t('flight.fetching')} showDots size="sm" />
                 </div>
               )}
 

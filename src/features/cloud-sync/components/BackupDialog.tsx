@@ -20,7 +20,7 @@ import {
   glassCardSurfaceClass,
   glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
-import { useTranslation, type Locale } from '../../../shared/i18n'
+import { useTranslation, translate, type Locale } from '../../../shared/i18n'
 
 interface Props {
   tripId: string
@@ -29,7 +29,9 @@ interface Props {
   onRestored: () => void
 }
 
-function backupSummary(backup: TripSnapshotBackup, locale: Locale = 'zh-CN'): string {
+function backupSummary(backup: TripSnapshotBackup, _locale: Locale = 'zh-CN'): string {
+  const t = (key: Parameters<typeof translate>[0], params?: Parameters<typeof translate>[1]) =>
+    translate(key, params, _locale === 'en' ? 'en' : 'zh-CN')
   const snapshot = backup.snapshot
   const days = snapshot.itinerary?.days?.length || 0
   const stops =
@@ -45,8 +47,8 @@ function backupSummary(backup: TripSnapshotBackup, locale: Locale = 'zh-CN'): st
   const inbound = snapshot.flights?.returnFlight?.flightNumber
   if (outbound || inbound) parts.push([outbound, inbound].filter(Boolean).join(' / '))
   if (snapshot.hotel?.selected?.name) parts.push(snapshot.hotel.selected.name)
-  if (days) parts.push(locale === 'en' ? `${days} Days · ${stops} Stops` : `${days} 天 · ${stops} 个行程点`)
-  return parts.length ? parts.join(' · ') : (locale === 'en' ? 'Empty trip or initialized snapshot' : '空行程或初始化存档')
+  if (days) parts.push(t('cloud.daysStopsSummary', { days, stops }))
+  return parts.length ? parts.join(' · ') : t('cloud.emptyTripSnapshot')
 }
 
 function formatBackupTime(value: string, locale: Locale = 'zh-CN'): string {
@@ -101,7 +103,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
         if (active) setBackups(data)
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to load backups' : '加载备份失败'))
+        if (active) setError(err instanceof Error ? err.message : t('cloud.loadBackupsFailed'))
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -123,7 +125,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
       onRestored()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to restore snapshot' : '恢复存档失败'))
+      setError(err instanceof Error ? err.message : t('cloud.restoreSnapshotFailed'))
       setRestoringId(null)
     } finally {
       setPendingRestoreBackup(null)

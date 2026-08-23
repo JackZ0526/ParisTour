@@ -1,3 +1,5 @@
 export * from './types'
 export * from './i18nStore'
 export * from './useTranslation'
+export * from './locales/registry'
+export * from './localeEnum'

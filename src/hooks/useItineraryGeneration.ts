@@ -49,10 +49,14 @@ import {
   getSharedItineraryCandidates,
 } from '../features/itinerary/services/itineraryGenerate'
 import {
+  detectLocaleFromDays,
+  translateItineraryText,
+} from '../shared/services/llm/business/itinerary'
+import {
   AREA_KEY_CN,
-  ITINERARY_LOADING_LINES,
   ITINERARY_LOADING_ROTATE_MS,
   dateForTripDay,
+  getItineraryGeneratingLines,
   hotelAreaShort,
   initialFlightsState,
   itineraryMissingLabels,
@@ -92,6 +96,7 @@ import {
 } from '../shared/services/llm/llm'
 import { LlmRequestError } from '../shared/services/llm/errors'
 import { getOpenAIModel } from '../shared/services/llm/model-state'
+import { useTranslation, type Locale } from '../shared/i18n'
 import type { DayPlan, Place, SelectedHotel } from '../types'
 import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
@@ -153,6 +158,12 @@ export interface UseItineraryGenerationResult {
   dayRegenerating: boolean
   dayRegenError: string | null
   dayRestoring: boolean
+  /**
+   * True when the current itinerary generation cycle was triggered
+   * automatically by a locale change (vs. a manual "regenerate" click).
+   * UI can show a small "auto-regenerating in <lang>" badge during the run.
+   */
+  autoRegenOnLocaleChange: boolean
   itineraryLoadingLine: string
   itineraryLoadingLineIndex: number
   itineraryStartDate: string | undefined
@@ -173,6 +184,13 @@ export interface UseItineraryGenerationResult {
   runFullItineraryGeneration: (options?: { resume?: boolean }) => Promise<void>
   handleResetDay: (dayIndex: number) => Promise<void>
   handleRegenerateItinerary: () => void
+  /**
+   * Translate only the human-readable text of the existing days into the
+   * target locale. Preserves day structure (places, times, pace, transport
+   * / walkLevel codes, placeKey) so the user's manual place picks are
+   * preserved across UI-language toggles.
+   */
+  handleTranslateItinerary: (targetLocale: Locale) => Promise<void>
   handleRestoreDefault: () => void
   handleRestoreDayDefault: (dayIndex: number) => void
   /** Bump in-flight full/day generation request ids so stale completions no-op. */
@@ -196,6 +214,11 @@ export function useItineraryGeneration(
   deps: UseItineraryGenerationDeps,
   setters: UseItineraryGenerationSetters,
 ): UseItineraryGenerationResult {
+  const { locale } = useTranslation()
+  const generatingLines = useMemo(
+    () => getItineraryGeneratingLines(locale),
+    [locale],
+  )
   const {
     tripDates,
     flights,
@@ -255,8 +278,15 @@ export function useItineraryGeneration(
   const [dayRestoring, setDayRestoring] = useState(false)
   const [copyRefreshing, setCopyRefreshing] = useState(false)
   const [itineraryLoadingLineIndex, setItineraryLoadingLineIndex] = useState(
-    () => Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
+    () => Math.floor(Math.random() * generatingLines.length),
   )
+  // When the locale changes, jump to a random line in the new language so
+  // the user isn't left staring at a Chinese sentence after switching to EN.
+  useEffect(() => {
+    setItineraryLoadingLineIndex(
+      Math.floor(Math.random() * generatingLines.length),
+    )
+  }, [generatingLines])
 
   // -- Refs ------------------------------------------------------------------
   const genRequestIdRef = useRef(0)
@@ -1031,6 +1061,43 @@ export function useItineraryGeneration(
     runFullItineraryGeneration,
   ])
 
+  /**
+   * Cheap locale-change pass: keep the day structure (places, times,
+   * pace, transport / walkLevel codes) verbatim and translate only the
+   * user-facing text — day.title / theme / summary, metroHintFromArea
+   * values, and each stop's `note` + `duration`. Replaces the older
+   * "auto-regenerate everything" hook so the user's manual place picks
+   * aren't lost on a UI-language toggle.
+   */
+  const handleTranslateItinerary = useCallback(
+    async (targetLocale: Locale) => {
+      if (!itineraryGenerated) return
+      if (isLlmConfigured() === false) return
+      const currentDays = days
+      if (currentDays.length === 0) return
+      const sourceLocale = detectLocaleFromDays(currentDays)
+      if (sourceLocale === targetLocale) return
+      setItineraryGenError(null)
+      setItineraryGenerating(true)
+      setAutoRegenOnLocaleChange(true)
+      try {
+        const { days: translatedDays } = await translateItineraryText({
+          days: currentDays,
+          sourceLocale,
+          targetLocale,
+        })
+        setDays(translatedDays)
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err)
+        setItineraryGenError(detail)
+      } finally {
+        setItineraryGenerating(false)
+        setAutoRegenOnLocaleChange(false)
+      }
+    },
+    [itineraryGenerated, days, isLlmConfigured],
+  )
+
   const handleRestoreDefault = useCallback(() => {
     const restored = restoreFullFromBaseline()
     if (!restored) return
@@ -1122,18 +1189,73 @@ export function useItineraryGeneration(
   useEffect(() => {
     if (!showItineraryLoading) return
     setItineraryLoadingLineIndex(
-      Math.floor(Math.random() * ITINERARY_LOADING_LINES.length),
+      Math.floor(Math.random() * generatingLines.length),
     )
     const id = window.setInterval(() => {
       setItineraryLoadingLineIndex(
-        (i) => (i + 1) % ITINERARY_LOADING_LINES.length,
+        (i) => (i + 1) % generatingLines.length,
       )
     }, ITINERARY_LOADING_ROTATE_MS)
     return () => window.clearInterval(id)
-  }, [showItineraryLoading])
+  }, [showItineraryLoading, generatingLines])
 
   const itineraryLoadingLine =
-    ITINERARY_LOADING_LINES[itineraryLoadingLineIndex] ?? ITINERARY_LOADING_LINES[0]
+    generatingLines[itineraryLoadingLineIndex] ?? generatingLines[0]
+
+  // -----------------------------------------------------------------------
+  // Auto-translate when the user switches language.
+  //
+  // If a trip has already been generated, its titles/themes/summaries/etc.
+  // were written in whatever locale was active at the time. When the user
+  // toggles the language, call `translateItineraryText` to translate the
+  // text fields in place — keeping the day structure (places, times, pace,
+  // transport / walkLevel codes, placeKey) verbatim so the user's manual
+  // place picks aren't lost. A 1.2s debounce prevents rapid toggling from
+  // triggering a flurry of LLM calls.
+  //
+  // Works in BOTH directions: zh-CN → en and en → zh-CN, and any future
+  // locale pair. The `lastAutoRegenLocaleRef` is updated *immediately* on
+  // locale change (not inside the setTimeout) so rapid back-and-forth
+  // toggles don't get swallowed by a stale ref value.
+  // -----------------------------------------------------------------------
+  const [autoRegenOnLocaleChange, setAutoRegenOnLocaleChange] = useState(false)
+  const lastAutoRegenLocaleRef = useRef<Locale | null>(null)
+  useEffect(() => {
+    if (lastAutoRegenLocaleRef.current === null) {
+      // First mount: seed the ref with the active locale so the very first
+      // user-initiated switch can be detected.
+      lastAutoRegenLocaleRef.current = locale
+      return
+    }
+    if (lastAutoRegenLocaleRef.current === locale) return
+    if (!itineraryGenerated) return
+    if (itineraryGenerating || itineraryIncrementalGenerating || dayRegenerating) {
+      return
+    }
+    // Update the ref synchronously so a quick second switch (e.g. en →
+    // zh-CN → en within 1.2s) is still detected by the next effect run.
+    const targetLocale = locale
+    lastAutoRegenLocaleRef.current = targetLocale
+    const id = window.setTimeout(() => {
+      void handleTranslateItinerary(targetLocale)
+    }, 1200)
+    return () => window.clearTimeout(id)
+  }, [
+    locale,
+    itineraryGenerated,
+    itineraryGenerating,
+    itineraryIncrementalGenerating,
+    dayRegenerating,
+    handleTranslateItinerary,
+  ])
+
+  // Clear the "auto-regen" badge once generation finishes so the next
+  // manual regeneration doesn't show the locale-change notice.
+  useEffect(() => {
+    if (!itineraryGenerating && !itineraryIncrementalGenerating) {
+      setAutoRegenOnLocaleChange(false)
+    }
+  }, [itineraryGenerating, itineraryIncrementalGenerating])
 
   // -- Restore gating --------------------------------------------------------
   const canRestoreDefault = hasMatchingBaseline(
@@ -1173,6 +1295,7 @@ export function useItineraryGeneration(
     dayRegenerating,
     dayRegenError,
     dayRestoring,
+    autoRegenOnLocaleChange,
     itineraryLoadingLine,
     itineraryLoadingLineIndex,
     itineraryStartDate,
@@ -1191,6 +1314,7 @@ export function useItineraryGeneration(
     runFullItineraryGeneration,
     handleResetDay,
     handleRegenerateItinerary,
+    handleTranslateItinerary,
     handleRestoreDefault,
     handleRestoreDayDefault,
     cancelInFlightGeneration,

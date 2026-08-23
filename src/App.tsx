@@ -85,7 +85,7 @@ import {
   saveRecommendationPreferences,
 } from './features/place/services/recommendationPreferences'
 import {
-  chineseDayCount,
+  dayCountLabel,
   destinationLabel,
   hasTripDates,
 } from './appHelpers'
@@ -275,6 +275,7 @@ export default function App() {
     setDayRegenError,
     dayRestoring,
     setDayRestoring,
+    autoRegenOnLocaleChange,
     itineraryLoadingLine,
     itineraryStartDate,
     numberOfDays,
@@ -658,7 +659,7 @@ export default function App() {
                   {destinationBrand.title}
                 </h1>
                 <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)] mt-0.5">
-                  <span className="shrink-0">{locale === 'en' ? `${numberOfDays}-Day Plan` : `${chineseDayCount(numberOfDays)}行程规划`}</span>
+                  <span className="shrink-0">{locale === 'en' ? t('app.dayPlanLabel', { count: numberOfDays }) : `${dayCountLabel(numberOfDays, locale)}行程规划`}</span>
                   {(trips.length > 1 || (activeTrip && activeTrip.role !== 'owner')) && (
                     <>
                       <span className="text-[var(--stone)]/40">·</span>
@@ -752,7 +753,7 @@ export default function App() {
                           : `${glassCapsuleToneClass.neutral} text-[var(--stone)]`
                     }`}
                   >
-                    {role === 'owner' ? (locale === 'en' ? 'Owner' : '拥有者') : role === 'editor' ? (locale === 'en' ? 'Editor' : '协作') : (locale === 'en' ? 'Read-only' : '只读')}
+                    {role === 'owner' ? t('auth.roleOwner') : role === 'editor' ? t('auth.roleEditor') : t('auth.readOnly')}
                   </span>
                 )}
               </button>
@@ -800,21 +801,21 @@ export default function App() {
                     className={`mobile-scroll-edge-fade flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                       summaryHasLeftOverflow ? 'has-left-overflow' : ''
                     }`}
-                    aria-label={locale === 'en' ? 'Trip summary' : '行程摘要'}
+                    aria-label={t('app.tripSummaryAria')}
                     onScroll={(event) => {
                       setSummaryHasLeftOverflow(event.currentTarget.scrollLeft > 1)
                     }}
                   >
                     <span
                       className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.destination} font-semibold text-[var(--copper)] dark:text-zinc-200`}
-                      title={locale === 'en' ? 'Destination' : '旅行目的地'}
+                      title={t('app.destinationTitle')}
                     >
                       <MapPin size={13} strokeWidth={2} className="text-[var(--copper)]" aria-hidden />
                       {destinationLabel(destination, locale)}
                     </span>
                     <span
                       className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.duration} font-medium text-[var(--sage)] dark:text-zinc-200`}
-                      title={locale === 'en' ? 'Trip duration' : '行程时长'}
+                      title={t('app.tripDurationTitle')}
                     >
                       <Moon size={13} strokeWidth={2} className="text-[var(--sage)]" aria-hidden />
                       {formatDayNightLabel(numberOfDays, locale)}
@@ -822,7 +823,7 @@ export default function App() {
                     {datesReady && tripDates?.startDate && tripDates.endDate && (
                       <span
                         className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.dates} font-medium text-[var(--stone)] dark:text-zinc-200`}
-                        title={locale === 'en' ? 'Trip dates' : '旅行日期'}
+                        title={t('app.tripDatesTitle')}
                       >
                         <CalendarDays size={13} strokeWidth={2} className="text-[var(--stone)] dark:text-[#7bb5ff]" aria-hidden />
                         {formatTripDayLabel(tripDates.startDate, locale)}–{formatTripDayLabel(tripDates.endDate, locale)}
@@ -833,7 +834,7 @@ export default function App() {
                         type="button"
                         onClick={() => handleSelectPlace(SELECTED_HOTEL_PLACE_ID)}
                         className={`${itinerarySummaryCapsuleClass} ${itinerarySummaryCapsuleTone.hotel} max-w-[12rem] font-medium text-[var(--stone)] dark:text-zinc-200 transition-colors hover:bg-[#eee1c6]/90 dark:hover:bg-white/10 active:scale-95`}
-                        title={locale === 'en' ? `Hotel details: ${hotel.name}` : `查看酒店详情：${hotel.name}`}
+                        title={t('app.hotelDetailsTitle', { name: hotel.name })}
                       >
                         <HotelIcon size={13} className="shrink-0 text-[var(--stone)] dark:text-[#deb881]" strokeWidth={2} aria-hidden />
                         <span className="truncate text-xs font-medium">{hotel.name}</span>
@@ -861,8 +862,8 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => setConfirmRestoreDefaultOpen(true)}
-                              aria-label={locale === 'en' ? 'Restore defaults' : '恢复默认推荐'}
-                              title={locale === 'en' ? 'Restore defaults' : '恢复默认推荐'}
+                              aria-label={t('app.restoreDefaultsLabel')}
+                              title={t('app.restoreDefaultsTitle')}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-white active:scale-95"
                             >
                               <History size={15} strokeWidth={1.8} aria-hidden />
@@ -871,8 +872,8 @@ export default function App() {
                           <button
                             type="button"
                             onClick={handleResetAll}
-                            aria-label={locale === 'en' ? 'Regenerate all' : '重新生成全部'}
-                            title={locale === 'en' ? 'Regenerate all' : '重新生成全部'}
+                            aria-label={t('app.regenerateAllLabel')}
+                            title={t('app.regenerateAllTitle')}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-white active:scale-95"
                           >
                             <Sparkles size={15} strokeWidth={1.8} aria-hidden />
@@ -892,12 +893,22 @@ export default function App() {
                         mode="thinking"
                         task="itineraryGenerate"
                         label={
-                          <span
-                            key={itineraryLoadingLineIndex}
-                            className="animate-fade-up inline-block max-w-md text-center"
-                          >
-                            {itineraryLoadingLine}
-                          </span>
+                          <div className="flex flex-col items-center gap-2">
+                            {autoRegenOnLocaleChange && (
+                              <span
+                                key={`auto-${locale}`}
+                                className="animate-fade-up inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/30 bg-[var(--copper)]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--copper)]"
+                              >
+                                {t('app.autoRegenOnLocaleChange')}
+                              </span>
+                            )}
+                            <span
+                              key={itineraryLoadingLineIndex}
+                              className="animate-fade-up inline-block max-w-md text-center"
+                            >
+                              {itineraryLoadingLine}
+                            </span>
+                          </div>
                         }
                         showDots
                         size="md"
@@ -912,7 +923,7 @@ export default function App() {
 
                   {showItineraryError && (
                     <div className="rounded-2xl border border-dashed border-[var(--copper)]/40 dark:border-[var(--copper)]/30 bg-white/60 dark:bg-[#18201c]/80 shadow-sm dark:shadow-none backdrop-blur-xl px-4 py-6 text-center">
-                      <p className="font-medium text-[var(--ink)]">{locale === 'en' ? 'Failed to generate itinerary' : '行程生成失败'}</p>
+                      <p className="font-medium text-[var(--ink)]">{t('app.failedToGenerate')}</p>
                       <p className="mt-1 whitespace-pre-line break-words text-left text-sm text-[var(--stone)] sm:text-center">
                         {itineraryGenError}
                       </p>
@@ -925,7 +936,7 @@ export default function App() {
                           }}
                           className="mt-4 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper)] hover:opacity-90"
                         >
-                          {locale === 'en' ? 'Try Again' : '再试一次'}
+                          {t('app.tryAgain')}
                         </button>
                       )}
                     </div>
@@ -935,7 +946,7 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--copper)]/40 dark:border-[var(--copper)]/30 bg-white/60 dark:bg-[#18201c]/80 shadow-sm dark:shadow-none backdrop-blur-xl px-4 py-3">
                       <div className="min-w-0 text-left">
                         <p className="text-sm font-medium text-[var(--ink)]">
-                          {locale === 'en' ? 'Generation interrupted for subsequent days' : '后续天数生成中断'}
+                          {t('app.generationInterrupted')}
                         </p>
                         <p className="mt-0.5 whitespace-pre-line break-words text-xs text-[var(--stone)]">
                           {itineraryGenError}
@@ -950,7 +961,7 @@ export default function App() {
                           }}
                           className="shrink-0 rounded-full bg-[var(--ink)] px-3 py-1.5 text-sm text-[var(--paper)] hover:opacity-90"
                         >
-                          {locale === 'en' ? 'Continue Generating' : '继续生成'}
+                          {t('app.continueGenerating')}
                         </button>
                       )}
                     </div>
@@ -994,7 +1005,7 @@ export default function App() {
                         <div
                           className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/70 p-1 shadow-sm backdrop-blur-xl lg:hidden"
                           role="tablist"
-                          aria-label={locale === 'en' ? 'Itinerary view' : '行程视图'}
+                          aria-label={t('app.itineraryViewAria')}
                         >
                           <button
                             type="button"
@@ -1026,7 +1037,7 @@ export default function App() {
                               />
                             )}
                             <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                              {locale === 'en' ? 'Timeline' : '时间线'}
+                              {t('app.tabTimeline')}
                             </span>
                           </button>
                           <button
@@ -1059,7 +1070,7 @@ export default function App() {
                               />
                             )}
                             <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                              {locale === 'en' ? 'Map' : '地图'}
+                              {t('app.tabMap')}
                             </span>
                           </button>
                         </div>
@@ -1122,7 +1133,7 @@ export default function App() {
                           }`}
                         >
                           <MapErrorBoundary>
-                            <React.Suspense fallback={<div className="flex h-[min(60vh,440px)] w-full items-center justify-center bg-[var(--mist)] text-sm text-[var(--stone)] md:h-[560px]">{locale === 'en' ? 'Loading map…' : '地图加载中…'}</div>}>
+                            <React.Suspense fallback={<div className="flex h-[min(60vh,440px)] w-full items-center justify-center bg-[var(--mist)] text-sm text-[var(--stone)] md:h-[560px]">{t('app.loadingMap')}</div>}>
                               <TripMap
                                 hotel={hotel}
                                 day={day}
@@ -1165,7 +1176,7 @@ export default function App() {
                     {/* Top Editorial Category Badge */}
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)]">
                       <Sparkles size={12} strokeWidth={2.2} />
-                      <span>{locale === 'en' ? 'ITINERARY READINESS · TRIP SETUP' : 'ITINERARY READINESS · 行程就绪准备'}</span>
+                      <span>{t('app.readinessHeader')}</span>
                     </div>
 
                     {/* Central 3D Frosted Icon Badge */}
@@ -1176,7 +1187,7 @@ export default function App() {
                     {/* Typography */}
                     <div className="space-y-1.5">
                       <h3 className="font-display text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-tight">
-                        {locale === 'en' ? 'A few steps remaining to build your itinerary' : '还差几项即可生成完整多日行程'}
+                        {t('app.readinessHeadline')}
                       </h3>
                       <p className="text-xs sm:text-sm text-[var(--stone)] leading-relaxed max-w-md mx-auto">
                         {locale === 'en'
@@ -1202,7 +1213,7 @@ export default function App() {
                           <div className="min-w-0">
                             <p className="font-medium truncate">{t('itinerary.tripDates')}</p>
                             <p className="text-[10.5px] text-[var(--stone)] truncate">
-                              {datesReady ? `${tripDates?.startDate?.slice(5)} → ${tripDates?.endDate?.slice(5)}` : (locale === 'en' ? 'Dates pending' : '待选定起止')}
+                              {datesReady ? `${tripDates?.startDate?.slice(5)} → ${tripDates?.endDate?.slice(5)}` : t('app.datesPendingShort')}
                             </p>
                           </div>
                         </div>
@@ -1212,7 +1223,7 @@ export default function App() {
                           </span>
                         ) : (
                           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
-                            {locale === 'en' ? 'To do' : '待办'}
+                            {t('app.todoBadge')}
                           </span>
                         )}
                       </button>
@@ -1235,8 +1246,8 @@ export default function App() {
                               {flights.outbound && flights.returnFlight
                                 ? `${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber}`
                                 : flights.outbound
-                                  ? (locale === 'en' ? `Outbound: ${flights.outbound.flightNumber}` : '已填去程')
-                                  : (locale === 'en' ? 'Schedule pending' : '待确认时刻')}
+                                  ? t('app.outboundFlightSummary', ({ flight: flights.outbound.flightNumber }))
+                                  : t('app.schedulePending')}
                             </p>
                           </div>
                         </div>
@@ -1246,7 +1257,7 @@ export default function App() {
                           </span>
                         ) : (
                           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
-                            {locale === 'en' ? 'To do' : '待办'}
+                            {t('app.todoBadge')}
                           </span>
                         )}
                       </button>
@@ -1266,7 +1277,7 @@ export default function App() {
                           <div className="min-w-0">
                             <p className="font-medium truncate">{t('hotel.title')}</p>
                             <p className="text-[10.5px] text-[var(--stone)] truncate">
-                              {isHotelSelected(hotel) ? hotel.name : (locale === 'en' ? 'Choose stay' : '待挑选住宿')}
+                              {isHotelSelected(hotel) ? hotel.name : t('app.chooseStay')}
                             </p>
                           </div>
                         </div>
@@ -1276,7 +1287,7 @@ export default function App() {
                           </span>
                         ) : (
                           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
-                            {locale === 'en' ? 'To do' : '待办'}
+                            {t('app.todoBadge')}
                           </span>
                         )}
                       </button>
@@ -1294,7 +1305,7 @@ export default function App() {
                           className="pointer-events-none absolute inset-x-3 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent"
                         />
                         <Luggage size={16} strokeWidth={2.2} />
-                        <span>{locale === 'en' ? 'Go to Logistics Setup' : '前往「出行」一键完善'}</span>
+                        <span>{t('app.goToLogistics')}</span>
                         <ChevronRight size={15} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
                       </button>
                     </div>
@@ -1326,10 +1337,10 @@ export default function App() {
                 />
                 <div className="relative max-w-3xl animate-fade-up">
                   <p className="text-xs uppercase tracking-[0.22em] text-[var(--copper)] font-semibold">
-                    {locale === 'en' ? 'TRIP SETUP · LOGISTICS & BOOKING' : 'TRIP SETUP · 出行预订'}
+                    {t('app.tripSetupHeader')}
                   </p>
                   <h1 className="font-display mt-1.5 text-2xl leading-tight text-[var(--ink)] sm:text-3xl lg:text-4xl">
-                    {destinationLabel(destination, locale)} · {locale === 'en' ? 'Logistics & Booking' : '出行与预订'}
+                    {destinationLabel(destination, locale)} · {t('app.logisticsBooking')}
                   </h1>
                   <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
                     {locale === 'en'
@@ -1345,8 +1356,8 @@ export default function App() {
                       <CalendarDays size={12} className="shrink-0" />
                       <span>
                         {tripDates
-                          ? `${tripDates.startDate} → ${tripDates.endDate} (${daysBetween(tripDates.startDate, tripDates.endDate)}${locale === 'en' ? ' Days' : '天'})`
-                          : (locale === 'en' ? 'Dates pending' : '日期待选')}
+                          ? `${tripDates.startDate} → ${tripDates.endDate} (${t('app.daysCountShort', { count: daysBetween(tripDates.startDate, tripDates.endDate) })})`
+                          : t('itinerary.datesPending')}
                       </span>
                     </span>
                     <span
@@ -1363,12 +1374,12 @@ export default function App() {
                       <Plane size={12} className="shrink-0" />
                       <span>
                         {flights.outbound && flights.returnFlight
-                          ? `${locale === 'en' ? 'Flights entered' : '航班已录入'} (${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber})`
+                          ? `${t('app.flightsEntered')} (${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber})`
                           : flights.outbound
-                            ? `${locale === 'en' ? 'Outbound' : '去程'} ${flights.outbound.flightNumber}`
+                            ? `${t('app.outboundShort')} ${flights.outbound.flightNumber}`
                             : flights.returnFlight
-                              ? `${locale === 'en' ? 'Return' : '返程'} ${flights.returnFlight.flightNumber}`
-                              : (locale === 'en' ? 'Flights pending' : '航班待查')}
+                              ? `${t('app.returnShort')} ${flights.returnFlight.flightNumber}`
+                              : t('app.flightsPending')}
                       </span>
                     </span>
                     <span
@@ -1384,7 +1395,7 @@ export default function App() {
                     >
                       <HotelIcon size={12} className="shrink-0" />
                       <span>
-                        {isHotelSelected(hotel) ? `${locale === 'en' ? 'Stay: ' : '住宿：'}${hotel.name}` : (locale === 'en' ? 'Stay pending' : '住宿待定')}
+                        {isHotelSelected(hotel) ? `${t('app.stayPrefix')}${hotel.name}` : t('app.stayPending')}
                       </span>
                     </span>
                     {itineraryReady && (
@@ -1539,9 +1550,9 @@ export default function App() {
         open={confirmRegenAllOpen}
         onClose={() => setConfirmRegenAllOpen(false)}
         onConfirm={handleRegenerateItinerary}
-        title={locale === 'en' ? 'Regenerate Entire Itinerary' : '重新生成全部行程'}
-        description={locale === 'en' ? 'Are you sure you want to regenerate all days? Custom modifications and selected places will be replaced.' : '确定要重新生成全部天数的行程吗？当前自定义调整与已选景点将被新生成的行程替换。'}
-        confirmText={locale === 'en' ? 'Regenerate' : '重新生成'}
+        title={t('app.regenerateDialog.title')}
+        description={t('app.regenerateDialog.description')}
+        confirmText={t('app.regenerateDialog.confirm')}
         cancelText={t('common.cancel')}
         tone="sage"
         icon="refresh"
@@ -1551,9 +1562,9 @@ export default function App() {
         open={confirmRestoreDefaultOpen}
         onClose={() => setConfirmRestoreDefaultOpen(false)}
         onConfirm={handleRestoreDefault}
-        title={locale === 'en' ? 'Restore All Defaults' : '恢复全部默认行程'}
-        description={locale === 'en' ? 'Are you sure you want to restore the initial itinerary recommendations? Custom modifications will be reset.' : '确定将全部行程恢复为初始默认推荐吗？当前所做的个性化调整将被重置。'}
-        confirmText={locale === 'en' ? 'Restore Defaults' : '恢复默认'}
+        title={t('app.restoreDialog.title')}
+        description={t('app.restoreDialog.description')}
+        confirmText={t('app.restoreDialog.confirm')}
         cancelText={t('common.cancel')}
         tone="warning"
         icon="history"
@@ -1563,9 +1574,9 @@ export default function App() {
         open={confirmClearAllOpen}
         onClose={() => setConfirmClearAllOpen(false)}
         onConfirm={doClearAllTripState}
-        title={locale === 'en' ? 'Clear All Trip Data' : '清空当前行程全部数据'}
-        description={locale === 'en' ? 'Clear all dates, flights, hotel, and itinerary to reset to a blank slate? This action cannot be undone.' : '确定清空日期、航班、酒店与行程，回到初始空状态？此操作不可撤销。'}
-        confirmText={locale === 'en' ? 'Clear All' : '清空全部'}
+        title={t('app.clearDialog.title')}
+        description={t('app.clearDialog.description')}
+        confirmText={t('app.clearDialog.confirm')}
         cancelText={t('common.cancel')}
         tone="danger"
         icon="trash"

@@ -44,7 +44,7 @@ function dayJson(day: number) {
     day,
     title: '测试日',
     theme: '咖啡',
-    pace: '适中',
+    pace: 'moderate',
     summary: '测试地址传递。',
     metroHintFromArea: { custom: '步行。' },
     stops: [
@@ -53,7 +53,7 @@ function dayJson(day: number) {
         placeKey: 'cafe-test',
         note: '喝咖啡。',
         transport: '步行',
-        walkLevel: '短步行',
+        walkLevel: 'short',
       },
     ],
   }

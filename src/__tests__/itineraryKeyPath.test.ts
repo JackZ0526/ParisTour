@@ -23,7 +23,7 @@ describe('key-path helpers', () => {
         day: 1,
         title: 't',
         theme: '以玛黑为落脚点',
-        pace: '适中',
+        pace: 'moderate',
         summary: '落脚于玛黑，今晚散步。',
         stops: [],
       },

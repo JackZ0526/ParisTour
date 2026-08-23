@@ -28,78 +28,80 @@ export type ApiRequestKind =
 
 export interface ApiRequestGroup {
   id: string
-  label: string
-  shortLabel: string
-  kinds: Array<{ kind: ApiRequestKind; label: string; legacy?: boolean }>
+  /** i18n key under `apiMeter.groups.<id>` — resolved via `t()` at render. */
+  labelKey: string
+  /** i18n key under `apiMeter.groups.<id>` used for the compact rail badge. */
+  shortLabelKey: string
+  kinds: Array<{ kind: ApiRequestKind; labelKey: string; legacy?: boolean }>
 }
 
 export const API_REQUEST_GROUPS: ApiRequestGroup[] = [
   {
     id: 'google-places',
-    label: 'Google',
-    shortLabel: 'Google',
+    labelKey: 'apiMeter.groups.google-places',
+    shortLabelKey: 'apiMeter.groups.google-places',
     kinds: [
-      { kind: 'google-official-search', label: '官方 · 搜索' },
-      { kind: 'google-official-details', label: '官方 · 详情' },
-      { kind: 'google-official-photo', label: '官方 · 照片' },
-      { kind: 'google-rapidapi-search', label: 'RapidAPI · 搜索' },
-      { kind: 'google-rapidapi-details', label: 'RapidAPI · 详情' },
-      { kind: 'google-rapidapi-photo', label: 'RapidAPI · 照片' },
+      { kind: 'google-official-search', labelKey: 'apiMeter.kinds.google-official-search' },
+      { kind: 'google-official-details', labelKey: 'apiMeter.kinds.google-official-details' },
+      { kind: 'google-official-photo', labelKey: 'apiMeter.kinds.google-official-photo' },
+      { kind: 'google-rapidapi-search', labelKey: 'apiMeter.kinds.google-rapidapi-search' },
+      { kind: 'google-rapidapi-details', labelKey: 'apiMeter.kinds.google-rapidapi-details' },
+      { kind: 'google-rapidapi-photo', labelKey: 'apiMeter.kinds.google-rapidapi-photo' },
     ],
   },
   {
     id: 'tripadvisor',
-    label: 'Tripadvisor',
-    shortLabel: 'Tripadvisor',
+    labelKey: 'apiMeter.groups.tripadvisor',
+    shortLabelKey: 'apiMeter.groups.tripadvisor',
     kinds: [
-      { kind: 'tripadvisor-search', label: '搜索' },
-      { kind: 'tripadvisor-gallery', label: '相册' },
-      { kind: 'tripadvisor-details', label: '详情' },
-      { kind: 'tripadvisor-autocomplete', label: '补全' },
+      { kind: 'tripadvisor-search', labelKey: 'apiMeter.kinds.tripadvisor-search' },
+      { kind: 'tripadvisor-gallery', labelKey: 'apiMeter.kinds.tripadvisor-gallery' },
+      { kind: 'tripadvisor-details', labelKey: 'apiMeter.kinds.tripadvisor-details' },
+      { kind: 'tripadvisor-autocomplete', labelKey: 'apiMeter.kinds.tripadvisor-autocomplete' },
     ],
   },
   {
     id: 'booking',
-    label: 'Booking',
-    shortLabel: 'Booking',
+    labelKey: 'apiMeter.groups.booking',
+    shortLabelKey: 'apiMeter.groups.booking',
     kinds: [
-      { kind: 'booking-search', label: '搜索' },
-      { kind: 'booking-detail', label: '详情' },
-      { kind: 'booking-photos', label: '照片' },
-      { kind: 'booking-autocomplete', label: '补全' },
-      { kind: 'booking-description', label: '简介' },
-      { kind: 'booking-reviews', label: '评论' },
-      { kind: 'booking-other', label: '其他' },
+      { kind: 'booking-search', labelKey: 'apiMeter.kinds.booking-search' },
+      { kind: 'booking-detail', labelKey: 'apiMeter.kinds.booking-detail' },
+      { kind: 'booking-photos', labelKey: 'apiMeter.kinds.booking-photos' },
+      { kind: 'booking-autocomplete', labelKey: 'apiMeter.kinds.booking-autocomplete' },
+      { kind: 'booking-description', labelKey: 'apiMeter.kinds.booking-description' },
+      { kind: 'booking-reviews', labelKey: 'apiMeter.kinds.booking-reviews' },
+      { kind: 'booking-other', labelKey: 'apiMeter.kinds.booking-other' },
     ],
   },
   {
     id: 'llm',
-    label: '大模型',
-    shortLabel: '大模型',
+    labelKey: 'apiMeter.groups.llm',
+    shortLabelKey: 'apiMeter.groups.llm',
     kinds: [
-      { kind: 'llm-deepseek', label: 'DeepSeek' },
-      { kind: 'llm-openai', label: 'OpenAI' },
-      { kind: 'llm-gemini', label: 'Gemini' },
+      { kind: 'llm-deepseek', labelKey: 'apiMeter.kinds.llm-deepseek' },
+      { kind: 'llm-openai', labelKey: 'apiMeter.kinds.llm-openai' },
+      { kind: 'llm-gemini', labelKey: 'apiMeter.kinds.llm-gemini' },
     ],
   },
   {
     id: 'flights',
-    label: '航班',
-    shortLabel: '航班',
+    labelKey: 'apiMeter.groups.flights',
+    shortLabelKey: 'apiMeter.groups.flights',
     kinds: [
-      { kind: 'flight-timetable', label: '时刻表' },
-      { kind: 'flight-aerodatabox', label: 'AeroDataBox' },
+      { kind: 'flight-timetable', labelKey: 'apiMeter.kinds.flight-timetable' },
+      { kind: 'flight-aerodatabox', labelKey: 'apiMeter.kinds.flight-aerodatabox' },
     ],
   },
   {
     id: 'other',
-    label: '其他',
-    shortLabel: '其他',
+    labelKey: 'apiMeter.groups.other',
+    shortLabelKey: 'apiMeter.groups.other',
     kinds: [
-      { kind: 'place-website', label: '官网图片' },
-      { kind: 'share-invite', label: '分享邀请' },
-      { kind: 'openrouteservice-directions', label: '道路路线' },
-      { kind: 'other', label: '未分类' },
+      { kind: 'place-website', labelKey: 'apiMeter.kinds.place-website' },
+      { kind: 'share-invite', labelKey: 'apiMeter.kinds.share-invite' },
+      { kind: 'openrouteservice-directions', labelKey: 'apiMeter.kinds.openrouteservice-directions' },
+      { kind: 'other', labelKey: 'apiMeter.kinds.other' },
     ],
   },
 ]

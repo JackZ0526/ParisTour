@@ -5,6 +5,7 @@ import {
   loadImageElement,
   type AvatarCrop,
 } from '../../auth/services/avatarStore'
+import { useTranslation } from '../../../shared/i18n'
 
 interface AvatarCropperProps {
   dataUrl: string
@@ -41,6 +42,7 @@ export function AvatarCropper({
   onCancel,
   onRepick,
 }: AvatarCropperProps) {
+  const { t } = useTranslation()
   const [img, setImg] = useState<HTMLImageElement | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [baseScale, setBaseScale] = useState(1) // "cover" scale: smaller dim = VIEWPORT_SIZE
@@ -264,7 +266,7 @@ export function AvatarCropper({
           onClick={() => zoomByButton(1 / ZOOM_STEP)}
           disabled={!isReady || scale <= MIN_SCALE}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/10 text-[var(--stone)] dark:text-zinc-200 hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white dark:hover:border-white/20 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="缩小"
+          aria-label={t('auth.zoomOut')}
         >
           <ZoomOut size={15} />
         </button>
@@ -273,7 +275,7 @@ export function AvatarCropper({
           onClick={() => zoomByButton(ZOOM_STEP)}
           disabled={!isReady || scale >= MAX_SCALE}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/10 text-[var(--stone)] dark:text-zinc-200 hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white dark:hover:border-white/20 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="放大"
+          aria-label={t('auth.zoomIn')}
         >
           <ZoomIn size={15} />
         </button>
@@ -282,10 +284,10 @@ export function AvatarCropper({
           onClick={handleReset}
           disabled={!isReady}
           className="inline-flex h-9 items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/10 px-3.5 text-[11px] font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white dark:hover:border-white/20 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="重置"
+          aria-label={t('auth.cropReset')}
         >
           <RotateCcw size={12} />
-          <span>重置</span>
+          <span>{t('auth.cropReset')}</span>
         </button>
       </div>
 
@@ -297,7 +299,7 @@ export function AvatarCropper({
           className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 hover:text-[var(--ink)] dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
         >
           <X size={13} />
-          <span>取消</span>
+          <span>{t('common.cancel')}</span>
         </button>
         {onRepick && (
           <button
@@ -305,7 +307,7 @@ export function AvatarCropper({
             onClick={onRepick}
             className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/12 bg-black/5 dark:bg-white/10 px-4 py-2.5 text-xs font-medium text-[var(--stone)] dark:text-zinc-200 hover:bg-black/10 hover:text-[var(--ink)] dark:hover:bg-white/15 dark:hover:text-white active:scale-95 transition-all cursor-pointer"
           >
-            <span>重新选择</span>
+            <span>{t('auth.repickImage')}</span>
           </button>
         )}
         <button
@@ -315,7 +317,7 @@ export function AvatarCropper({
           className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(35,42,38,0.2),inset_0_1px_1.5px_rgba(255,255,255,0.3)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25)] transition-all hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
         >
           <Check size={14} />
-          <span>确认裁切</span>
+          <span>{t('auth.confirmCrop')}</span>
         </button>
       </div>
     </div>

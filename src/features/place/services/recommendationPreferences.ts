@@ -1,3 +1,6 @@
+import { LEGACY_PREF_TAG_MAP, localizePrefTag } from '../../../shared/i18n/localeEnum'
+import { getLocale, type Locale } from '../../../shared/i18n'
+
 const STORAGE_KEY = 'paris-tour-recommendation-preferences-v1'
 
 export interface RecommendationPreferences {
@@ -20,30 +23,30 @@ export function cleanTagText(tag: string): string {
     .trim()
 }
 
-/** Pre-curated list of ultra-concise French travel preference tags (2-5 chars each, pure text) */
+/** Pre-curated list of ultra-concise French travel preference tags (codes; localized at display) */
 export const PRESET_PREFERENCE_TAGS: readonly string[] = [
-  '晨间咖啡',
-  '两顿正餐',
-  '轻松少步行',
-  '巴黎迪士尼',
-  '凯旋门香街',
-  '避开大展馆',
-  '摄影出片',
-  '艺术画廊',
-  '法式烘焙',
-  '塞纳河游船',
-  '玛黑中古店',
-  '在地市集',
-  '铁塔夜景',
-  '亲子友好',
-  '平价美食',
+  'morningCoffee',
+  'twoMeals',
+  'easyWalking',
+  'disney',
+  'champsArc',
+  'avoidLargeMuseums',
+  'photography',
+  'artGalleries',
+  'frenchBakery',
+  'seineCruise',
+  'maraisVintage',
+  'localMarkets',
+  'eiffelNight',
+  'familyFriendly',
+  'affordableFood',
 ]
 
 export const DEFAULT_PREFERENCE_TAGS: readonly string[] = [
-  '晨间咖啡',
-  '两顿正餐',
-  '轻松少步行',
-  '凯旋门香街',
+  'morningCoffee',
+  'twoMeals',
+  'easyWalking',
+  'champsArc',
 ]
 
 export const DEFAULT_RECOMMENDATION_PREFERENCES: RecommendationPreferences = {
@@ -119,23 +122,48 @@ export const COLOR_PALETTES: readonly TagTheme[] = [
 export const BASE_TAG_PILL =
   "group relative isolate overflow-hidden inline-flex h-7.5 items-center px-3.5 text-xs font-semibold leading-none rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.65)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.08)] backdrop-blur-md backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-[1px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent before:content-[''] transition-all cursor-pointer select-none"
 
-export function getTagTheme(tag: string): TagTheme {
-  const t = cleanTagText(tag).toLowerCase()
-  if (t.includes('咖啡') || t.includes('早餐')) return COLOR_PALETTES[0]
-  if (t.includes('餐') || t.includes('吃') || t.includes('肉') || t.includes('面') || t.includes('生蚝') || t.includes('菜') || t.includes('美食')) return COLOR_PALETTES[1]
-  if (t.includes('步') || t.includes('慢') || t.includes('轻松') || t.includes('避开')) return COLOR_PALETTES[2]
-  if (t.includes('画') || t.includes('展') || t.includes('故居') || t.includes('文艺') || t.includes('艺术')) return COLOR_PALETTES[3]
-  if (t.includes('甜') || t.includes('烘焙') || t.includes('面包')) return COLOR_PALETTES[4]
-  if (t.includes('凯旋门') || t.includes('香街') || t.includes('地标')) return COLOR_PALETTES[5]
-  if (t.includes('照') || t.includes('出片') || t.includes('夜景') || t.includes('铁塔') || t.includes('摄影')) return COLOR_PALETTES[6]
-  if (t.includes('迪士尼') || t.includes('亲子') || t.includes('乐园') || t.includes('儿童')) return COLOR_PALETTES[7]
-  if (t.includes('市集') || t.includes('中古') || t.includes('买手') || t.includes('购物')) return COLOR_PALETTES[8]
-  if (t.includes('酒') || t.includes('船') || t.includes('塞纳河')) return COLOR_PALETTES[9]
+function tagCode(rawTag: string): string {
+  // Convert legacy Chinese → code so the theme function works for both
+  // pre-existing localStorage data and the new code-based constants.
+  const cleaned = cleanTagText(rawTag)
+  return LEGACY_PREF_TAG_MAP[cleaned] ?? cleaned
+}
 
-  let hash = 0
-  for (let i = 0; i < t.length; i++) hash = (hash << 5) - hash + t.charCodeAt(i)
-  const index = Math.abs(hash) % COLOR_PALETTES.length
-  return COLOR_PALETTES[index]
+export function getTagTheme(tag: string): TagTheme {
+  const code = tagCode(tag)
+  switch (code) {
+    case 'morningCoffee':
+      return COLOR_PALETTES[0]
+    case 'twoMeals':
+    case 'affordableFood':
+      return COLOR_PALETTES[1]
+    case 'easyWalking':
+    case 'avoidLargeMuseums':
+      return COLOR_PALETTES[2]
+    case 'photography':
+    case 'eiffelNight':
+      return COLOR_PALETTES[6]
+    case 'artGalleries':
+      return COLOR_PALETTES[3]
+    case 'frenchBakery':
+      return COLOR_PALETTES[4]
+    case 'champsArc':
+      return COLOR_PALETTES[5]
+    case 'disney':
+    case 'familyFriendly':
+      return COLOR_PALETTES[7]
+    case 'maraisVintage':
+    case 'localMarkets':
+      return COLOR_PALETTES[8]
+    case 'seineCruise':
+      return COLOR_PALETTES[9]
+    default: {
+      let hash = 0
+      for (let i = 0; i < code.length; i++) hash = (hash << 5) - hash + code.charCodeAt(i)
+      const index = Math.abs(hash) % COLOR_PALETTES.length
+      return COLOR_PALETTES[index]
+    }
+  }
 }
 
 function normalizeTime(value: unknown): string {
@@ -159,14 +187,17 @@ export function normalizeRecommendationPreferences(
       ),
     )
   } else {
-    // Backward compatibility: Derive tags from legacy boolean flags
+    // Backward compatibility: Derive tags from legacy boolean flags.
+    // Output uses the new code-based enum; the UI localizes via
+    // `localizePrefTag` and accepts legacy Chinese values via
+    // `LEGACY_PREF_TAG_MAP` for pre-refactor localStorage data.
     tags = []
-    if (value?.preferCafeStart ?? true) tags.push('晨间咖啡')
-    if (value?.preferLunchAndDinner ?? true) tags.push('两顿正餐')
-    if (value?.preferLowWalking ?? true) tags.push('轻松少步行')
-    if (value?.includeDisneyDay) tags.push('巴黎迪士尼')
-    if (value?.includeChampsAndArc ?? true) tags.push('凯旋门香街')
-    if (value?.avoidLouvreAndVersailles) tags.push('避开大展馆')
+    if (value?.preferCafeStart ?? true) tags.push('morningCoffee')
+    if (value?.preferLunchAndDinner ?? true) tags.push('twoMeals')
+    if (value?.preferLowWalking ?? true) tags.push('easyWalking')
+    if (value?.includeDisneyDay) tags.push('disney')
+    if (value?.includeChampsAndArc ?? true) tags.push('champsArc')
+    if (value?.avoidLouvreAndVersailles) tags.push('avoidLargeMuseums')
     if (tags.length === 0) tags = [...DEFAULT_PREFERENCE_TAGS]
   }
 
@@ -181,7 +212,7 @@ export function normalizeRecommendationPreferences(
     includeDisneyDay: hasTag((t) => t.includes('迪士尼')),
     includeChampsAndArc: hasTag((t) => t.includes('香街') || t.includes('香榭丽舍') || t.includes('凯旋门')),
     avoidLouvreAndVersailles: hasTag((t) => t.includes('避开') || t.includes('卢浮宫') || t.includes('凡尔赛') || t.includes('展馆')),
-    preferLowWalking: hasTag((t) => t.includes('少步行') || t.includes('慢节奏') || t.includes('轻松')),
+    preferLowWalking: hasTag((t) => t.includes('少步行') || t.includes('慢节奏') || t.includes('relaxed')),
     extraNotes: String(value?.extraNotes || '').trim().slice(0, 800),
   }
 }
@@ -220,22 +251,40 @@ export function clearRecommendationPreferences() {
 
 export function recommendationPreferencesPrompt(
   prefs: RecommendationPreferences,
+  options?: { locale?: Locale },
 ): string[] {
-  const lines: string[] = [
-    `通常约 ${prefs.dayStartTime} 开始当天行程`,
-  ]
+  const locale: Locale = options?.locale ?? (typeof getLocale === 'function' ? getLocale() : 'zh-CN')
+  const isEn = locale === 'en'
+  const lines: string[] = isEn
+    ? [`Trips usually start around ${prefs.dayStartTime}.`]
+    : [`通常约 ${prefs.dayStartTime} 开始当天行程`]
 
   if (prefs.tags && prefs.tags.length > 0) {
-    lines.push(`【用户指定行程偏好标签池（必须严格遵守与结合）】：`)
+    if (isEn) {
+      lines.push('[User-specified itinerary preference tags (must follow strictly)]:')
+    } else {
+      lines.push('【用户指定行程偏好标签池（必须严格遵守与结合）】：')
+    }
+    // For EN mode, present each tag localized so the LLM reads the chip text
+    // it would actually display. Legacy Chinese values pass through verbatim.
     prefs.tags.forEach((tag, idx) => {
-      lines.push(`${idx + 1}. ${tag}`)
+      const display = isEn ? localizePrefTag(tag, locale) : tag
+      lines.push(`${idx + 1}. ${display}`)
     })
   } else {
-    lines.push('用户未设置特殊偏好标签，按经典舒适节奏安排。')
+    lines.push(
+      isEn
+        ? 'No custom preference tags set; plan at a classic comfortable pace.'
+        : '用户未设置特殊偏好标签，按经典舒适节奏安排。',
+    )
   }
 
   if (prefs.extraNotes) {
-    lines.push(`【用户补充要求】：${prefs.extraNotes}`)
+    if (isEn) {
+      lines.push(`[User additional notes]: ${prefs.extraNotes}`)
+    } else {
+      lines.push(`【用户补充要求】：${prefs.extraNotes}`)
+    }
   }
 
   return lines

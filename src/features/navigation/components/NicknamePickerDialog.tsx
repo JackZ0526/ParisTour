@@ -53,7 +53,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
       }
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to save nickname' : '保存昵称失败'))
+      setError(err instanceof Error ? err.message : t('auth.saveNicknameFailed'))
     } finally {
       setSaving(false)
     }
@@ -63,7 +63,7 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
     setDraft('')
   }
 
-  const defaultDisplayName = email ? email.split('@')[0] : (locale === 'en' ? 'Traveler' : '旅人')
+  const defaultDisplayName = email ? email.split('@')[0] : t('auth.defaultDisplayName')
 
   return (
     <BottomSheet

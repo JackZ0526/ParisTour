@@ -1,4 +1,5 @@
 import type { Coordinates, Place, SelectedHotel } from '../../../types'
+import { getLocale, translate } from '../../../shared/i18n'
 
 /** Charles de Gaulle — day-1 route origin (not an itinerary stop). */
 export const CDG_PLACE_ID = 'attr-cdg'
@@ -6,6 +7,10 @@ export const CDG_LOCATION: Coordinates = { lat: 49.0097, lng: 2.5479 }
 
 /** Synthetic place id for the currently selected hotel (day-1 first stop). */
 export const SELECTED_HOTEL_PLACE_ID = 'hotel-selected'
+
+function cdgLabel(): string {
+  return translate('itinerary.cdgAirportLabel' as never, undefined, getLocale())
+}
 
 export function placeFromHotel(hotel: SelectedHotel): Place {
   return {
@@ -26,7 +31,7 @@ export function placeFromHotel(hotel: SelectedHotel): Place {
     googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
       `${hotel.name} ${hotel.address}`,
     )}`,
-    durationHint: '入住 30–45 分钟',
+    durationHint: translate('itinerary.checkInDuration' as never, undefined, getLocale()) || 'Check-in 30–45 min',
   }
 }
 
@@ -50,7 +55,7 @@ export function getDayOriginFromHotelFields(
       ...CDG_LOCATION,
       kind: 'airport',
       id: CDG_PLACE_ID,
-      label: '戴高乐机场 CDG',
+      label: cdgLabel(),
     }
   }
 

@@ -61,7 +61,8 @@ import {
 } from '../../map/services/googleMapsDirectionsUrl'
 import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
-import { useTranslation } from '../../../shared/i18n'
+import { useTranslation, getLocale, translate } from '../../../shared/i18n'
+import { localizePace, localizeTravelChip } from '../../../shared/i18n'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -118,12 +119,12 @@ type SwapAnim = {
   phase: SwapPhase
 }
 
-const typeLabel: Record<string, string> = {
-  cafe: '咖啡馆',
-  attraction: '景点',
-  restaurant: '餐厅',
-  transport: '交通',
-  hotel: '酒店',
+const typeLabelKey: Record<string, string> = {
+  cafe: 'itinerary.cafeStop',
+  attraction: 'itinerary.sight',
+  restaurant: 'itinerary.restaurantStop',
+  transport: 'itinerary.transitMode',
+  hotel: 'itinerary.hotelStop',
 }
 
 const timelineCapsuleClass = `${glassCapsuleSurfaceClass} inline-flex items-center`
@@ -165,15 +166,15 @@ function travelChipFromLeg(leg: ResolvedDayLeg | null | undefined): string | nul
       .map((l) => l.label)
       .filter(Boolean)
       .slice(0, 2)
-    return lines.length ? lines.join(' · ') : '公共交通'
+    return lines.length ? lines.join(' · ') : 'transit'
   }
-  if (leg.displayMode === 'DRIVING') return '驾车'
+  if (leg.displayMode === 'DRIVING') return 'driving'
   if (leg.displayMode === 'WALKING') {
     const m = leg.distanceMeters || 0
-    if (m > 0 && m < 400) return '很少走'
-    if (m > 0 && m < 1200) return '短步行'
-    if (m >= 1200) return '中等步行'
-    return '步行'
+    if (m > 0 && m < 400) return 'minimal'
+    if (m > 0 && m < 1200) return 'short'
+    if (m >= 1200) return 'moderate'
+    return 'walking'
   }
   return null
 }
@@ -374,7 +375,7 @@ function LegConnector({
               chipRow(
                 <LoadingIndicator
                   variant="badge"
-                  label={fallbackLabel || '正在计算导航…'}
+                  label={fallbackLabel || translate('itinerary.calculatingNavigation' as never, undefined, getLocale()) || (getLocale() === 'en' ? 'Calculating navigation…' : '正在计算导航…')}
                   size="sm"
                   showDots
                 />,
@@ -414,7 +415,7 @@ function LegConnector({
                     href={routeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    aria-label={`${fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}，在 Google Maps 查看路线`}
+                    aria-label={`${fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')} · ${translate('itinerary.directionsLabel' as never, undefined, getLocale()) || (getLocale() === 'en' ? 'Directions' : '路线导航')}`}
                   >
                     <span className="timeline-route-link-label">
                       {fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}
@@ -428,7 +429,7 @@ function LegConnector({
                   </a>
                 ) : (
                   <span className={`${timelineCapsuleClass} px-2.5 py-1 text-xs ${tone}`}>
-                    {leg?.label || fallbackLabel || '查看地图导航'}
+                    {leg?.label || fallbackLabel || translate('itinerary.viewMapDirections' as never, undefined, getLocale()) || (getLocale() === 'en' ? 'View map directions' : '查看地图导航')}
                   </span>
                 ),
               )
@@ -1129,7 +1130,7 @@ export function DayTimeline({
     place || {
       id: day.stops[index]?.placeId || `missing-${index}`,
       type: 'attraction' as const,
-      name: day.stops[index]?.placeId || '未知地点',
+      name: day.stops[index]?.placeId || t('itinerary.unknownPlace'),
     },
   )
   const stopNumbers = numberedStopIndexes(stopPlaces)
@@ -1503,11 +1504,11 @@ export function DayTimeline({
               {dayPending ? (
                 <span className="inline-block h-3 w-16 rounded-full day-tab-shimmer" />
               ) : (
-                day.pace
+                localizePace(day.pace)
               )}
             </span>
             <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.neutral} hidden px-2.5 py-1 text-xs text-[var(--stone)] dark:text-zinc-300 sm:inline-flex`}>
-              {readOnly ? '只读共享' : '可拖拽排序 · 可增删'}
+              {readOnly ? t('itinerary.readOnlyShared') : t('itinerary.dragReorderHint')}
             </span>
             {copyRefreshing && !dayRegenerating && (
               <LoadingIndicator
@@ -1539,8 +1540,8 @@ export function DayTimeline({
                 type="button"
                 onClick={() => setConfirmRestoreDayOpen(true)}
                 disabled={dayRegenerating || dayRestoring || dayPending}
-                title={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
-                aria-label={dayRestoring ? '正在恢复本日默认' : '恢复本日默认'}
+                title={dayRestoring ? t('itinerary.restoringToday') : t('itinerary.restoreToday')}
+                aria-label={dayRestoring ? t('itinerary.restoringToday') : t('itinerary.restoreToday')}
                 aria-busy={dayRestoring || dayPending || undefined}
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white dark:hover:bg-white/15 dark:hover:text-zinc-100 active:scale-95 disabled:cursor-wait disabled:opacity-60`}
               >
@@ -1551,8 +1552,8 @@ export function DayTimeline({
               type="button"
               onClick={() => setConfirmRegenDayOpen(true)}
               disabled={dayRegenerating || dayRestoring || dayPending}
-              title={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
-              aria-label={dayRegenerating ? '正在重新生成行程' : '重新生成行程'}
+              title={dayRegenerating ? t('itinerary.regeneratingItinerary') : t('itinerary.regenerateItinerary')}
+              aria-label={dayRegenerating ? t('itinerary.regeneratingItinerary') : t('itinerary.regenerateItinerary')}
               aria-busy={dayRegenerating || dayPending || undefined}
               className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${glassHandleSurfaceClass} text-[var(--stone)] transition-colors hover:border-[var(--sage)] hover:text-[var(--sage)] hover:bg-white dark:hover:bg-white/15 dark:hover:text-zinc-100 active:scale-95 disabled:cursor-wait disabled:opacity-60`}
             >
@@ -1593,13 +1594,13 @@ export function DayTimeline({
               variant="inline"
               thinkingLabel={
                 dayPending
-                  ? `正在生成第 ${day.day} 天行程…`
-                  : '正在仔细规划今天的行程…'
+                  ? t('itinerary.dayPendingGenerating', { day: day.day })
+                  : t('itinerary.dayRegenThinking')
               }
               generatingLabel={
                 dayPending
-                  ? `正在生成第 ${day.day} 天行程…`
-                  : '正在重新生成今天的行程…'
+                  ? t('itinerary.dayPendingGenerating', { day: day.day })
+                  : t('itinerary.dayRegenRegenerating')
               }
               size="sm"
               showDots
@@ -1608,7 +1609,7 @@ export function DayTimeline({
             />
             {dayPending ? (
               <p className="mt-1.5 text-xs text-[var(--stone)]">
-                其他天可先查看，这一天生成好后会自动更新。
+                {t('itinerary.dayPendingHint')}
               </p>
             ) : null}
           </div>
@@ -1713,8 +1714,8 @@ export function DayTimeline({
             !isGhost && liveIndex != null ? isFixedAt(liveIndex) : false
           const pinTitle =
             day.day === 1 && liveIndex === 0 && place.id === SELECTED_HOTEL_PLACE_ID
-              ? '酒店入住点固定为首站'
-              : '回酒店过夜固定为末站'
+              ? t('itinerary.hotelCheckInFirstHint')
+              : t('itinerary.hotelOvernightLastHint')
           const legToNext =
             liveIndex != null ? navPlan.betweenStops[liveIndex] : undefined
           const nextStop =
@@ -1828,8 +1829,8 @@ export function DayTimeline({
               {isHotelStop ? (
                 <span
                   className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
-                  title="酒店"
-                  aria-label="酒店"
+                  title={t('itinerary.hotelStop')}
+                  aria-label={t('itinerary.hotelStop')}
                 >
                   <HouseIcon />
                 </span>
@@ -1860,7 +1861,7 @@ export function DayTimeline({
                       {stop.time}
                     </span>
                     <span className="text-xs text-[var(--stone)]">
-                      {typeLabel[place.type] || place.type}
+                      {typeLabelKey[place.type] ? t(typeLabelKey[place.type] as never) : place.type}
                     </span>
                   </div>
                   <PlaceName
@@ -1874,7 +1875,7 @@ export function DayTimeline({
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
-                        {travelChip}
+                        {localizeTravelChip(travelChip)}
                       </span>
                     )}
                     {stop.duration && (
@@ -2047,7 +2048,7 @@ export function DayTimeline({
                                 {swapAnim.oldStop.time}
                               </span>
                               <span className="text-xs text-[var(--stone)]">
-                                {typeLabel[oldSwapPlace.type] || oldSwapPlace.type}
+                                {typeLabelKey[oldSwapPlace.type] ? t(typeLabelKey[oldSwapPlace.type] as never) : oldSwapPlace.type}
                               </span>
                             </div>
                             <PlaceName
@@ -2197,7 +2198,7 @@ export function DayTimeline({
                         {stop.time}
                       </span>
                       <span className="text-xs text-[var(--stone)]">
-                        {typeLabel[place.type] || place.type}
+                        {typeLabelKey[place.type] ? t(typeLabelKey[place.type] as never) : place.type}
                       </span>
                     </div>
                     <PlaceName
@@ -2213,7 +2214,7 @@ export function DayTimeline({
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                       {travelChip && (
                         <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
-                          {travelChip}
+                          {localizeTravelChip(travelChip)}
                         </span>
                       )}
                       {stop.duration && (

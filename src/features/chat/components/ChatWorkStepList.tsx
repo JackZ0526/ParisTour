@@ -16,6 +16,7 @@ import type {
   TripChatWorkStep,
 } from '../services/tripChat'
 import { cleanQueryString } from '../../../shared/services/llm/stream'
+import { getLocale, translate, type Locale } from '../../../shared/i18n'
 
 /** Client-side pipeline steps shown while the assistant works (Cursor-ish). */
 export type ChatWorkStepId =
@@ -29,40 +30,86 @@ export type ChatWorkStepId =
 
 export type ChatWorkStep = TripChatWorkStep & { id: ChatWorkStepId }
 
-export const CHAT_WORK_STEP_LABELS: Record<ChatWorkStepId, string> = {
+type WorkStepLabelKey =
+  | 'chat.workStepPreprocessPlan'
+  | 'chat.workStepPreprocessFallback'
+  | 'chat.workStepWebSearch'
+  | 'chat.workStepGenerate'
+  | 'chat.workStepParse'
+  | 'chat.workStepResolvePlaces'
+  | 'chat.workStepApply'
+
+const STEP_LABEL_KEYS: Record<ChatWorkStepId, WorkStepLabelKey> = {
+  preprocessPlan: 'chat.workStepPreprocessPlan',
+  preprocessFallback: 'chat.workStepPreprocessFallback',
+  webSearch: 'chat.workStepWebSearch',
+  generate: 'chat.workStepGenerate',
+  parse: 'chat.workStepParse',
+  resolvePlaces: 'chat.workStepResolvePlaces',
+  apply: 'chat.workStepApply',
+}
+
+/** Localized labels for every pipeline step. Defaults to the active locale. */
+export function getChatWorkStepLabels(locale: Locale = getLocale()): Record<ChatWorkStepId, string> {
+  const out = {} as Record<ChatWorkStepId, string>
+  ;(Object.keys(STEP_LABEL_KEYS) as ChatWorkStepId[]).forEach((id) => {
+    const key = STEP_LABEL_KEYS[id]
+    const translated = translate(key, undefined, locale)
+    if (translated) {
+      out[id] = translated
+      return
+    }
+    out[id] = FALLBACK_LABELS_ZH[id]
+  })
+  return out
+}
+
+/** Locale-aware single-step label, with a Chinese last-resort fallback. */
+export function chatWorkStepLabel(id: ChatWorkStepId, locale: Locale = getLocale()): string {
+  const key = STEP_LABEL_KEYS[id]
+  return translate(key, undefined, locale) || FALLBACK_LABELS_ZH[id]
+}
+
+/** Internal Chinese fallback used only when the registry is missing the key. */
+const FALLBACK_LABELS_ZH: Record<ChatWorkStepId, string> = {
   preprocessPlan: '理解问题',
   preprocessFallback: '兜底路由',
   webSearch: '搜索网络',
-  resolvePlaces: '核对地点',
   generate: '生成回答',
-  apply: '应用改动',
   parse: '解析动作',
+  resolvePlaces: '核对地点',
+  apply: '应用改动',
 }
 
 export function initialChatWorkSteps(_userText: string): ChatWorkStep[] {
+  const labels = getChatWorkStepLabels()
   return [
-    { id: 'preprocessPlan', label: CHAT_WORK_STEP_LABELS.preprocessPlan, status: 'active' },
-    { id: 'preprocessFallback', label: CHAT_WORK_STEP_LABELS.preprocessFallback, status: 'skipped' },
-    { id: 'webSearch', label: CHAT_WORK_STEP_LABELS.webSearch, status: 'pending' },
-    { id: 'generate', label: CHAT_WORK_STEP_LABELS.generate, status: 'pending' },
-    { id: 'parse', label: CHAT_WORK_STEP_LABELS.parse, status: 'pending' },
+    { id: 'preprocessPlan', label: labels.preprocessPlan, status: 'active' },
+    { id: 'preprocessFallback', label: labels.preprocessFallback, status: 'skipped' },
+    { id: 'webSearch', label: labels.webSearch, status: 'pending' },
+    { id: 'generate', label: labels.generate, status: 'pending' },
+    { id: 'parse', label: labels.parse, status: 'pending' },
     // Keep these steps in the pipeline so the UI can always render the full
     // progress layout, even when a turn doesn't require them.
-    { id: 'resolvePlaces', label: CHAT_WORK_STEP_LABELS.resolvePlaces, status: 'skipped' },
-    { id: 'apply', label: CHAT_WORK_STEP_LABELS.apply, status: 'skipped' },
+    { id: 'resolvePlaces', label: labels.resolvePlaces, status: 'skipped' },
+    { id: 'apply', label: labels.apply, status: 'skipped' },
   ] as ChatWorkStep[]
 }
 
 export function searchStepLabel(
   detail: TripChatWebSearchDetail | undefined,
   userText: string,
+  locale: Locale = getLocale(),
 ): string {
+  const prefix = translate('chat.workStepSearchPrefix' as never, undefined, locale) ||
+    (locale === 'en' ? 'Search: ' : '搜索：')
+  const fallback = chatWorkStepLabel('webSearch', locale)
   if (detail?.query) {
     const extracted = extractSearchKeyword(detail.query)
-    return extracted ? `搜索：${extracted}` : CHAT_WORK_STEP_LABELS.webSearch
+    return extracted ? `${prefix}${extracted}` : fallback
   }
-  if (userText.trim()) return `搜索：${userText.trim().slice(0, 24)}`
-  return CHAT_WORK_STEP_LABELS.webSearch
+  if (userText.trim()) return `${prefix}${userText.trim().slice(0, 24)}`
+  return fallback
 }
 
 /**
@@ -113,26 +160,54 @@ function extractSearchKeyword(rawQuery: string): string | null {
   return s || null
 }
 
-export function requestPlanStepLabel(plan: TripChatRequestPlan): string {
+export function requestPlanStepLabel(
+  plan: TripChatRequestPlan,
+  locale: Locale = getLocale(),
+): string {
   const intent = plan.intent
 
   const intentLabel =
     intent === 'recommend'
-      ? '推荐'
+      ? (translate('chat.workStepPlanIntentRecommend' as never, undefined, locale) ||
+          (locale === 'en' ? 'recommend' : '推荐'))
       : intent === 'mutate'
-        ? '行程调整'
+        ? (translate('chat.workStepPlanIntentMutate' as never, undefined, locale) ||
+            (locale === 'en' ? 'itinerary edit' : '行程调整'))
         : intent === 'answer'
-          ? '信息查询'
-          : '理解问题'
+          ? (translate('chat.workStepPlanIntentAnswer' as never, undefined, locale) ||
+              (locale === 'en' ? 'information query' : '信息查询'))
+          : (translate('chat.workStepPlanIntentUnderstand' as never, undefined, locale) ||
+              (locale === 'en' ? 'understanding the question' : '理解问题'))
 
-  const needsWebLabel = plan.needsWeb ? '需要联网' : '无需联网'
+  const needsWebLabel = plan.needsWeb
+    ? (translate('chat.workStepPlanNeedsWebYes' as never, undefined, locale) ||
+        (locale === 'en' ? 'web needed' : '需要联网'))
+    : (translate('chat.workStepPlanNeedsWebNo' as never, undefined, locale) ||
+        (locale === 'en' ? 'no web needed' : '无需联网'))
+
   const effort = plan.recommendedEffort
   const effortLabel =
-    effort === 'off' ? 'off' : effort === 'low' ? '低' : effort === 'medium' ? '中' : '高'
+    effort === 'off'
+      ? 'off'
+      : effort === 'low'
+        ? (translate('chat.workStepPlanEffortLow' as never, undefined, locale) ||
+            (locale === 'en' ? 'low' : '低'))
+        : effort === 'medium'
+          ? (translate('chat.workStepPlanEffortMedium' as never, undefined, locale) ||
+              (locale === 'en' ? 'medium' : '中'))
+          : (translate('chat.workStepPlanEffortHigh' as never, undefined, locale) ||
+              (locale === 'en' ? 'high' : '高'))
 
   // Preprocess step: explicitly show routing + whether we’ll do web search
-  // and the chosen reasoning depth.
-  return `分析问题：${intentLabel} · ${needsWebLabel} · 推理强度：${effortLabel}`
+  // and the chosen reasoning depth. Separator is `·` in both locales for parity.
+  const planLabel = translate('chat.workStepPlanLabel' as never, undefined, locale) ||
+    (locale === 'en' ? 'Analyzing the question' : '分析问题')
+  return `${planLabel}：${intentLabel} · ${needsWebLabel} · ${effortLabelLabel(locale)} ${effortLabel}`
+}
+
+/** "Reasoning effort" prefix used in the plan-step label (locale-aware). */
+function effortLabelLabel(locale: Locale): string {
+  return locale === 'en' ? 'Reasoning effort:' : '推理强度：'
 }
 
 export function activateChatWorkStep(
@@ -179,7 +254,10 @@ export function finishChatWorkSteps(steps: ChatWorkStep[]): ChatWorkStep[] {
   )
 }
 
-export function completedWorkSummary(steps: TripChatWorkStep[]): string {
+export function completedWorkSummary(
+  steps: TripChatWorkStep[],
+  locale: Locale = getLocale(),
+): string {
   const visible = steps.filter((s) => s.status !== 'skipped')
   const doneIds = new Set(visible.filter((s) => s.status === 'done').map((s) => s.id))
   const hasWebSearch = doneIds.has('webSearch')
@@ -187,19 +265,54 @@ export function completedWorkSummary(steps: TripChatWorkStep[]): string {
   const hasResolvePlaces = doneIds.has('resolvePlaces')
   const hasApply = doneIds.has('apply')
 
+  const t = (key: Parameters<typeof translate>[0], zhFallback: string) =>
+    translate(key, undefined, locale) || (locale === 'en' ? englishFallback(key) : zhFallback)
+
   // Prefer a natural, user-facing completion hint over the raw internal label.
   if (hasApply) {
-    return hasWebSearch ? '已联网搜索并完成行程改动' : '已完成行程改动'
+    return hasWebSearch
+      ? t('chat.workStepCompletedApplyWithWeb' as never, '已联网搜索并完成行程改动')
+      : t('chat.workStepCompletedApply' as never, '已完成行程改动')
   }
   if (hasResolvePlaces && !hasApply) {
-    return hasWebSearch ? '已联网搜索并核对地点' : '已核对地点'
+    return hasWebSearch
+      ? t('chat.workStepCompletedResolveWithWeb' as never, '已联网搜索并核对地点')
+      : t('chat.workStepCompletedResolve' as never, '已核对地点')
   }
-  if (hasWebSearch && hasGenerate) return '已完成联网搜索并生成回答'
-  if (hasWebSearch && !hasGenerate) return '已完成联网搜索'
-  if (hasGenerate) return '已生成回答'
+  if (hasWebSearch && hasGenerate) {
+    return t('chat.workStepCompletedGenerateWithWeb' as never, '已完成联网搜索并生成回答')
+  }
+  if (hasWebSearch && !hasGenerate) {
+    return t('chat.workStepCompletedWebOnly' as never, '已完成联网搜索')
+  }
+  if (hasGenerate) {
+    return t('chat.workStepCompletedGenerate' as never, '已生成回答')
+  }
 
   const lastDone = [...visible].reverse().find((s) => s.status === 'done')
-  return lastDone?.label || CHAT_WORK_STEP_LABELS.generate
+  return lastDone?.label || chatWorkStepLabel('generate', locale)
+}
+
+function englishFallback(key: Parameters<typeof translate>[0]): string {
+  // Last-resort English text when the registry is missing the key.
+  switch (key) {
+    case 'chat.workStepCompletedApplyWithWeb':
+      return 'Searched the web and applied itinerary changes'
+    case 'chat.workStepCompletedApply':
+      return 'Applied itinerary changes'
+    case 'chat.workStepCompletedResolveWithWeb':
+      return 'Searched the web and verified places'
+    case 'chat.workStepCompletedResolve':
+      return 'Verified places'
+    case 'chat.workStepCompletedGenerateWithWeb':
+      return 'Searched the web and generated answer'
+    case 'chat.workStepCompletedWebOnly':
+      return 'Web search complete'
+    case 'chat.workStepCompletedGenerate':
+      return 'Answer generated'
+    default:
+      return ''
+  }
 }
 
 export function actionsNeedPlaceLookup(actions: TripChatAction[]): boolean {

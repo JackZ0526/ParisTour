@@ -13,7 +13,7 @@ import {
 import { formatOwnerHandle, type AccessibleTrip } from '../services/tripCloud'
 import { getUserNickname, useUserNickname } from '../../auth/services/nicknameStore'
 import { glassBackdropSurfaceClass, glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
-import { useTranslation, type Locale } from '../../../shared/i18n'
+import { useTranslation, translate, type Locale } from '../../../shared/i18n'
 
 export interface TripSelectorCapsuleProps {
   trips: AccessibleTrip[]
@@ -26,18 +26,20 @@ export interface TripSelectorCapsuleProps {
  * Format relative time (e.g. "刚刚" / "Just now", "10分钟前" / "10m ago")
  */
 function formatRelativeTime(isoString?: string, locale: Locale = 'zh-CN'): string {
+  const t = (key: Parameters<typeof translate>[0], params?: Parameters<typeof translate>[1]) =>
+    translate(key, params, locale === 'en' ? 'en' : 'zh-CN')
   if (!isoString) return ''
   try {
     const date = new Date(isoString)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
-    if (diffMins < 1) return locale === 'en' ? 'Just now' : '刚刚'
-    if (diffMins < 60) return locale === 'en' ? `${diffMins}m ago` : `${diffMins}分钟前`
+    if (diffMins < 1) return t('cloud.justNow')
+    if (diffMins < 60) return t('cloud.minutesAgo', { count: diffMins })
     const diffHours = Math.floor(diffMins / 60)
-    if (diffHours < 24) return locale === 'en' ? `${diffHours}h ago` : `${diffHours}小时前`
+    if (diffHours < 24) return t('cloud.hoursAgo', { count: diffHours })
     const diffDays = Math.floor(diffHours / 24)
-    if (diffDays < 30) return locale === 'en' ? `${diffDays}d ago` : `${diffDays}天前`
+    if (diffDays < 30) return t('cloud.daysAgo', { count: diffDays })
     return locale === 'en'
       ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : `${date.getMonth() + 1}月${date.getDate()}日`
@@ -261,11 +263,11 @@ export function TripSelectorCapsule({
                               isActive ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink)]'
                             }`}
                           >
-                            {trip.isPrimary ? (locale === 'en' ? 'Primary Trip' : '我的主行程') : trip.title || (locale === 'en' ? 'Itinerary' : '行程规划')}
+                            {trip.isPrimary ? t('profile.primaryTrip') : trip.title || t('itinerary.tripOverview')}
                           </span>
                           {trip.isPrimary && (
                             <span className="shrink-0 rounded bg-[var(--copper)]/15 px-1 py-0.2 text-[9px] font-bold text-[var(--copper)]">
-                              {locale === 'en' ? 'Default' : '默认'}
+                              {t('profile.defaultBadge')}
                             </span>
                           )}
                         </div>
@@ -284,7 +286,7 @@ export function TripSelectorCapsule({
                                       trip.ownerName ||
                                       (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
                                     }`)
-                              : (locale === 'en' ? 'Created by you' : '自己创建')}
+                              : t('profile.createdByYou')}
                           </span>
                           {trip.updatedAt && (
                             <>
@@ -311,10 +313,10 @@ export function TripSelectorCapsule({
                         }`}
                       >
                         {trip.role === 'owner'
-                          ? (locale === 'en' ? 'Owner' : '拥有者')
+                          ? t('auth.roleOwner')
                           : trip.role === 'editor'
-                            ? (locale === 'en' ? 'Editor' : '协作')
-                            : (locale === 'en' ? 'Read-only' : '只读')}
+                            ? t('auth.roleEditor')
+                            : t('auth.readOnly')}
                       </span>
 
                       {isActive && (

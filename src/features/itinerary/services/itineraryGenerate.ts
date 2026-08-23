@@ -3,14 +3,17 @@ import type {
   DayPlan,
   FlightInfo,
   ItineraryStop,
+  Pace,
   Place,
   PlaceType,
   SelectedHotel,
+  Transport,
   WalkLevel,
 } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
 import { fetchWikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
+import { getLocale } from '../../../shared/i18n'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
@@ -35,8 +38,8 @@ import {
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
 
-const PACE_SET = new Set(['轻松', '适中', '乐园日', '自驾日'])
-const WALK_SET = new Set<WalkLevel>(['很少走', '短步行', '中等步行'])
+const PACE_SET = new Set<Pace>(['relaxed', 'moderate', 'park', 'self-drive'])
+const WALK_SET = new Set<WalkLevel>(['minimal', 'short', 'moderate'])
 const TYPE_SET = new Set<PlaceType>(['cafe', 'attraction', 'restaurant', 'transport', 'hotel'])
 
 const DISNEY_PLACE_ID = 'attr-disney'
@@ -55,11 +58,11 @@ function slugKey(raw: string): string {
 
 function normalizePace(raw: unknown): DayPlan['pace'] {
   const v = String(raw || '').trim()
-  if (PACE_SET.has(v)) return v as DayPlan['pace']
-  if (/disney|迪士尼|乐园/i.test(v)) return '乐园日'
-  if (/自驾|drive/i.test(v)) return '自驾日'
-  if (/轻松|relax|light/i.test(v)) return '轻松'
-  return '适中'
+  if (PACE_SET.has(v as Pace)) return v as Pace
+  if (/disney|迪士尼|乐园/i.test(v)) return 'park'
+  if (/自驾|drive/i.test(v)) return 'self-drive'
+  if (/轻松|relax|light/i.test(v)) return 'relaxed'
+  return 'moderate'
 }
 
 function normalizeWalk(raw: unknown): WalkLevel | undefined {
@@ -67,10 +70,10 @@ function normalizeWalk(raw: unknown): WalkLevel | undefined {
   return WALK_SET.has(v) ? v : undefined
 }
 
-function normalizeTransportChoice(raw: unknown): '公共交通' | '步行' | undefined {
+function normalizeTransportChoice(raw: unknown): Transport | undefined {
   const text = String(raw || '').trim()
   if (!text) return undefined
-  return /walk|walking|步行|走路|步走/i.test(text) ? '步行' : '公共交通'
+  return /walk|walking|步行|走路|步走/i.test(text) ? 'walking' : 'transit'
 }
 
 function normalizeType(raw: unknown): PlaceType {
@@ -434,7 +437,7 @@ function collapseDisneyStopsOnDay(day: DayPlan, places: Record<string, Place>): 
     placeId: DISNEY_PLACE_ID,
     note: '巴黎迪士尼乐园全日；建议提前购票与 App 排队。园内用餐即可，不必另排餐厅站。',
     transport: 'RER A → Marne-la-Vallée–Chessy（约 45–60 分钟）',
-    walkLevel: '中等步行',
+    walkLevel: 'moderate',
     duration: '全天',
   }
 
@@ -458,7 +461,7 @@ function collapseDisneyStopsOnDay(day: DayPlan, places: Record<string, Place>): 
       placeId: SELECTED_HOTEL_PLACE_ID,
       note: overnight?.note || '乐园归来回酒店休整；早出晚归预留疲惫。',
       transport: overnight?.transport || 'RER A 回城',
-      walkLevel: overnight?.walkLevel || '很少走',
+      walkLevel: overnight?.walkLevel || 'minimal',
       duration: overnight?.duration || '过夜',
     },
   ]
@@ -467,7 +470,7 @@ function collapseDisneyStopsOnDay(day: DayPlan, places: Record<string, Place>): 
     ...day,
     title: day.title.includes('迪士尼') ? day.title : '巴黎迪士尼',
     theme: day.theme || 'RER A 乐园日',
-    pace: '乐园日',
+    pace: 'park',
     summary: day.summary || '今天只去迪士尼，不安排其他景点；园内玩够再回酒店。',
     stops,
   }
@@ -520,6 +523,7 @@ export function validateAndFixGeneratedDays(
   // Ensure contiguous day numbers 1..n
   const byDay = new Map(next.map((d) => [d.day, d]))
   const filled: DayPlan[] = []
+  const en = getLocale() === 'en'
   for (let i = 1; i <= n; i++) {
     const existing = byDay.get(i)
     filled.push(
@@ -535,10 +539,14 @@ export function validateAndFixGeneratedDays(
           }
         : {
             day: i,
-            title: i === 1 ? '抵达巴黎' : i === n ? '返程' : `第 ${i} 天`,
-            theme: '自由安排',
-            pace: i === 1 || i === n ? '轻松' : '适中',
-            summary: '今天行程待补全。',
+            title: en
+              ? i === 1 ? 'Arrival in Paris' : i === n ? 'Departure' : `Day ${i}`
+              : i === 1 ? '抵达巴黎' : i === n ? '返程' : `第 ${i} 天`,
+            theme: en ? 'Free time' : '自由安排',
+            pace: i === 1 || i === n ? 'relaxed' : 'moderate',
+            summary: en
+              ? 'Day still to be filled in.'
+              : '今天行程待补全。',
             metroHintFromArea: blankMetroHints(),
             stops: [],
           },
@@ -556,7 +564,7 @@ export function validateAndFixGeneratedDays(
   if (disneyIdx < 0) {
     disneyIdx = filled.findIndex(
       (day) =>
-        day.pace === '乐园日' ||
+        day.pace === 'park' ||
         /迪士尼|disney/i.test(`${day.title} ${day.theme}`) ||
         day.stops.some((stop) => isDisneyStop(stop, places)),
     )
@@ -568,7 +576,7 @@ export function validateAndFixGeneratedDays(
         ...d,
         title: d.title.includes('迪士尼') ? d.title : '巴黎迪士尼',
         theme: d.theme || 'RER A 乐园日',
-        pace: '乐园日',
+        pace: 'park',
         summary: d.summary || '今天只去迪士尼，不安排其他景点。',
       },
       places,
@@ -609,7 +617,7 @@ export function validateAndFixGeneratedDays(
     filled[n - 1] = {
       ...last,
       title: last.title || '返程',
-      pace: '轻松',
+      pace: 'relaxed',
       stops: [
         ...last.stops,
         {
@@ -618,7 +626,7 @@ export function validateAndFixGeneratedDays(
           placeId: CDG_PLACE_ID,
           note: '国际航班建议起飞前 3–3.5 小时到 CDG；按返程时刻倒推离开酒店。',
           transport: 'RER B 或出租车',
-          walkLevel: '很少走',
+          walkLevel: 'minimal',
           duration: '离境',
         },
       ],
@@ -654,7 +662,7 @@ function softFixSingleDay(
     options?.forceDisneyDay != null && next.day === options.forceDisneyDay
   const choseDisney =
     forcedDisney ||
-    next.pace === '乐园日' ||
+    next.pace === 'park' ||
     /迪士尼|disney/i.test(`${next.title} ${next.theme}`) ||
     next.stops.some((stop) => isDisneyStop(stop, places))
 
@@ -675,7 +683,7 @@ function softFixSingleDay(
           ...next,
           title: next.title.includes('迪士尼') ? next.title : '巴黎迪士尼',
           theme: next.theme || 'RER A 乐园日',
-          pace: '乐园日',
+          pace: 'park',
           summary: next.summary || '今天只去迪士尼，不安排其他景点。',
         },
         places,
@@ -693,7 +701,7 @@ function softFixSingleDay(
     next = {
       ...next,
       title: next.title || '返程',
-      pace: next.pace || '轻松',
+      pace: next.pace || 'relaxed',
       stops: next.stops.filter((s) => {
         if (s.placeId === SELECTED_HOTEL_PLACE_ID) return false
         if (places[s.placeId]?.type === 'hotel') return false
@@ -711,7 +719,7 @@ function softFixSingleDay(
             placeId: CDG_PLACE_ID,
             note: '国际航班建议起飞前 3–3.5 小时到 CDG；按返程时刻倒推离开酒店。',
             transport: 'RER B 或出租车',
-            walkLevel: '很少走',
+            walkLevel: 'minimal',
             duration: '离境',
           },
         ],
@@ -774,7 +782,7 @@ export function buildDisneyDayResult(input: {
     day: input.dayNumber,
     title: '巴黎迪士尼',
     theme: 'RER A 乐园日',
-    pace: '乐园日',
+    pace: 'park',
     summary: '今天只去迪士尼，不安排其他景点；园内玩够再回酒店。',
     metroHintFromArea: {
       custom: 'RER A 直达 Marne-la-Vallée–Chessy（约 45–60 分钟）。',
@@ -787,15 +795,16 @@ export function buildDisneyDayResult(input: {
   const merged: DayPlan[] = []
   for (let i = 1; i <= input.dayCount; i++) {
     const existing = byDay.get(i)
+    const en = getLocale() === 'en'
     merged.push(
       existing
         ? { ...existing, day: i }
         : {
             day: i,
-            title: `第 ${i} 天`,
-            theme: '自由安排',
-            pace: '适中',
-            summary: '今天行程待补全。',
+            title: en ? `Day ${i}` : `第 ${i} 天`,
+            theme: en ? 'Free time' : '自由安排',
+            pace: 'moderate',
+            summary: en ? 'Day still to be filled in.' : '今天行程待补全。',
             metroHintFromArea: blankMetroHints(),
             stops: [],
           },
@@ -945,7 +954,7 @@ export async function buildGeneratedSingleDay(
       placeId,
       note: String(s.note || '').trim() || '按当天节奏灵活调整。',
       transport: normalizeTransportChoice(s.transport),
-      walkLevel: normalizeWalk(s.walkLevel) || '短步行',
+      walkLevel: normalizeWalk(s.walkLevel) || 'short',
       duration: s.duration ? String(s.duration).trim() : undefined,
     }
   })
@@ -977,15 +986,16 @@ export async function buildGeneratedSingleDay(
   const merged: DayPlan[] = []
   for (let i = 1; i <= input.dayCount; i++) {
     const existing = byDay.get(i)
+    const en = getLocale() === 'en'
     merged.push(
       existing
         ? { ...existing, day: i }
         : {
             day: i,
-            title: `第 ${i} 天`,
-            theme: '自由安排',
-            pace: '适中',
-            summary: '今天行程待补全。',
+            title: en ? `Day ${i}` : `第 ${i} 天`,
+            theme: en ? 'Free time' : '自由安排',
+            pace: 'moderate',
+            summary: en ? 'Day still to be filled in.' : '今天行程待补全。',
             metroHintFromArea: blankMetroHints(),
             stops: [],
           },
@@ -1077,7 +1087,7 @@ export async function buildGeneratedItinerary(
         placeId,
         note: String(s.note || '').trim() || '按当天节奏灵活调整。',
         transport: normalizeTransportChoice(s.transport),
-        walkLevel: normalizeWalk(s.walkLevel) || '短步行',
+        walkLevel: normalizeWalk(s.walkLevel) || 'short',
         duration: s.duration ? String(s.duration).trim() : undefined,
       }
     })

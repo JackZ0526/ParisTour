@@ -36,7 +36,7 @@ export function AvatarPickerDialog({
   onClose,
   email,
 }: AvatarPickerDialogProps) {
-  const { locale } = useTranslation()
+  const { t } = useTranslation()
   const { user } = useAuth()
   const { avatar, setAvatar, resetAvatar } = useUserAvatar(email)
   const [isReading, setIsReading] = useState(false)
@@ -53,7 +53,7 @@ export function AvatarPickerDialog({
     if (!file) return
     setUploadError(null)
     if (!file.type.startsWith('image/')) {
-      setUploadError(locale === 'en' ? 'Please select a valid image file (JPG / PNG / WebP)' : '请选择有效的图片文件 (JPG / PNG / WebP)')
+      setUploadError(t('auth.pleasePickImage'))
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
@@ -62,11 +62,11 @@ export function AvatarPickerDialog({
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
-        reader.onerror = () => reject(new Error(locale === 'en' ? 'Failed to read image file' : '读取图片文件失败'))
+        reader.onerror = () => reject(new Error(t('auth.failedToReadImage')))
         reader.onload = (ev) => {
           const result = ev.target?.result
           if (typeof result !== 'string' || !result) {
-            reject(new Error(locale === 'en' ? 'Image data is empty' : '图片数据为空'))
+            reject(new Error(t('auth.imageDataEmpty')))
             return
           }
           resolve(result)
@@ -75,7 +75,7 @@ export function AvatarPickerDialog({
       })
       setPendingDataUrl(dataUrl)
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to process image, please try again' : '处理图片失败，请重试'))
+      setUploadError(err instanceof Error ? err.message : t('auth.failedToProcessImage'))
     } finally {
       setIsReading(false)
       if (fileInputRef.current) {
@@ -128,13 +128,13 @@ export function AvatarPickerDialog({
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
-              {locale === 'en' ? 'Profile Avatar' : '个性头像设置'}
+              {t('auth.avatarTitle')}
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-              {locale === 'en' ? 'Upload a custom photo avatar, applied instantly across your account.' : '上传本地照片作为您的专属头像，全局即时生效。'}
+              {t('auth.avatarSubtitle')}
             </p>
           </div>
-          <CloseIconButton onClick={onClose} className="hidden sm:flex" aria-label={locale === 'en' ? 'Close' : '关闭'} />
+          <CloseIconButton onClick={onClose} className="hidden sm:flex" aria-label={t('auth.closeAria')} />
         </div>
       </header>
 
@@ -165,7 +165,7 @@ export function AvatarPickerDialog({
             className="flex items-center gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/80 p-3 text-xs font-medium text-emerald-800 shadow-sm backdrop-blur-md"
           >
             <Check size={14} className="text-emerald-600 shrink-0" />
-            <span>{locale === 'en' ? 'Avatar updated and saved successfully!' : '头像已成功更新并保存！'}</span>
+            <span>{t('auth.avatarUpdated')}</span>
           </motion.div>
         )}
 
@@ -180,10 +180,10 @@ export function AvatarPickerDialog({
           >
             <div className="mb-4 text-center">
               <h3 className="font-display text-base sm:text-lg font-semibold text-[var(--ink)]">
-                {locale === 'en' ? 'Crop Avatar' : '调整裁切位置'}
+                {t('auth.cropAvatar')}
               </h3>
               <p className="mt-1 text-[11px] sm:text-xs text-[var(--stone)] dark:text-zinc-400">
-                {locale === 'en' ? 'Drag or zoom the image to position within the frame' : '拖动或缩放图片，框内区域将保存为头像'}
+                {t('auth.cropHint')}
               </p>
             </div>
             <AvatarCropper
@@ -226,7 +226,7 @@ export function AvatarPickerDialog({
                 {isReading && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center rounded-[2rem] bg-black/40 backdrop-blur-xs text-white">
                     <LoaderCircle size={28} className="animate-spin text-white" />
-                    <span className="mt-1 text-[11px] font-medium">{locale === 'en' ? 'Loading…' : '读取中…'}</span>
+                    <span className="mt-1 text-[11px] font-medium">{t('auth.loadingDots')}</span>
                   </div>
                 )}
               </motion.div>
@@ -243,12 +243,12 @@ export function AvatarPickerDialog({
                   {isCustomPhoto ? (
                     <>
                       <Check size={12} className="text-emerald-600" />
-                      <span>{locale === 'en' ? 'Custom photo avatar active' : '已启用自定义照片头像'}</span>
+                      <span>{t('auth.customActive')}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles size={12} className="text-[var(--copper)]" />
-                      <span>{locale === 'en' ? 'Default initial avatar active' : '当前使用默认首字母徽标'}</span>
+                      <span>{t('auth.defaultActive')}</span>
                     </>
                   )}
                 </span>
@@ -265,8 +265,8 @@ export function AvatarPickerDialog({
                   <Camera size={14} />
                   <span>
                     {isCustomPhoto
-                      ? (locale === 'en' ? 'Change Photo' : '更换新照片')
-                      : (locale === 'en' ? 'Upload Photo' : '上传本地照片')}
+                      ? t('auth.changePhoto')
+                      : t('auth.uploadPhoto')}
                   </span>
                 </button>
 
@@ -276,10 +276,10 @@ export function AvatarPickerDialog({
                     disabled={isReading}
                     onClick={handleResetDefault}
                     className="inline-flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-2.5 text-xs font-medium text-[var(--stone)] hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-all active:scale-95 cursor-pointer"
-                    title={locale === 'en' ? 'Reset to default email initial' : '恢复为默认邮箱首字母'}
+                    title={t('auth.resetToDefault')}
                   >
                     <RotateCcw size={13} />
-                    <span>{locale === 'en' ? 'Reset' : '恢复默认'}</span>
+                    <span>{t('auth.reset')}</span>
                   </button>
                 )}
               </div>

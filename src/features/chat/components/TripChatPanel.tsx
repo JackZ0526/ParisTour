@@ -94,8 +94,27 @@ import {
   type PendingPlaceConfirm,
 } from './chatHelpers'
 
-const NO_ACTION_APPLIED_NOTE = '行程未改动，请再说一下你想要的调整。'
-const DETAIL_CONFIRM_MISSING_NOTE = '行程未改动：请在详情页确认是否加入。'
+// Locale-aware chat action notes. These are helpers (not module constants)
+// because the registry needs to be live and we want the active locale.
+import { getLocale, translate, type Locale } from '../../../shared/i18n'
+
+function noActionAppliedNote(locale: Locale = getLocale()): string {
+  return (
+    translate('chat.actionNoteNoChange' as never, undefined, locale) ||
+    (locale === 'en'
+      ? 'Trip not changed — please tell me what to adjust.'
+      : '行程未改动，请再说一下你想要的调整。')
+  )
+}
+
+function detailConfirmMissingNote(locale: Locale = getLocale()): string {
+  return (
+    translate('chat.actionNoteConfirmMissing' as never, undefined, locale) ||
+    (locale === 'en'
+      ? 'Trip not changed: please confirm on the place detail page.'
+      : '行程未改动：请在详情页确认是否加入。')
+  )
+}
 
 function getModelBrandTheme(modelId: string) {
   if (isDeepSeekModel(modelId)) {
@@ -183,7 +202,7 @@ export interface TripChatHandlers {
 }
 import { ChatBubbleIcon } from './ChatBubbleIcon'
 import {
-  CHAT_WORK_STEP_LABELS,
+  chatWorkStepLabel,
   actionsNeedPlaceLookup,
   activateChatWorkStep,
   finishChatWorkSteps,
@@ -224,16 +243,17 @@ interface Props {
 }
 
 interface ChatSuggestion {
-  text: string
+  /** i18n key (TranslationKey) used to render the chip text via t() at render time. */
+  text: import('../../../shared/i18n').TranslationKey
   tone: keyof typeof glassCapsuleToneClass
 }
 
 const SUGGESTIONS: ChatSuggestion[] = [
-  { text: '介绍一下当前选中的酒店', tone: 'gold' },
-  { text: '按左岸、中档重新推荐一批酒店', tone: 'gold' },
-  { text: '介绍一下今天行程里的第一个地点', tone: 'sage' },
-  { text: '帮我在今天加上一家附近的咖啡馆', tone: 'copper' },
-  { text: '把凯旋门从行程里删掉', tone: 'neutral' },
+  { text: 'chat.suggestHotelCurrent', tone: 'gold' },
+  { text: 'chat.suggestHotelsLeftBank', tone: 'gold' },
+  { text: 'chat.suggestFirstPlace', tone: 'sage' },
+  { text: 'chat.suggestAddCafe', tone: 'copper' },
+  { text: 'chat.suggestRemoveArc', tone: 'neutral' },
 ]
 
 export function TripChatPanel({
@@ -266,7 +286,7 @@ export function TripChatPanel({
   const isDesktop = useMediaQuery('(min-width: 640px)')
   useBodyScrollLock(open && !isDesktop)
   const { isDark } = useTheme()
-  const { locale } = useTranslation()
+  const { t, locale } = useTranslation()
   const { model, thinkingMode } = useLlmSettings()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -420,7 +440,10 @@ export function TripChatPanel({
     const stopNote =
       pending.note ||
       (pending.kind === 'replace'
-        ? `用于替换「${pending.fromPlaceName || '原地点'}」`
+        ? translate('chat.actionNoteUsedToReplace' as never, { from: pending.fromPlaceName || translate('chat.actionNoteOriginalPlace' as never, undefined, locale) || (locale === 'en' ? 'the original place' : '原地点') }, locale) ||
+          (locale === 'en'
+            ? `Used to replace “${pending.fromPlaceName || 'the original place'}”`
+            : `用于替换「${pending.fromPlaceName || '原地点'}」`)
         : '')
     const detailKeys = placeDetailKeysFromPlace(place)
     const bypass = pendingStoryRegenToken > 0
@@ -652,15 +675,21 @@ export function TripChatPanel({
         description:
           (hasUsefulNote ? travelerNote : undefined) ||
           ta.description ||
-          `${ta.name}，适合安排进第 ${input.dayNum} 天行程。`,
+          (locale === 'en'
+            ? `${ta.name}, a good fit for day ${input.dayNum} of the trip.`
+            : `${ta.name}，适合安排进第 ${input.dayNum} 天行程。`),
         ratingHint:
-          ta.rating != null ? `Tripadvisor ★ ${ta.rating.toFixed(1)}` : 'Tripadvisor 景点',
+          ta.rating != null
+            ? `Tripadvisor ★ ${ta.rating.toFixed(1)}`
+            : locale === 'en'
+              ? 'Tripadvisor attraction'
+              : 'Tripadvisor 景点',
         image: ta.photos[0] || FALLBACK_IMAGE,
         location: ta.location,
         googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
           `${ta.name} Paris`,
         )}`,
-        durationHint: '90 分钟',
+        durationHint: t('chat.durationMinutes90') || (locale === 'en' ? '90 min' : '90 分钟'),
       }
     }
 
@@ -729,11 +758,17 @@ export function TripChatPanel({
       googleRating: details.rating,
       googleUserRatingCount: details.userRatingCount,
       googleAddress: details.address,
-      ratingHint: details.rating ? `Google ${details.rating}` : 'Google 地点',
+      ratingHint: details.rating
+        ? `Google ${details.rating}`
+        : locale === 'en'
+          ? 'Google place'
+          : 'Google 地点',
       image: websitePhoto || FALLBACK_IMAGE,
       location: details.location,
       googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
-      durationHint: placeType === 'cafe' ? '45 分钟' : '90 分钟',
+      durationHint: placeType === 'cafe'
+        ? (t('chat.durationMinutes45') || (locale === 'en' ? '45 min' : '45 分钟'))
+        : (t('chat.durationMinutes90') || (locale === 'en' ? '90 min' : '90 分钟')),
     }
   }
 
@@ -860,8 +895,16 @@ export function TripChatPanel({
         excludePlaceName: action.toPlaceName,
       })
     if (!hit) {
-      const label = action.fromPlaceName?.trim() || action.placeType || '地点'
-      throw new Error(`第 ${dayNum} 天没有可替换的「${label}」`)
+      const label =
+        action.fromPlaceName?.trim() ||
+        action.placeType ||
+        t('chat.actionNotePlaceFallback') ||
+        (locale === 'en' ? 'Place' : '地点')
+      throw new Error(
+        locale === 'en'
+          ? `No replaceable “${label}” on day ${dayNum}`
+          : `第 ${dayNum} 天没有可替换的「${label}」`,
+      )
     }
 
     const place = await buildPlaceFromQuery({
@@ -1042,22 +1085,31 @@ export function TripChatPanel({
     if (recovered) {
       const confirmNote =
         recovered.kind === 'replace'
-          ? `已找到「${recovered.place.name}」，请在详情页确认是否替换「${recovered.fromPlaceName || '原地点'}」`
-          : `已找到「${recovered.place.name}」，请在详情页确认是否加入第 ${recovered.dayNum} 天`
+          ? locale === 'en'
+            ? `Found “${recovered.place.name}”. Please confirm on the detail page whether to replace “${recovered.fromPlaceName || 'the original place'}”.`
+            : `已找到「${recovered.place.name}」，请在详情页确认是否替换「${recovered.fromPlaceName || '原地点'}」`
+          : locale === 'en'
+            ? `Found “${recovered.place.name}”. Please confirm on the detail page whether to add it to day ${recovered.dayNum}.`
+            : `已找到「${recovered.place.name}」，请在详情页确认是否加入第 ${recovered.dayNum} 天`
+      const detailConfirmNeedle = locale === 'en' ? /confirm on the detail page/i : /请在详情页确认/
       return {
         reply: clarifyReplyForPending(reply, [recovered]),
-        notes: [...notes.filter((n) => !/请在详情页确认/.test(n)), confirmNote],
+        notes: [...notes.filter((n) => !detailConfirmNeedle.test(n)), confirmNote],
         pending: [recovered],
       }
     }
 
     const cleaned = stripDetailConfirmClaim(reply)
-    const keepNotes = notes.filter((n) => !/请在详情页确认/.test(n))
+    const detailConfirmNeedle = locale === 'en' ? /confirm on the detail page/i : /请在详情页确认/
+    const keepNotes = notes.filter((n) => !detailConfirmNeedle.test(n))
+    const missingNote = detailConfirmMissingNote(locale)
     return {
       reply: cleaned
-        ? `${cleaned}\n\n（${DETAIL_CONFIRM_MISSING_NOTE}）`
-        : DETAIL_CONFIRM_MISSING_NOTE,
-      notes: [...keepNotes, DETAIL_CONFIRM_MISSING_NOTE],
+        ? locale === 'en'
+          ? `${cleaned}\n\n(${missingNote})`
+          : `${cleaned}\n\n（${missingNote}）`
+        : missingNote,
+      notes: [...keepNotes, missingNote],
       pending: [],
     }
   }
@@ -1089,18 +1141,26 @@ export function TripChatPanel({
 
       if (pending.kind === 'replace') {
         if (!pending.replaceStopId) {
+          const from = pending.fromPlaceName || '原地点'
           setActionNotes((prev) => [
             ...prev,
-            `无法替换「${pending.fromPlaceName || '原地点'}」：缺少行程停点信息，请再说一次。`,
+            (translate('chat.actionNoteReplaceMissingStopInfo' as never, { from }, locale) ||
+              (locale === 'en'
+                ? `Couldn’t replace “${from}”: missing stop info, please say it again.`
+                : `无法替换「${from}」：缺少行程停点信息，请再说一次。`)),
           ])
           return
         }
         handlers.replaceStop(pending.dayNum, pending.replaceStopId, place, {
           select: false,
         })
+        const from = pending.fromPlaceName || '原地点'
         setActionNotes((prev) => [
           ...prev,
-          `已将第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」替换为「${place.name}」`,
+          (translate('chat.actionNoteReplacedOnDay' as never, { from, to: place.name, day: pending.dayNum }, locale) ||
+            (locale === 'en'
+              ? `Replaced “${from}” with “${place.name}” on day ${pending.dayNum}.`
+              : `已将第 ${pending.dayNum} 天的「${from}」替换为「${place.name}」`)),
         ])
         return
       }
@@ -1111,8 +1171,14 @@ export function TripChatPanel({
       setActionNotes((prev) => [
         ...prev,
         mode === 'end'
-          ? `已将「${place.name}」加到第 ${pending.dayNum} 天末尾`
-          : `已将「${place.name}」按最顺路插入第 ${pending.dayNum} 天`,
+          ? (translate('chat.actionNoteAddedToEndOfDay' as never, { place: place.name, day: pending.dayNum }, locale) ||
+              (locale === 'en'
+                ? `Added “${place.name}” to the end of day ${pending.dayNum}.`
+                : `已将「${place.name}」加到第 ${pending.dayNum} 天末尾`))
+          : (translate('chat.actionNoteAddedByRouteOfDay' as never, { place: place.name, day: pending.dayNum }, locale) ||
+              (locale === 'en'
+                ? `Inserted “${place.name}” on the most convenient spot of day ${pending.dayNum}.`
+                : `已将「${place.name}」按最顺路插入第 ${pending.dayNum} 天`)),
       ])
     } finally {
       setConfirmBusy(false)
@@ -1122,7 +1188,7 @@ export function TripChatPanel({
   async function rerecommendPending(rejected: PendingPlaceConfirm) {
     if (busy || confirmBusy || rejected.status === 'rerecommending') return
     if (!isLlmConfigured()) {
-      setError(locale === 'en' ? 'Chat assistant is temporarily unavailable. Please try again later.' : '对话助手暂不可用，请稍后再试。')
+      setError(t('chat.chatUnavailable'))
       return
     }
 
@@ -1142,7 +1208,9 @@ export function TripChatPanel({
       { role: 'user', content: message, hidden: true },
       { role: 'assistant', content: '' },
     ])
-    setActionNotes(['正在重新推荐…'])
+    setActionNotes([
+      t('chat.actionNoteReRecommending') || (locale === 'en' ? 'Re-recommending…' : '正在重新推荐…'),
+    ])
     setBusy(true)
     setStreamingReply(false)
     const ac = beginChatRequest()
@@ -1235,13 +1303,17 @@ export function TripChatPanel({
                 activateChatWorkStep(
                   prev.map((s) =>
                     s.id === 'apply'
-                      ? { ...s, status: 'pending' as const, label: '打开确认页…' }
+                      ? {
+                          ...s,
+                          status: 'pending' as const,
+                          label: t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'),
+                        }
                       : s,
                   ),
                   'resolvePlaces',
                   {
                     labels: {
-                      resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                      resolvePlaces: detail?.label || chatWorkStepLabel('resolvePlaces'),
                     },
                   },
                 ),
@@ -1251,7 +1323,9 @@ export function TripChatPanel({
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'apply', {
                 labels: {
-                  apply: detail?.pending ? '打开确认页…' : '应用改动…',
+                  apply: detail?.pending
+                    ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'))
+                    : (t('chat.actionNoteApplying') || (locale === 'en' ? 'Applying changes…' : '应用改动…')),
                 },
               }),
             )
@@ -1281,7 +1355,10 @@ export function TripChatPanel({
           ? notes
           : pending.length
             ? []
-            : ['没有拿到新的地点推荐，请再说一下你想要的风格或区域。'],
+            : [t('chat.actionNoteNoNewRecommendations') ||
+              (locale === 'en'
+                ? 'No new recommendations came back. Try a different area or style.'
+                : '没有拿到新的地点推荐，请再说一下你想要的风格或区域。')],
       )
       setPendingPlaces((prev) => {
         const rest = prev.filter((p) => p.id !== rejected.id)
@@ -1311,14 +1388,14 @@ export function TripChatPanel({
             {
               ...last,
               content: `${last.content.trim()}\n\n（${
-                locale === 'en' ? 'Recommendation interrupted: ' : '重新推荐中断：'
-              }${err instanceof Error ? err.message : (locale === 'en' ? 'Please try again later' : '请稍后再试')}）`,
+                t('chat.recommendationInterrupted')
+              }${err instanceof Error ? err.message : t('chat.pleaseTryAgain')}）`,
             },
           ]
         }
         return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
       })
-      setError(err instanceof Error ? err.message : (locale === 'en' ? 'Failed to re-recommend, please try again later.' : '重新推荐失败，请稍后再试。'))
+      setError(err instanceof Error ? err.message : t('chat.reRecommendFailed'))
       setOpen(true)
       clearWorkPipeline()
     } finally {
@@ -1363,11 +1440,15 @@ export function TripChatPanel({
           return []
         })
         .filter(Boolean)
-      const compactNames = [...new Set(names)].slice(0, 2).join('、')
+      const compactNames = [...new Set(names)].slice(0, 2).join(locale === 'en' ? ', ' : '、')
+      const compactLabel = compactNames
+        ? (translate('chat.actionNoteResolvePlacesActive' as never, { names: compactNames }, locale) ||
+            (locale === 'en'
+              ? `Verifying places: ${compactNames}`
+              : `正在核对地点：${compactNames}`))
+        : chatWorkStepLabel('resolvePlaces')
       options?.onProgress?.('resolvePlaces', {
-        label: compactNames
-          ? `正在核对地点：${compactNames}`
-          : CHAT_WORK_STEP_LABELS.resolvePlaces,
+        label: compactLabel,
       })
     } else {
       options?.onProgress?.('apply', { pending: false })
@@ -1534,8 +1615,8 @@ export function TripChatPanel({
                         time: '12:00',
                         placeId: result.appliedPlace!.id,
                         note: result.appliedPlace!.description,
-                        walkLevel: '短步行',
-                        duration: result.appliedPlace!.durationHint || '60 分钟',
+                        walkLevel: 'short',
+                        duration: result.appliedPlace!.durationHint || t('chat.durationMinutes60') || (locale === 'en' ? '60 min' : '60 分钟'),
                       },
                     ],
                   }
@@ -1572,11 +1653,15 @@ export function TripChatPanel({
         if (action.type === 'remove_hotel') {
           const hit = matchHotelCandidate(workingCandidates, action.hotelName)
           if (!hit) {
-            notes.push(`候选项里没有「${action.hotelName}」`)
+            notes.push(
+              locale === 'en'
+                ? `“${action.hotelName}” is not in your hotel candidates`
+                : `候选项里没有「${action.hotelName}」`,
+            )
             continue
           }
           if (workingCandidates.length <= 1) {
-            notes.push('至少保留一家酒店候选项')
+            notes.push(t('chat.actionNoteAtLeastOneHotel') || (locale === 'en' ? 'Keep at least one hotel candidate.' : '至少保留一家酒店候选项'))
             continue
           }
           const next = workingCandidates.filter((h) => h.id !== hit.id)
@@ -1660,7 +1745,7 @@ export function TripChatPanel({
           notes.push(result.note)
         }
       } catch (err) {
-        notes.push(err instanceof Error ? err.message : '操作失败')
+        notes.push(err instanceof Error ? err.message : t('chat.actionNoteOpFailed') || (locale === 'en' ? 'Action failed' : '操作失败'))
       }
     }
 
@@ -1675,7 +1760,7 @@ export function TripChatPanel({
     const message = text.trim()
     if (!message || busy) return
     if (!isLlmConfigured()) {
-      setError(locale === 'en' ? 'Chat assistant is temporarily unavailable. Please try again later.' : '对话助手暂不可用，请稍后再试。')
+      setError(t('chat.chatUnavailable'))
       return
     }
 
@@ -1780,13 +1865,17 @@ export function TripChatPanel({
                 activateChatWorkStep(
                   prev.map((s) =>
                     s.id === 'apply'
-                      ? { ...s, status: 'pending' as const, label: '打开确认页…' }
+                      ? {
+                          ...s,
+                          status: 'pending' as const,
+                          label: t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'),
+                        }
                       : s,
                   ),
                   'resolvePlaces',
                   {
                     labels: {
-                      resolvePlaces: detail?.label || CHAT_WORK_STEP_LABELS.resolvePlaces,
+                      resolvePlaces: detail?.label || chatWorkStepLabel('resolvePlaces'),
                     },
                   },
                 ),
@@ -1796,7 +1885,9 @@ export function TripChatPanel({
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'apply', {
                 labels: {
-                  apply: detail?.pending ? '打开确认页…' : '应用改动…',
+                  apply: detail?.pending
+                    ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'))
+                    : (t('chat.actionNoteApplying') || (locale === 'en' ? 'Applying changes…' : '应用改动…')),
                 },
               }),
             )
@@ -1805,7 +1896,7 @@ export function TripChatPanel({
         notes = applied.notes
         pending = applied.pending
       } else if (replyClaimsItineraryApplied(result.reply)) {
-        notes = [NO_ACTION_APPLIED_NOTE]
+        notes = [noActionAppliedNote(locale)]
       }
 
       // Guard again after long applyActions (Google Places) in case a newer turn started.
@@ -1837,8 +1928,8 @@ export function TripChatPanel({
             {
               ...last,
               content: `${last.content.trim()}\n\n（${
-                locale === 'en' ? 'Response interrupted: ' : '回答中断：'
-              }${err instanceof Error ? err.message : (locale === 'en' ? 'Please try again later' : '请稍后再试')}）`,
+                t('chat.responseInterrupted')
+              }${err instanceof Error ? err.message : t('chat.pleaseTryAgain')}）`,
             },
           ]
         }
@@ -1879,7 +1970,7 @@ export function TripChatPanel({
           <motion.button
             key="trip-chat-backdrop"
             type="button"
-            aria-label="关闭行程助手"
+            aria-label={t('chat.closePanelAria')}
             initial={backdrop.initial}
             animate={backdrop.animate}
             exit={backdrop.exit}
@@ -1904,7 +1995,7 @@ export function TripChatPanel({
         ref={rootRef}
         role={open ? 'dialog' : 'button'}
         tabIndex={open ? -1 : 0}
-        aria-label={open ? '行程助手' : '打开行程助手'}
+        aria-label={open ? t('chat.title') : t('chat.openPanelAria')}
         aria-expanded={open}
         onClick={open ? undefined : () => setOpen(true)}
         onKeyDown={
@@ -2010,7 +2101,7 @@ export function TripChatPanel({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-display text-xl leading-tight text-[var(--ink)]">行程助手</h3>
+                  <h3 className="font-display text-xl leading-tight text-[var(--ink)]">{t('chat.title')}</h3>
                   {/* Model & Thinking Status Capsule */}
                   {(() => {
                     const brandTheme = getModelBrandTheme(model)
@@ -2027,7 +2118,7 @@ export function TripChatPanel({
                           <>
                             <span className={brandTheme.dot}>·</span>
                             <span className={brandTheme.subtext}>
-                              思考{getThinkingModeLabel(thinkingMode)}
+                              {t('chat.thinkingPrefix')}{getThinkingModeLabel(thinkingMode)}
                             </span>
                           </>
                         )}
@@ -2039,7 +2130,7 @@ export function TripChatPanel({
                   {/* Current Day Capsule */}
                   <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 dark:border-[#668b7a]/40 bg-[#f4f8f5]/85 dark:bg-[#668b7a]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
-                    第 {currentDay} 天
+                    {t('chat.currentDay', { day: currentDay })}
                   </span>
 
                   {/* Viewing Place Context Capsule */}
@@ -2067,7 +2158,7 @@ export function TripChatPanel({
             {!history.some((t) => !t.hidden) && (
               <div className="space-y-2.5">
                 <p className="text-xs font-medium text-[var(--stone)]">
-                  试试问我：介绍酒店、换一批住宿、介绍今天地点、加咖啡馆，或删改行程。
+                  {t('chat.tryAskingIntro')}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {SUGGESTIONS.map(({ text, tone }) => (
@@ -2075,10 +2166,10 @@ export function TripChatPanel({
                       key={text}
                       type="button"
                       disabled={busy}
-                      onClick={() => void submit(text)}
+                      onClick={() => void submit(t(text))}
                       className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass[tone]} inline-flex items-center px-3 py-1.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer`}
                     >
-                      {text}
+                      {t(text)}
                     </button>
                   ))}
                 </div>
@@ -2158,8 +2249,8 @@ export function TripChatPanel({
                       >
                         {showThinking ? (
                           <LoadingIndicator
-                            thinkingLabel="助手思考中…"
-                            generatingLabel="助手回答中…"
+                            thinkingLabel={t('chat.thinkingAssistantLabel')}
+                            generatingLabel={t('chat.answeringAssistantLabel')}
                             showDots
                             size="sm"
                             mode="thinking"
@@ -2213,7 +2304,7 @@ export function TripChatPanel({
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="跟我说你想怎么改行程…"
+              placeholder={t('chat.sendPromptPlaceholder')}
               disabled={busy || !open}
               tabIndex={open ? undefined : -1}
               aria-busy={busy || undefined}
@@ -2234,7 +2325,7 @@ export function TripChatPanel({
                   thinkingEnabled={requestThinkingEnabled}
                 />
                 <span className="tracking-wide">
-                  {chatBusy.label({ thinking: '思考中…', generating: '回答中…' })}
+                  {chatBusy.label({ thinking: t('chat.thinkingAssistantLabel'), generating: t('chat.answeringAssistantLabel') })}
                 </span>
               </div>
             ) : (
@@ -2248,7 +2339,7 @@ export function TripChatPanel({
                     : 'border border-black/[0.08] dark:border-white/10 bg-black/[0.07] dark:bg-white/5 text-[var(--stone)] dark:text-zinc-500 shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-none backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
                 }`}
               >
-                发送
+                {t('chat.sendButton')}
               </button>
             )}
           </form>
@@ -2332,7 +2423,9 @@ export function TripChatPanel({
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                     >
                       {confirmBusy && <ButtonSpinner />}
-                      {activePending.kind === 'replace' ? '确认替换' : '加入行程'}
+                      {activePending.kind === 'replace'
+                        ? (t('chat.actionNoteConfirmReplace') || (locale === 'en' ? 'Confirm replace' : '确认替换'))
+                        : (t('chat.actionNoteAddToTrip') || (locale === 'en' ? 'Add to trip' : '加入行程'))}
                     </button>
                     <button
                       type="button"

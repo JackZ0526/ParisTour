@@ -1,4 +1,5 @@
 import type { Coordinates } from '../../../types'
+import { getLocale, translate, type Locale } from '../../../shared/i18n'
 
 export type GoogleMapsTravelMode = 'walking' | 'transit'
 
@@ -45,9 +46,20 @@ export function inferGoogleMapsTravelMode(
   return 'transit'
 }
 
-export function googleMapsTravelModeLabel(mode: GoogleMapsTravelMode): string {
-  if (mode === 'walking') return '步行'
-  return '公共交通'
+export function googleMapsTravelModeLabel(
+  mode: GoogleMapsTravelMode,
+  locale: Locale = getLocale(),
+): string {
+  if (mode === 'walking') {
+    return (
+      translate('transport.walking' as never, undefined, locale) ||
+      (locale === 'en' ? 'Walking' : '步行')
+    )
+  }
+  return (
+    translate('transport.transit' as never, undefined, locale) ||
+    (locale === 'en' ? 'Transit' : '公共交通')
+  )
 }
 
 /**

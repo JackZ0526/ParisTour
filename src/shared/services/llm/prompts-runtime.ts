@@ -56,6 +56,7 @@ const TASK_THINKING: Record<
   // Structured JSON: thinking CoT shares max_tokens and often yields empty content.
   itineraryGenerate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryDayGenerate: { baseline: 'off', min: 'off', max: 'off' },
+  itineraryTranslate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryStart: { baseline: 'low', min: 'off', max: 'low' },
   destinationSuggest: { baseline: 'low', min: 'off', max: 'low' },
   preferenceExtract: { baseline: 'off', min: 'off', max: 'off' },

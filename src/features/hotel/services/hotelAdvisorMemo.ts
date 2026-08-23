@@ -38,7 +38,11 @@ export function hotelAdvisorKeys(
   return [...new Set(keys.filter(Boolean))]
 }
 
-function isValidMemoForLocale(reason: string, locale: Locale = getLocale()): boolean {
+/**
+ * A stored memo is "valid" for a locale when its language matches.
+ * Public so the locale-switch regen hook can detect stale hotel cards.
+ */
+export function isValidMemoForLocale(reason: string, locale: Locale = getLocale()): boolean {
   if (!reason.trim()) return false
   if (locale === 'en' && looksChinese(reason)) return false
   if (locale === 'zh-CN' && !looksChinese(reason)) return false

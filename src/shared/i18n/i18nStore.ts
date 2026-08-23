@@ -3,45 +3,83 @@
  *
  * Lightweight, type-safe reactive store using useSyncExternalStore.
  * Manages locale selection, localStorage persistence, and DOM <html lang="..."> attribute.
+ *
+ * All locale metadata (id, native name, dictionary, system prefixes,
+ * LLM instruction) is sourced from `./locales/registry.ts` — this file
+ * contains no per-locale branching and stays untouched when adding a
+ * new language.
  */
 
-import { zhCN } from './locales/zh-CN'
-import { en } from './locales/en'
-import type { Locale, TranslationKey, I18nSchema } from './types'
+import { LOCALES, DEFAULT_LOCALE } from './locales/registry'
+import type { Locale, TranslationKey } from './types'
 
 const LOCALE_STORAGE_KEY = 'paris_tour_locale_mode'
-const DEFAULT_LOCALE: Locale = 'zh-CN'
-
-const dictionaries: Record<Locale, I18nSchema> = {
-  'zh-CN': zhCN,
-  en,
-  fr: en, // Fallback to English for French until French dictionary is added
-}
 
 let currentLocale: Locale = DEFAULT_LOCALE
 const listeners = new Set<() => void>()
 
-export function isLocale(value: unknown): value is Locale {
-  return value === 'zh-CN' || value === 'en' || value === 'fr'
+/* ------------------------------------------------------------------ *
+ *  Dev-time missing-key warnings
+ * ------------------------------------------------------------------ */
+
+let devWarnEnabled: boolean =
+  typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
+
+const warnedKeys = new Set<string>()
+
+/** Test-only: silence or restore the dev missing-key console.warn. */
+export function setI18nDevWarnEnabled(enabled: boolean) {
+  devWarnEnabled = enabled
+  if (!enabled) warnedKeys.clear()
 }
+
+function warnMissingKey(key: string, activeLocale: Locale) {
+  if (!devWarnEnabled) return
+  // Dedupe within a session so re-renders don't spam the console.
+  const tag = `${activeLocale}::${key}`
+  if (warnedKeys.has(tag)) return
+  warnedKeys.add(tag)
+  // eslint-disable-next-line no-console
+  console.warn(`[i18n] Missing key "${key}" in "${activeLocale}". Falling back to "${DEFAULT_LOCALE}".`)
+}
+
+/* ------------------------------------------------------------------ *
+ *  Locale validation
+ * ------------------------------------------------------------------ */
+
+export function isLocale(value: unknown): value is Locale {
+  return typeof value === 'string' && value in LOCALES
+}
+
+/* ------------------------------------------------------------------ *
+ *  System preference detection
+ * ------------------------------------------------------------------ */
 
 function getSystemPreferredLocale(): Locale {
   if (typeof window === 'undefined' || !navigator.language) return DEFAULT_LOCALE
   const lang = navigator.language.toLowerCase()
-  if (lang.startsWith('zh')) return 'zh-CN'
-  if (lang.startsWith('en')) return 'en'
-  if (lang.startsWith('fr')) return 'fr'
+  for (const meta of Object.values(LOCALES)) {
+    if (meta.systemPrefixes.some((p) => lang.startsWith(p))) return meta.id
+  }
   return DEFAULT_LOCALE
 }
 
+/* ------------------------------------------------------------------ *
+ *  DOM sync
+ * ------------------------------------------------------------------ */
+
 function applyLocaleToDOM(locale: Locale) {
   if (typeof document === 'undefined') return
-  document.documentElement.lang = locale === 'zh-CN' ? 'zh-CN' : locale
+  document.documentElement.lang = locale
 }
 
 function notifyListeners() {
   listeners.forEach((listener) => listener())
 }
+
+/* ------------------------------------------------------------------ *
+ *  Public API
+ * ------------------------------------------------------------------ */
 
 export function getLocale(): Locale {
   return currentLocale
@@ -96,6 +134,11 @@ export function subscribeLocale(listener: () => void): () => void {
 /**
  * Dot-path key lookup and parameter interpolation.
  * e.g. translate('nav.dayN', { day: 3 }) => '第 3 天' / 'Day 3'
+ *
+ * Lookup chain: active locale → DEFAULT_LOCALE → key string.
+ * Missing keys in the active locale trigger a dev-only `console.warn`
+ * (deduped per session). Missing keys in the default locale are always
+ * silent (they're a developer bug, not a translation gap).
  */
 export function translate(
   key: TranslationKey,
@@ -103,28 +146,33 @@ export function translate(
   overrideLocale?: Locale,
 ): string {
   const activeLocale = overrideLocale || currentLocale
-  const dict = dictionaries[activeLocale] || dictionaries[DEFAULT_LOCALE]
+  const activeDict = (LOCALES[activeLocale] ?? LOCALES[DEFAULT_LOCALE]).dictionary
+  const defaultDict = LOCALES[DEFAULT_LOCALE].dictionary
 
   const parts = key.split('.')
-  let current: unknown = dict
+  let current: unknown = activeDict
+  let activeMissing = false
 
   for (const part of parts) {
     if (current && typeof current === 'object' && part in current) {
       current = (current as Record<string, unknown>)[part]
     } else {
-      // Fallback to default dictionary if missing in active
-      const fallbackDict = dictionaries[DEFAULT_LOCALE] as unknown as Record<string, unknown>
-      let fallbackVal: unknown = fallbackDict
-      for (const fallbackPart of parts) {
-        if (fallbackVal && typeof fallbackVal === 'object' && fallbackPart in fallbackVal) {
-          fallbackVal = (fallbackVal as Record<string, unknown>)[fallbackPart]
-        } else {
-          fallbackVal = undefined
-          break
-        }
-      }
-      current = typeof fallbackVal === 'string' ? fallbackVal : key
+      activeMissing = true
       break
+    }
+  }
+
+  if (activeMissing) {
+    warnMissingKey(key, activeLocale)
+    // Fall back to the default dictionary.
+    current = defaultDict
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = (current as Record<string, unknown>)[part]
+      } else {
+        current = undefined
+        break
+      }
     }
   }
 
@@ -132,29 +180,23 @@ export function translate(
     return key
   }
 
-  let result = current
-  if (params) {
-    for (const [paramKey, paramValue] of Object.entries(params)) {
-      result = result.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue))
-    }
-  }
+  if (!params) return current
 
+  let result = current
+  for (const [paramKey, paramValue] of Object.entries(params)) {
+    result = result.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue))
+  }
   return result
 }
 
 export function getLlmLanguageInstruction(overrideLocale?: Locale): string {
-  const activeLocale = overrideLocale || currentLocale
-  if (activeLocale === 'en') {
-    return 'Respond and format all descriptive text in natural, elegant English.'
-  }
-  if (activeLocale === 'fr') {
-    return 'Répondez et formulez tous les textes descriptifs en français.'
-  }
-  return '文案使用自然地道的简体中文。'
+  const id = overrideLocale || currentLocale
+  return (LOCALES[id] ?? LOCALES[DEFAULT_LOCALE]).llmInstruction
 }
 
 export function _resetI18nStoreForTests() {
   currentLocale = DEFAULT_LOCALE
   listeners.clear()
+  warnedKeys.clear()
+  devWarnEnabled = false
 }
-

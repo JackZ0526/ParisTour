@@ -1,5 +1,6 @@
 import type { DayPlan, ItineraryStop, Place } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from './dayOrigin'
+import { getLocale, translate } from '../../../shared/i18n'
 
 const STORAGE_KEY = 'paris-tour-itinerary-v1'
 /** Immutable first-generation snapshot for 「恢复默认推荐」. */
@@ -59,7 +60,7 @@ function makeOvernightHotelStop(dayNum: number, existing?: ItineraryStop): Itine
     placeId: SELECTED_HOTEL_PLACE_ID,
     note: existing?.note || '回酒店休息，结束今天的行程。',
     transport: existing?.transport || '地铁 / 步行回酒店',
-    walkLevel: existing?.walkLevel || '很少走',
+    walkLevel: existing?.walkLevel || 'minimal',
     duration: existing?.duration || '过夜',
   }
 }
@@ -127,14 +128,24 @@ export function ensureDay1HotelFirst(days: DayPlan[]): DayPlan[] {
     const hotelStop: ItineraryStop = {
       id: checkIn?.id || `d1-${SELECTED_HOTEL_PLACE_ID}-checkin`,
       // Prefer preserved / computed time; seed 「10:30」 was a static placeholder.
-      time: checkIn?.time || '待定',
+      time:
+        checkIn?.time ||
+        translate('itinerary.pendingTime' as never, undefined, getLocale()),
       placeId: SELECTED_HOTEL_PLACE_ID,
       note:
         checkIn?.note ||
-        '从 CDG 出关后先到酒店办理入住、放下行李，稍作休息再出门。',
-      transport: checkIn?.transport || 'RER B / 出租车自戴高乐机场',
-      walkLevel: checkIn?.walkLevel || '很少走',
-      duration: checkIn?.duration || '入住 30–45 分钟',
+        // Pre-LLM default; when the LLM fills in Day 1 it always overrides this.
+        (getLocale() === 'en'
+          ? 'After clearing CDG, head to the hotel to check in, drop your bags, and rest before going out.'
+          : '从 CDG 出关后先到酒店办理入住、放下行李，稍作休息再出门。'),
+      transport:
+        checkIn?.transport ||
+        translate('itinerary.hotelCheckInTransport' as never, undefined, getLocale()),
+      walkLevel: checkIn?.walkLevel || 'minimal',
+      duration:
+        checkIn?.duration ||
+        translate('itinerary.checkInDuration' as never, undefined, getLocale()) ||
+        'Check-in 30–45 min',
     }
 
     // Preserve a trailing overnight hotel stop if Day 1 already had more than one hotel.
@@ -163,14 +174,24 @@ function cloneDay(day: DayPlan, dayNumber = day.day): DayPlan {
 }
 
 export function blankDay(dayNumber: number): DayPlan {
+  const locale = getLocale()
   return {
     day: dayNumber,
-    title: `第 ${dayNumber} 天`,
-    theme: '自由安排',
-    pace: '适中',
-    summary: '今天还没有安排地点，添加景点后会自动生成标题与总结。',
+    // Use existing nav.dayN; falls back to a locale-aware template.
+    title: translate('nav.dayN' as never, { day: dayNumber }, locale) ||
+      (locale === 'en' ? `Day ${dayNumber}` : `第 ${dayNumber} 天`),
+    theme: translate('itinerary.defaultDayTheme' as never, undefined, locale) ||
+      (locale === 'en' ? 'Free time' : '自由安排'),
+    pace: 'moderate',
+    summary:
+      translate('itinerary.defaultDaySummary' as never, undefined, locale) ||
+      (locale === 'en'
+        ? 'No places added yet — pick spots on the map to start building this day.'
+        : '今天还没有安排地点，添加景点后会自动生成标题与总结。'),
     metroHintFromArea: {
-      custom: '按导航前往下一个地点。',
+      custom:
+        translate('itinerary.navigateHint' as never, undefined, locale) ||
+        (locale === 'en' ? 'Follow navigation to the next stop.' : '按导航前往下一个地点。'),
     },
     stops: [],
   }

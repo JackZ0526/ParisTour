@@ -30,7 +30,33 @@ export const ITINERARY_LOADING_LINES = [
   '正在把用户偏好转成可执行的日程…',
   '正在确认每天的酒店起点与返程安排…',
   '正在完成结构校验，马上就好…',
+] as const
+
+export const ITINERARY_LOADING_LINES_EN: readonly string[] = [
+  'Stitching the day-by-day plan from flight, hotel, and preferences…',
+  'Pulling candidates from Google\'s verified places…',
+  'Comparing ratings, review counts, and route distances…',
+  'Clustering same-day places by neighborhood…',
+  'Checking arrival and return-day time boundaries…',
+  'Balancing meals, sights, and rest…',
+  'Checking for duplicate stops and route detours…',
+  'Translating your preferences into an executable schedule…',
+  'Confirming each day\'s hotel start and return…',
+  'Finalizing the structure check, almost there…',
 ]
+
+/**
+ * Locale-aware generating line rotator. ZH keeps the original poetic lines;
+ * everything else falls back to the English list. The hook and any future
+ * call site should read this through `getItineraryGeneratingLines(getLocale())`
+ * (or pass an explicit locale override) so the cycle rotates in the right
+ * language.
+ */
+export function getItineraryGeneratingLines(
+  locale: Locale = getLocale(),
+): readonly string[] {
+  return locale === 'en' ? ITINERARY_LOADING_LINES_EN : ITINERARY_LOADING_LINES
+}
 
 export const ITINERARY_LOADING_ROTATE_MS = 3200
 
@@ -129,15 +155,28 @@ export function syncDaysCopyToHotelArea(days: DayPlan[], hotelAreaKey: string): 
   return changed ? next : days
 }
 
-export function seasonEyebrow(startDate?: string | null, destination?: string): string {
+export function seasonEyebrow(
+  startDate?: string | null,
+  destination?: string,
+  locale: Locale = getLocale(),
+): string {
   const dest = destination?.trim()
-  if (!startDate) return dest ? `${dest} Escape` : 'Next Escape'
+  if (locale === 'en') {
+    if (!startDate) return dest ? `${dest} Escape` : 'Next Escape'
+    const month = new Date(`${startDate}T12:00:00`).getMonth() + 1
+    if (Number.isNaN(month)) return dest ? `${dest} Escape` : 'Next Escape'
+    if (month >= 3 && month <= 5) return 'Spring Escape'
+    if (month >= 6 && month <= 8) return 'Summer Escape'
+    if (month >= 9 && month <= 11) return 'Autumn Escape'
+    return 'Winter Escape'
+  }
+  if (!startDate) return dest ? `${dest} 出行` : '下次出行'
   const month = new Date(`${startDate}T12:00:00`).getMonth() + 1
-  if (Number.isNaN(month)) return dest ? `${dest} Escape` : 'Next Escape'
-  if (month >= 3 && month <= 5) return 'Spring Escape'
-  if (month >= 6 && month <= 8) return 'Summer Escape'
-  if (month >= 9 && month <= 11) return 'Autumn Escape'
-  return 'Winter Escape'
+  if (Number.isNaN(month)) return dest ? `${dest} 出行` : '下次出行'
+  if (month >= 3 && month <= 5) return `${dest || ''} 春季出行`.trim()
+  if (month >= 6 && month <= 8) return `${dest || ''} 夏季出行`.trim()
+  if (month >= 9 && month <= 11) return `${dest || ''} 秋季出行`.trim()
+  return `${dest || ''} 冬季出行`.trim()
 }
 
 import { getLocale, type Locale } from './shared/i18n'
@@ -154,7 +193,13 @@ export function destinationLabel(destination: string, locale: Locale = getLocale
   return trimmed || '目的地'
 }
 
-export function chineseDayCount(n: number): string {
+/**
+ * Locale-aware day count label.
+ * ZH: Chinese numeral + 「天」 (e.g. 1 → 「一天」, 5 → 「五天」).
+ * EN: Arabic digit + " " + day/days (e.g. 1 → "1 day", 5 → "5 days").
+ */
+export function dayCountLabel(n: number, locale: Locale = getLocale()): string {
+  if (locale === 'en') return `${n} ${n === 1 ? 'day' : 'days'}`
   const map: Record<number, string> = {
     1: '一',
     2: '二',
@@ -170,10 +215,33 @@ export function chineseDayCount(n: number): string {
   return `${map[n] || n}天`
 }
 
-export function hotelAreaShort(hotel: SelectedHotel): string | null {
+/**
+ * Parallel English names for the same 6 area keys, used when the active
+ * locale is `en`. Kept side-by-side with `AREA_KEY_CN` so any other locale
+ * in the future can add its own map.
+ */
+export const AREA_KEY_EN: Record<string, string> = {
+  marais: 'Marais',
+  opera: 'Opéra',
+  boulevards: ' Grands Boulevards',
+  saintGermain: 'Saint-Germain',
+  latin: 'Latin Quarter',
+  trocadero: 'Trocadéro',
+}
+
+/**
+ * Resolve a short area label for a hotel, switching by active locale.
+ * Returns `null` when the hotel has no areaKey (caller decides what to
+ * show — usually the bare hotel name).
+ */
+export function hotelAreaShort(
+  hotel: SelectedHotel,
+  locale: Locale = getLocale(),
+): string | null {
   if (!hotel.areaKey) return null
-  const cn = AREA_KEY_CN[hotel.areaKey]
-  if (cn) return cn
+  const map = locale === 'en' ? AREA_KEY_EN : AREA_KEY_CN
+  const label = map[hotel.areaKey]
+  if (label) return label.trim()
   // `hotel.area` is a legacy field on some hotel shapes but isn't in
   // SelectedHotel; fall back to areaKey as a last resort.
   return null
@@ -192,13 +260,23 @@ export function hasTripDates(tripDates: TripDateRange | null | undefined): boole
   return Boolean(tripDates?.startDate && tripDates?.endDate)
 }
 
-export function itineraryMissingLabels(input: {
-  datesReady: boolean
-  outboundReady: boolean
-  returnReady: boolean
-  hotelReady: boolean
-}): string[] {
+export function itineraryMissingLabels(
+  input: {
+    datesReady: boolean
+    outboundReady: boolean
+    returnReady: boolean
+    hotelReady: boolean
+  },
+  locale: Locale = getLocale(),
+): string[] {
   const missing: string[] = []
+  if (locale === 'en') {
+    if (!input.datesReady) missing.push('dates')
+    if (!input.outboundReady) missing.push('outbound flight')
+    if (!input.returnReady) missing.push('return flight')
+    if (!input.hotelReady) missing.push('hotel')
+    return missing
+  }
   if (!input.datesReady) missing.push('日期')
   if (!input.outboundReady) missing.push('去程')
   if (!input.returnReady) missing.push('返程')
@@ -211,6 +289,7 @@ export function buildHeroCopy(
   tripDates: TripDateRange | null,
   hotel: SelectedHotel,
   days: DayPlan[],
+  locale: Locale = getLocale(),
 ): { eyebrow: string; title: string; blurb: string; tags: string[] } {
   const hotelOn = isHotelSelected(hotel)
   const planDays = Math.max(1, days.length || 1)
@@ -218,22 +297,30 @@ export function buildHeroCopy(
   const tripDayCount = tripDates
     ? daysBetween(tripDates.startDate, tripDates.endDate) || planDays
     : planDays
-  const durationLabel = chineseDayCount(tripDayCount)
+  const durationLabel = dayCountLabel(tripDayCount, locale)
   const dest = destination.trim()
-  const destLabel = destinationLabel(destination)
-  const area = hotelOn ? hotelAreaShort(hotel) : null
+  const destLabel = destinationLabel(destination, locale)
+  const area = hotelOn ? hotelAreaShort(hotel, locale) : null
   const hotelPhrase = hotelOn
     ? area
-      ? `${area}的${hotel.name}`
+      ? locale === 'en'
+        ? `${hotel.name} in ${area}`
+        : `${area}的${hotel.name}`
       : hotel.name
     : null
 
-  const eyebrow = seasonEyebrow(tripDates?.startDate, dest)
+  const eyebrow = seasonEyebrow(tripDates?.startDate, dest, locale)
   const title = tripDates
-    ? `${dest || '行程'} · ${durationLabel}`
+    ? locale === 'en'
+      ? `${dest || 'Trip'} · ${durationLabel}`
+      : `${dest || '行程'} · ${durationLabel}`
     : dest
-      ? `${dest} Tour`
-      : '下次去哪儿？'
+      ? locale === 'en'
+        ? `${dest} Tour`
+        : `${dest} Tour`
+      : locale === 'en'
+        ? 'Where to next?'
+        : '下次去哪儿？'
 
   const tags: string[] = []
   if (tripDates) {
@@ -241,36 +328,65 @@ export function buildHeroCopy(
       `${formatTripDayLabel(tripDates.startDate)} – ${formatTripDayLabel(tripDates.endDate)}`,
     )
   } else {
-    tags.push('日期待定')
+    tags.push(locale === 'en' ? 'Dates pending' : '日期待定')
   }
-  tags.push('市内地铁 + 步行')
+  tags.push(locale === 'en' ? 'Metro + walking' : '市内地铁 + 步行')
   const themes = itineraryThemeTags(days)
   if (themes.length) tags.push(themes.join(' · '))
-  if (hotelOn && area) tags.push(`住${area}`)
-  else if (hotelOn) tags.push('酒店已定')
-  else tags.push('酒店待选')
+  if (hotelOn && area) {
+    tags.push(locale === 'en' ? `Stay in ${area}` : `住${area}`)
+  } else if (hotelOn) {
+    tags.push(locale === 'en' ? 'Hotel confirmed' : '酒店已定')
+  } else {
+    tags.push(locale === 'en' ? 'Hotel pending' : '酒店待选')
+  }
+
+  const dateRangeLabel =
+    tripDates
+      ? `${formatTripDayLabel(tripDates.startDate)}–${formatTripDayLabel(tripDates.endDate)}`
+      : ''
 
   let blurb: string
   if (tripDates && hotelPhrase) {
     blurb = dest
-      ? `温哥华往返 · 目的地${destLabel}，${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}，住${hotelPhrase}。航班、路线和你的推荐偏好会一起决定每天的节奏。`
-      : `温哥华往返 · ${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}，住${hotelPhrase}。闹钟可以偷懒，行程不行——先定下目的地，故事才真正开场。`
+      ? locale === 'en'
+        ? `Round-trip · destination ${destLabel}, ${dateRangeLabel}, total ${durationLabel}, stay at ${hotelPhrase}. Flights, routes, and your preferences together shape each day's pace.`
+        : `温哥华往返 · 目的地${destLabel}，${dateRangeLabel}，共${durationLabel}，住${hotelPhrase}。航班、路线和你的推荐偏好会一起决定每天的节奏。`
+      : locale === 'en'
+        ? `Round-trip · ${dateRangeLabel}, total ${durationLabel}, stay at ${hotelPhrase}. The alarm can slack off, but the itinerary can't — pick a destination first and the story truly begins.`
+        : `温哥华往返 · ${dateRangeLabel}，共${durationLabel}，住${hotelPhrase}。闹钟可以偷懒，行程不行——先定下目的地，故事才真正开场。`
   } else if (tripDates) {
     blurb = dest
-      ? `温哥华往返 · ${destLabel}，${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}。日期敲定了，枕头还在待业——节奏先留白，酒店一落定，动线就会乖乖跟着你跑。`
-      : `温哥华往返 · ${formatTripDayLabel(tripDates.startDate)}至${formatTripDayLabel(tripDates.endDate)}，共${durationLabel}。日期敲定了，目的地与酒店却还在「待议」——先点亮目的地，行程才有坐标。`
+      ? locale === 'en'
+        ? `Round-trip · ${destLabel}, ${dateRangeLabel}, total ${durationLabel}. Dates are set, but the pillow is still idle — leave the rhythm open, and once the hotel is locked, the route will obediently follow.`
+        : `温哥华往返 · ${destLabel}，${dateRangeLabel}，共${durationLabel}。日期敲定了，枕头还在待业——节奏先留白，酒店一落定，动线就会乖乖跟着你跑。`
+      : locale === 'en'
+        ? `Round-trip · ${dateRangeLabel}, total ${durationLabel}. Dates are set, but the destination and hotel are still pending — light up the destination first, and the itinerary will have a coordinate.`
+        : `温哥华往返 · ${dateRangeLabel}，共${durationLabel}。日期敲定了，目的地与酒店却还在「待议」——先点亮目的地，行程才有坐标。`
   } else if (hotelPhrase) {
     const themeHint =
       themes.length > 0
-        ? `市内地铁加步行主打，${themes.join('、')}已塞进行程口袋。`
-        : '市内地铁加步行主打，日期一敲定，节奏立刻显形。'
+        ? locale === 'en'
+          ? `Metro + walking as the main mode; ${themes.join(', ')} already packed in.`
+          : `市内地铁加步行主打，${themes.join('、')}已塞进行程口袋。`
+        : locale === 'en'
+          ? 'Metro + walking as the main mode; once dates are set, the rhythm will take shape.'
+          : '市内地铁加步行主打，日期一敲定，节奏立刻显形。'
     blurb = dest
-      ? `温哥华往返 · ${destLabel}，落脚${hotelPhrase}。床位已锁定，出发日还在装神秘；${themeHint}`
-      : `温哥华往返 · 落脚${hotelPhrase}。床位已锁定，目的地与出发日还在装神秘；${themeHint}`
+      ? locale === 'en'
+        ? `Round-trip · ${destLabel}, staying at ${hotelPhrase}. Bed is locked, but the departure date is still playing coy; ${themeHint}`
+        : `温哥华往返 · ${destLabel}，落脚${hotelPhrase}。床位已锁定，出发日还在装神秘；${themeHint}`
+      : locale === 'en'
+        ? `Round-trip · staying at ${hotelPhrase}. Bed is locked, but the destination and departure date are still playing coy; ${themeHint}`
+        : `温哥华往返 · 落脚${hotelPhrase}。床位已锁定，目的地与出发日还在装神秘；${themeHint}`
   } else if (dest) {
-    blurb = `温哥华往返 · ${destLabel}${chineseDayCount(planDays)}雏形已就位，日期与酒店却还在「待议」。先点亮这两项，行程才会从草稿升级成正经旅行。`
+    blurb = locale === 'en'
+      ? `Round-trip · ${destLabel} ${dayCountLabel(planDays, locale)} draft is in place, but the dates and hotel are still pending. Light up those two and the trip graduates from draft to real travel.`
+      : `温哥华往返 · ${destLabel}${dayCountLabel(planDays, locale)}雏形已就位，日期与酒店却还在「待议」。先点亮这两项，行程才会从草稿升级成正经旅行。`
   } else {
-    blurb = `温哥华往返 · 先告诉我这次要去哪儿，再排日期、航班与酒店。目的地一定，后面的行程才有根。`
+    blurb = locale === 'en'
+      ? 'Round-trip · tell me where this time, then we can sort out the dates, flights, and hotel. Set the destination and everything else has a root to grow from.'
+      : '温哥华往返 · 先告诉我这次要去哪儿，再排日期、航班与酒店。目的地一定，后面的行程才有根。'
   }
 
   return { eyebrow, title, blurb, tags }

@@ -86,8 +86,8 @@ export function DateRangePicker({
   placeholder,
   id: idProp,
 }: Props) {
-  const { locale } = useTranslation()
-  const defaultPlaceholder = locale === 'en' ? 'Depart – Return' : '出发 – 返程'
+  const { t, locale } = useTranslation()
+  const defaultPlaceholder = t('itinerary.dateRangePlaceholder')
   const autoId = useId()
   const id = idProp ?? autoId
   const rootRef = useRef<HTMLDivElement>(null)
@@ -222,9 +222,9 @@ export function DateRangePicker({
     : (placeholder || defaultPlaceholder)
 
   const hint = pickingEnd
-    ? (locale === 'en' ? 'Click again to select return date' : '再点一次选择返程日期')
+    ? t('itinerary.clickAgainReturn')
     : open
-      ? (locale === 'en' ? 'Select departure date, then return date' : '先选出发日期，再选返程')
+      ? t('itinerary.selectDepartThenReturn')
       : null
 
   const reduce = useReducedMotion()
@@ -284,7 +284,7 @@ export function DateRangePicker({
         {open && (
           <motion.div
             role="dialog"
-            aria-label={label ? `${label}` : (locale === 'en' ? 'Select trip dates' : '选择行程日期')}
+            aria-label={label ? `${label}` : t('itinerary.selectDatesAria')}
             initial={popoverAnim.initial}
             animate={popoverAnim.animate}
             exit={popoverAnim.exit}
@@ -295,7 +295,7 @@ export function DateRangePicker({
             <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
               <button
                 type="button"
-                aria-label={locale === 'en' ? 'Previous month' : '上一个月'}
+                aria-label={t('itinerary.prevMonth')}
                 onClick={() => shiftMonth(-1)}
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/10 text-[var(--stone)] shadow-xs transition-colors hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95"
               >
@@ -306,7 +306,7 @@ export function DateRangePicker({
               </p>
               <button
                 type="button"
-                aria-label={locale === 'en' ? 'Next month' : '下一个月'}
+                aria-label={t('itinerary.nextMonth')}
                 onClick={() => shiftMonth(1)}
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/10 text-[var(--stone)] shadow-xs transition-colors hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95"
               >
@@ -427,11 +427,11 @@ export function DateRangePicker({
               <span className="inline-flex items-center gap-2">
                 <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.copper} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--copper)] font-medium`}>
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--copper)]" />
-                  {locale === 'en' ? 'Depart' : '出发'}
+                  {t('itinerary.depart')}
                 </span>
                 <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[var(--sage)] font-medium`}>
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
-                  {locale === 'en' ? 'Return' : '返程'}
+                  {t('itinerary.return')}
                 </span>
               </span>
               {hint && <span className="font-medium text-[var(--ink)]">{hint}</span>}

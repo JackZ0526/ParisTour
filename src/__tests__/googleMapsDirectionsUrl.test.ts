@@ -29,9 +29,9 @@ describe('Google Maps direction links', () => {
   })
 
   it('prefers explicit transit copy over a generic walking-level hint', () => {
-    expect(inferGoogleMapsTravelMode('地铁 8 号线', '短步行')).toBe('transit')
-    expect(inferGoogleMapsTravelMode('步行 8 分钟', '短步行')).toBe('walking')
-    expect(inferGoogleMapsTravelMode('出租车', '很少走')).toBe('transit')
+    expect(inferGoogleMapsTravelMode('地铁 8 号线', 'short')).toBe('transit')
+    expect(inferGoogleMapsTravelMode('步行 8 分钟', 'short')).toBe('walking')
+    expect(inferGoogleMapsTravelMode('出租车', 'minimal')).toBe('transit')
   })
 
   it('uses Place IDs when valid and disambiguated names otherwise', () => {

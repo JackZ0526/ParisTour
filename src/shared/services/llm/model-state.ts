@@ -12,8 +12,9 @@ import {
   defaultOpenAIModelFromEnv,
   llmStorageKeys,
 } from '../../../config/llmModels'
-import { THINKING_MODE_OPTIONS, THINKING_EFFORT_OPTIONS, isLockedThinkingMode } from './thinking'
+import { isLockedThinkingMode } from './thinking'
 import type { ThinkingEffortUi, ThinkingMode, ThinkingToggle } from './types'
+import { getLocale, translate, type TranslationKey } from '../../i18n'
 
 type ThinkingActiveMode = 'auto' | ThinkingEffortUi
 
@@ -214,15 +215,33 @@ export function getThinkingEffort(): ThinkingEffortUi {
   return activeThinking.lastEffort || 'medium'
 }
 
+function thinkingModeLabelKey(mode: ThinkingMode): TranslationKey {
+  switch (mode) {
+    case 'auto': return 'llm.thinkingModeAuto'
+    case 'off': return 'llm.thinkingModeOff'
+    case 'low': return 'llm.thinkingModeLow'
+    case 'medium': return 'llm.thinkingModeMedium'
+    case 'high': return 'llm.thinkingModeHigh'
+  }
+}
+
 export function getThinkingModeLabel(mode = getThinkingMode()): string {
-  return THINKING_MODE_OPTIONS.find((o) => o.id === mode)?.label || '自动'
+  return translate(thinkingModeLabelKey(mode), undefined, getLocale())
+}
+
+function thinkingEffortLabelKey(effort: ThinkingEffortUi): TranslationKey {
+  switch (effort) {
+    case 'low': return 'llm.thinkingModeLow'
+    case 'medium': return 'llm.thinkingModeMedium'
+    case 'high': return 'llm.thinkingModeHigh'
+  }
 }
 
 export function getThinkingEffortLabel(
   effort: ThinkingEffortUi | ThinkingMode = getThinkingMode(),
 ): string {
   if (effort === 'auto' || effort === 'off') return getThinkingModeLabel(effort)
-  return THINKING_EFFORT_OPTIONS.find((o) => o.id === effort)?.label || '中'
+  return translate(thinkingEffortLabelKey(effort as ThinkingEffortUi), undefined, getLocale())
 }
 
 /** Compact FAB chip label — model short name only (thinking mode lives in the popover / title). */

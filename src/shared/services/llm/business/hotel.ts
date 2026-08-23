@@ -264,30 +264,56 @@ export async function recommendHotelsForTrip(input?: {
   const count = Math.max(1, Math.min(8, input?.count || 5))
   const preferences = input?.preferences?.trim() || ''
   const dayCount = input?.dayCount && input.dayCount > 0 ? input.dayCount : undefined
-  const tripLabel = dayCount ? `${dayCount}日巴黎行程` : '巴黎行程'
+  const activeLocale = getLocale()
+  const langRule = getLlmLanguageInstruction()
+  const isEn = activeLocale === 'en'
+  const tripLabel = isEn
+    ? `${dayCount || ''} day${dayCount === 1 ? '' : 's'} in Paris`.trim()
+    : dayCount
+      ? `${dayCount}日巴黎行程`
+      : '巴黎行程'
   const system = buildPrompt(
-    `巴黎旅行住宿顾问。为温哥华出发的${tripLabel}从已验证候选中挑选酒店。`,
+    isEn
+      ? 'Paris accommodation advisor. Pick the best-fit hotels from verified Booking candidates for a Vancouver-originated Paris trip.'
+      : `巴黎旅行住宿顾问。为温哥华出发的${tripLabel}从已验证候选中挑选酒店。`,
     null,
     COMMON_RULES,
     PLACE_RESEARCH_DISCIPLINE,
     `<hard_rules>
-- 恰好推荐 ${count} 家真实酒店（中档为主，可含 1 家稍高档）。
-- area 统一写成「N区 (Français / 中文)」格式，例如「4区 (Marais / 玛黑)」「9区 (Opéra / 歌剧院)」「16区 (Trocadéro / 特罗卡德罗)」。
-- 优先 3–4区玛黑 / 2区大林荫道 / 9区歌剧院 / 6区圣日耳曼 / 5区拉丁区 等地铁便利区。
-- 若提供 userPreferences，必须优先满足（区位、预算、风格、安静/便利等）。
-- name 使用 Booking 返回的正式店名；尽量附带含邮编的 address（如 75004 Paris）。
-- 只能从 verifiedCandidates 中选择；name、bookingHotelId 与 address 必须原样复制，不得编造酒店或评分。
+- ${langRule}
+- Recommend exactly ${count} real hotels (mid-range primary, may include 1 upscale).
 - ${
-    count === 1
-      ? '仅 1 家时 isBest 必须为 true。'
-      : '恰好 1 家 isBest=true 作为最优推荐，其余 false。'
-  }
-- batch>1 时给出明显不同的新名单，避开 avoidAlso。
-- description：2 句中文；reason：一句话为何适合本次行程/用户偏好。
+      isEn
+        ? `area: write as "Nth Arr. (Quartier)" e.g. "4th Arr. (Marais)", "9th Arr. (Opéra)", "16th Arr. (Trocadéro)".`
+        : `area 统一写成「N区 (Français / 中文)」格式，例如「4区 (Marais / 玛黑)」「9区 (Opéra / 歌剧院)」「16区 (Trocadéro / 特罗卡德罗)」。`
+    }
+- ${
+      isEn
+        ? 'Prioritize 3rd–4th Marais / 2nd Grands Boulevards / 9th Opéra / 6th Saint-Germain / 5th Latin — all metro-convenient.'
+        : '优先 3–4区玛黑 / 2区大林荫道 / 9区歌剧院 / 6区圣日耳曼 / 5区拉丁区 等地铁便利区。'
+    }
+- If userPreferences is provided, prioritize it (district, budget, vibe, quiet/convenient, etc.).
+- name must use the official Booking name; include postal-code address when possible (e.g. 75004 Paris).
+- Only pick from verifiedCandidates; copy name, bookingHotelId, address verbatim — do not invent hotels or ratings.
+- ${
+      count === 1
+        ? 'When count is 1, isBest must be true.'
+        : 'Exactly 1 hotel has isBest=true as the top pick; the rest false.'
+    }
+- batch>1: produce a clearly different list, avoiding avoidAlso.
+- ${
+      isEn
+        ? 'description: 2 fluent English sentences highlighting district / property character / nearby metro. reason: one English sentence on why it fits this trip / user preferences.'
+        : 'description：2 句中文；reason：一句话为何适合本次行程/用户偏好。'
+    }
 </hard_rules>`,
     jsonContract(
-      '{ hotels: [{ name, bookingHotelId?, area: "N区 (Français / 中文)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }',
-      '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "bookingHotelId": "...", "area": "4区 (Marais / 玛黑)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "nearestMetro": "Saint-Sébastien – Froissart (8号线)", "priceHint": "€€€", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。", "isBest": true }] }',
+      isEn
+        ? '{ hotels: [{ name, bookingHotelId?, area: "Nth Arr. (Quartier)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }'
+        : '{ hotels: [{ name, bookingHotelId?, area: "N区 (Français / 中文)", address?, description, nearestMetro?, priceHint?, reason, isBest: boolean }] }',
+      isEn
+        ? '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "bookingHotelId": "...", "area": "4th Arr. (Marais)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "Boutique hideaway in the heart of the Marais, with interiors by Christian Lacroix. Walkable to small bistros and galleries.", "nearestMetro": "Saint-Sébastien – Froissart (Line 8)", "priceHint": "€€€", "reason": "Central Marais location with Line 8 metro access — easy transfers to Right Bank classics and day trips.", "isBest": true }] }'
+        : '{ "hotels": [{ "name": "Hôtel du Petit Moulin", "bookingHotelId": "...", "area": "4区 (Marais / 玛黑)", "address": "29-31 rue de Poitou, 75003 Paris", "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "nearestMetro": "Saint-Sébastien – Froissart (8号线)", "priceHint": "€€€", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。", "isBest": true }] }',
     ),
   )
   const user = JSON.stringify({
@@ -353,13 +379,17 @@ export async function recommendHotelsForTrip(input?: {
     out.push({
       bookingHotelId: verified.id,
       name,
-      area: String(row.area || '巴黎市区').trim() || '巴黎市区',
+      area: isEn
+        ? String(row.area || 'Central Paris').trim() || 'Central Paris'
+        : String(row.area || '巴黎市区').trim() || '巴黎市区',
       address: verified.address || String(row.address || '').trim() || undefined,
       description:
-        String(row.description || row.reason || '').trim() || `${name}，适合巴黎行程住宿。`,
+        String(row.description || row.reason || '').trim() ||
+        (isEn ? `${name}, a comfortable base for your Paris stay.` : `${name}，适合巴黎行程住宿。`),
       nearestMetro: String(row.nearestMetro || '').trim() || undefined,
       priceHint: String(row.priceHint || '').trim() || undefined,
-      reason: String(row.reason || '地铁便利，适合本次行程').trim(),
+      reason: String(row.reason || '').trim() ||
+        (isEn ? 'Metro-convenient location suitable for this trip.' : '地铁便利，适合本次行程'),
       isBest: Boolean(row.isBest),
     })
     seen.add(key)
@@ -383,4 +413,89 @@ export async function recommendHotelsForTrip(input?: {
   }
 
   return out
+}
+
+/**
+ * Regenerate just the locale-sensitive prose fields (`description` and `reason`)
+ * for a single existing hotel, without changing the hotel itself.
+ *
+ * Used by the locale-switch regen hook to translate a stored Chinese
+ * recommendation into English (or vice versa) when the user switches
+ * interface language.
+ */
+export async function regenerateHotelLanguageFields(input: {
+  name: string
+  area?: string
+  address?: string
+  description?: string
+  reason?: string
+  nearestMetro?: string
+  rating?: number
+  reviewCount?: number
+  starRating?: number
+  propertyType?: string
+  isBest?: boolean
+  locale: Locale
+  signal?: AbortSignal
+}): Promise<{ description: string; reason: string } | null> {
+  if (!isLlmConfigured()) return null
+
+  const isEn = input.locale === 'en'
+  const langRule = getLlmLanguageInstruction(input.locale)
+  const system = buildPrompt(
+    isEn
+      ? 'Paris accommodation copywriter. Rewrite the language fields of an existing hotel recommendation into natural, fluent English for the target locale.'
+      : '巴黎住宿文案编辑。把现有酒店推荐的语言字段改写成目标 locale 的自然、流畅表达。',
+    null,
+    `<hard_rules>
+- ${langRule}
+- Do NOT change the hotel's identity (name, address, nearestMetro, area, isBest) — copy them verbatim.
+- Output exactly two fields: "description" (1–2 sentences) and "reason" (1 short sentence on fit).
+- Base the rewrite on the existing description / reason; do not invent amenities or facts.
+- If a field is empty in the source, write a short, neutral, factual fallback in the target language.
+</hard_rules>`,
+    jsonContract(
+      isEn
+        ? '{ description: "string", reason: "string" }'
+        : '{ description: "string", reason: "string" }',
+      isEn
+        ? '{ "description": "A boutique hideaway in the heart of the Marais, with interiors by Christian Lacroix. Walkable to small bistros and galleries.", "reason": "Central Marais location with Line 8 metro access." }'
+        : '{ "description": "玛黑心脏地带的精品酒店，由 Christian Lacroix 设计内饰。步行可达多家小馆与画廊。", "reason": "玛黑中心、地铁 8 号线，去右岸经典与迪士尼换乘都方便。" }',
+    ),
+  )
+  const user = JSON.stringify({
+    locale: input.locale,
+    hotel: {
+      name: input.name,
+      area: input.area || '',
+      address: input.address || '',
+      nearestMetro: input.nearestMetro || '',
+      starRating: input.starRating ?? null,
+      propertyType: input.propertyType || '',
+      rating: input.rating ?? null,
+      reviewCount: input.reviewCount ?? null,
+      isBest: Boolean(input.isBest),
+    },
+    existing: {
+      description: input.description || '',
+      reason: input.reason || '',
+    },
+  })
+
+  const text = await generateText(system, user, {
+    strict: true,
+    task: 'hotelDetail',
+    json: true,
+    webSearch: false,
+    userText: input.name,
+  })
+  if (!text) return null
+
+  const parsed = extractJsonObject(text)
+  if (!parsed) return null
+
+  const description = String(parsed.description || '').trim()
+  const reason = String(parsed.reason || '').trim()
+  if (!description && !reason) return null
+  return { description, reason }
 }

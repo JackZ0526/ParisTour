@@ -48,6 +48,7 @@ import {
 import { PlaceName } from './PlaceName'
 import { PlacePhotoGallery } from './PlacePhotoGallery'
 import type { PlaceInfoSource } from '../services/placeSource'
+import { useTranslation } from '../../../shared/i18n'
 import {
   fetchWikimediaPlacePhoto,
   type WikimediaPlacePhoto,
@@ -71,19 +72,19 @@ interface Props {
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80'
 
-const typeLabel: Record<PlaceType, string> = {
-  cafe: '咖啡馆',
-  attraction: '景点',
-  restaurant: '餐厅',
-  transport: '交通',
-  hotel: '酒店',
+const typeLabelKey: Record<PlaceType, string> = {
+  cafe: 'place.addCafeOption',
+  attraction: 'place.monument',
+  restaurant: 'place.addRestaurantOption',
+  transport: 'itinerary.transitMode',
+  hotel: 'itinerary.hotelStop',
 }
 
-const recommendTabs: Array<{ id: RecommendPlaceType; label: string }> = [
-  { id: 'attraction', label: '景点' },
-  { id: 'cafe', label: '咖啡馆' },
-  { id: 'restaurant', label: '餐厅' },
-]
+const recommendTabKeys: Record<RecommendPlaceType, string> = {
+  attraction: 'place.monument',
+  cafe: 'place.addCafeOption',
+  restaurant: 'place.addRestaurantOption',
+}
 
 const GOOGLE_PLACE_LABELS = {
   title: '行程顾问点评',
@@ -106,6 +107,7 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
+  const { t } = useTranslation()
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -383,8 +385,8 @@ export function AddPlaceDialog({
       const returnedTypes = new Set(list.map((item) => item.type))
       if (!list.length) {
         const message = isLlmConfigured()
-          ? '这次没有可用推荐，请再点「换一批」或改用 Google 搜索。'
-          : '推荐助手暂不可用，请改用 Google 搜索。'
+          ? t('place.recsEmpty')
+          : t('place.recsUnavailable')
         setRecErrors((prev) => ({
           ...prev,
           ...Object.fromEntries(types.map((type) => [type, message])),
@@ -469,8 +471,7 @@ export function AddPlaceDialog({
       }
       if (epoch !== recommendationEpochRef.current) return
 
-      const remaining = recommendTabs
-        .map((tab) => tab.id)
+      const remaining = (Object.keys(recommendTabKeys) as RecommendPlaceType[])
         .filter((type) => type !== primaryType && !hasFullType(type))
       if (remaining.length) {
         await fetchRecommendations({
@@ -698,7 +699,7 @@ export function AddPlaceDialog({
       if (isLlmConfigured() && !hasUsefulIntro) {
         const blurb = await generatePlaceDescription({
           name: details.name,
-          type: typeLabel[type] || type,
+          type: t(typeLabelKey[type] as never) || type,
           address: details.address,
           googleSummary: details.summary || intro,
         })
@@ -751,7 +752,7 @@ export function AddPlaceDialog({
         ratingHint:
           details.rating != null
             ? `Google ★ ${details.rating.toFixed(1)}`
-            : 'AI 推荐 / Google 地点',
+            : t('place.aiOrGoogle'),
         priceHint: details.priceLevel,
         image: mainPhoto || wikimediaPhoto?.url || FALLBACK_IMAGE,
         location: details.location,
@@ -945,7 +946,7 @@ export function AddPlaceDialog({
         <div ref={chromeRef} className="shrink-0">
           <div className="flex items-center justify-between border-b border-[var(--mist)] px-4 py-3">
             <div>
-              <h3 className="font-display text-2xl">添加地点</h3>
+              <h3 className="font-display text-2xl">{t('place.addPlace')}</h3>
             </div>
             <CloseIconButton onClick={onClose} className="hidden sm:flex mt-0.5" />
           </div>
@@ -954,7 +955,7 @@ export function AddPlaceDialog({
             <div
               className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/50 dark:bg-black/35 p-1 shadow-sm dark:shadow-none backdrop-blur-md"
               role="tablist"
-              aria-label="添加地点视图"
+              aria-label={t('place.addPlaceView')}
             >
               <button
                 type="button"
@@ -994,7 +995,7 @@ export function AddPlaceDialog({
                     mainTab === 'ai' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                   }`}
                 >
-                  AI 推荐
+                  {t('place.tabAiRecs')}
                 </span>
               </button>
               <button
@@ -1035,7 +1036,7 @@ export function AddPlaceDialog({
                     mainTab === 'google' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                   }`}
                 >
-                  Google 搜索
+                  {t('place.tabGoogleSearch')}
                 </span>
               </button>
             </div>
@@ -1055,21 +1056,21 @@ export function AddPlaceDialog({
           {mainTab === 'ai' ? (
             <div className="space-y-3">
               <p className="text-xs text-[var(--stone)]">
-                根据今天「{dayTitle}」给出推荐。点「换一批」可刷新列表；已加入行程的地点会暂时隐藏。
+                {t('place.recsIntro', { title: dayTitle })}
               </p>
 
               <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {recommendTabs.map((tab) => {
-                  const active = category === tab.id
+                {(Object.keys(recommendTabKeys) as RecommendPlaceType[]).map((tabId) => {
+                  const active = category === tabId
                   return (
                     <button
-                      key={tab.id}
+                      key={tabId}
                       type="button"
                       onClick={() => {
                         setHasSwitchedCategory(true)
-                        setCategory(tab.id)
+                        setCategory(tabId)
                         setExpandedKey(null)
-                        void ensureRecommendationCategory(tab.id)
+                        void ensureRecommendationCategory(tabId)
                       }}
                       className="relative isolate shrink-0 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/5 px-3 py-1.5 text-sm transition-colors hover:bg-white/90 dark:hover:bg-white/15"
                     >
@@ -1100,11 +1101,11 @@ export function AddPlaceDialog({
                           active ? 'text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                         }`}
                       >
-                        {tab.label}
+                        {t(recommendTabKeys[tabId] as never)}
                         <span className={`ml-1 ${active ? 'text-white/80' : 'opacity-70'}`}>
-                          {loadingByCategory[tab.id] && !grouped[tab.id].length
+                          {loadingByCategory[tabId] && !grouped[tabId].length
                             ? '(…)'
-                            : `(${grouped[tab.id].length})`}
+                            : `(${grouped[tabId].length})`}
                         </span>
                       </span>
                     </button>
@@ -1293,7 +1294,7 @@ export function AddPlaceDialog({
                   })}
                   {!visible.length && (
                     <p className="py-6 text-center text-sm text-[var(--stone)]">
-                      这一类暂时没有推荐，可切换其他分类、换一批，或用 Google 搜索。
+                      {t('place.recsCategoryEmpty')}
                     </p>
                   )}
                 </ul>
@@ -1310,7 +1311,7 @@ export function AddPlaceDialog({
                   {refreshingRecs && (
                     <ButtonSpinner mode="thinking" task="placeRecommend" />
                   )}
-                  {refreshingRecs ? '正在换一批…' : '换一批'}
+                  {refreshingRecs ? t('place.refreshingRecs') : t('place.refreshRecs')}
                 </button>
               )}
 
@@ -1344,8 +1345,8 @@ export function AddPlaceDialog({
                   className="mt-1 w-full rounded-xl border border-[var(--mist)] dark:border-white/10 bg-white/80 dark:bg-black/35 px-3 py-2 text-base text-[var(--ink)]"
                 >
                   <option value="attraction">景点</option>
-                  <option value="cafe">咖啡馆</option>
-                  <option value="restaurant">餐厅</option>
+                  <option value="cafe">{t('place.addCafeOption')}</option>
+                  <option value="restaurant">{t('place.addRestaurantOption')}</option>
                   <option value="transport">交通</option>
                 </select>
               </label>

@@ -18,6 +18,7 @@ import {
   subscribeApiRequestMeter,
   type ApiRequestMeterSnapshot,
 } from '../services/apiRequestMeter'
+import { useTranslation } from '../i18n'
 
 const SUMMARY_GROUPS = API_REQUEST_GROUPS.filter((group) =>
   (API_REQUEST_SUMMARY_GROUP_IDS as readonly string[]).includes(group.id),
@@ -121,6 +122,7 @@ const morphSpring = {
 }
 
 export function ApiRequestMeter() {
+  const { t } = useTranslation()
   const rootRef = useRef<HTMLElement | null>(null)
   const openTimer = useRef<number | null>(null)
   const closeTimer = useRef<number | null>(null)
@@ -318,7 +320,7 @@ export function ApiRequestMeter() {
     <aside
       ref={rootRef}
       className="api-meter"
-      aria-label="今日 API 请求次数"
+      aria-label={t('apiMeter.ariaLabel')}
       style={containerStyle}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -395,7 +397,7 @@ export function ApiRequestMeter() {
               return (
                 <li key={group.id} className="relative">
                   <p className="api-meter-rail-label">
-                    {RAIL_LABELS[group.id] || group.shortLabel}
+                    {RAIL_LABELS[group.id] || t(group.shortLabelKey as never)}
                   </p>
                   <motion.p
                     key={total}
@@ -440,11 +442,11 @@ export function ApiRequestMeter() {
             <div className="flex items-center gap-1.5 min-w-0">
               <Activity size={13} strokeWidth={2.4} className="text-[var(--copper)] shrink-0" />
               <span className="font-display text-[13px] font-semibold text-[var(--ink)] tracking-tight">
-                API 调用明细
+                {t('apiMeter.panelTitle')}
               </span>
             </div>
             <span className="inline-flex items-center rounded-full border border-[var(--copper)]/20 dark:border-[var(--copper)]/35 bg-[var(--copper)]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[var(--copper)] shadow-2xs">
-              今日总计 {snapshot.used} 次
+              {t('apiMeter.todayTotal', { count: snapshot.used })}
             </span>
           </div>
 
@@ -459,7 +461,7 @@ export function ApiRequestMeter() {
                     <div className="flex items-center gap-1.5 min-w-0">
                       <GroupIcon size={12} strokeWidth={2.2} className="text-[var(--sage)] dark:text-[#88b3a0] shrink-0" />
                       <span className="font-semibold text-[11.5px] text-[var(--ink)] truncate">
-                        {group.label}
+                        {t(group.labelKey as never)}
                       </span>
                     </div>
                     <span
@@ -482,7 +484,7 @@ export function ApiRequestMeter() {
                         const count = snapshot.byKind[item.kind] || 0
                         return (
                           <li key={item.kind} className="flex items-center justify-between gap-2">
-                            <span className="truncate">{item.label}</span>
+                            <span className="truncate">{t(item.labelKey as never)}</span>
                             <span
                               className={`tabular-nums font-medium ${
                                 count > 0

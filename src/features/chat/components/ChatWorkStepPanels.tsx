@@ -11,6 +11,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import type { TripChatWorkStep } from '../services/tripChat'
+import { useTranslation } from '../../../shared/i18n'
 import { completedWorkSummary } from './ChatWorkStepList'
 
 function ChatWorkStepIcon({
@@ -66,6 +67,16 @@ export function ChatWorkStepsPanel({
   const visible = steps.filter((step) => step.status !== 'skipped')
   if (!visible.length) return null
 
+  const { t, locale } = useTranslation()
+  // "Skipped: " prefix used for the inline skipped-step label.
+  const skippedPrefix = t('chat.workStepSkippedPrefix' as never) ||
+    (locale === 'en' ? 'Skipped: ' : '已跳过：')
+  // "Waiting: " prefix for the pending visual; only relevant when the label
+  // starts with the active-step prefix word. In English we just show the label
+  // as-is since we don't have a 1:1 active→pending word swap.
+  const waitingPrefix = t('chat.workStepWaitingPrefix' as never) ||
+    (locale === 'en' ? 'Waiting: ' : '等待：')
+
   // Live turn: always show the full pipeline (all steps, including skipped ones).
   if (!completed) {
     // When not explicitly expanded, only show the current active step.
@@ -95,9 +106,11 @@ export function ChatWorkStepsPanel({
             const skipped = step.status === 'skipped'
             const label =
               step.status === 'pending'
-                ? step.label.replace(/^正在/, '等待')
+                ? locale === 'zh-CN'
+                  ? step.label.replace(/^正在/, '等待')
+                  : `${waitingPrefix}${step.label}`
                 : skipped
-                  ? `已跳过：${step.label}`
+                  ? `${skippedPrefix}${step.label}`
                   : step.label
 
             return (

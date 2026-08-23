@@ -38,7 +38,7 @@ function day(dayNumber: number, placeIds: string[]): DayPlan {
     day: dayNumber,
     title: 'Test day',
     theme: '',
-    pace: '轻松',
+    pace: 'relaxed',
     summary: '',
     metroHintFromArea: {},
     stops: placeIds.map((placeId, index) => ({

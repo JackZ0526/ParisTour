@@ -532,9 +532,9 @@ function fallbackDayCopy(input: {
   const highlights = input.placeNames.slice(0, 3).join('、')
   const lastDay = input.totalDays && input.totalDays > 0 ? input.totalDays : undefined
   const title =
-    input.pace === '乐园日'
+    input.pace === 'park'
       ? '迪士尼日'
-      : input.pace === '自驾日'
+      : input.pace === 'self-drive'
         ? '近郊自驾'
         : input.day === 1
           ? '抵达巴黎'
@@ -565,10 +565,13 @@ export async function generateDayCopy(input: {
   totalDays?: number
 }): Promise<{ title: string; theme: string; summary: string } | null> {
   if (!input.placeNames.length) {
+    const en = getLocale() === 'en'
     return {
-      title: `第 ${input.day} 天`,
-      theme: '自由安排',
-      summary: '今天还没有安排地点，添加景点后会自动生成标题与总结。',
+      title: en ? `Day ${input.day}` : `第 ${input.day} 天`,
+      theme: en ? 'Free time' : '自由安排',
+      summary: en
+        ? 'No places added yet — pick spots on the map to start building this day.'
+        : '今天还没有安排地点，添加景点后会自动生成标题与总结。',
     }
   }
 

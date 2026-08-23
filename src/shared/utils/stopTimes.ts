@@ -5,7 +5,6 @@ import { parseAirportLocalTime } from '../../features/flight/utils/flightTime'
 export const CDG_EXIT_BUFFER_MINUTES = 60
 
 const HM_RE = /^(\d{1,2}):(\d{2})$/
-const PENDING_TIME = '待定'
 
 /** Parse `HH:MM` (or `H:MM`) into minutes from midnight. */
 export function parseHm(raw: string | undefined | null): number | null {
@@ -82,8 +81,9 @@ export function defaultVisitMinutes(placeType?: string | null): number {
 
 function isSpecialScheduleTime(raw: string | undefined | null): boolean {
   if (!raw?.trim()) return false
-  if (parseHm(raw) != null) return false
-  return /按航班|倒推|待定/.test(raw)
+  // A real HH:MM time always parses; anything else is treated as a placeholder
+  // ("待定" / "TBD" / "By flight" / empty / null) and left untouched.
+  return parseHm(raw) == null
 }
 
 /**
@@ -154,8 +154,8 @@ export function applyDay1HotelArrivalTimes(
   }
 
   const oldFirst = parseHm(first.time)
-  const shift =
-    oldFirst != null && first.time !== PENDING_TIME ? newFirst - oldFirst : 0
+  // Only shift by a real diff — TBD/empty times parse as null and yield a 0 shift.
+  const shift = oldFirst != null ? newFirst - oldFirst : 0
 
   let changed = false
   const stops: ItineraryStop[] = day.stops.map((stop, index) => {

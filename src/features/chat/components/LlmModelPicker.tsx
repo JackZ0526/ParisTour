@@ -31,6 +31,7 @@ import {
   type ThinkingMode,
 } from '../../../shared/services/llm/llm'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
+import { useTranslation, type TranslationKey } from '../../../shared/i18n'
 
 type Props = {
   /** Disable while a long LLM job is in flight (optional). */
@@ -113,6 +114,7 @@ function useMediaQuery(query: string): boolean {
  * second, competing layout animation.
  */
 export function LlmModelPicker({ disabled = false, className = '' }: Props) {
+  const { t } = useTranslation()
   const { model, setModel, thinkingMode } = useLlmSettings()
   const [open, setOpen] = useState(false)
   // Keep the expanded content in normal flow until the closing morph has
@@ -277,7 +279,7 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         tabIndex={present ? -1 : 0}
         aria-haspopup={!present ? 'dialog' : undefined}
         aria-expanded={open}
-        aria-label={present ? '模型与思考设置' : fullLabel}
+        aria-label={present ? t('llm.modelPanelAria') : fullLabel}
         title={!present ? fullLabel : undefined}
         onClick={present ? undefined : openPicker}
         onKeyDown={
@@ -406,10 +408,10 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
             <ThinkingControls mode={thinkingMode} disabled={disabled} />
           ) : (
             <div>
-              <SectionHeader>思考</SectionHeader>
+              <SectionHeader>{t('llm.thinkingSection')}</SectionHeader>
               <div className={`${GLASS_INNER_CARD_CLASS} px-3 py-2.5`}>
                 <p className="text-xs leading-snug text-[var(--stone)]">
-                  当前模型不支持思考强度设置
+                  {t('llm.modelNoThinkingSupport')}
                 </p>
               </div>
             </div>
@@ -436,6 +438,7 @@ function ThinkingControls({
   mode: ThinkingMode
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   const autoCheckboxId = useId()
   const thinkingOn = mode !== 'off'
   const autoOn = mode === 'auto'
@@ -468,11 +471,11 @@ function ThinkingControls({
     <div className="flex flex-col justify-end">
       {/* L1: section header + master capsule — same weight as 「模型」 */}
       <div className="flex items-center gap-3 px-1">
-        <p className="min-w-0 flex-1 text-sm font-semibold text-[var(--ink)]">思考</p>
+        <p className="min-w-0 flex-1 text-sm font-semibold text-[var(--ink)]">{t('llm.thinkingSection')}</p>
         <PillSwitch
           checked={thinkingOn}
           disabled={disabled}
-          ariaLabel="开启思考"
+          ariaLabel={t('llm.thinkingToggleAria')}
           onCheckedChange={setThinkingEnabled}
         />
       </div>
@@ -516,10 +519,10 @@ function ThinkingControls({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-semibold leading-snug text-[var(--ink)]">
-                    自动选择强度
+                    {t('llm.autoIntensity')}
                   </span>
                   <span className="mt-0.5 block text-[11px] leading-snug text-[var(--stone)]">
-                    按当前操作自动选择思考强度
+                    {t('llm.autoIntensityDesc')}
                   </span>
                 </span>
               </label>
@@ -583,14 +586,14 @@ function ThinkingControls({
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--stone)]/60"
               />
               <p className="text-xs leading-snug text-[var(--stone)]">
-                跳过额外推理，响应更直接
+                {t('llm.thinkingSkippedHint')}
               </p>
             </div>
           </motion.div>
         </motion.div>
       </div>
 
-      <span className="sr-only">当前模式 {mode}</span>
+      <span className="sr-only">{t('llm.currentModeSr', { mode })}</span>
     </div>
   )
 }
@@ -697,7 +700,15 @@ function magnetize(raw: number): number {
   return r + (stop - r) * pull
 }
 
-/** Discrete 低 · 中 · 高 magnetic slider (ParisTour palette). */
+function effortLabelKey(id: ThinkingEffortUi): TranslationKey {
+  switch (id) {
+    case 'low': return 'llm.thinkingModeLow'
+    case 'medium': return 'llm.thinkingModeMedium'
+    case 'high': return 'llm.thinkingModeHigh'
+  }
+}
+
+/** Discrete low/medium/high magnetic slider (ParisTour palette). */
 function ThinkingIntensitySlider({
   value,
   disabled,
@@ -707,6 +718,7 @@ function ThinkingIntensitySlider({
   disabled?: boolean
   onChange: (mode: ThinkingEffortUi) => void
 }) {
+  const { t } = useTranslation()
   const trackRef = useRef<HTMLDivElement>(null)
   const draggingRef = useRef(false)
   const [dragging, setDragging] = useState(false)
@@ -718,7 +730,9 @@ function ThinkingIntensitySlider({
   const safeIndex = index < 0 ? 1 : index
   const settledRatio = THINKING_SLIDER_STOPS[safeIndex] ?? 0.5
   const ratio = dragRatio ?? settledRatio
-  const label = THINKING_SLIDER_OPTIONS[safeIndex]?.label ?? '中'
+  const label = THINKING_SLIDER_OPTIONS[safeIndex]
+    ? t(effortLabelKey(THINKING_SLIDER_OPTIONS[safeIndex]!.id))
+    : t('llm.thinkingModeMedium')
   const activeStop = nearestStop(ratio)
 
   const ratioFromClientX = (clientX: number) => {
@@ -837,7 +851,7 @@ function ThinkingIntensitySlider({
         ref={trackRef}
         role="slider"
         tabIndex={disabled ? -1 : 0}
-        aria-label="思考强度"
+        aria-label={t('llm.effortSliderAria')}
         aria-valuemin={0}
         aria-valuemax={THINKING_SLIDER_OPTIONS.length - 1}
         aria-valuenow={safeIndex}
@@ -931,7 +945,7 @@ function ThinkingIntensitySlider({
               safeIndex === i ? 'font-medium text-[var(--sage)]' : 'text-[var(--stone)]'
             }`}
           >
-            {opt.label}
+            {t(effortLabelKey(opt.id))}
           </span>
         ))}
       </div>
@@ -977,6 +991,7 @@ function ModelSettingsPanel({
   onToggle: () => void
   onSelect: (model: string) => void
 }) {
+  const { t } = useTranslation()
   const optionsId = useId()
   const deepseek = isDeepSeekModel(model)
   const heightTransition = expanded
@@ -991,7 +1006,7 @@ function ModelSettingsPanel({
 
   return (
     <div className={`${canThink ? 'mt-3.5' : 'mt-3'} border-t border-white/85 dark:border-white/10 pt-3`}>
-      <SectionHeader>模型</SectionHeader>
+      <SectionHeader>{t('llm.modelSection')}</SectionHeader>
       <div className={GLASS_INNER_CARD_CLASS}>
         <button
           type="button"
@@ -1037,7 +1052,7 @@ function ModelSettingsPanel({
                   <ModelOption
                     key={option.id}
                     label={option.shortLabel}
-                    detail={option.description}
+                    detail={t(option.descriptionKey)}
                     selected={option.id === model}
                     disabled={disabled}
                     icon={<ModelBrandIcon deepseek className="h-4 w-4" />}
@@ -1050,7 +1065,7 @@ function ModelSettingsPanel({
                   <ModelOption
                     key={option.id}
                     label={option.shortLabel}
-                    detail={option.description}
+                    detail={t(option.descriptionKey)}
                     selected={option.id === model}
                     disabled={disabled}
                     icon={<ModelBrandIcon deepseek={false} className="h-4 w-4" />}

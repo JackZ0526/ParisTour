@@ -113,7 +113,7 @@ describe('API request meter', () => {
 
     expect(snapshot.used).toBe(3)
     expect(snapshot.byKind['openrouteservice-directions']).toBe(1)
-    expect(google?.label).toBe('Google')
+    expect(google?.labelKey).toBe('apiMeter.groups.google-places')
     expect(google && groupCount(snapshot, google)).toBe(2)
   })
 

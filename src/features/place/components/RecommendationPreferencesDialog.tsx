@@ -30,6 +30,7 @@ import {
   glassModalSurfaceClass,
 } from '../../../shared/styles/glassCapsule'
 import { useTranslation } from '../../../shared/i18n'
+import { localizePrefTag } from '../../../shared/i18n'
 
 interface Props {
   open: boolean
@@ -252,11 +253,11 @@ export function RecommendationPreferencesDialog({
                       key={cleanTag}
                       type="button"
                       onClick={() => removeTag(cleanTag)}
-                      title={`Remove: ${cleanTag}`}
-                      aria-label={`Remove ${cleanTag}`}
+                      title={`Remove: ${localizePrefTag(cleanTag)}`}
+                      aria-label={`Remove ${localizePrefTag(cleanTag)}`}
                       className={`${BASE_TAG_PILL} active:scale-95 ${theme.activePill}`}
                     >
-                      <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{cleanTag}</span>
+                      <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{localizePrefTag(cleanTag)}</span>
                     </button>
                   )
                 })}
@@ -286,11 +287,11 @@ export function RecommendationPreferencesDialog({
                       key={cleanPreset}
                       type="button"
                       onClick={() => addTag(cleanPreset)}
-                      title={`Add: ${cleanPreset}`}
-                      aria-label={`Add ${cleanPreset}`}
+                      title={`Add: ${localizePrefTag(cleanPreset)}`}
+                      aria-label={`Add ${localizePrefTag(cleanPreset)}`}
                       className={`${BASE_TAG_PILL} active:scale-95 ${theme.suggestedPill}`}
                     >
-                      <span className="relative z-10">{cleanPreset}</span>
+                      <span className="relative z-10">{localizePrefTag(cleanPreset)}</span>
                     </button>
                   )
                 })
@@ -447,7 +448,7 @@ export function RecommendationPreferencesDialog({
                             key={clean}
                             className={`${BASE_TAG_PILL} ${theme.activePill}`}
                           >
-                            <span className="relative z-10">{clean}</span>
+                            <span className="relative z-10">{localizePrefTag(clean)}</span>
                           </span>
                         )
                       })}

@@ -40,6 +40,7 @@ export type LlmTaskKind =
   | 'itineraryGenerate'
   | 'itineraryDayGenerate'
   | 'itineraryStart'
+  | 'itineraryTranslate'
   | 'destinationSuggest'
   | 'preferenceExtract'
   | 'router'
@@ -200,7 +201,7 @@ export interface FullItineraryStopDraft {
   placeKey: string
   note: string
   transport?: string
-  walkLevel?: '很少走' | '短步行' | '中等步行'
+  walkLevel?: WalkLevel
   duration?: string
 }
 
@@ -208,7 +209,7 @@ export interface FullItineraryDayDraft {
   day: number
   title: string
   theme: string
-  pace: '轻松' | '适中' | '乐园日' | '自驾日'
+  pace: Pace
   summary: string
   metroHintFromArea?: Record<string, string>
   stops: FullItineraryStopDraft[]
@@ -283,4 +284,4 @@ export interface SingleDayItineraryDraft {
 
 // Local re-import to keep the type self-contained.
 // (No runtime cost — types are erased.)
-import type { FlightInfo } from '../../../types'
+import type { FlightInfo, Pace, WalkLevel } from '../../../types'

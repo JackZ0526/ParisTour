@@ -43,6 +43,7 @@ import {
   getTagTheme,
   type RecommendationPreferences,
 } from '../../place/services/recommendationPreferences'
+import { localizePrefTag } from '../../../shared/i18n/localeEnum'
 import { formatOwnerHandle, type AccessibleTrip } from '../../cloud-sync'
 import {
   getCloudSaveStatus,
@@ -264,7 +265,7 @@ export function ProfileTab({
                     {cloudSync.enabled && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-[var(--stone)] dark:text-zinc-400 truncate">
                         <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>{cloudSync.isBusy ? (locale === 'en' ? 'Syncing to cloud…' : '云端同步中') : (locale === 'en' ? 'Encrypted cloud sync' : '云端已加密同步')}</span>
+                        <span>{cloudSync.isBusy ? t('profile.syncingToCloud') : t('profile.encryptedCloudSync')}</span>
                       </span>
                     )}
                   </div>
@@ -354,14 +355,14 @@ export function ProfileTab({
             <div className="space-y-2">
               <label className="text-xs font-medium text-[var(--stone)]">{t('profile.currentTripsLabel')}</label>
               <div className="grid grid-cols-1 gap-2">
-                {trips.map((t) => {
-                  const isActive = t.id === activeTripId
-                  const isItemShared = t.role !== 'owner'
+                {trips.map((trip) => {
+                  const isActive = trip.id === activeTripId
+                  const isItemShared = trip.role !== 'owner'
                   return (
                     <button
-                      key={t.id}
+                      key={trip.id}
                       type="button"
-                      onClick={() => onSwitchTrip?.(t.id)}
+                      onClick={() => onSwitchTrip?.(trip.id)}
                       className={`flex items-center justify-between gap-3 rounded-2xl p-3 text-left transition-all duration-150 cursor-pointer ${
                         isActive
                           ? 'border-2 border-[var(--copper)] bg-[var(--copper)]/10 dark:bg-[var(--copper)]/15 shadow-sm'
@@ -387,11 +388,11 @@ export function ProfileTab({
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <div className="truncate text-xs font-semibold text-[var(--ink)]">
-                              {t.isPrimary ? (locale === 'en' ? 'Primary Trip' : '我的主行程') : t.title || (locale === 'en' ? 'Itinerary' : '行程规划')}
+                              {trip.isPrimary ? t('profile.primaryTrip') : trip.title || t('itinerary.tripOverview')}
                             </div>
-                            {t.isPrimary && (
+                            {trip.isPrimary && (
                               <span className="shrink-0 rounded bg-[var(--copper)]/15 px-1 py-0.2 text-[9px] font-bold text-[var(--copper)]">
-                                {locale === 'en' ? 'Default' : '默认'}
+                                {t('profile.defaultBadge')}
                               </span>
                             )}
                           </div>
@@ -399,34 +400,34 @@ export function ProfileTab({
                             {isItemShared
                               ? (locale === 'en'
                                   ? `From ${
-                                      (t.ownerEmail ? getUserNickname(t.ownerEmail) : '') ||
-                                      t.ownerName ||
-                                      (t.ownerEmail ? formatOwnerHandle(t.ownerEmail) : 'Others')
+                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                      trip.ownerName ||
+                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : 'Others')
                                     }`
                                   : `来自 ${
-                                      (t.ownerEmail ? getUserNickname(t.ownerEmail) : '') ||
-                                      t.ownerName ||
-                                      (t.ownerEmail ? formatOwnerHandle(t.ownerEmail) : '他人')
+                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                      trip.ownerName ||
+                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
                                     }`)
-                              : (locale === 'en' ? 'Created by you' : '自己创建')}
+                              : t('profile.createdByYou')}
                           </div>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            t.role === 'owner'
+                            trip.role === 'owner'
                               ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200/50 dark:border-amber-400/30'
-                              : t.role === 'editor'
+                              : trip.role === 'editor'
                                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-400/30'
                                 : 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300 border border-zinc-200/50 dark:border-white/15'
                           }`}
                         >
-                          {t.role === 'owner'
-                            ? (locale === 'en' ? 'Owner' : '拥有者')
-                            : t.role === 'editor'
-                              ? (locale === 'en' ? 'Editor' : '协作')
-                              : (locale === 'en' ? 'Read-only' : '只读')}
+                          {trip.role === 'owner'
+                            ? t('auth.roleOwner')
+                            : trip.role === 'editor'
+                              ? t('auth.roleEditor')
+                              : t('auth.readOnly')}
                         </span>
                         {isActive && (
                           <Check size={14} strokeWidth={2.5} className="text-[var(--copper)]" />
@@ -490,7 +491,7 @@ export function ProfileTab({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
               <Sparkles size={16} className="text-[var(--copper)] shrink-0" />
-              <span>{locale === 'en' ? 'AI Preferences' : 'AI 智能偏好配置'}</span>
+              <span>{t('profile.aiPreferences')}</span>
             </div>
             <p className="mt-0.5 text-xs text-[var(--stone)] dark:text-zinc-400 leading-relaxed">
               {locale === 'en'
@@ -508,7 +509,7 @@ export function ProfileTab({
               <Timer size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">{locale === 'en' ? 'Daily departure' : '每日出发'}</p>
+              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">{t('profile.dailyDeparture')}</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
                 {recommendationPreferences?.dayStartTime || '10:00'}
               </p>
@@ -521,11 +522,11 @@ export function ProfileTab({
               <Tag size={16} strokeWidth={2} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">{locale === 'en' ? 'Active tags' : '生效偏好'}</p>
+              <p className="text-[10.5px] text-[var(--stone)] dark:text-zinc-400">{t('profile.activeTags')}</p>
               <p className="text-xs font-semibold text-[var(--ink)] truncate">
                 {recommendationPreferences?.tags?.length
-                  ? (locale === 'en' ? `${recommendationPreferences.tags.length} active` : `${recommendationPreferences.tags.length} 项标签生效`)
-                  : (locale === 'en' ? 'None set' : '未设置标签')}
+                  ? t('profile.tagsActiveCount', { count: recommendationPreferences.tags.length })
+                  : t('profile.noneSet')}
               </p>
             </div>
           </div>
@@ -542,19 +543,19 @@ export function ProfileTab({
                   key={clean}
                   className={`${BASE_TAG_PILL} cursor-default ${theme.activePill}`}
                 >
-                  <span className="relative z-10">{clean}</span>
+                  <span className="relative z-10">{localizePrefTag(clean)}</span>
                 </span>
               )
             })}
             {recommendationPreferences.tags.length > 10 && (
               <span className="inline-flex h-7.5 items-center rounded-full border border-black/8 dark:border-white/10 bg-white/60 dark:bg-white/10 px-2.5 text-[11px] font-semibold text-[var(--stone)] dark:text-zinc-300 shadow-2xs">
-                +{recommendationPreferences.tags.length - 10} {locale === 'en' ? 'more' : '项'}
+                {t('profile.tagsMoreCount', { count: recommendationPreferences.tags.length - 10 })}
               </span>
             )}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-3 text-center text-xs text-[var(--stone)] dark:text-zinc-400">
-            {locale === 'en' ? 'No preference tags set yet. Tap below to customize your preferences.' : '暂未设置偏好标签，点击下方按钮定制专属路线偏好'}
+            {t('profile.noTagsSet')}
           </div>
         )}
 
@@ -563,7 +564,7 @@ export function ProfileTab({
           <div className="flex items-start gap-2 rounded-2xl border border-white/80 dark:border-white/10 bg-white/50 dark:bg-white/5 p-2.5 shadow-2xs backdrop-blur-md">
             <MessageSquare size={13} className="mt-0.5 shrink-0 text-[var(--copper)]/80" />
             <p className="text-xs text-[var(--stone)] dark:text-zinc-300 leading-relaxed line-clamp-2">
-              <span className="font-medium text-[var(--ink)]">{locale === 'en' ? 'Extra notes: ' : '补充要求：'}</span>
+              <span className="font-medium text-[var(--ink)]">{t('profile.extraNotesPrefix')}</span>
               {recommendationPreferences.extraNotes}
             </p>
           </div>
@@ -576,7 +577,7 @@ export function ProfileTab({
           className="group relative isolate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2c2621] to-[#1f1b18] dark:from-white/12 dark:to-white/[0.07] dark:border dark:border-white/18 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white dark:text-zinc-100 shadow-[0_4px_16px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.2)] dark:shadow-[0_8px_22px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.15),inset_0_-1px_1px_rgba(0,0,0,0.4)] transition-all hover:-translate-y-px hover:brightness-110 dark:hover:border-white/25 active:translate-y-0 active:scale-[0.99] cursor-pointer"
         >
           <SlidersHorizontal size={14} />
-          <span>{locale === 'en' ? 'Open Preferences' : '打开偏好设置详细面板'}</span>
+          <span>{t('profile.openPreferencesFull')}</span>
           <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5 text-white/70" />
         </button>
       </div>
@@ -673,7 +674,7 @@ export function ProfileTab({
             <span>{t('profile.languageTitle')}</span>
           </div>
           <span className="text-xs text-[var(--stone)] dark:text-zinc-400">
-            {locale === 'zh-CN' ? '简体中文' : 'English'}
+            {locale === 'zh-CN' ? t('profile.langZh') : t('profile.langEn')}
           </span>
         </div>
 

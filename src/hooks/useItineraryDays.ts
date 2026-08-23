@@ -345,7 +345,7 @@ export function useItineraryDays(
         time: '12:00',
         placeId: place.id,
         note: place.description,
-        walkLevel: '短步行',
+        walkLevel: 'short',
         duration: place.durationHint || '60 分钟',
       }
 
@@ -500,7 +500,7 @@ export function useItineraryDays(
             time: old.time || '12:00',
             placeId: place.id,
             note: place.description,
-            walkLevel: old.walkLevel || '短步行',
+            walkLevel: old.walkLevel || 'short',
             duration: place.durationHint || old.duration || '60 分钟',
             transport: old.transport,
           }

@@ -23,11 +23,11 @@ import {
 import { dateForTripDay, formatTripDayLabel } from '../../itinerary/services/tripDates'
 import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlaceDetails'
 import {
-  COMMON_RULES,
-  NO_HALLUCINATION,
-  PLACE_RESEARCH_DISCIPLINE,
-  ROUTER_EXAMPLES,
   buildPrompt,
+  getCommonRules,
+  getNoHallucinationRule,
+  getPlaceResearchDiscipline,
+  getRouterExamples,
   jsonContract,
 } from '../../../shared/services/llm/prompts'
 import { getLocale, getLlmLanguageInstruction } from '../../../shared/i18n'
@@ -513,7 +513,59 @@ ${langRule} 可以介绍地点/酒店、解释节奏、建议改动，并在需�
   // Hard rules. Re-grouped by concern (vs the original flat bullet list)
   // so the model can scan to the right section.
   // -----------------------------------------------------------------------
-  const itineraryRules = `<itinerary_actions>
+  const itineraryRules = activeLocale === 'en'
+    ? `<itinerary_actions>
+<intent>
+- Itinerary edits / hotel ops / flight ops → emit the matching action; pure Q&A → actions=[].
+- When this turn is pure Q&A (plan.intent=answer): only answer, do not modify the itinerary; actions must be [].
+</intent>
+
+<place_actions>
+<add_place>The user is adding a place (not replacing).
+- mode defaults to "best" (system picks the best fit along the day's route). Only use "end" if the user explicitly says "add at the end / append to the end".
+- placeName = the exact "name" field value of an existing itinerary place. Type words ("Chinese restaurant", "cafe") are ❌ wrong.
+- The Day 1 hotel check-in point cannot be removed.
+- Do NOT pass insertAt.</add_place>
+
+<replace_place>When the user says "swap / change / replace / switch to another" you MUST use replace_place, not add_place.
+- fromPlaceName = the exact "name" field value of the existing stop (not a type word).
+- If the user does not name the old stop (e.g. "swap to another Chinese restaurant"): pick the matching-type stop from today (if multiple, prefer the last one); set fromPlaceName to that name.
+- source:
+  - The user named a new place in their message (e.g. "add Café X") → source="explicit", write immediately.
+  - The user only gave a type / slot (e.g. "add a Chinese restaurant", "find a cafe nearby") → source="recommend", the system shows a detail page for the user to confirm.
+- replace_place: toPlaceName user-named → explicit; you recommended → recommend.
+- After a replace, today must not end up with two same-type stops.
+</replace_place>
+
+<remove_place>Always applies immediately; no source required.
+The "name" field must match the exact name in the itinerary.</remove_place>
+
+<date_targeting>
+- When the user says "today / this day" or doesn't specify a date: OMIT the "day" field in actions (the system uses the currently viewed day).
+- Only when the user explicitly says "Day N / day N / switch to day N" should day=N be set (N must be in ${dayRange}), or use switch_day.
+- Do not silently edit a different day just because it has a same-named stop.
+- select_place: prefer the currently viewed day; do not auto-jump to a different day to find a place, unless the user named that day.
+</date_targeting>
+
+<note>For add_place / replace_place, the "note" is a 1–2 sentence traveller-facing intro or tip about THIS place (what the place actually is, what to try).
+❌ "Inserted on the way" / "Added at the end" / "Scheduled as day N dinner by route".
+✅ "Sichuan spot, lunch set menu from 12€, near the north door of the Louvre".</note>
+</place_actions>
+
+<hotel_actions>
+- select_hotel: pick one from the candidate list as the current stay
+- add_hotel: add a new candidate by name or address (select defaults to true)
+- remove_hotel: remove from the candidate list
+- refresh_hotels: refresh the whole batch ("new batch" / "recommend again" / "want something more convenient / cheaper"). Write the key preferences into "preferences"; keepCustom=true
+- replace_hotel: swap just one in the list. When the user names a new hotel, use toHotelName; otherwise use "preferences" to re-recommend. fromHotelName may be the hotel name or the area
+- replace_hotels: swap multiple at once (fromHotelNames array + preferences)
+- The "swap to another hotel" intent uses replace_hotel / replace_hotels, NOT replace_place.
+</hotel_actions>
+
+<switch_day>{"type":"switch_day","day":${dayRange}}</switch_day>
+<reorder_place>{"type":"reorder_place","placeName":"...","toIndex":0} — "day" is optional and must be in 1..${dayCount}</reorder_place>
+</itinerary_actions>`
+    : `<itinerary_actions>
 <intent>
 - 行程修改/酒店操作/航班操作 → 必须在 actions 里给出对应操作；纯问答时 actions=[]。
 - 本轮是纯问答（plan.intent=answer）：只回答，不修改行程，actions 必须是 []。
@@ -569,7 +621,23 @@ name 字段必须匹配行程里该地点的精确 name。</remove_place>
   // Few-shot examples. Two short cases that disambiguate the trickiest
   // boundaries (add vs replace_place, with/without explicit naming).
   // -----------------------------------------------------------------------
-  const examples = `<examples>
+  const examples = activeLocale === 'en'
+    ? `<examples>
+Case 1 — add vs replace:
+user: "Add a Chinese restaurant for me"
+  → mode="best", placeName="…new place…", source="recommend", note="…", actions=[add_place]
+user: "Swap tonight's Chinese restaurant for a hotpot place"
+  → fromPlaceName="actual name of tonight's Chinese restaurant", toPlaceName="…hotpot place…", source="explicit", actions=[replace_place]
+
+Case 2 — source decision:
+- The message names a specific new place / attraction → source="explicit"
+- The message only gives a type / slot ("add one", "recommend", "swap to another") → source="recommend"
+
+Case 3 — default day:
+user: "Add a coffee shop" (no day mentioned) → omit the "day" field in actions
+user: "Add a coffee shop on day 3" → actions[].day=3
+</examples>`
+    : `<examples>
 例 1 — 加 vs 换：
 user: "帮我加一家中餐厅"
   → mode="best", placeName="…新店…", source="recommend", note="…", actions=[add_place]
@@ -593,12 +661,12 @@ user: "第三天加个咖啡馆" → actions[].day=3
   const base = buildPrompt(
     role,
     context,
-    COMMON_RULES,
+    getCommonRules(activeLocale),
     plan.intent === 'answer'
       ? ''
       : [
-          PLACE_RESEARCH_DISCIPLINE,
-          NO_HALLUCINATION,
+          getPlaceResearchDiscipline(activeLocale),
+          getNoHallucinationRule(activeLocale),
           itineraryRules,
           examples,
         ]
@@ -606,11 +674,20 @@ user: "第三天加个咖啡馆" → actions[].day=3
           .join('\n\n'),
     jsonContract(
       plan.intent === 'answer'
-        ? '{"reply":"给用户看的中文回复","actions":[]}'
-        : '{"reply":"给用户看的中文回复","actions":[…]}',
+        ? (activeLocale === 'en'
+            ? '{"reply":"reply shown to the user in English","actions":[]}'
+            : '{"reply":"给用户看的中文回复","actions":[]}')
+        : (activeLocale === 'en'
+            ? '{"reply":"reply shown to the user in English","actions":[…]}'
+            : '{"reply":"给用户看的中文回复","actions":[…]}'),
       plan.intent === 'answer'
-        ? '{"reply":"Le Grand Rex 在 2e arrondissement，1933 年的装饰艺术影院。","actions":[]}'
-        : '{"reply":"今晚的中餐厅可以换成「蜀香苑」吗？","actions":[{"type":"replace_place","fromPlaceName":"今晚那家中餐厅真实 name","toPlaceName":"蜀香苑","placeType":"restaurant","source":"explicit","note":"川菜小馆，午市套餐 12€ 起"}]}',
+        ? (activeLocale === 'en'
+            ? '{"reply":"Le Grand Rex is in the 2e arrondissement, an art-deco cinema from 1933.","actions":[]}'
+            : '{"reply":"Le Grand Rex 在 2e arrondissement，1933 年的装饰艺术影院。","actions":[]}')
+        : (activeLocale === 'en'
+            ? '{"reply":"Can we swap tonight\'s Chinese restaurant for \"Shu Xiang Yuan\"?","actions":[{"type":"replace_place","fromPlaceName":"the actual name of tonight\'s Chinese restaurant","toPlaceName":"Shu Xiang Yuan","placeType":"restaurant","source":"explicit","note":"Sichuan spot, lunch set menu from 12€"}]}'
+            : '{"reply":"今晚的中餐厅可以换成「蜀香苑」吗？","actions":[{"type":"replace_place","fromPlaceName":"今晚那家中餐厅真实 name","toPlaceName":"蜀香苑","placeType":"restaurant","source":"explicit","note":"川菜小馆，午市套餐 12€ 起"}]}'),
+      activeLocale,
     ),
   )
 
@@ -739,35 +816,60 @@ function webResearchInstructions(ctx: TripChatContext): string {
   const destName = dest.name || '目的地'
   const dates = buildTripDatesSnapshot(ctx)
   const viewing = buildViewingSnapshot(ctx)
+  const locale = getLocale()
 
   const contextParts: string[] = [
-    `<destination>${destName}${dest.country ? `（${dest.country}）` : ''}</destination>`,
+    `<destination>${destName}${dest.country ? ` (${dest.country})` : ''}</destination>`,
     dates.tripStartDate && dates.tripEndDate
-      ? `<trip_dates locked="true">${dates.tripStartDate} 至 ${dates.tripEndDate}；用户说"旅行期间/到时候/那几天"均指这个日期范围。</trip_dates>`
-      : `<trip_dates>旅行日期尚未确定；不要擅自假设月份或年份。</trip_dates>`,
+      ? locale === 'en'
+        ? `<trip_dates locked="true">${dates.tripStartDate} to ${dates.tripEndDate}; phrases like "during the trip / while I'm there / on those days" refer to this range.</trip_dates>`
+        : `<trip_dates locked="true">${dates.tripStartDate} 至 ${dates.tripEndDate}；用户说"旅行期间/到时候/那几天"均指这个日期范围。</trip_dates>`
+      : locale === 'en'
+        ? `<trip_dates>Travel dates are not set yet; do not assume any month or year.</trip_dates>`
+        : `<trip_dates>旅行日期尚未确定；不要擅自假设月份或年份。</trip_dates>`,
   ]
   if (viewing) {
     const subject =
       viewing.type === 'place'
-        ? `地点 ${viewing.name}${viewing.nameLocal ? ` / ${viewing.nameLocal}` : ''}`
-        : `酒店 ${viewing.name}${viewing.address ? `（${viewing.address}）` : ''}`
+        ? locale === 'en'
+          ? `place ${viewing.name}${viewing.nameLocal ? ` / ${viewing.nameLocal}` : ''}`
+          : `地点 ${viewing.name}${viewing.nameLocal ? ` / ${viewing.nameLocal}` : ''}`
+        : locale === 'en'
+          ? `hotel ${viewing.name}${viewing.address ? ` (${viewing.address})` : ''}`
+          : `酒店 ${viewing.name}${viewing.address ? `（${viewing.address}）` : ''}`
     contextParts.splice(
       1,
       0,
-      `<viewing>用户正在查看详情页：${subject}。若问题含"这个/这家/多少钱"等指代，检索对象优先为该详情页。</viewing>`,
+      locale === 'en'
+        ? `<viewing>The user is on the detail page: ${subject}. If the question contains a deictic reference like "this / how much / what's it like", prioritise the detail-page subject as the lookup target.</viewing>`
+        : `<viewing>用户正在查看详情页：${subject}。若问题含"这个/这家/多少钱"等指代，检索对象优先为该详情页。</viewing>`,
     )
   }
 
   return buildPrompt(
-    '你是旅行信息检索助手。根据用户问题检索公开网页，汇总与行程相关的事实。',
+    locale === 'en'
+      ? 'Travel information research assistant. Use the user\'s question to look up public web pages and summarise the facts that are relevant to their trip.'
+      : '你是旅行信息检索助手。根据用户问题检索公开网页，汇总与行程相关的事实。',
     contextParts.join('\n\n'),
-    `<focus>
+    locale === 'en'
+      ? `<focus>
+- Restaurants / cafes: rough price level or per-person, menu clues, opening hours
+- Attractions / events: tickets, reservations, short-term weather, and any events / exhibitions / shows / festivals / markets that fall inside the user\'s travel dates
+- For event questions, prioritise checking the dates, location, and official source. List only items that overlap with the user\'s travel dates or are explicitly relevant.
+</focus>`
+      : `<focus>
 - 餐厅/咖啡馆：大致价位或人均、菜单线索、营业时间
 - 景点/活动：门票、预约、短期天气，以及旅行日期内的活动/展览/演出/节庆/市集
 - 活动类问题要优先核对举办日期、地点和官方来源；只列与用户旅行日期重叠或明确相关的项目
 </focus>`,
-    `<output>
-- 简洁中文要点列表；标明不确定或可能过时
+    locale === 'en'
+      ? `<output>
+- Concise bullet list in the target language. Flag anything uncertain or possibly outdated.
+- Do NOT invent exact numbers (price / time / rating).
+- Do NOT output JSON. Do NOT mention "snapshot" or "internal system structure".
+</output>`
+      : `<output>
+- 简洁要点列表；标明不确定或可能过时
 - 不要编造精确数字（价格/时间/评分）
 - 不要输出 JSON；不要提及"快照""系统内部结构"
 </output>`,
@@ -1298,20 +1400,40 @@ export async function planTripChatRequest(input: {
   let reason = ''
   let source: TripChatRequestPlan['source'] = 'fallback'
 
+  const routerLocale = getLocale()
+  const routerIsEn = routerLocale === 'en'
   try {
     const raw = await openaiChat(
       [
         {
           role: 'system',
           content: buildPrompt(
-            '你是行程助手的请求路由器。只分析任务，不回答用户，也不修改行程。',
+            routerIsEn
+              ? 'You are the request router for a trip assistant. Only analyze the task — do not answer the user and do not modify the itinerary.'
+              : '你是行程助手的请求路由器。只分析任务，不回答用户，也不修改行程。',
             null,
-            `<intent>
+            routerIsEn
+              ? `<intent>
+- answer   — only answer / explain / summarise, no app-state change
+- recommend — need to pick places / hotels or compare candidates
+- mutate   — explicit add / remove / replace / reorder / day-switch
+</intent>`
+              : `<intent>
 - answer   — 只回答/解释/概括，不改变应用状态
 - recommend — 需要挑选地点/酒店或比较候选
 - mutate   — 明确要求修改/添加/删除/替换/重排/切换行程
 </intent>`,
-            `<needsWeb>
+            routerIsEn
+              ? `<needsWeb>
+true when the answer depends on current / third-party public facts:
+opening hours / price / tickets / weather / strikes and transit status / recent events / ratings and reviews / open-ended place or restaurant recommendations / whether a place actually exists / anything that should be verified to be reliable
+
+false when current itinerary alone is enough:
+add / remove / change / reorder / switch days / summarise existing content / write copy / general knowledge that does not require fresh facts
+
+Do not only look for the keyword "internet"; understand the reference, context, and the real information needed. When the information may change or is uncertain, prefer web search.
+</needsWeb>`
+              : `<needsWeb>
 true 时（答案依赖当前或第三方公开事实）：
 营业时间/价格/票务/天气/罢工与交通状态/近期活动/评分评论/开放式地点或餐厅推荐/地点是否真实存在/任何应先核实才可靠的信息
 
@@ -1320,17 +1442,30 @@ false 时（仅根据当前行程即可完成）：
 
 不要只看"联网"关键词，要理解指代、上下文和任务真正需要的信息。信息可能变化或不确定时宁可联网。
 </needsWeb>`,
-            `<reasoning_effort>
+            routerIsEn
+              ? `<reasoning_effort>
+- off    — simple fact / confirmation / fully clear single-step operation
+- low    — needs a bit of understanding or structured manipulation
+- medium — comparison / suggestion / a few constraints or explanation needed
+- high   — multi-day reorder / multi-objective trade-off / multi-step complex edit / highly ambiguous
+Do not set every simple request to "low" for safety; pick "off" when no reasoning is genuinely needed.
+</reasoning_effort>`
+              : `<reasoning_effort>
 - off   — 简单事实/确认/完全明确的单步操作
 - low   — 需要少量理解或结构化操作
 - medium — 比较/建议/含少量约束或需要解释
 - high  — 多日重排/多目标权衡/多步骤复杂修改/高度歧义
 不要为了保险把所有简单请求都设为 low；确实不需要推理时选 off。
 </reasoning_effort>`,
-            ROUTER_EXAMPLES,
+            getRouterExamples(routerLocale),
             jsonContract(
-              '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"简短原因"}',
-              '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"纯行程操作"}',
+              routerIsEn
+                ? '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"short reason"}'
+                : '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"简短原因"}',
+              routerIsEn
+                ? '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"pure itinerary operation"}'
+                : '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"纯行程操作"}',
+              routerLocale,
             ),
           ),
         },

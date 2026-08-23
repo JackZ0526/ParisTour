@@ -1,19 +1,12 @@
 /**
  * Paris Tour i18n type definitions
+ *
+ * `Locale` and `LocaleMeta` / `SUPPORTED_LOCALES` live in two different
+ * places on purpose: `Locale` is a pure type (no runtime cost), while
+ * the registry needs to live next to the dictionaries it references.
  */
 
-export type Locale = 'zh-CN' | 'en' | 'fr'
-
-export interface LocaleOption {
-  id: Locale
-  label: string
-  nativeName: string
-}
-
-export const SUPPORTED_LOCALES: LocaleOption[] = [
-  { id: 'zh-CN', label: '简体中文', nativeName: '简体中文' },
-  { id: 'en', label: 'English', nativeName: 'English' },
-]
+export type Locale = 'zh-CN' | 'en'
 
 export interface I18nSchema {
   common: {
@@ -99,6 +92,44 @@ export interface I18nSchema {
     roleEditor: string
     roleViewer: string
     companion: string
+    // New keys from refactor
+    inviteOnly: string
+    inviteOnlyMessage: string
+    signInOrUpAria: string
+    alreadyRegistered: string
+    passwordTooShort: string
+    signupsDisabled: string
+    operationFailedRetry: string
+    readOnly: string
+    inviteSignupHint: string
+    inviteSigninHint: string
+    signupConfirmationHint: string
+    signupSuccess: string
+    inviteRequired: string
+    avatarTitle: string
+    avatarSubtitle: string
+    closeAria: string
+    avatarUpdated: string
+    cropAvatar: string
+    cropHint: string
+    loadingDots: string
+    customActive: string
+    defaultActive: string
+    changePhoto: string
+    uploadPhoto: string
+    resetToDefault: string
+    reset: string
+    pleasePickImage: string
+    failedToReadImage: string
+    imageDataEmpty: string
+    failedToProcessImage: string
+    saveNicknameFailed: string
+    defaultDisplayName: string
+    // Cropper controls (AvatarCropper)
+    zoomIn: string
+    zoomOut: string
+    repickImage: string
+    confirmCrop: string
   }
   profile: {
     tripManagement: string
@@ -122,6 +153,21 @@ export interface I18nSchema {
     languageTitle: string
     langZh: string
     langEn: string
+    // New keys from refactor
+    syncingToCloud: string
+    encryptedCloudSync: string
+    primaryTrip: string
+    defaultBadge: string
+    createdByYou: string
+    aiPreferences: string
+    dailyDeparture: string
+    activeTags: string
+    tagsActiveCount: string
+    noneSet: string
+    tagsMoreCount: string
+    noTagsSet: string
+    extraNotesPrefix: string
+    openPreferencesFull: string
   }
   itinerary: {
     tripOverview: string
@@ -159,17 +205,75 @@ export interface I18nSchema {
     openInGoogleMaps: string
     directionsLabel: string
     directionsDesc: string
+    directionsNotReady: string
     fromAirport: string
     fromHotel: string
     emptyTimelineReadOnly: string
     emptyTimelineClickAdd: string
     regenDayTitle: string
     regenDayDesc: string
+    // Day-level generation loading text
+    dayPendingGenerating: string
+    dayPendingHint: string
+    dayRegenThinking: string
+    dayRegenRegenerating: string
+    // DayTimeline misc loading and action labels
+    calculatingNavigation: string
+    viewMapDirections: string
+    unknownPlace: string
+    restoringToday: string
+    restoreToday: string
+    regeneratingItinerary: string
+    regenerateItinerary: string
+    hotelCheckInFirstHint: string
+    hotelOvernightLastHint: string
     restoreDayTitle: string
     restoreDayDesc: string
     viewRoute: string
     stopNotes: string
     customTime: string
+    // New keys from refactor
+    dateRangePlaceholder: string
+    clickAgainReturn: string
+    selectDepartThenReturn: string
+    selectDatesAria: string
+    prevMonth: string
+    nextMonth: string
+    depart: string
+    return: string
+    hotelStop: string
+    transitMode: string
+    sight: string
+    cafeStop: string
+    restaurantStop: string
+    readOnlyShared: string
+    dragReorderHint: string
+    checkInDuration: string
+    cdgAirportLabel: string
+    // Locale-aware placeholders for empty / pre-LLM states. English strings
+    // are used as fallbacks when the registry is missing a key.
+    pendingTime: string
+    hotelCheckInTransport: string
+    defaultDayTheme: string
+    defaultDaySummary: string
+    navigateHint: string
+  }
+  pace: {
+    relaxed: string
+    moderate: string
+    park: string
+    selfDrive: string
+  }
+  walkLevel: {
+    minimal: string
+    short: string
+    moderate: string
+  }
+  transport: {
+    transit: string
+    walking: string
+    driving: string
+    cycling: string
   }
   hotel: {
     title: string
@@ -183,6 +287,8 @@ export interface I18nSchema {
     dragPrompt: string
     chooseThisHotel: string
     removeFromCandidate: string
+    keepInCandidates: string
+    addAsCandidate: string
     selectedHotelLabel: string
     rating: string
     advisorReview: string
@@ -244,8 +350,22 @@ export interface I18nSchema {
     cancelCurrentSelection: string
     deleteCustomHotelTitle: string
     deleteCustomHotelDesc: string
+    thisHotel: string
     eliminateCandidateTitle: string
     eliminateCandidateDesc: string
+    // New keys from refactor
+    bookOn: string
+    retry: string
+    consLabel: string
+    bookingFeaturedReviews: string
+    noFeaturedReviews: string
+    recommendFailed: string
+    customAddressFallback: string
+    findingTailored: string
+    surpriseFresh: string
+    resolveFailed: string
+    listSeparator: string
+    propertyHotel: string
   }
   flight: {
     title: string
@@ -285,6 +405,32 @@ export interface I18nSchema {
     searchInboundByDate: string
     pickDatesFirst: string
     flightSearchHint: string
+    // New keys from refactor
+    searchLabel: string
+    refreshSchedule: string
+    refresh: string
+    collapse: string
+    editFlights: string
+    searching: string
+    fetching: string
+    scheduled: string
+    actualOrEst: string
+    departureLabel: string
+    arrivalLabel: string
+    terminalLabel: string
+    durationLabel: string
+    aircraftLabel: string
+    statusLabel: string
+    flightSchedule: string
+    outboundErrorPrefix: string
+    returnErrorPrefix: string
+    flightSearchFailed: string
+    readOnlyFlights: string
+    enterFlightsHint: string
+    pickDatesFirstFlights: string
+    datesRoundtripReady: string
+    suggestPickDates: string
+    pleaseEnterFlightNumber: string
   }
   place: {
     title: string
@@ -321,6 +467,39 @@ export interface I18nSchema {
     translationUnavailableRetry: string
     reviews: string
     extractingTags: string
+    addPlaceView: string
+    tabAiRecs: string
+    tabGoogleSearch: string
+    recsIntro: string
+    recsEmpty: string
+    recsUnavailable: string
+    recsCategoryEmpty: string
+    refreshRecs: string
+    refreshingRecs: string
+    addCafeOption: string
+    addRestaurantOption: string
+    aiOrGoogle: string
+    count: string
+    // New keys from refactor
+    placeDetailsLabel: string
+    googleReviews: string
+    tripadvisorReviews: string
+    aiTranslatedName: string
+    photoAttributionPrefix: string
+    photoFromAttribution: string
+    photoPrev: string
+    photoNext: string
+    refreshPhotosTitle: string
+    clearCacheReloadTitle: string
+    refreshPhotosLabel: string
+    cachedGoogleRating: string
+    ratingChip: string
+    tripadvisorRatingTitle: string
+    priceChip: string
+    cuisineChip: string
+    viewReviewsOnGoogle: string
+    embeddedMapTitle: string
+    // Existing preference-dialog keys (kept in place for backward compat)
     dayStartTime: string
     activeTagPool: string
     activeTagsCount: string
@@ -334,6 +513,23 @@ export interface I18nSchema {
     discard: string
     addToCandidates: string
     addToActive: string
+  }
+  preferenceTag: {
+    morningCoffee: string
+    twoMeals: string
+    easyWalking: string
+    disney: string
+    champsArc: string
+    avoidLargeMuseums: string
+    photography: string
+    artGalleries: string
+    frenchBakery: string
+    seineCruise: string
+    maraisVintage: string
+    localMarkets: string
+    eiffelNight: string
+    familyFriendly: string
+    affordableFood: string
   }
   chat: {
     title: string
@@ -352,6 +548,110 @@ export interface I18nSchema {
     applied: string
     suggestedPrompts: string
     thinkingStatus: string
+    // New keys from refactor
+    chatUnavailable: string
+    recommendationInterrupted: string
+    reRecommendFailed: string
+    pleaseTryAgain: string
+    responseInterrupted: string
+    // Trip chat panel
+    currentDay: string
+    tryAskingIntro: string
+    sendButton: string
+    thinkingNow: string
+    thinkingDone: string
+    thinkingPrefix: string
+    thinkingAssistantLabel: string
+    answeringAssistantLabel: string
+    answeringNow: string
+    openPanelAria: string
+    closePanelAria: string
+    // Suggested prompts
+    suggestHotelCurrent: string
+    suggestHotelsLeftBank: string
+    suggestFirstPlace: string
+    suggestAddCafe: string
+    suggestRemoveArc: string
+    // Work-step pipeline labels (ChatWorkStepList.tsx)
+    workStepPreprocessPlan: string
+    workStepPreprocessFallback: string
+    workStepWebSearch: string
+    workStepGenerate: string
+    workStepParse: string
+    workStepResolvePlaces: string
+    workStepApply: string
+    workStepSearchPrefix: string
+    workStepPlanLabel: string
+    workStepPlanIntentRecommend: string
+    workStepPlanIntentMutate: string
+    workStepPlanIntentAnswer: string
+    workStepPlanIntentUnderstand: string
+    workStepPlanNeedsWebYes: string
+    workStepPlanNeedsWebNo: string
+    workStepPlanEffortLow: string
+    workStepPlanEffortMedium: string
+    workStepPlanEffortHigh: string
+    workStepCompletedApplyWithWeb: string
+    workStepCompletedApply: string
+    workStepCompletedResolveWithWeb: string
+    workStepCompletedResolve: string
+    workStepCompletedGenerateWithWeb: string
+    workStepCompletedWebOnly: string
+    workStepCompletedGenerate: string
+    workStepSkippedPrefix: string
+    workStepWaitingPrefix: string
+    // Chat action notes (status messages shown in the assistant's reply)
+    actionNoteNoChange: string
+    actionNoteConfirmMissing: string
+    actionNoteReplaceFromMissing: string
+    actionNoteReplaceMissingStopInfo: string
+    actionNoteReplacedOnDay: string
+    actionNoteReRecommending: string
+    actionNoteNoNewRecommendations: string
+    actionNoteAtLeastOneHotel: string
+    actionNoteOpFailed: string
+    actionNoteResolvePlacesActive: string
+    actionNoteOpeningConfirm: string
+    actionNoteApplying: string
+    actionNoteOriginalPlace: string
+    actionNoteUsedToReplace: string
+    actionNoteAddedToEndOfDay: string
+    actionNoteAddedByRouteOfDay: string
+    actionNotePlaceFallback: string
+    actionNoteConfirmReplace: string
+    actionNoteAddToTrip: string
+    // Duration fallback strings
+    durationMinutes90: string
+    durationMinutes60: string
+    durationMinutes45: string
+  }
+  llm: {
+    // LlmModelPicker sections
+    thinkingSection: string
+    modelSection: string
+    modelPanelAria: string
+    openPanelAria: string
+    closePanelAria: string
+    modelNoThinkingSupport: string
+    thinkingToggleAria: string
+    autoIntensity: string
+    autoIntensityDesc: string
+    thinkingSkippedHint: string
+    effortSliderAria: string
+    currentModeSr: string
+    // Thinking mode + effort labels
+    thinkingModeAuto: string
+    thinkingModeOff: string
+    thinkingModeLow: string
+    thinkingModeMedium: string
+    thinkingModeHigh: string
+    thinkingModeCurrentSr: string
+    // Model descriptions
+    deepseekV4FlashDesc: string
+    deepseekV4ProDesc: string
+    gpt56LunaDesc: string
+    gpt56SolDesc: string
+    gpt56TerraDesc: string
   }
   cloud: {
     backupTitle: string
@@ -378,6 +678,117 @@ export interface I18nSchema {
     restoreSnapshot: string
     confirmRestoreSnapshot: string
     restoring: string
+    // New keys from refactor
+    membersLoadFailed: string
+    memberAddedWithInvite: string
+    memberAddedNoInvite: string
+    memberAddFailed: string
+    memberRemoveFailed: string
+    permissionUpdateFailed: string
+    justNow: string
+    minutesAgo: string
+    hoursAgo: string
+    daysAgo: string
+    daysStopsSummary: string
+    emptyTripSnapshot: string
+    loadBackupsFailed: string
+    restoreSnapshotFailed: string
+  }
+  apiMeter: {
+    ariaLabel: string
+    panelTitle: string
+    todayTotal: string
+    groups: {
+      'google-places': string
+      tripadvisor: string
+      booking: string
+      llm: string
+      flights: string
+      other: string
+    }
+    kinds: {
+      'google-official-search': string
+      'google-official-details': string
+      'google-official-photo': string
+      'google-rapidapi-search': string
+      'google-rapidapi-details': string
+      'google-rapidapi-photo': string
+      'tripadvisor-search': string
+      'tripadvisor-gallery': string
+      'tripadvisor-details': string
+      'tripadvisor-autocomplete': string
+      'booking-search': string
+      'booking-detail': string
+      'booking-photos': string
+      'booking-autocomplete': string
+      'booking-description': string
+      'booking-reviews': string
+      'booking-other': string
+      'llm-deepseek': string
+      'llm-openai': string
+      'llm-gemini': string
+      'flight-timetable': string
+      'flight-aerodatabox': string
+      'place-website': string
+      'share-invite': string
+      'openrouteservice-directions': string
+      other: string
+    }
+  }
+  app: {
+    // Trip summary / readiness banner
+    tripSummaryAria: string
+    destinationTitle: string
+    tripDurationTitle: string
+    tripDatesTitle: string
+    hotelDetailsTitle: string
+    restoreDefaultsLabel: string
+    restoreDefaultsTitle: string
+    regenerateAllLabel: string
+    regenerateAllTitle: string
+    autoRegenOnLocaleChange: string
+    failedToGenerate: string
+    tryAgain: string
+    generationInterrupted: string
+    continueGenerating: string
+    itineraryViewAria: string
+    tabTimeline: string
+    tabMap: string
+    loadingMap: string
+    readinessHeader: string
+    readinessHeadline: string
+    todoBadge: string
+    datesPendingShort: string
+    outboundFlightSummary: string
+    schedulePending: string
+    chooseStay: string
+    goToLogistics: string
+    tripSetupHeader: string
+    logisticsBooking: string
+    daysCountShort: string
+    flightsEntered: string
+    outboundShort: string
+    returnShort: string
+    flightsPending: string
+    stayPrefix: string
+    stayPending: string
+    dayPlanLabel: string
+    // Confirm dialogs
+    regenerateDialog: {
+      title: string
+      description: string
+      confirm: string
+    }
+    restoreDialog: {
+      title: string
+      description: string
+      confirm: string
+    }
+    clearDialog: {
+      title: string
+      description: string
+      confirm: string
+    }
   }
 }
 

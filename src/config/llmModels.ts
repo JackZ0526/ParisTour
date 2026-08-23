@@ -6,6 +6,8 @@
  * and `services/llm/prompts.ts`.
  */
 
+import type { TranslationKey } from '../shared/i18n/types'
+
 /** Temporarily off — set true to re-enable Gemini failover / manual model switch. */
 export const ENABLE_LLM_PROVIDER_SWITCH = false
 
@@ -35,14 +37,14 @@ export const DEEPSEEK_MODEL_OPTIONS = [
     id: 'deepseek-v4-flash',
     label: 'DeepSeek V4 Flash',
     shortLabel: 'V4 Flash',
-    description: '极速响应 · 日常问答推荐',
+    descriptionKey: 'llm.deepseekV4FlashDesc' as TranslationKey,
     provider: 'deepseek' as const,
   },
   {
     id: 'deepseek-v4-pro',
     label: 'DeepSeek V4 Pro',
     shortLabel: 'V4 Pro',
-    description: '深度推理 · 复杂行程规划',
+    descriptionKey: 'llm.deepseekV4ProDesc' as TranslationKey,
     provider: 'deepseek' as const,
   },
 ] as const
@@ -53,21 +55,21 @@ export const OPENAI_ONLY_MODEL_OPTIONS = [
     id: 'gpt-5.6-luna',
     label: 'GPT-5.6 luna',
     shortLabel: '5.6 luna',
-    description: '轻量平衡 · 快速微调',
+    descriptionKey: 'llm.gpt56LunaDesc' as TranslationKey,
     provider: 'openai' as const,
   },
   {
     id: 'gpt-5.6-sol',
     label: 'GPT-5.6 sol',
     shortLabel: '5.6 sol',
-    description: '高阶智能 · 综合能力强',
+    descriptionKey: 'llm.gpt56SolDesc' as TranslationKey,
     provider: 'openai' as const,
   },
   {
     id: 'gpt-5.6-terra',
     label: 'GPT-5.6 terra',
     shortLabel: '5.6 terra',
-    description: '旗舰推理 · 复杂逻辑规划',
+    descriptionKey: 'llm.gpt56TerraDesc' as TranslationKey,
     provider: 'openai' as const,
   },
 ] as const

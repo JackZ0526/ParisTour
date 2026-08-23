@@ -21,6 +21,7 @@ import {
   memoizeHotelAdvisorCopy,
   rememberHotelAdvisorCopy,
 } from '../services/hotelAdvisorMemo'
+import { useHotelAdvisorLocaleRegen } from '../hooks/useHotelAdvisorLocaleRegen'
 import { generateHotelCardBlurb, generateHotelDetailCopy, isLlmConfigured } from '../../../shared/services/llm/llm'
 import { looksChinese } from '../../chat/services/translate'
 import { memoizeLlmCall } from '../../../shared/services/llm/llmMemo'
@@ -650,7 +651,7 @@ function BookingHotelFacts({
     (factsPending && policies.length === 0) || (policiesNeedTranslate && !policiesRevealed)
   const policiesKey = policies.join('\n---\n')
 
-  const listSeparator = locale === 'en' ? ', ' : '、'
+  const listSeparator = t('hotel.listSeparator')
 
   useLayoutEffect(() => {
     setLocationRevealed(!locationNeedsTranslate)
@@ -699,7 +700,7 @@ function BookingHotelFacts({
                         {'★'.repeat(starCount)}
                       </span>
                     )}
-                    {hotel.propertyType ? localizePropertyType(hotel.propertyType, locale) : (locale === 'en' ? 'Hotel' : '酒店')}
+                    {hotel.propertyType ? localizePropertyType(hotel.propertyType, locale) : t('hotel.propertyHotel')}
                   </span>
                 )}
                 {factsPending && !hotel.propertyType && starCount === 0 && (
@@ -764,7 +765,7 @@ function BookingHotelFacts({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-md border border-[var(--mist)] bg-white/70 dark:bg-white/10 px-2.5 py-1.5 text-xs font-medium text-[#003b95]/85 dark:text-[#7bb5ff] transition hover:border-[#003b95]/20 hover:bg-[#003b95]/5 dark:hover:bg-white/15 hover:text-[#003b95] dark:hover:text-[#5fa2f8]"
               >
-                {locale === 'en' ? 'Book on ' : '前往 '}
+                {t('hotel.bookOn')}
                 <span>
                   <span className="text-[#003580] dark:text-[#5fa2f8]">Booking</span>
                   <span className="text-[#006ce4] dark:text-[#7bb5ff]">.com</span>
@@ -785,7 +786,7 @@ function BookingHotelFacts({
               onClick={onIdentityRetry}
               className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
             >
-              {locale === 'en' ? 'Retry Matching' : '重试匹配'}
+              {t('hotel.retryMatching')}
             </button>
           </div>
         )}
@@ -797,7 +798,7 @@ function BookingHotelFacts({
               onClick={onRetry}
               className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
             >
-              {locale === 'en' ? 'Retry' : '重试'}
+              {t('hotel.retry')}
             </button>
           </div>
         )}
@@ -940,7 +941,7 @@ function BookingReviewsPanel({
   const [reviewsRevealed, setReviewsRevealed] = useState(false)
   const reviews = (hotel.reviews || []).map((review) => ({
     text: review.negativeText
-      ? `${review.text}\n\n${locale === 'en' ? 'Cons: ' : '不足：'}${review.negativeText}`
+      ? `${review.text}\n\n${t('hotel.consLabel')}${review.negativeText}`
       : review.text,
     rating: review.rating,
     author: review.author,
@@ -982,7 +983,7 @@ function BookingReviewsPanel({
             onClick={onRetry}
             className="font-medium underline underline-offset-2 hover:text-amber-950 dark:hover:text-amber-100"
           >
-            {locale === 'en' ? 'Retry' : '重试'}
+            {t('hotel.retry')}
           </button>
         </div>
       )}
@@ -990,7 +991,7 @@ function BookingReviewsPanel({
         <div className={showReviewShimmer ? 'hidden' : undefined}>
           <GoogleReviewsList
             reviews={reviews}
-            sourceLabel={locale === 'en' ? 'Booking.com Featured Reviews' : 'Booking.com 精选评论'}
+            sourceLabel={t('hotel.bookingFeaturedReviews')}
             showHeader={false}
             showShimmer={false}
             onPendingChange={(pending) => setReviewsRevealed(!pending)}
@@ -998,7 +999,7 @@ function BookingReviewsPanel({
         </div>
       )}
       {!loading && !error && hotel.bookingReviewsLoaded && !reviews.length && (
-        <p className="text-sm text-[var(--stone)]">{locale === 'en' ? 'No featured guest reviews available to display.' : '暂无可展示的精选住客评论。'}</p>
+        <p className="text-sm text-[var(--stone)]">{t('hotel.noFeaturedReviews')}</p>
       )}
     </section>
   )
@@ -1079,6 +1080,14 @@ export function HotelPicker({
   selectedRef.current = selected
   pendingCustomRef.current = pendingCustom
   dragRef.current = drag
+
+  // When the user switches interface language, regenerate `reason` /
+  // `tripFit` for hotels whose stored copy is in the previous language.
+  useHotelAdvisorLocaleRegen({
+    candidates,
+    days,
+    onCandidatesChange,
+  })
 
   const popupCandidate = useMemo(() => {
     if (pendingCustom) return pendingCustom
@@ -1662,7 +1671,7 @@ export function HotelPicker({
 
   async function bootstrapRecommendations() {
     if (!isLlmConfigured()) {
-      setError(locale === 'en' ? 'Unable to generate hotel recommendations. Please enter a custom address below.' : '暂时无法生成酒店推荐，请使用下方自定义地址。')
+      setError(t('hotel.customAddressFallback'))
       return
     }
 
@@ -1680,7 +1689,7 @@ export function HotelPicker({
       setOthersCollapsed(false)
       persistHotelState(llmCards, null, { othersCollapsed: false })
     } catch (e) {
-      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Failed to recommend hotels' : '推荐酒店失败'))
+      setError(e instanceof Error ? e.message : t('hotel.recommendFailed'))
     } finally {
       setRefreshing(false)
     }
@@ -1688,7 +1697,7 @@ export function HotelPicker({
 
   async function runFreshRecommendations(preferences?: string) {
     if (!isLlmConfigured()) {
-      setError(locale === 'en' ? 'Unable to generate hotel recommendations. Please enter a custom address below.' : '暂时无法生成酒店推荐，请使用下方自定义地址。')
+      setError(t('hotel.customAddressFallback'))
       return
     }
 
@@ -1697,8 +1706,8 @@ export function HotelPicker({
     setRefreshing(true)
     setRefreshHint(
       prefs
-        ? (locale === 'en' ? 'Finding new hotels tailored to your preferences…' : '正在按你的喜好重新推荐酒店…')
-        : (locale === 'en' ? 'Surprise me: Finding a fresh batch of hotels…' : '交给命运：正在挑选一批新酒店…')
+        ? t('hotel.findingTailored')
+        : t('hotel.surpriseFresh')
     )
     setError(null)
     try {
@@ -1728,7 +1737,7 @@ export function HotelPicker({
       setOthersCollapsed(false)
       setPreferText('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Failed to recommend hotels' : '推荐酒店失败'))
+      setError(e instanceof Error ? e.message : t('hotel.recommendFailed'))
     } finally {
       setRefreshing(false)
       setRefreshHint(null)
@@ -1748,7 +1757,7 @@ export function HotelPicker({
       setPopupHotelId(null)
       setPendingCustom(hydrateHotelAdvisorFromCache(card))
     } catch (e) {
-      setError(e instanceof Error ? e.message : (locale === 'en' ? 'Failed to resolve location' : '解析失败'))
+      setError(e instanceof Error ? e.message : t('hotel.resolveFailed'))
     } finally {
       setLoading(false)
     }
@@ -2783,7 +2792,7 @@ export function HotelPicker({
                   onClick={decideConsider}
                   className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-[var(--stone)] transition-colors hover:text-[var(--ink)] active:scale-95 flex-1 sm:flex-none`}
                 >
-                  {decidingCustom ? (locale === 'en' ? 'Add as Candidate' : '仅加入候选') : (locale === 'en' ? 'Keep in Candidates' : '保留备选')}
+                  {decidingCustom ? t('hotel.addAsCandidate') : t('hotel.keepInCandidates')}
                 </button>
               </div>
 
@@ -2813,22 +2822,9 @@ export function HotelPicker({
         title={t('hotel.deleteCustomHotelTitle')}
         description={
           <span>
-            {locale === 'en' ? (
-              <>
-                Are you sure you want to delete custom hotel{' '}
-                <strong className="font-semibold text-[var(--ink)]">
-                  "{pendingDeleteHotel?.name || 'this hotel'}"
-                </strong>?
-              </>
-            ) : (
-              <>
-                确定删除自定义酒店{' '}
-                <strong className="font-semibold text-[var(--ink)]">
-                  「{pendingDeleteHotel?.name || '此酒店'}」
-                </strong>{' '}
-                吗？
-              </>
-            )}
+            {t('hotel.deleteCustomHotelDesc', {
+              name: pendingDeleteHotel?.name || t('hotel.thisHotel'),
+            })}
           </span>
         }
         confirmText={t('common.delete')}
@@ -2848,23 +2844,9 @@ export function HotelPicker({
         title={t('hotel.eliminateCandidateTitle')}
         description={
           <span>
-            {locale === 'en' ? (
-              <>
-                Are you sure you want to remove{' '}
-                <strong className="font-semibold text-[var(--ink)]">
-                  "{pendingEliminateHotel?.name || 'this hotel'}"
-                </strong>{' '}
-                from candidate list?
-              </>
-            ) : (
-              <>
-                确定将{' '}
-                <strong className="font-semibold text-[var(--ink)]">
-                  「{pendingEliminateHotel?.name || '此酒店'}」
-                </strong>{' '}
-                从候选列表中淘汰移除吗？
-              </>
-            )}
+            {t('hotel.eliminateCandidateDesc', {
+              name: pendingEliminateHotel?.name || t('hotel.thisHotel'),
+            })}
           </span>
         }
         confirmText={t('hotel.removeFromCandidate')}
