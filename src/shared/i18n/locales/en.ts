@@ -226,7 +226,7 @@ export const en: I18nSchema = {
     dragToReorder: 'Drag to reorder',
     openInGoogleMaps: 'Open in Google Maps',
     directionsLabel: 'Directions',
-    directionsDesc: 'Click each transit leg to open live routing in Google Maps',
+    directionsDesc: 'Click a transit leg to open it in Google Maps',
     directionsNotReady: 'Route links show up after the dates, flight, and hotel are confirmed.',
     fromAirport: 'From Airport',
     fromHotel: 'From Hotel',

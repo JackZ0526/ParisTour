@@ -415,7 +415,7 @@ function LegConnector({
                     href={routeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    aria-label={`${fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')} · ${translate('itinerary.directionsLabel' as never, undefined, getLocale()) || (getLocale() === 'en' ? 'Directions' : '路线导航')}`}
+                    aria-label={`${fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')} · ${translate('itinerary.directionsLabel', undefined, getLocale())}`}
                   >
                     <span className="timeline-route-link-label">
                       {fallbackLabel || googleMapsTravelModeLabel(routeMode || 'transit')}
