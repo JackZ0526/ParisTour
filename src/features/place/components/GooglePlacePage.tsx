@@ -1714,7 +1714,7 @@ export function GooglePlacePage({
                   heroReady && (
                     <span
                       className="absolute bottom-2 left-2 z-10"
-                      aria-label={t('place.photoFromAttribution', { source: placeSourceLabel(photoSource) })}
+                      aria-label={t('place.photoFromAttribution', { source: placeSourceLabel(photoSource, locale) })}
                     >
                       <PlaceSourceMark source={photoSource} onPhoto />
                     </span>
@@ -1894,7 +1894,9 @@ export function GooglePlacePage({
               >
                 <PlaceSourceMark source="tripadvisor" />
                 <span className="sr-only">
-                  {factsSource ? `${placeSourceLabel(factsSource)} 评分 ` : '评分 '}
+                  {factsSource
+                    ? t('place.ratingSrLabel', { source: placeSourceLabel(factsSource, locale) })
+                    : t('place.ratingSrLabel', { source: '' }).trimEnd() + ' '}
                 </span>
                 ★ {displayRating.toFixed(1)}
                 {displayRatingCount != null ? `（${displayRatingCount}）` : ''}

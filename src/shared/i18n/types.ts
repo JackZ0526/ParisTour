@@ -579,6 +579,12 @@ export interface I18nSchema {
     mapAria: string
     sourcePhotoTitle: string
     sourceInfoTitle: string
+    // Localized descriptor for the website source. Google / Tripadvisor /
+    // Booking.com / Wikimedia are proper nouns and stay untranslated.
+    sourceWebsite: string
+    // Screen-reader prefix on the place-rating chip. Read like
+    // "{Tripadvisor} rating {score}" or "{source} rating {score}".
+    ratingSrLabel: string
     // PlaceName translation badge
     translating: string
     translatedBadgeAria: string

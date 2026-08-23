@@ -157,7 +157,7 @@ export function PlacePhotoGallery({
   const lastTapTime = useRef(0)
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
   const heroImgRef = useRef<HTMLImageElement>(null)
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   const galleryLength = photos.length
   const displayPhoto = photos[photoIndex] || photos[0] || ''
@@ -302,7 +302,7 @@ export function PlacePhotoGallery({
         {photoSource && photoSource !== 'wikimedia' && displayPhoto && heroReady && (
           <span
             className="absolute bottom-2 left-2 z-10"
-            aria-label={t('place.photoAttributionAria', { source: placeSourceLabel(photoSource) })}
+            aria-label={t('place.photoAttributionAria', { source: placeSourceLabel(photoSource, locale) })}
           >
             <PlaceSourceMark source={photoSource} onPhoto />
           </span>

@@ -524,6 +524,8 @@ export const en: I18nSchema = {
     mapAria: '{name} map',
     sourcePhotoTitle: 'Photo from {label}',
     sourceInfoTitle: 'Information from {label}',
+    sourceWebsite: 'Official site',
+    ratingSrLabel: '{source} rating ',
     // PlaceName translation badge
     translating: 'Translating…',
     translatedBadgeAria: 'AI-translated name',

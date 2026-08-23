@@ -1,3 +1,6 @@
+import type { Locale } from '../../../shared/i18n/types'
+import { translate } from '../../../shared/i18n/i18nStore'
+
 export type PlaceInfoSource =
   | 'google'
   | 'tripadvisor'
@@ -5,14 +8,21 @@ export type PlaceInfoSource =
   | 'website'
   | 'wikimedia'
 
-const SOURCE_LABEL: Record<PlaceInfoSource, string> = {
+/**
+ * Brand names (Google / Tripadvisor / Booking.com / Wikimedia) are proper
+ * nouns and stay untranslated across locales. The `website` source is a
+ * generic descriptor, so it goes through the i18n dictionary.
+ */
+const BRAND_LABEL: Record<Exclude<PlaceInfoSource, 'website'>, string> = {
   google: 'Google',
   tripadvisor: 'Tripadvisor',
   booking: 'Booking.com',
-  website: '官网',
   wikimedia: 'Wikimedia',
 }
 
-export function placeSourceLabel(source: PlaceInfoSource): string {
-  return SOURCE_LABEL[source]
+export function placeSourceLabel(source: PlaceInfoSource, locale?: Locale): string {
+  if (source === 'website') {
+    return translate('place.sourceWebsite', undefined, locale)
+  }
+  return BRAND_LABEL[source]
 }

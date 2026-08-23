@@ -51,8 +51,8 @@ export function PlaceSourceMark({
   onPhoto?: boolean
   className?: string
 }) {
-  const { t } = useTranslation()
-  const label = placeSourceLabel(source)
+  const { t, locale } = useTranslation()
+  const label = placeSourceLabel(source, locale)
   const showText = showLabel && source !== 'booking'
   const inner = (
     <>

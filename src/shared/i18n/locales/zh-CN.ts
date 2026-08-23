@@ -524,6 +524,8 @@ export const zhCN: I18nSchema = {
     mapAria: '{name} 地图',
     sourcePhotoTitle: '图片来自 {label}',
     sourceInfoTitle: '信息来自 {label}',
+    sourceWebsite: '官网',
+    ratingSrLabel: '{source} 评分 ',
     // PlaceName translation badge
     translating: '翻译中…',
     translatedBadgeAria: '非公认中文名，由 AI 翻译',
