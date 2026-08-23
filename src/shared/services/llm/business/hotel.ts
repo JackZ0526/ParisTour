@@ -2,8 +2,8 @@
  * LLM call sites for hotels (detail copy / recommendation).
  */
 import {
-  COMMON_RULES,
-  PLACE_RESEARCH_DISCIPLINE,
+  getCommonRules,
+  getPlaceResearchDiscipline,
   buildPrompt,
   jsonContract,
 } from '../prompts'
@@ -277,8 +277,8 @@ export async function recommendHotelsForTrip(input?: {
       ? 'Paris accommodation advisor. Pick the best-fit hotels from verified Booking candidates for a Vancouver-originated Paris trip.'
       : `巴黎旅行住宿顾问。为温哥华出发的${tripLabel}从已验证候选中挑选酒店。`,
     null,
-    COMMON_RULES,
-    PLACE_RESEARCH_DISCIPLINE,
+    getCommonRules(activeLocale),
+    getPlaceResearchDiscipline(activeLocale),
     `<hard_rules>
 - ${langRule}
 - Recommend exactly ${count} real hotels (mid-range primary, may include 1 upscale).

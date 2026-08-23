@@ -1,7 +1,7 @@
 /**
  * LLM call site for intelligent preference tag extraction from natural language.
  */
-import { buildPrompt, jsonContract, COMMON_RULES } from '../prompts'
+import { buildPrompt, getCommonRules, jsonContract } from '../prompts'
 import { extractJsonObject } from '../json'
 import { generateText, isLlmConfigured } from './_service'
 import {
@@ -71,7 +71,7 @@ function buildSystemPrompt(locale: Locale): string {
     return buildPrompt(
       'Paris travel preference extractor. Your job is to deeply condense a user\'s free-form, conversational travel wishes into a tight set of professional, plain-text travel preference chips.',
       null,
-      COMMON_RULES,
+      getCommonRules(locale),
       `<hard_rules>
 - ${langRule}
 - Strip the user's conversational phrasing entirely; never return raw fragments of the input as a tag.
@@ -101,7 +101,7 @@ function buildSystemPrompt(locale: Locale): string {
   return buildPrompt(
     '巴黎旅行偏好提炼专家。你的任务是将用户自由输入的口语化旅行期望与需求，深度归纳、提炼为极简、专业的纯文字旅行偏好标签（Tag Chips）。',
     null,
-    COMMON_RULES,
+    getCommonRules(locale),
     `<hard_rules>
 - ${langRule}
 - 彻底摆脱用户的口语化原句，严禁直接把用户原句断句作为标签！

@@ -21,9 +21,20 @@
  */
 
 import type { Locale } from '../../i18n/types'
+import { getLocale } from '../../i18n/i18nStore'
 
 const ZH = 'zh-CN' as const
 const EN = 'en' as const
+
+/**
+ * Resolves the locale a prompt fragment should be built in. Defaults to
+ * whatever the i18n store reports at call time, so callers that forget to
+ * pass an explicit locale still get the right language. Tests that need
+ * a fixed snapshot should pass the locale explicitly.
+ */
+function promptLocale(override?: Locale): Locale {
+  return override ?? getLocale()
+}
 
 // ---------------------------------------------------------------------------
 // Public sections (locale-aware functions; call sites pass the active locale).
@@ -36,7 +47,7 @@ const EN = 'en' as const
  *  - output contract (single JSON object, no markdown, stream order)
  *  - fact discipline (no fabrication, no exact numbers without a source)
  */
-export function getCommonRules(locale: Locale = ZH): string {
+export function getCommonRules(locale: Locale = promptLocale()): string {
   if (locale === EN) {
     return `<common_rules>
 <data_isolation>
@@ -91,10 +102,6 @@ export function getCommonRules(locale: Locale = ZH): string {
 </common_rules>`
 }
 
-/**
- * Back-compat: Chinese-only snapshot for any legacy import that does not
- * pass a locale. New callers should use `getCommonRules(locale)`.
- */
 export const COMMON_RULES = getCommonRules(ZH)
 
 /**
@@ -102,7 +109,7 @@ export const COMMON_RULES = getCommonRules(ZH)
  * `source="recommend"` means the itinerary hasn't been written yet, so
  * the reply must NOT claim success.
  */
-export function getNoHallucinationRule(locale: Locale = ZH): string {
+export function getNoHallucinationRule(locale: Locale = promptLocale()): string {
   if (locale === EN) {
     return `<no_hallucination>
 - Whenever the request changes itinerary / hotel / flight, "actions" must never be empty. Saying "OK/adding it now" without a matching action is a serious error.
@@ -128,7 +135,7 @@ export const NO_HALLUCINATION = getNoHallucinationRule(ZH)
  * the expected geography. Sourced from the hard rules that previously
  * lived inline in `tripChat.systemPrompt`.
  */
-export function getPlaceResearchDiscipline(locale: Locale = ZH): string {
+export function getPlaceResearchDiscipline(locale: Locale = promptLocale()): string {
   if (locale === EN) {
     return `<place_research_discipline>
 - Every recommended place must have a Google-Maps-discoverable official name (the address / place name field), not a colloquial shortcut.
@@ -145,15 +152,13 @@ export function getPlaceResearchDiscipline(locale: Locale = ZH): string {
 </place_research_discipline>`
 }
 
-/** Back-compat alias (Chinese version). */
-export const PLACE_RESEARCH_DISCIPLINE = getPlaceResearchDiscipline(ZH)
 
 /**
  * Place-type vocabulary hard rule, shared by every prompt that picks or
  * categorises real-world places (place-recommend, full-plan, single-day
  * regen). Previously lived inline in each call site.
  */
-export function getCafeVsRestaurantRule(locale: Locale = ZH): string {
+export function getCafeVsRestaurantRule(locale: Locale = promptLocale()): string {
   if (locale === EN) {
     return `<cafe_vs_restaurant>
 - type=cafe ONLY means "coffee shop" — a small spot focused on specialty coffee, pastries/light food, or brunch/breakfast. NOT a sit-down restaurant.
@@ -170,15 +175,13 @@ export function getCafeVsRestaurantRule(locale: Locale = ZH): string {
 </cafe_vs_restaurant>`
 }
 
-/** Back-compat alias (Chinese version). */
-export const CAFE_VS_RESTAURANT_RULE = getCafeVsRestaurantRule(ZH)
 
 /**
  * Examples for the trip-chat preflight router. Keeping the JSON contract
  * beside a worked example cuts mis-classification dramatically. Used by
  * `tripChat.planTripChatRequest`.
  */
-export function getRouterExamples(locale: Locale = ZH): string {
+export function getRouterExamples(locale: Locale = promptLocale()): string {
   if (locale === EN) {
     return `<examples>
 Example 1 (mutate + needsWeb):
@@ -209,8 +212,7 @@ out: {"intent":"recommend","needsWeb":true,"reasoningEffort":"medium","reason":"
 </examples>`
 }
 
-/** Back-compat alias (Chinese version). */
-export const ROUTER_EXAMPLES = getRouterExamples(ZH)
+
 
 // ---------------------------------------------------------------------------
 // Builders
@@ -247,7 +249,7 @@ export function snapshotBlock(label: string, data: unknown): string {
  * JSON schema reminder to keep at the end of prompts that must return a
  * structured response. Stream-friendly order: reply first, actions second.
  */
-export function jsonContract(shape: string, example?: string, locale: Locale = ZH): string {
+export function jsonContract(shape: string, example?: string, locale: Locale = promptLocale()): string {
   const lead = locale === EN
     ? 'Output exactly one JSON object. Field order: reply first, then actions.'
     : '只输出一个 JSON 对象。字段顺序：reply 优先，再 actions。'

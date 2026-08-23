@@ -148,11 +148,6 @@ export {
 export {
   buildPrompt,
   jsonContract,
-  CAFE_VS_RESTAURANT_RULE,
-  COMMON_RULES,
-  NO_HALLUCINATION,
-  PLACE_RESEARCH_DISCIPLINE,
-  ROUTER_EXAMPLES,
 } from './prompts'
 
 // ── Preflight + web-research injection ──────────────────────────────────

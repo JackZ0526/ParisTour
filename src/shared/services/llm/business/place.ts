@@ -8,9 +8,9 @@
  */
 import { memoizeLlmCall } from '../llmMemo'
 import {
-  CAFE_VS_RESTAURANT_RULE,
-  COMMON_RULES,
-  PLACE_RESEARCH_DISCIPLINE,
+  getCafeVsRestaurantRule,
+  getCommonRules,
+  getPlaceResearchDiscipline,
   buildPrompt,
   jsonContract,
 } from '../prompts'
@@ -261,7 +261,7 @@ export async function generatePlaceDescription(input: {
 - ${langRule}
 - <output_format>2–3 句正文，不要列表，不要夸张营销套话，不要标题。</output_format>
 </hard_rules>`,
-        CAFE_VS_RESTAURANT_RULE,
+        getCafeVsRestaurantRule(activeLocale),
       )
       const user = [
         `地点：${input.name}`,
@@ -678,13 +678,14 @@ export async function recommendPlacesForDay(input: {
     ...(input.tripPlaceNames || []),
     ...(input.excludeNames || []),
   ])
+  const locale = getLocale()
 
   const system = buildPrompt(
     '巴黎旅行顾问。根据游客当天已有行程和推荐偏好，从已验证候选中挑选互补、少重复的地点。',
     null,
-    COMMON_RULES,
-    PLACE_RESEARCH_DISCIPLINE,
-    CAFE_VS_RESTAURANT_RULE,
+    getCommonRules(locale),
+    getPlaceResearchDiscipline(locale),
+    getCafeVsRestaurantRule(locale),
     `<hard_rules>
 - 只推荐 requestedTypes 中的类别；每个类别严格给出 ${countPerType} 个地点，共 ${
       requestedTypes.length * countPerType

@@ -1275,7 +1275,7 @@ export function AddPlaceDialog({
                                           className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] dark:bg-[var(--copper)] px-3 py-2.5 text-sm text-[var(--paper)] dark:text-white disabled:opacity-50"
                                         >
                                           {busyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
-                                          {busyEnd ? '加入中…' : '加到最后'}
+                                          {busyEnd ? t('place.addingBusy') : t('place.addToEnd')}
                                         </button>
                                       </div>
                                       <p className="text-xs text-[var(--stone)]">
@@ -1441,7 +1441,7 @@ export function AddPlaceDialog({
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
                 >
                   {googleBusyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
-                  {googleBusyEnd ? '加入中…' : '加到最后'}
+                  {googleBusyEnd ? t('place.addingBusy') : t('place.addToEnd')}
                 </button>
               </div>
               <p className="text-xs text-[var(--stone)]">

@@ -88,6 +88,7 @@ export async function suggestPopularDestinations(options?: {
     jsonContract(
       '{ destinations: [{ name, subtitle? }] }',
       example,
+      locale,
     ),
   )
   const user = JSON.stringify({
