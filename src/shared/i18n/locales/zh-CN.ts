@@ -578,6 +578,12 @@ export const zhCN: I18nSchema = {
     ratingChip: '评分',
     tripadvisorRatingTitle: 'Tripadvisor 评分',
     priceChip: '价格',
+    // Localized price-tier chips (0..4). Symbol prefix is € / $ / £ / ¥.
+    priceTier0: '€0 · 白嫖快乐',
+    priceTier1: '€ · 学生党续命',
+    priceTier2: '€€ · 钱包暂安',
+    priceTier3: '€€€ · 约会烧钱档',
+    priceTier4: '€€€€ · 存款消失术',
     cuisineChip: '菜系',
     viewReviewsOnGoogle: '在 Google 地图查看评价',
     embeddedMapTitle: '地图位置（本页嵌入）',

@@ -578,6 +578,12 @@ export const en: I18nSchema = {
     ratingChip: 'Rating',
     tripadvisorRatingTitle: 'Tripadvisor rating',
     priceChip: 'Price',
+    // Localized price-tier chips (0..4). Symbol prefix is € / $ / £ / ¥.
+    priceTier0: 'Free · no bill',
+    priceTier1: '€ · student-budget',
+    priceTier2: '€€ · kind to the wallet',
+    priceTier3: '€€€ · date-night splurge',
+    priceTier4: '€€€€ · savings vanish',
     cuisineChip: 'Cuisine',
     viewReviewsOnGoogle: 'View reviews on Google Maps',
     embeddedMapTitle: 'Map Location (Embedded)',

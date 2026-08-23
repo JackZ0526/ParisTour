@@ -71,6 +71,7 @@ import {
 } from '../shared/services/llm/llmArtifactStore'
 import { placeIdentitySimilarity, PLACE_NAME_MATCH_MIN, placeSearchQuery } from '../shared/utils/placeTitle'
 import { formatPriceLevelLabel } from '../shared/utils/priceLevel'
+import { setLocale } from '../shared/i18n/i18nStore'
 
 const SPHERE_LISTING_URL =
   'https://www.tripadvisor.ca/Restaurant_Review-g187147-d25158864-Reviews-Sphere-Paris_Ile_de_France.html'
@@ -269,10 +270,16 @@ describe('Tripadvisor place photos', () => {
   })
 
   it('maps Tripadvisor dollar and euro price marks onto the same chips as Google', () => {
+    setLocale('zh-CN')
     expect(formatPriceLevelLabel('PRICE_LEVEL_EXPENSIVE')).toBe('€€€ · 约会烧钱档')
     expect(formatPriceLevelLabel('$$$$')).toBe('€€€€ · 存款消失术')
     expect(formatPriceLevelLabel('€€')).toBe('€€ · 钱包暂安')
     expect(formatPriceLevelLabel('$ - $$')).toBe('€€ · 钱包暂安')
+    setLocale('en')
+    expect(formatPriceLevelLabel('PRICE_LEVEL_EXPENSIVE', 'en')).toBe('€€€ · date-night splurge')
+    expect(formatPriceLevelLabel('$$$$', 'en')).toBe('€€€€ · savings vanish')
+    expect(formatPriceLevelLabel('€€', 'en')).toBe('€€ · kind to the wallet')
+    expect(formatPriceLevelLabel('$ - $$', 'en')).toBe('€€ · kind to the wallet')
   })
 
   it('picks a large gallery size from one media-gallery payload', () => {

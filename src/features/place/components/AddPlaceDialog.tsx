@@ -106,7 +106,7 @@ export function AddPlaceDialog({
   onClose,
   onAddCustom,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -1133,7 +1133,7 @@ export function AddPlaceDialog({
                     const busyEnd = addingName === `${item.name}:end`
                     const photos = details?.photos?.length ? details.photos : []
                     const photoIndex = photoIndexByKey[key] || 0
-                    const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel)
+                    const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel, locale)
 
                     return (
                       <motion.li

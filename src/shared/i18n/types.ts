@@ -547,6 +547,13 @@ export interface I18nSchema {
     ratingChip: string
     tripadvisorRatingTitle: string
     priceChip: string
+    // Localized price-tier chips (0..4). The symbol prefix stays
+    // (€, $, £, ¥); only the trailing descriptor is translated.
+    priceTier0: string
+    priceTier1: string
+    priceTier2: string
+    priceTier3: string
+    priceTier4: string
     cuisineChip: string
     viewReviewsOnGoogle: string
     embeddedMapTitle: string

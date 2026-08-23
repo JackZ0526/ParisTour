@@ -1440,6 +1440,7 @@ export function GooglePlacePage({
       : rapidApiFallbackActive
         ? details?.priceLevel
         : tripadvisorInfo?.priceLevel || details?.priceLevel,
+    locale,
   )
   const displayCuisine =
     isAttraction || rapidApiFallbackActive ? undefined : tripadvisorInfo?.cuisine
