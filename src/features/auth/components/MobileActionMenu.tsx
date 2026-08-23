@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Archive, LogOut, Share2, Trash2 } from 'lucide-react'
+import { useTranslation } from '../../../shared/i18n'
 
 interface MobileActionMenuProps {
   hasActiveTrip: boolean
@@ -24,6 +25,7 @@ export function MobileActionMenu({
   onClearAll,
   onSignOut,
 }: MobileActionMenuProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -68,7 +70,7 @@ export function MobileActionMenu({
         ref={menuRef}
         role={open ? 'dialog' : 'button'}
         tabIndex={open ? -1 : 0}
-        aria-label={open ? '更多操作菜单' : '更多操作'}
+        aria-label={open ? t('auth.actionMenuMoreOpen') : t('auth.actionMenuMore')}
         aria-expanded={open}
         onClick={open ? undefined : () => setOpen(true)}
         onKeyDown={
@@ -140,7 +142,7 @@ export function MobileActionMenu({
                   className="flex h-10 items-center gap-2 rounded-xl px-3 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)] transition-colors"
                 >
                   <Archive size={16} strokeWidth={1.8} aria-hidden />
-                  <span>存档</span>
+                  <span>{t('auth.actionBackup')}</span>
                 </button>
               )}
               {canShare && (
@@ -153,7 +155,7 @@ export function MobileActionMenu({
                   className="flex h-10 items-center gap-2 rounded-xl px-3 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)] transition-colors"
                 >
                   <Share2 size={16} strokeWidth={1.8} aria-hidden />
-                  <span>分享</span>
+                  <span>{t('auth.actionShare')}</span>
                 </button>
               )}
               {canClear && (
@@ -166,7 +168,7 @@ export function MobileActionMenu({
                   className="flex h-10 items-center gap-2 rounded-xl px-3 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)] transition-colors"
                 >
                   <Trash2 size={16} strokeWidth={1.8} aria-hidden />
-                  <span>清空全部</span>
+                  <span>{t('auth.actionClearAll')}</span>
                 </button>
               )}
               <button
@@ -178,7 +180,7 @@ export function MobileActionMenu({
                 className="flex h-10 items-center gap-2 rounded-xl px-3 text-left text-sm text-[var(--ink)] hover:bg-[var(--mist)] focus-visible:bg-[var(--mist)] transition-colors"
               >
                 <LogOut size={16} strokeWidth={1.8} aria-hidden />
-                <span>登出</span>
+                <span>{t('auth.actionSignOut')}</span>
               </button>
             </motion.div>
           )}

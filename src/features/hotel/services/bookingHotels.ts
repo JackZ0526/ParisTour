@@ -5,6 +5,7 @@ import {
   setLlmArtifact,
 } from '../../../shared/services/llm/llmArtifactStore'
 import { placeIdentitySimilarity, PLACE_NAME_MATCH_MIN } from '../../../shared/utils/placeTitle'
+import { translate } from '../../../shared/i18n'
 
 export interface BookingHotelReview {
   text: string
@@ -355,16 +356,16 @@ export function isBookingApiEnabled(): boolean {
 
 async function request<T>(rest: string, params: Record<string, string>): Promise<T> {
   if (!isBookingApiEnabled()) {
-    throw new Error('Booking 酒店服务尚未启用；当前不会消耗 API 请求额度。')
+    throw new Error(translate('errors.bookingServiceDisabled'))
   }
   const query = new URLSearchParams({ rest, ...params })
   const response = await authFetch(`/api/booking?${query}`)
   if (!response.ok) {
     const message = await response.text().catch(() => '')
     if (/booking_upstream_waf|AwsWafIntegration|challenge-container/i.test(message)) {
-      throw new Error('Booking 数据源暂时被上游验证拦截，请稍后再试。')
+      throw new Error(translate('errors.bookingUpstreamBlocked'))
     }
-    throw new Error(`Booking 酒店服务请求失败（${response.status}）${message ? `：${message}` : ''}`)
+    throw new Error(translate('errors.bookingRequestFailed', { status: response.status, message: message ? `：${message}` : '' }))
   }
   const payload = (await response.json()) as T
   const root = asRecord(payload)
@@ -372,10 +373,10 @@ async function request<T>(rest: string, params: Record<string, string>): Promise
     const errors = asRecord(root.errors)
     const upstreamContent = text(errors?.content)
     if (/AwsWafIntegration|challenge-container/i.test(upstreamContent)) {
-      throw new Error('Booking 数据源暂时被上游验证拦截，请稍后再试。')
+      throw new Error(translate('errors.bookingUpstreamBlocked'))
     }
     const detail = uniqueStrings(Object.values(errors || {})).join('；')
-    throw new Error(`Booking 酒店服务返回错误${detail ? `：${detail}` : ''}`)
+    throw new Error(translate('errors.bookingServiceError', { detail: detail ? `：${detail}` : '' }))
   }
   return payload
 }

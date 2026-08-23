@@ -1,3 +1,5 @@
+import { translate } from '../../../shared/i18n'
+
 export interface GeocodeResult {
   lat: number
   lng: number
@@ -11,7 +13,7 @@ export interface GeocodeResult {
 export async function geocodeParisAddress(query: string): Promise<GeocodeResult> {
   const q = query.trim()
   if (q.length < 3) {
-    throw new Error('请输入更完整的酒店名称或地址')
+    throw new Error(translate('errors.geocodeIncompleteAddress'))
   }
 
   const params = new URLSearchParams({
@@ -28,13 +30,13 @@ export async function geocodeParisAddress(query: string): Promise<GeocodeResult>
   })
 
   if (!res.ok) {
-    throw new Error('地址解析失败，请稍后重试')
+    throw new Error(translate('errors.geocodeFailed'))
   }
 
   const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>
   const first = data[0]
   if (!first) {
-    throw new Error('找不到该地址，请尝试法文地址或加上门牌与区号')
+    throw new Error(translate('errors.geocodeAddressNotFound'))
   }
 
   return {

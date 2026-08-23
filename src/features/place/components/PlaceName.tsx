@@ -28,14 +28,15 @@ function hasCjk(text: string) {
 }
 
 function TranslateBadge({ className }: { className?: string }) {
+  const { t } = useTranslation()
   return (
     <span
       className={
         className ||
         'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--mist)] text-[var(--stone)]'
       }
-      title="非公认中文名，由 AI 翻译"
-      aria-label="非公认中文名，由 AI 翻译"
+      title={t('place.translatedBadgeTitle')}
+      aria-label={t('place.translatedBadgeAria')}
     >
       <Languages size={10} strokeWidth={1.75} aria-hidden />
     </span>
@@ -88,7 +89,7 @@ export function PlaceName({
   enrichFromGoogle = false,
   zhIsLlmTranslated = false,
 }: Props) {
-  const { locale } = useTranslation()
+  const { locale, t } = useTranslation()
   const excludePropCjk = zhIsLlmTranslated
   const chineseOpts = excludePropCjk ? { ...EXCLUDE_PROP_CJK_OPTIONS, locale } : { locale }
   const locationLat = location?.lat
@@ -315,7 +316,7 @@ export function PlaceName({
               {llmZhTranslating && !displayedZh ? (
                 <span className="inline-flex min-w-0 items-center gap-1 text-[var(--stone)]/70">
                   <ActivityBars size="sm" />
-                  <span>翻译中…</span>
+                  <span>{t('place.translating')}</span>
                 </span>
               ) : (
                 <span className="min-w-0 truncate">

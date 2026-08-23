@@ -23,6 +23,7 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { sanitizeMapRouteCache } from '../../map/services/mapRouteCache'
 import { getUserNickname } from '../../auth/services/nicknameStore'
+import { getLocale, translate, type Locale } from '../../../shared/i18n'
 
 export type TripRole = 'owner' | 'viewer' | 'editor'
 
@@ -59,8 +60,9 @@ export type AccessibleTrip = {
   label: string
 }
 
-export function formatOwnerHandle(email?: string | null): string {
-  if (!email) return '他人'
+export function formatOwnerHandle(email?: string | null, locale?: Locale): string {
+  const others = translate('cloud.ownerOthers', undefined, locale) || 'Others'
+  if (!email) return others
   try {
     const nick = getUserNickname(email)
     if (nick && nick.trim()) return nick.trim()
@@ -68,7 +70,7 @@ export function formatOwnerHandle(email?: string | null): string {
     /* ignore */
   }
   const prefix = email.split('@')[0]?.trim() || ''
-  return prefix ? `@${prefix}` : '他人'
+  return prefix ? `@${prefix}` : others
 }
 
 const LAST_TRIP_KEY_PREFIX = 'paris-tour-last-trip-v1:'
@@ -131,7 +133,7 @@ function asSnapshot(raw: unknown): TripSnapshot {
   return {
     version: 1,
     dates: s.dates ?? null,
-    destination: typeof s.destination === 'string' ? s.destination : '巴黎',
+    destination: typeof s.destination === 'string' ? s.destination : '',
     flights: s.flights ?? null,
     hotel: s.hotel ?? null,
     itinerary: s.itinerary ?? null,
@@ -320,7 +322,7 @@ export async function ensurePrimaryTrip(userId: string): Promise<TripRow> {
   // session race can never be mistaken for a brand-new account.
   const { data: authData, error: authError } = await sb.auth.getUser()
   if (authError || authData.user?.id !== userId) {
-    throw new Error('登录会话尚未完成云端验证，请刷新页面后重新登录。现有行程数据不会受影响。')
+    throw new Error(translate('errors.cloudSessionUnverified'))
   }
 
   const empty = emptyTripSnapshot()
@@ -329,7 +331,7 @@ export async function ensurePrimaryTrip(userId: string): Promise<TripRow> {
     .insert({
       owner_id: userId,
       is_primary: true,
-      title: '我的巴黎行程',
+      title: translate('cloud.defaultPrimaryTripTitle'),
       snapshot: coreSnapshotForCloud(empty),
       hotel: null,
       artifacts: {},
@@ -367,15 +369,15 @@ export async function listAccessibleTrips(
   const primary = await ensurePrimaryTrip(userId)
   out.push({
     id: primary.id,
-    title: primary.title || '巴黎主行程',
+    title: primary.title || translate('cloud.defaultPrimaryTripTitle'),
     ownerId: primary.owner_id,
     ownerEmail: email,
-    ownerName: formatOwnerHandle(email),
+    ownerName: formatOwnerHandle(email, getLocale()),
     isPrimary: true,
     role: 'owner',
     updatedAt: primary.updated_at,
     snapshot: primary.snapshot,
-    label: primary.title || '我的主行程',
+    label: primary.title || translate('cloud.tripPrimary'),
   })
 
   const { data: shares, error: shareError } = await sb
@@ -391,7 +393,7 @@ export async function listAccessibleTrips(
     if (!t?.id) continue
     if (out.some((x) => x.id === t.id)) continue
     const role: TripRole = row.role === 'editor' ? 'editor' : 'viewer'
-    const perm = role === 'editor' ? '可编辑' : '只读'
+    const perm = role === 'editor' ? translate('cloud.permEditor') : translate('cloud.permViewer')
 
     let rawOwnerEmail: string | undefined
     const { data: ownerEmailRes } = await sb.rpc('trip_owner_email', {
@@ -400,11 +402,11 @@ export async function listAccessibleTrips(
     if (typeof ownerEmailRes === 'string' && ownerEmailRes.trim()) {
       rawOwnerEmail = ownerEmailRes.trim().toLowerCase()
     }
-    const ownerName = formatOwnerHandle(rawOwnerEmail)
+    const ownerName = formatOwnerHandle(rawOwnerEmail, getLocale())
 
     out.push({
       id: t.id,
-      title: t.title || '协作行程',
+      title: t.title || translate('cloud.defaultSharedTripTitle'),
       ownerId: t.owner_id,
       ownerEmail: rawOwnerEmail,
       ownerName,
@@ -412,7 +414,7 @@ export async function listAccessibleTrips(
       role,
       updatedAt: t.updated_at,
       snapshot: snapshotFromCloudRow(t),
-      label: `来自 ${ownerName} · ${perm}`,
+      label: translate('cloud.sharedTripLabel', { owner: ownerName, perm }),
     })
   }
 
@@ -605,7 +607,7 @@ export async function restoreTripSnapshotBackup(
     .eq('trip_id', tripId)
     .maybeSingle()
   if (backupError) throw backupError
-  if (!backupRow) throw new Error('找不到该存档备份，可能已超出最近 5 次范围。')
+  if (!backupRow) throw new Error(translate('errors.cloudBackupNotFound'))
 
   const restored = asSnapshot(backupRow.snapshot)
   // Keep restored artifacts empty if backup was stripped; do not invent old caches.
@@ -720,30 +722,34 @@ function describeCloudSaveError(err: unknown): string {
   const code = rec && typeof rec.code === 'string' ? rec.code : ''
   const raw = extractErrorText(err)
   const haystack = `${code} ${raw}`.toLowerCase()
+  const locale = getLocale()
 
   if (/row-level security|rls|42501|permission denied|not authorized/.test(haystack)) {
-    return '没有写入权限（当前可能是只读共享）'
+    return translate('cloud.errorNoWritePermission', undefined, locale)
   }
   if (/jwt|not authenticated|invalid claim|401/.test(haystack)) {
-    return '登录已过期，请重新登录'
+    return translate('cloud.errorSessionExpired', undefined, locale)
   }
   if (/payload too large|too large|413|54000|value too long/.test(haystack)) {
-    return '行程数据过大，无法写入云端'
+    return translate('cloud.errorPayloadTooLarge', undefined, locale)
   }
   if (/failed to fetch|networkerror|network request|load failed/.test(haystack)) {
-    return '网络中断，请检查连接后重试'
+    return translate('cloud.errorNetworkDown', undefined, locale)
   }
   if (/timeout|timed out|57014/.test(haystack)) {
-    return '云端响应超时，请稍后重试'
+    return translate('cloud.errorTimeout', undefined, locale)
   }
   if (/duplicate|23505|conflict|409/.test(haystack)) {
-    return '云端记录冲突，请刷新后重试'
+    return translate('cloud.errorConflict', undefined, locale)
   }
-  if (code && raw && raw !== '保存失败') {
+  const failGeneric = translate('cloud.saveLabelError', undefined, locale)
+  if (code && raw && raw !== failGeneric) {
     return `${raw}（${code}）`
   }
-  if (raw && raw !== '保存失败') return raw
-  return code ? `云端返回错误 ${code}` : '未知错误，请稍后重试'
+  if (raw && raw !== failGeneric) return raw
+  return code
+    ? translate('cloud.errorCodeOnly', { code }, locale)
+    : translate('cloud.errorUnknown', undefined, locale)
 }
 
 function isTransientCloudSaveError(err: unknown): boolean {
@@ -1432,7 +1438,7 @@ export async function upsertTripShare(
   role: TripShareRole,
 ): Promise<void> {
   const email = inviteeEmail.trim().toLowerCase()
-  if (!email || !email.includes('@')) throw new Error('请输入有效邮箱')
+  if (!email || !email.includes('@')) throw new Error(translate('errors.cloudEmailInvalid'))
   const sb = getSupabase()
 
   const { error } = await sb.from('trip_shares').upsert(
@@ -1474,7 +1480,7 @@ export async function sendShareInviteEmail(
     error?: string
   }
   if (!res.ok) {
-    throw new Error(data.error || `发送邀请邮件失败（${res.status}）`)
+    throw new Error(data.error || translate('errors.cloudInviteFailed', { status: res.status }))
   }
   return {
     sent: Boolean(data.sent),

@@ -659,7 +659,7 @@ export default function App() {
                   {destinationBrand.title}
                 </h1>
                 <div className="flex items-center gap-1.5 text-[11px] text-[var(--stone)] mt-0.5">
-                  <span className="shrink-0">{locale === 'en' ? t('app.dayPlanLabel', { count: numberOfDays }) : `${dayCountLabel(numberOfDays, locale)}行程规划`}</span>
+                  <span className="shrink-0">{locale === 'en' ? t('app.dayPlanLabel', { count: numberOfDays }) : t('app.dayPlanLabelZh', { count: dayCountLabel(numberOfDays, locale) })}</span>
                   {(trips.length > 1 || (activeTrip && activeTrip.role !== 'owner')) && (
                     <>
                       <span className="text-[var(--stone)]/40">·</span>
@@ -701,8 +701,8 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setBackupOpen(true)}
-                  aria-label="存档备份"
-                  title="存档备份"
+                  aria-label={t('app.quickActionBackupAria')}
+                  title={t('app.quickActionBackupTitle')}
                   className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-zinc-100 hover:shadow active:scale-95 lg:inline-flex cursor-pointer"
                 >
                   <Archive size={15} strokeWidth={1.9} />
@@ -717,8 +717,8 @@ export default function App() {
                     setShareOpen(true)
                     void refreshTrips().catch(() => undefined)
                   }}
-                  aria-label="邀请协作分享"
-                  title="邀请协作分享"
+                  aria-label={t('app.quickActionShareAria')}
+                  title={t('app.quickActionShareTitle')}
                   className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 text-zinc-600 dark:text-zinc-300 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-white/20 hover:text-zinc-900 dark:hover:text-zinc-100 hover:shadow active:scale-95 lg:inline-flex cursor-pointer"
                 >
                   <Share2 size={15} strokeWidth={1.9} />
@@ -730,7 +730,7 @@ export default function App() {
                 type="button"
                 onClick={() => handleSelectTab('profile')}
                 className="flex items-center gap-1.5 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 p-1 sm:pl-1.5 sm:pr-3 shadow-sm backdrop-blur-md transition-all hover:bg-white/90 dark:hover:bg-white/20 hover:shadow active:scale-95 cursor-pointer"
-                title="查看个人中心与偏好"
+                title={t('app.headerProfileTitle')}
               >
                 <UserAvatarView
                   avatar={avatar}
@@ -914,9 +914,7 @@ export default function App() {
                         size="md"
                       />
                       <p className="mt-2 text-center text-xs text-[var(--stone)]">
-                        {locale === 'en'
-                          ? 'Generates a multi-day itinerary from dates, flights, and hotel. Initial planning may take a moment.'
-                          : '根据日期、航班与酒店生成完整多日行程，首次可能需要一小会儿。'}
+                        {t('app.emptyHeroSubtitle')}
                       </p>
                     </div>
                   )}
@@ -1132,7 +1130,13 @@ export default function App() {
                               : 'hidden lg:block'
                           }`}
                         >
-                          <MapErrorBoundary>
+                          <MapErrorBoundary
+                            labels={{
+                              title: t('map.errorTitle'),
+                              desc: t('map.errorDesc'),
+                              retry: t('map.errorRetry'),
+                            }}
+                          >
                             <React.Suspense fallback={<div className="flex h-[min(60vh,440px)] w-full items-center justify-center bg-[var(--mist)] text-sm text-[var(--stone)] md:h-[560px]">{t('app.loadingMap')}</div>}>
                               <TripMap
                                 hotel={hotel}
@@ -1190,9 +1194,7 @@ export default function App() {
                         {t('app.readinessHeadline')}
                       </h3>
                       <p className="text-xs sm:text-sm text-[var(--stone)] leading-relaxed max-w-md mx-auto">
-                        {locale === 'en'
-                          ? 'Set your travel dates, flights, and hotel. AI will generate daily routes, transit connections, and dining spots.'
-                          : '配置旅行日期、往返航班与心仪酒店后，AI 将为您智能规划每日景点动线、合理串联交通与就餐建议。'}
+                        {t('app.emptySetupSubtitle')}
                       </p>
                     </div>
 
@@ -1343,9 +1345,7 @@ export default function App() {
                     {destinationLabel(destination, locale)} · {t('app.logisticsBooking')}
                   </h1>
                   <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
-                    {locale === 'en'
-                      ? 'Set travel dates, confirm flight times, and select accommodation. Once ready, generate or explore your daily itinerary.'
-                      : '设置旅行起止日期、确认往返航班时刻并挑选心仪住宿。三项就绪后即可生成或浏览每日行程。'}
+                    {t('app.emptyReadinessSubtitle')}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
                     <span
@@ -1475,7 +1475,7 @@ export default function App() {
               activeTripId={activeTrip?.id}
               onSwitchTrip={(tripId) => {
                 void switchTrip(tripId).catch((err) => {
-                  window.alert(err instanceof Error ? err.message : '切换失败')
+                  window.alert(err instanceof Error ? err.message : t('app.switchTripFailed'))
                 })
               }}
               readOnly={readOnly}

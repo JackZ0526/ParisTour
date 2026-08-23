@@ -207,7 +207,7 @@ export function FlightPanel({
   ): Promise<void> {
     const trimmed = flightNumber.trim()
     if (!trimmed) {
-      throw new Error('请先输入航班号')
+      throw new Error(t('flight.pleaseEnterFlightNumber'))
     }
     const travel = travelFor(direction)
     const info = await lookupFlight(trimmed, travel, { forceRefresh })

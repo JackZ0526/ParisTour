@@ -2,6 +2,7 @@ import {
   placeSourceLabel,
   type PlaceInfoSource,
 } from '../services/placeSource'
+import { useTranslation } from '../../../shared/i18n'
 
 function BrandImage({
   src,
@@ -50,6 +51,7 @@ export function PlaceSourceMark({
   onPhoto?: boolean
   className?: string
 }) {
+  const { t } = useTranslation()
   const label = placeSourceLabel(source)
   const showText = showLabel && source !== 'booking'
   const inner = (
@@ -65,7 +67,7 @@ export function PlaceSourceMark({
         ? 'inline-flex items-center rounded-full bg-white/92 px-2 py-1 shadow-sm backdrop-blur-sm'
         : 'inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm'
     return (
-      <span className={`${photoClass} ${className}`} title={`图片来自 ${label}`}>
+      <span className={`${photoClass} ${className}`} title={t('place.sourcePhotoTitle', { label })}>
         {inner}
       </span>
     )
@@ -74,7 +76,7 @@ export function PlaceSourceMark({
   return (
     <span
       className={`inline-flex items-center gap-1 ${className}`}
-      title={`信息来自 ${label}`}
+      title={t('place.sourceInfoTitle', { label })}
     >
       {inner}
     </span>

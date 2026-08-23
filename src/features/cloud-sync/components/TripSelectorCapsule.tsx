@@ -103,7 +103,7 @@ export function TripSelectorCapsule({
       await onSelectTrip(tripId)
       setIsOpen(false)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : '切换失败')
+      window.alert(err instanceof Error ? err.message : t('app.switchTripFailed'))
     } finally {
       setSwitchingId(null)
     }
@@ -111,15 +111,15 @@ export function TripSelectorCapsule({
 
   // Determine current capsule label & badge
   const activeOwnerNick = useUserNickname(activeTrip?.ownerEmail).nickname
-  const activeOwnerLabel = activeOwnerNick || activeTrip?.ownerName || (activeTrip?.ownerEmail ? formatOwnerHandle(activeTrip.ownerEmail) : '他人')
+  const activeOwnerLabel = activeOwnerNick || activeTrip?.ownerName || (activeTrip?.ownerEmail ? formatOwnerHandle(activeTrip.ownerEmail) : t('cloud.ownerOthers'))
 
   const displayTitle = activeTrip
     ? activeTrip.role === 'owner'
       ? activeTrip.isPrimary
-        ? '我的主行程'
-        : activeTrip.title || '我的行程'
-      : `来自 ${activeOwnerLabel}`
-    : '行程空间'
+        ? t('cloud.tripPrimary')
+        : activeTrip.title || t('cloud.tripMine')
+      : t('cloud.tripFromOwner', { owner: activeOwnerLabel })
+    : t('cloud.tripEmpty')
 
   return (
     <div className={`relative inline-flex shrink-0 items-center ${className}`}>
@@ -131,7 +131,7 @@ export function TripSelectorCapsule({
         onClick={toggleOpen}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label={`当前行程：${displayTitle}，点击切换`}
+        aria-label={t('app.currentTripAria', { title: displayTitle })}
         className={`group relative isolate inline-flex h-[22px] shrink-0 items-center gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/10 px-2 text-[11px] font-medium text-[var(--ink)] dark:text-zinc-200 shadow-xs backdrop-blur-md transition-all duration-200 ${
           canSwitch
             ? 'cursor-pointer hover:bg-white/95 dark:hover:bg-white/15 hover:shadow hover:border-white dark:hover:border-white/20 active:scale-95'
@@ -201,7 +201,7 @@ export function TripSelectorCapsule({
               exit={{ opacity: 0, y: -6, scale: 0.96 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
               role="listbox"
-              aria-label="选择行程"
+              aria-label={t('app.selectTripAria')}
               className={`overflow-hidden rounded-3xl p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] ${glassModalSurfaceClass}`}
             >
               {/* Popover Header */}
@@ -275,17 +275,12 @@ export function TripSelectorCapsule({
                         <div className="flex items-center gap-1 text-[10.5px] text-[var(--stone)] dark:text-zinc-400 mt-0.5">
                           <span>
                             {isItemShared
-                              ? (locale === 'en'
-                                  ? `From ${
-                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
-                                      trip.ownerName ||
-                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : 'Others')
-                                    }`
-                                  : `来自 ${
-                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
-                                      trip.ownerName ||
-                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
-                                    }`)
+                              ? t('cloud.tripFromOwner', {
+                                  owner:
+                                    (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                    trip.ownerName ||
+                                    (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : t('cloud.ownerOthers')),
+                                })
                               : t('profile.createdByYou')}
                           </span>
                           {trip.updatedAt && (

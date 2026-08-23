@@ -5,10 +5,25 @@ import App from './App.tsx'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { AuthGate } from './features/auth/components/AuthGate'
 import { initTheme } from './shared/services/themeStore'
-import { initLocale } from './shared/i18n'
+import { initLocale, subscribeLocale, getLocale, translate } from './shared/i18n'
 
 initTheme()
 initLocale()
+
+// Keep <title> in sync with the active locale. Static strings are
+// "Paris Tour" (brand) + a locale-aware tagline. We intentionally
+// don't depend on a particular destination so the app stays generic.
+const APP_TITLE_BY_LOCALE: Record<string, string> = {
+  'zh-CN': 'Paris Tour · 行程规划',
+  en: 'Paris Tour · Trip Planner',
+}
+function syncDocumentTitle() {
+  const locale = getLocale()
+  const base = APP_TITLE_BY_LOCALE[locale] ?? APP_TITLE_BY_LOCALE.en
+  document.title = `${base} · ${translate('app.brandTagline', undefined, locale)}`
+}
+syncDocumentTitle()
+subscribeLocale(syncDocumentTitle)
 
 // vite-plugin-pwa: register the service worker. With `autoUpdate` in
 // vite.config.ts, the new SW activates in the background; we just log

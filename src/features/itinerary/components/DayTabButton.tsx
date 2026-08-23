@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from '../../../shared/i18n'
 
 type DayTabButtonProps = {
   dayNumber: number
@@ -28,6 +29,7 @@ export function DayTabButton({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const isMountedRef = useRef(false)
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  const { t } = useTranslation()
 
   const placeholderTitle = /^第\s*\d+\s*天$/.test(title.trim())
   /** Streaming preview title while the day is still generating. */
@@ -78,7 +80,7 @@ export function DayTabButton({
       type="button"
       onClick={onSelect}
       aria-busy={pending || undefined}
-      aria-label={pending ? `第 ${dayNumber} 天，正在生成` : undefined}
+      aria-label={pending ? t('itinerary.dayPendingAria', { day: dayNumber }) : undefined}
       style={box ? { width: box.w, height: box.h } : undefined}
       className={`day-tab-button relative isolate snap-start shrink-0 rounded-full px-3.5 py-2 text-sm outline-none transition-all duration-200 sm:px-4 ${
         active

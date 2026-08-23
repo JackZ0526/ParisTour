@@ -214,7 +214,7 @@ export function useItineraryGeneration(
   deps: UseItineraryGenerationDeps,
   setters: UseItineraryGenerationSetters,
 ): UseItineraryGenerationResult {
-  const { locale } = useTranslation()
+  const { locale, t } = useTranslation()
   const generatingLines = useMemo(
     () => getItineraryGeneratingLines(locale),
     [locale],
@@ -651,7 +651,7 @@ export function useItineraryGeneration(
         // Shared Google candidates once per run.
         const sharedCandidates = await getSharedItineraryCandidates(hotel)
         if (!sharedCandidates.length) {
-          throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+          throw new Error(t('errors.googleNoCandidates'))
         }
 
         const generateDayWithRetry = async (dayNumber: number) => {

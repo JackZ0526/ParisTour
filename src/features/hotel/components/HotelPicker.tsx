@@ -695,7 +695,7 @@ function BookingHotelFacts({
                     {starCount > 0 && (
                       <span
                         className="text-[12px] leading-none tracking-[0.08em] text-[#f5a623]"
-                        aria-label={`${starCount} 星酒店`}
+                        aria-label={t('hotel.starCountAria', { count: starCount })}
                       >
                         {'★'.repeat(starCount)}
                       </span>
@@ -2292,8 +2292,8 @@ export function HotelPicker({
                         <button
                           type="button"
                           data-hotel-no-drag
-                          aria-label={`删除 ${selectedCandidate.name}`}
-                          title="删除自定义酒店"
+                          aria-label={t('hotel.deleteCustomHotelAria', { name: selectedCandidate.name })}
+                          title={t('hotel.cancelCurrentSelection')}
                           onClick={(e) => {
                             e.stopPropagation()
                             setPendingDeleteHotel(selectedCandidate)
@@ -2620,8 +2620,8 @@ export function HotelPicker({
                         <button
                           type="button"
                           data-hotel-no-drag
-                          aria-label={`删除 ${hotel.name}`}
-                          title="删除自定义酒店"
+                          aria-label={t('hotel.deleteCustomHotelAria', { name: hotel.name })}
+                          title={t('hotel.deleteCustomHotelTitle')}
                           onClick={(e) => {
                             e.stopPropagation()
                             setPendingDeleteHotel(hotel)
@@ -2646,7 +2646,7 @@ export function HotelPicker({
       </div>
 
       {showEmpty && !error && (
-        <p className="text-sm text-[var(--stone)]">暂无候选项。可点「换一批推荐」或自定义地址。</p>
+        <p className="text-sm text-[var(--stone)]">{t('hotel.emptyCandidates')}</p>
       )}
       {error && <p className="text-sm text-red-700">{error}</p>}
         </div>

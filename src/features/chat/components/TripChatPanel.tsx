@@ -663,7 +663,7 @@ export function TripChatPanel({
         name: input.placeName,
       })
       if (!ta?.location) {
-        throw new Error(`找不到景点「${input.placeName}」，请换个更完整的名称。`)
+        throw new Error(t('errors.placeNameNotFoundAttraction', { name: input.placeName }))
       }
       const travelerNote = !isOperationalStopNote(input.note) ? input.note?.trim() : undefined
       const hasUsefulNote = Boolean(travelerNote && travelerNote.length >= 12)
@@ -718,7 +718,7 @@ export function TripChatPanel({
           `没有在当前住宿附近验证到「${input.placeName}」，已取消操作，避免误选外地同名地点。`,
         )
       }
-      throw new Error(`找不到地点「${input.placeName}」，请换个更完整的名称。`)
+      throw new Error(t('errors.placeNameNotFoundGeneric', { name: input.placeName }))
     }
 
     // Never seed place.description from operational action.note
@@ -882,7 +882,7 @@ export function TripChatPanel({
   }> {
     const dayNum = action.day || activeDay
     const day = workingDays.find((d) => d.day === dayNum)
-    if (!day) throw new Error(`没有第 ${dayNum} 天`)
+    if (!day) throw new Error(t('errors.dayNotFound', { dayNum }))
 
     const hit =
       (action.fromPlaceName
@@ -900,11 +900,7 @@ export function TripChatPanel({
         action.placeType ||
         t('chat.actionNotePlaceFallback') ||
         (locale === 'en' ? 'Place' : '地点')
-      throw new Error(
-        locale === 'en'
-          ? `No replaceable “${label}” on day ${dayNum}`
-          : `第 ${dayNum} 天没有可替换的「${label}」`,
-      )
+      throw new Error(t('errors.placeNotReplaceable', { dayNum, label }))
     }
 
     const place = await buildPlaceFromQuery({
@@ -2144,7 +2140,7 @@ export function TripChatPanel({
               </div>
               <CloseIconButton
                 onClick={() => setOpen(false)}
-                aria-label="关闭助手"
+                aria-label={t('chat.closeAssistantAria')}
               />
             </div>
           </div>

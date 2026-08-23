@@ -16,6 +16,7 @@ import {
   withGoogleMapsPhotoKey,
   withoutGoogleMapsPhotoKey,
 } from './googleMapsKey'
+import { translate } from '../../../shared/i18n'
 
 export interface GoogleReview {
   text: string
@@ -674,7 +675,12 @@ async function rapidRequest<T>(
   }
   if (!response.ok) {
     const message = await response.text().catch(() => '')
-    throw new Error(`Places request failed (${response.status})${message ? `: ${message}` : ''}`)
+    throw new Error(
+      translate('errors.placesRequestFailed', {
+        status: response.status,
+        message: message ? `: ${message}` : '',
+      }),
+    )
   }
   return (await response.json()) as T
 }

@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatTripDayLabel } from '../services/tripDates'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import { glassPopoverSurfaceClass } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   value: string
@@ -45,7 +46,7 @@ export function DatePicker({
   value,
   onChange,
   label,
-  placeholder = '选择日期',
+  placeholder,
   min,
   id: idProp,
 }: Props) {
@@ -53,6 +54,8 @@ export function DatePicker({
   const id = idProp ?? autoId
   const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
+  const resolvedPlaceholder = placeholder ?? t('common.selectDateAria')
 
   const parsed = parseIso(value)
   const today = todayIso()
@@ -154,7 +157,7 @@ export function DatePicker({
         {open && (
           <motion.div
             role="dialog"
-            aria-label={label ? `${label}日历` : '选择日期'}
+            aria-label={label ? t('common.monthCalendarAria', { label }) : resolvedPlaceholder}
             initial={popover.initial}
             animate={popover.animate}
             exit={popover.exit}
@@ -165,7 +168,7 @@ export function DatePicker({
             <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
               <button
                 type="button"
-                aria-label="上一个月"
+                aria-label={t('common.prevMonthAria')}
                 onClick={() => shiftMonth(-1)}
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 bg-white/70 text-[var(--stone)] shadow-xs transition-colors hover:bg-white hover:text-[var(--ink)] active:scale-95"
               >
@@ -176,7 +179,7 @@ export function DatePicker({
               </p>
               <button
                 type="button"
-                aria-label="下一个月"
+                aria-label={t('common.nextMonthAria')}
                 onClick={() => shiftMonth(1)}
                 className="flex h-7 w-7 items-center justify-center rounded-full border border-black/5 bg-white/70 text-[var(--stone)] shadow-xs transition-colors hover:bg-white hover:text-[var(--ink)] active:scale-95"
               >

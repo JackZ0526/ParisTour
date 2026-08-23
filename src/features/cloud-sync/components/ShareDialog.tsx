@@ -60,7 +60,7 @@ function RoleToggle({
     <div
       className="relative inline-flex rounded-full border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/10 p-1 shadow-sm backdrop-blur-xl"
       role="group"
-      aria-label="role"
+      aria-label={t('app.roleGroupAria')}
     >
       {(
         [

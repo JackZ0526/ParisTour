@@ -181,8 +181,8 @@ export function ProfileTab({
                     type="button"
                     onClick={() => setAvatarPickerOpen(true)}
                     className="relative block rounded-2xl transition-transform active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--copper)]"
-                    title="点击定制个性头像"
-                    aria-label="点击定制个性头像"
+                    title={t('app.customAvatarTitle')}
+                    aria-label={t('app.customAvatarAria')}
                   >
                     <UserAvatarView
                       avatar={avatar}
@@ -229,8 +229,8 @@ export function ProfileTab({
                       type="button"
                       onClick={() => setNicknamePickerOpen(true)}
                       className="inline-flex items-center justify-center rounded-full p-1 text-[var(--stone)] hover:text-[var(--copper)] transition-colors active:scale-95 cursor-pointer"
-                      title="修改个性昵称"
-                      aria-label="修改个性昵称"
+                      title={t('app.editNicknameTitle')}
+                      aria-label={t('app.editNicknameAria')}
                     >
                       <Edit3 size={13} strokeWidth={2} />
                     </button>
@@ -762,7 +762,7 @@ export function ProfileTab({
       {/* System Footer Info Note */}
       <div className="text-center pt-1 text-[11px] text-[var(--stone)]/60 space-y-0.5 -mb-2">
         <p>Paris Tour v0.8.1 · Supabase {t('auth.cloudSyncActive')}</p>
-        <p>Tour · Travel Planning & Guide</p>
+        <p>{t('app.brandTagline')}</p>
       </div>
 
       {/* Avatar Customization Modal */}

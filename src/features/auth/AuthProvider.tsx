@@ -62,7 +62,7 @@ function localDebugTrip(): AccessibleTrip {
   }
 }
 
-import { getLocale, translate } from '../../shared/i18n'
+import { getLocale, translate, useTranslation } from '../../shared/i18n'
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
   const locale = getLocale()
@@ -122,6 +122,7 @@ async function hydrateAccountThemePreference(userId: string): Promise<void> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const isLocalDebug = !isCloudSyncEnabled() && isLocalhost()
 
   const [status, setStatus] = useState<AuthStatus>(() => {
@@ -200,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAllowlisted(false)
         setTrips([])
         setActiveTripId(null)
-        setError(getLocale() === 'en' ? 'This email has not been invited yet.' : '该邮箱尚未获邀请，暂时无法使用。')
+        setError(t('auth.inviteOnlyMessage'))
         setStatus('not_allowlisted')
         try {
           await getSupabase().auth.signOut({ scope: 'local' })
@@ -236,7 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (!isCurrentBootstrap()) return
         console.error(err)
-        const defaultMsg = getLocale() === 'en' ? 'Failed to load trip' : '加载行程失败'
+        const defaultMsg = t('auth.errorTripLoadFailed')
         const msg =
           err && typeof err === 'object' && 'message' in err
             ? String((err as { message: unknown }).message)
@@ -341,7 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
-      const msg = getLocale() === 'en' ? 'This email has not been invited yet. Unable to sign in.' : '该邮箱尚未获邀请，无法登录。'
+      const msg = t('auth.errorNotAllowlistedSignIn')
       setError(msg)
       throw new Error(msg)
     }
@@ -364,12 +365,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listed = await isEmailAllowlisted(normalized)
     if (!listed) {
       setStatus('not_allowlisted')
-      const msg = getLocale() === 'en' ? 'This email has not been invited yet. Unable to sign up.' : '该邮箱尚未获邀请，无法注册。'
+      const msg = t('auth.errorNotAllowlistedSignUp')
       setError(msg)
       throw new Error(msg)
     }
     if (password.length < 6) {
-      throw new Error(getLocale() === 'en' ? 'Password must be at least 6 characters.' : '密码至少 6 位。')
+      throw new Error(t('auth.passwordTooShort'))
     }
     const sb = getSupabase()
     const { data, error: authError } = await sb.auth.signUp({
@@ -421,7 +422,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const accessible = await listAccessibleTrips(user.id, email)
       setTrips(accessible)
       const next = accessible.find((t) => t.id === tripId)
-      if (!next) throw new Error('找不到该行程')
+      if (!next) throw new Error(t('auth.errorTripNotFound'))
       applyAccessibleTripLocally(next)
       setActiveTripId(next.id)
       rememberLastTripId(user.id, next.id)

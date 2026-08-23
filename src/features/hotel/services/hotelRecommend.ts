@@ -1,4 +1,5 @@
 import { getOpenAIModel, recommendHotelsForTrip } from '../../../shared/services/llm/llm'
+import { translate } from '../../../shared/i18n'
 import { clearLlmMemo } from '../../../shared/services/llm/llmMemo'
 import { loadHotelCache, saveHotelCache } from './hotelCache'
 import {
@@ -61,7 +62,7 @@ export async function fetchResolvedHotelRecommendations(input?: {
   )
   const dates = loadTripDates()
   if (!dates?.startDate || !dates.endDate) {
-    throw new Error('请先选择行程日期，再获取 Booking 酒店推荐。')
+    throw new Error(translate('errors.pickTripDatesFirstHotels'))
   }
   const verifiedCandidates = (
     await searchBookingHotelCandidates({
@@ -79,7 +80,7 @@ export async function fetchResolvedHotelRecommendations(input?: {
       userRatingCount: candidate.reviewCount,
     }))
   if (!verifiedCandidates.length) {
-    throw new Error('Booking 暂时没有返回可验证的巴黎酒店候选。')
+    throw new Error(translate('errors.bookingNoCandidates'))
   }
   const raw = await recommendHotelsForTrip({
     count,
@@ -91,7 +92,7 @@ export async function fetchResolvedHotelRecommendations(input?: {
   })
   const resolved = await resolveHotelCandidates(raw.slice(0, count))
   if (!resolved.length) {
-    throw new Error('未能解析推荐酒店，请再试一次。')
+    throw new Error(translate('errors.couldNotParseHotels'))
   }
   const best = resolved.find((h) => h.isBest) || resolved[0]
   return markBest(resolved, best.id)
@@ -158,7 +159,7 @@ export async function replaceOneHotelCandidate(input: {
         input.preferences?.trim() ||
         `替换「${from.name}」（${from.area}），给一家更合适的巴黎酒店`,
     })
-    if (!card) throw new Error('未能生成替换酒店')
+    if (!card) throw new Error(translate('errors.couldNotGenerateReplacement'))
     replacement = {
       ...card,
       reason: card.reason || `替换「${from.name}」`,
@@ -201,7 +202,7 @@ export async function replaceHotelCandidates(input: {
   preferences?: string
 }): Promise<{ candidates: HotelCandidate[]; selected: SelectedHotel; note: string }> {
   if (!input.fromHotels.length) {
-    throw new Error('没有可替换的酒店')
+    throw new Error(translate('errors.noReplacementAvailable'))
   }
 
   const exclude = input.current.map((c) => c.name)
@@ -215,7 +216,7 @@ export async function replaceHotelCandidates(input: {
   })
 
   if (fresh.length < input.fromHotels.length) {
-    throw new Error('替换推荐数量不足，请再试一次')
+    throw new Error(translate('errors.notEnoughReplacements'))
   }
 
   const replaceIds = new Set(input.fromHotels.map((h) => h.id))

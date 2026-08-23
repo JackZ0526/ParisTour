@@ -758,9 +758,9 @@ export function LogisticsTravelSection({
         open={confirmClearDatesOpen}
         onClose={() => setConfirmClearDatesOpen(false)}
         onConfirm={() => commitDates(null)}
-        title="清空旅行日期"
-        description="确定清空旅行起止日期吗？相关的行程天数与航班时间对齐将恢复默认。"
-        confirmText="清空日期"
+        title={t('flight.clearTripDatesTitle')}
+        description={t('flight.clearTripDatesDesc')}
+        confirmText={t('flight.clearTripDatesButton')}
         tone="danger"
         icon="trash"
       />

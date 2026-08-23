@@ -253,8 +253,8 @@ export function RecommendationPreferencesDialog({
                       key={cleanTag}
                       type="button"
                       onClick={() => removeTag(cleanTag)}
-                      title={`Remove: ${localizePrefTag(cleanTag)}`}
-                      aria-label={`Remove ${localizePrefTag(cleanTag)}`}
+                      title={t('place.recPrefRemoveTitle', { name: localizePrefTag(cleanTag) })}
+                      aria-label={t('place.recPrefRemoveAria', { name: localizePrefTag(cleanTag) })}
                       className={`${BASE_TAG_PILL} active:scale-95 ${theme.activePill}`}
                     >
                       <span className="relative z-10 truncate max-w-[240px] sm:max-w-none">{localizePrefTag(cleanTag)}</span>
@@ -287,8 +287,8 @@ export function RecommendationPreferencesDialog({
                       key={cleanPreset}
                       type="button"
                       onClick={() => addTag(cleanPreset)}
-                      title={`Add: ${localizePrefTag(cleanPreset)}`}
-                      aria-label={`Add ${localizePrefTag(cleanPreset)}`}
+                      title={t('place.recPrefAddTitle', { name: localizePrefTag(cleanPreset) })}
+                      aria-label={t('place.recPrefAddAria', { name: localizePrefTag(cleanPreset) })}
                       className={`${BASE_TAG_PILL} active:scale-95 ${theme.suggestedPill}`}
                     >
                       <span className="relative z-10">{localizePrefTag(cleanPreset)}</span>

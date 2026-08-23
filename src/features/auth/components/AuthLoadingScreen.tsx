@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Sparkles, KeyRound, Compass, Settings, ShieldCheck } from 'lucide-react'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
+import { useTranslation } from '../../../shared/i18n'
 
 interface AuthLoadingScreenProps {
   mode?: 'auth' | 'trip' | 'unconfigured'
@@ -13,21 +14,22 @@ export function AuthLoadingScreen({
   title,
   subtitle,
 }: AuthLoadingScreenProps) {
+  const { t } = useTranslation()
   const displayTitle =
     title ||
     (mode === 'auth'
-      ? '正在验证登录状态'
+      ? t('auth.loadingAuthTitle')
       : mode === 'trip'
-        ? '正在加载行程存档'
-        : '需要配置云端服务')
+        ? t('auth.loadingTripTitle')
+        : t('auth.loadingUnconfiguredTitle'))
 
   const displaySubtitle =
     subtitle ||
     (mode === 'auth'
-      ? '正在安全连接 Supabase 认证服务，同步用户鉴权状态…'
+      ? t('auth.loadingAuthSubtitle')
       : mode === 'trip'
-        ? '正在为您提取云端行程数据、路线规划与个性化偏好…'
-        : '请在 .env 中正确配置 Supabase 环境变量后重试。')
+        ? t('auth.loadingTripSubtitle')
+        : t('auth.loadingUnconfiguredSubtitle'))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[var(--paper)] px-4 py-4 select-none">
@@ -62,7 +64,7 @@ export function AuthLoadingScreen({
           {/* Top Brand Pill Badge */}
           <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 px-3.5 py-1 text-[10.5px] font-medium tracking-[0.24em] uppercase text-[var(--sage)]">
             <Sparkles size={11} strokeWidth={2} className="shrink-0" />
-            <span>Paris Tour · 安全服务</span>
+            <span>{t('auth.brandPill')}</span>
           </div>
 
           {/* Central 3D Frosted Icon Badge with Aura Rings */}
@@ -103,9 +105,9 @@ export function AuthLoadingScreen({
           ) : (
             <div className="mt-6 w-full rounded-2xl border border-[var(--copper)]/20 bg-white/60 p-4 text-left text-xs text-[var(--stone)]">
               <p className="font-mono text-[11px] leading-normal text-[var(--ink)]">
-                1. 配置 <code className="font-bold">VITE_SUPABASE_URL</code><br />
-                2. 配置 <code className="font-bold">VITE_SUPABASE_ANON_KEY</code><br />
-                3. 执行 <code className="font-bold">supabase/schema.sql</code>
+                {t('auth.unconfiguredStep1', { env: 'VITE_SUPABASE_URL' })}<br />
+                {t('auth.unconfiguredStep2', { env: 'VITE_SUPABASE_ANON_KEY' })}<br />
+                {t('auth.unconfiguredStep3', { sql: 'supabase/schema.sql' })}
               </p>
             </div>
           )}
@@ -113,7 +115,7 @@ export function AuthLoadingScreen({
           {/* Bottom Security Assurance Footnote */}
           <div className="mt-6 flex items-center gap-1.5 text-[11px] text-[var(--stone)]/70">
             <ShieldCheck size={13} strokeWidth={2} className="text-[var(--sage)]" />
-            <span>端到端加密传输与实时安全就绪</span>
+            <span>{t('auth.securityFootnote')}</span>
           </div>
         </div>
       </motion.div>

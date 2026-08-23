@@ -1811,7 +1811,7 @@ export function GooglePlacePage({
                   <div
                     className="flex gap-2 overflow-hidden"
                     aria-busy
-                    aria-label="正在加载更多照片"
+                    aria-label={t('place.loadingMorePhotosAria')}
                   >
                     {displayPhoto ? (
                       <GalleryThumb
@@ -2119,7 +2119,7 @@ export function GooglePlacePage({
               <p className="mb-2 text-sm font-medium">{t('place.embeddedMapTitle')}</p>
               <div className="overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 shadow-sm">
                 <iframe
-                  title={`${name} map`}
+                  title={t('place.mapAria', { name })}
                   src={embedSrc}
                   className="h-[260px] w-full border-0"
                   loading="lazy"

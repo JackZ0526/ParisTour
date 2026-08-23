@@ -41,6 +41,11 @@ export interface I18nSchema {
     readOnlyBanner: string
     disclaimer: string
     custom: string
+    // Calendar / date picker a11y
+    monthCalendarAria: string
+    prevMonthAria: string
+    nextMonthAria: string
+    selectDateAria: string
   }
   nav: {
     logistics: string
@@ -130,6 +135,33 @@ export interface I18nSchema {
     zoomOut: string
     repickImage: string
     confirmCrop: string
+    // Mobile action menu (auth/components/MobileActionMenu)
+    actionMenuMore: string
+    actionMenuMoreOpen: string
+    actionBackup: string
+    actionShare: string
+    actionClearAll: string
+    actionSignOut: string
+    // LoginPage password visibility toggle
+    showPassword: string
+    hidePassword: string
+    // AuthLoadingScreen
+    brandPill: string
+    loadingAuthTitle: string
+    loadingTripTitle: string
+    loadingUnconfiguredTitle: string
+    loadingAuthSubtitle: string
+    loadingTripSubtitle: string
+    loadingUnconfiguredSubtitle: string
+    unconfiguredStep1: string
+    unconfiguredStep2: string
+    unconfiguredStep3: string
+    securityFootnote: string
+    // AuthProvider service errors
+    errorNotAllowlistedSignIn: string
+    errorNotAllowlistedSignUp: string
+    errorTripNotFound: string
+    errorTripLoadFailed: string
   }
   profile: {
     tripManagement: string
@@ -257,6 +289,17 @@ export interface I18nSchema {
     defaultDayTheme: string
     defaultDaySummary: string
     navigateHint: string
+    // Airport / day-end pin labels and drag-handle a11y
+    airportAria: string
+    airportTitle: string
+    todayLastStop: string
+    dragHandleAria: string
+    dragHandleTitle: string
+    removeStopAria: string
+    removeStopTitle: string
+    // DayTabButton
+    dayPendingAria: string
+    dayStopsLoadingAria: string
   }
   pace: {
     relaxed: string
@@ -366,6 +409,10 @@ export interface I18nSchema {
     resolveFailed: string
     listSeparator: string
     propertyHotel: string
+    // Star count aria-label, custom-hotel delete aria, empty-candidate fallback
+    starCountAria: string
+    deleteCustomHotelAria: string
+    emptyCandidates: string
   }
   flight: {
     title: string
@@ -431,6 +478,10 @@ export interface I18nSchema {
     datesRoundtripReady: string
     suggestPickDates: string
     pleaseEnterFlightNumber: string
+    // Confirm clear trip dates dialog
+    clearTripDatesTitle: string
+    clearTripDatesDesc: string
+    clearTripDatesButton: string
   }
   place: {
     title: string
@@ -513,6 +564,41 @@ export interface I18nSchema {
     discard: string
     addToCandidates: string
     addToActive: string
+    // Photo gallery a11y / source attribution / map label
+    photoAttributionAria: string
+    photoPrevAria: string
+    photoNextAria: string
+    loadingMorePhotosAria: string
+    mapAria: string
+    sourcePhotoTitle: string
+    sourceInfoTitle: string
+    // PlaceName translation badge
+    translating: string
+    translatedBadgeAria: string
+    translatedBadgeTitle: string
+    // AddPlaceDialog
+    aiFitReason: string
+    type: string
+    typeAttraction: string
+    typeTransport: string
+    addPlaceSearchPlaceholder: string
+    searching: string
+    searchButton: string
+    fitReasonHint: string
+    fitReasonHintShort: string
+    fallbackDescription: string
+    recPrefRemoveAria: string
+    recPrefRemoveTitle: string
+    recPrefAddAria: string
+    recPrefAddTitle: string
+    // AddPlaceDialog loading labels
+    loadingGooglePhoto: string
+    aiThinkingLabel: string
+    aiGeneratingLabel: string
+    // AddPlaceDialog action buttons
+    addBestOnRoute: string
+    addToEnd: string
+    addingBusy: string
   }
   preferenceTag: {
     morningCoffee: string
@@ -566,6 +652,8 @@ export interface I18nSchema {
     answeringNow: string
     openPanelAria: string
     closePanelAria: string
+    // Close assistant icon button (TripChatPanel)
+    closeAssistantAria: string
     // Suggested prompts
     suggestHotelCurrent: string
     suggestHotelsLeftBank: string
@@ -691,8 +779,40 @@ export interface I18nSchema {
     daysAgo: string
     daysStopsSummary: string
     emptyTripSnapshot: string
+    // Trip selector / owner labels
+    tripPrimary: string
+    tripMine: string
+    tripFromOwner: string
+    tripEmpty: string
+    ownerOthers: string
+    ownerFromPrefix: string
+    // Cloud sync default labels
+    defaultPrimaryTripTitle: string
+    defaultSharedTripTitle: string
+    sharedTripLabel: string
+    permEditor: string
+    permViewer: string
+    // Cloud save error descriptions
+    errorNoWritePermission: string
+    errorSessionExpired: string
+    errorPayloadTooLarge: string
+    errorNetworkDown: string
+    errorTimeout: string
+    errorConflict: string
+    errorCodeOnly: string
+    errorUnknown: string
     loadBackupsFailed: string
     restoreSnapshotFailed: string
+    // Cloud save indicator labels
+    saveLabelPending: string
+    saveLabelSaving: string
+    saveLabelSaved: string
+    saveLabelError: string
+    saveLabelErrorWithReason: string
+    syncLabelSyncing: string
+    syncLabelSynced: string
+    saveKicker: string
+    syncKicker: string
   }
   apiMeter: {
     ariaLabel: string
@@ -789,6 +909,170 @@ export interface I18nSchema {
       description: string
       confirm: string
     }
+    // Floating nav (navigation/components/BottomNavBar)
+    floatingNavAria: string
+    primaryNavAria: string
+    // Top header quick actions (App.tsx)
+    quickActionBackupAria: string
+    quickActionBackupTitle: string
+    quickActionShareAria: string
+    quickActionShareTitle: string
+    headerProfileTitle: string
+    switchTripFailed: string
+    // Brand
+    brandTagline: string
+    // Share role group aria (cloud-sync/components/ShareDialog)
+    roleGroupAria: string
+    // Trip selector (cloud-sync/components/TripSelectorCapsule)
+    currentTripAria: string
+    selectTripAria: string
+    // Profile tab customisation buttons
+    customAvatarTitle: string
+    customAvatarAria: string
+    editNicknameTitle: string
+    editNicknameAria: string
+    // Empty states / hero copy
+    emptyHeroSubtitle: string
+    emptySetupSubtitle: string
+    emptyReadinessSubtitle: string
+    dayPlanLabelZh: string
+  }
+  destination: {
+    panelTitle: string
+    panelDesc: string
+    inputLabel: string
+    inputPlaceholder: string
+    popularTitle: string
+    fallbackNotice: string
+    refreshIdle: string
+    refreshBusy: string
+    candidatesLoadingThinking: string
+    candidatesLoadingGenerating: string
+    candidatesRefreshThinking: string
+    candidatesRefreshGenerating: string
+    clearButton: string
+    clearConfirmTitle: string
+    clearConfirmDesc: string
+    clearConfirmButton: string
+    refreshFailed: string
+    thinkingLabel: string
+    generatingLabel: string
+  }
+  map: {
+    errorTitle: string
+    errorDesc: string
+    errorRetry: string
+  }
+  errors: {
+    // Google Places
+    googleNoCandidates: string
+    googleNeedOriginalName: string
+    googleNotFound: string
+    googleSearchOriginal: string
+    googleLoadDetailsFailed: string
+    googleParseRecsFailed: string
+    googleRecsLoadFailed: string
+    googleAddFailed: string
+    googleSearchFailed: string
+    placesRequestFailed: string
+    // Cloud / Supabase
+    cloudSessionUnverified: string
+    cloudBackupNotFound: string
+    cloudEmailInvalid: string
+    cloudInviteFailed: string
+    // Destination suggest
+    openaiNotConfigured: string
+    noNewDestinations: string
+    // Hotel recommend
+    pickTripDatesFirstHotels: string
+    bookingNoCandidates: string
+    couldNotParseHotels: string
+    couldNotGenerateReplacement: string
+    noReplacementAvailable: string
+    notEnoughReplacements: string
+    // Booking service
+    bookingServiceDisabled: string
+    bookingUpstreamBlocked: string
+    bookingRequestFailed: string
+    bookingServiceError: string
+    // Flight lookup
+    flightLookupInvalidDateRange: string
+    flightLookupIncompleteSchedule: string
+    flightLookupUnparseableXml: string
+    flightLookupEmptyResult: string
+    flightLookupInvalidFlightNumber: string
+    flightLookupSelectDatesFirst: string
+    flightLookupUnsupportedRoute: string
+    flightLookupScheduleNotFound: string
+    // OpenRouteService
+    routeServiceNoRoute: string
+    routeServiceRequestFailed: string
+    // Geocode
+    geocodeIncompleteAddress: string
+    geocodeFailed: string
+    geocodeAddressNotFound: string
+    // Chat action errors
+    placeNameNotFoundAttraction: string
+    placeNameNotFoundGeneric: string
+    dayNotFound: string
+    placeNotReplaceable: string
+  }
+  hero: {
+    // Season eyebrow (appHelpers.ts seasonEyebrow)
+    eyebrowWithDest: string
+    eyebrowNextEscape: string
+    eyebrowSpring: string
+    eyebrowSummer: string
+    eyebrowAutumn: string
+    eyebrowWinter: string
+    eyebrowSpringNoDest: string
+    eyebrowSummerNoDest: string
+    eyebrowAutumnNoDest: string
+    eyebrowWinterNoDest: string
+    // destinationLabel
+    destinationEmpty: string
+    // dayCountLabel
+    dayCount: string
+    // itineraryMissingLabels
+    missingDates: string
+    missingOutbound: string
+    missingReturn: string
+    missingHotel: string
+    // buildHeroCopy — hotel phrase
+    hotelInArea: string
+    // buildHeroCopy — title
+    titleWithDest: string
+    titleTrip: string
+    titleDestOnly: string
+    titleWhereToNext: string
+    // buildHeroCopy — tags
+    tagsDatesPending: string
+    tagsMetroWalking: string
+    tagsHotelConfirmed: string
+    tagsHotelPending: string
+    tagsStayIn: string
+    // buildHeroCopy — blurbs
+    blurbDatesHotelWithDest: string
+    blurbDatesHotelNoDest: string
+    blurbDatesWithDest: string
+    blurbDatesNoDest: string
+    blurbHotelWithDest: string
+    blurbHotelNoDest: string
+    blurbJustDest: string
+    blurbEmpty: string
+    blurbThemeWithThemes: string
+    blurbThemeNoThemes: string
+    // Itinerary loading lines (10 entries each locale)
+    loadingLine1: string
+    loadingLine2: string
+    loadingLine3: string
+    loadingLine4: string
+    loadingLine5: string
+    loadingLine6: string
+    loadingLine7: string
+    loadingLine8: string
+    loadingLine9: string
+    loadingLine10: string
   }
 }
 

@@ -13,7 +13,7 @@ import type {
 import { SELECTED_HOTEL_PLACE_ID } from '../utils/dayOrigin'
 import { fetchWikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
 import { ensureDay1HotelFirst } from '../utils/itineraryState'
-import { getLocale } from '../../../shared/i18n'
+import { getLocale, translate } from '../../../shared/i18n'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
@@ -859,7 +859,7 @@ export async function buildGeneratedSingleDay(
           (input.occupiedPlaces || []).map((place) => place.name),
         )
   if (!verifiedCandidates.length) {
-    throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+    throw new Error(translate('errors.googleNoCandidates'))
   }
   const areaLabel =
     input.hotelAreaLabel || hotel.areaKey || undefined
@@ -1018,7 +1018,7 @@ export async function buildGeneratedItinerary(
   const hotel = input.hotel
   const verifiedCandidates = await loadItineraryCandidates(hotel)
   if (!verifiedCandidates.length) {
-    throw new Error('Google 暂时没有返回可验证的地点候选，请稍后重试。')
+    throw new Error(translate('errors.googleNoCandidates'))
   }
   const draft = await generateFullItinerary({
     ...input,

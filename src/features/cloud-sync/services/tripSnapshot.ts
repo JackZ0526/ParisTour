@@ -63,7 +63,7 @@ export function emptyTripSnapshot(): TripSnapshot {
   return {
     version: TRIP_SNAPSHOT_VERSION,
     dates: null,
-    destination: '巴黎',
+    destination: '',
     flights: null,
     hotel: null,
     itinerary: null,
@@ -89,7 +89,7 @@ export function collectTripSnapshot(): TripSnapshot {
   return {
     version: TRIP_SNAPSHOT_VERSION,
     dates: loadTripDates(),
-    destination: loadDestination() || '巴黎',
+    destination: loadDestination() || '',
     flights: loadFlightSelection(),
     hotel: loadHotelCache(),
     itinerary:
@@ -108,7 +108,7 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
   const snap = snapshot && typeof snapshot === 'object' ? snapshot : emptyTripSnapshot()
 
   saveTripDates(snap.dates ?? null)
-  saveDestination((snap.destination || '巴黎').trim() || '巴黎')
+  saveDestination((snap.destination || '').trim())
 
   if (snap.flights && (snap.flights.outbound || snap.flights.returnFlight)) {
     saveFlightSelection({

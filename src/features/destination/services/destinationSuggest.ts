@@ -4,6 +4,7 @@ import {
   type DestinationSuggestion,
 } from '../../../shared/services/llm/llm'
 import { getLlmArtifact, setLlmArtifact } from '../../../shared/services/llm/llmArtifactStore'
+import { translate } from '../../../shared/i18n'
 
 const ARTIFACT_KEY = 'destinations:popular'
 
@@ -96,7 +97,7 @@ export async function refreshPopularDestinations(options: {
   source: 'llm'
 }> {
   if (!isLlmConfigured()) {
-    throw new Error('未配置 OpenAI API Key，无法重新推荐目的地。')
+    throw new Error(translate('errors.openaiNotConfigured'))
   }
 
   const list = await suggestPopularDestinations({
@@ -107,7 +108,7 @@ export async function refreshPopularDestinations(options: {
   })
 
   if (!list.length) {
-    throw new Error('大模型没有返回新的目的地。')
+    throw new Error(translate('errors.noNewDestinations'))
   }
 
   writeCache(list)

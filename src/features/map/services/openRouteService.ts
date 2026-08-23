@@ -1,4 +1,5 @@
 import { authFetch } from '../../auth/services/authFetch'
+import { translate } from '../../../shared/i18n'
 import {
   buildMapRouteKey,
   buildMapRouteSegmentKey,
@@ -56,7 +57,7 @@ function parseRouteResponse(
       )
     : []
   if (value.geometry?.type !== 'LineString' || coordinates.length < 2) {
-    throw new Error('道路路线服务没有返回有效路线。')
+    throw new Error(translate('errors.routeServiceNoRoute'))
   }
   return {
     key,
@@ -151,7 +152,7 @@ export async function getOrFetchMapRoute(
       ) {
         disableOpenRouteService()
       }
-      throw new Error(payload.error || `道路路线请求失败（HTTP ${response.status}）`)
+      throw new Error(payload.error || translate('errors.routeServiceRequestFailed', { status: response.status }))
     }
     const route = parseRouteResponse(payload, key, profile)
     cacheMapRoute(route)

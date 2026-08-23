@@ -1672,7 +1672,7 @@ export function DayTimeline({
           className="space-y-1"
           role="status"
           aria-busy="true"
-          aria-label={`正在加载第 ${day.day} 天行程地点`}
+          aria-label={t('itinerary.dayStopsLoadingAria', { day: day.day })}
         >
           {Array.from({ length: 3 }, (_, i) => (
             <TimelineStopCardSkeleton key={i} index={i} />
@@ -1782,13 +1782,13 @@ export function DayTimeline({
             <div className={`flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl ${glassCardSurfaceClass} p-3`}>
               <span
                 className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
-                title="机场"
-                aria-label="机场"
+                title={t('itinerary.airportTitle')}
+                aria-label={t('itinerary.airportAria')}
               >
                 <PlaneIcon />
               </span>
               <div className="min-w-0 flex-1">
-                <span className="text-xs text-[var(--stone)]">今日终点</span>
+                <span className="text-xs text-[var(--stone)]">{t('itinerary.todayLastStop')}</span>
                 <p className="mt-1 font-medium">{place.name}</p>
               </div>
             </div>
@@ -1813,8 +1813,8 @@ export function DayTimeline({
               ) : (
                 <span
                   className={`timeline-drag-handle mt-1 inline-flex h-7 w-7 cursor-grab select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-xs text-[var(--stone)] dark:text-zinc-300 touch-none active:cursor-grabbing transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)]`}
-                  title="按住拖动排序"
-                  aria-label="按住拖动排序"
+                  title={t('itinerary.dragHandleTitle')}
+                  aria-label={t('itinerary.dragHandleAria')}
                   onPointerDown={(e) => {
                     if (liveIndex == null) return
                     const card = (e.currentTarget as HTMLElement).closest(
@@ -1837,8 +1837,8 @@ export function DayTimeline({
               ) : isAirportStop ? (
                 <span
                   className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
-                  title="机场"
-                  aria-label="机场"
+                  title={t('itinerary.airportTitle')}
+                  aria-label={t('itinerary.airportAria')}
                 >
                   <PlaneIcon />
                 </span>
@@ -1903,8 +1903,8 @@ export function DayTimeline({
               ) : (
                 <button
                   type="button"
-                  title="删除此地点"
-                  aria-label="删除此地点"
+                  title={t('itinerary.removeStopTitle')}
+                  aria-label={t('itinerary.removeStopAria')}
                   disabled={
                     dayRestoring ||
                     Boolean(exitAnim) ||

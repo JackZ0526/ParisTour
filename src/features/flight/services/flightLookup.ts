@@ -4,6 +4,7 @@ import {
   getCachedFlight,
   withFlightLookupLock,
 } from './flightCache'
+import { translate } from '../../../shared/i18n'
 function normalizeFlightNumber(input: string): string {
   return input.replace(/\s+/g, '').toUpperCase()
 }
@@ -347,7 +348,7 @@ function parseTimetableXml(xml: string): TimetableLeg[] {
   }
   const doc = new DOMParser().parseFromString(xml, 'text/xml')
   if (doc.querySelector('parsererror')) {
-    throw new Error('TimeTable 返回的 XML 无法解析')
+    throw new Error(translate('errors.flightLookupUnparseableXml'))
   }
   const details = Array.from(doc.getElementsByTagName('FlightDetails'))
   const legs: TimetableLeg[] = []
@@ -516,7 +517,7 @@ async function lookupFlightViaTimeTable(
 ): Promise<FlightInfo> {
   const dateKey = toYyyymmdd(lookupDate)
   if (!/^\d{8}$/.test(dateKey)) {
-    throw new Error('行程日期格式无效')
+    throw new Error(translate('errors.flightLookupInvalidDateRange'))
   }
   const candidates = operatingFlightCandidates(flightNumber)
   const routes = routesForDirection(direction)
@@ -536,7 +537,7 @@ async function lookupFlightViaTimeTable(
         if (!match) continue
         const mapped = mapTimetableLeg(match, flightNumber)
         if (!mapped.from?.scheduled || !mapped.to?.scheduled) {
-          throw new Error('TimeTable 返回的计划起降时间不完整')
+          throw new Error(translate('errors.flightLookupIncompleteSchedule'))
         }
         return mapped
       } catch (e) {
@@ -555,7 +556,7 @@ async function lookupFlightViaTimeTable(
         if (!match) continue
         const mapped = mapTimetableLeg(match, flightNumber)
         if (!mapped.from?.scheduled || !mapped.to?.scheduled) {
-          throw new Error('TimeTable 返回的计划起降时间不完整')
+          throw new Error(translate('errors.flightLookupIncompleteSchedule'))
         }
         return mapped
       }
@@ -731,7 +732,11 @@ export async function lookupFlightViaAeroDataBox(
   const best = selectFlightRecord(lastList, lookupDate, direction)
   if (!best) {
     throw new Error(
-      `未找到 ${flightNumber} 在 ${lookupDate} 的计划时刻（已尝试：${candidates.join('、')}）`,
+      translate('errors.flightLookupScheduleNotFound', {
+        flight: flightNumber,
+        date: lookupDate,
+        candidates: candidates.join('、'),
+      }),
     )
   }
   const mapped = mapAeroDataBoxFlight(
@@ -740,7 +745,7 @@ export async function lookupFlightViaAeroDataBox(
     usedNumber !== normalizeFlightNumber(flightNumber) ? usedNumber : undefined,
   )
   if (!mapped.from?.scheduled || !mapped.to?.scheduled) {
-    throw new Error('AeroDataBox 返回的计划起降时间不完整')
+    throw new Error(translate('errors.flightLookupIncompleteSchedule'))
   }
   return mapped
 }
@@ -755,11 +760,11 @@ export async function lookupFlight(
 ): Promise<FlightInfo> {
   const iata = normalizeFlightNumber(flightNumber)
   if (!/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(iata)) {
-    throw new Error('请输入有效航班号，例如 AF375 或 AF374')
+    throw new Error(translate('errors.flightLookupInvalidFlightNumber'))
   }
   const lookupDate = resolveLookupDate(travel)
   if (!lookupDate) {
-    throw new Error('请先选择行程日期，再查询航班计划时刻')
+    throw new Error(translate('errors.flightLookupSelectDatesFirst'))
   }
   if (options?.forceRefresh) {
     clearCachedFlight(iata, lookupDate)
@@ -789,7 +794,7 @@ export async function lookupRouteFlight(
   } else if ((dep === 'CDG' || dep === 'ORY') && arr === 'YVR') {
     fallbackNumber = 'AF374'
   } else {
-    throw new Error(`暂不支持按航线 ${dep}→${arr} 自动查询，请直接输入航班号`)
+    throw new Error(translate('errors.flightLookupUnsupportedRoute', { dep, arr }))
   }
   return lookupFlight(fallbackNumber, travel, options)
 }

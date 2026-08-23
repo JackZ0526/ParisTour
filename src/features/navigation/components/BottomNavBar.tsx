@@ -29,12 +29,12 @@ export function BottomNavBar({
   ]
   return (
     <aside
-      aria-label="悬浮导航栏"
+      aria-label={t('app.floatingNavAria')}
       className="fixed bottom-[max(1.15rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[370px] select-none lg:hidden"
     >
       {/* High-transparency Semi-transparent Frosted Glass Capsule with Specular Reflection */}
       <nav
-        aria-label="主要导航"
+        aria-label={t('app.primaryNavAria')}
         className="relative flex h-[60px] items-center justify-around gap-1.5 overflow-hidden rounded-full bg-white/45 dark:bg-[#151c18]/75 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.1),inset_0_1px_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_0_rgba(255,255,255,0.6),inset_0_0_12px_rgba(255,255,255,0.35)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45),inset_0_1px_1.5px_0_rgba(255,255,255,0.15),inset_0_-1px_1px_0_rgba(0,0,0,0.5)] backdrop-blur-2xl backdrop-saturate-[180%] transition-colors"
       >
         {/* Liquid Glass Flowing Gradient Border (流光折射渐变发丝描边) */}

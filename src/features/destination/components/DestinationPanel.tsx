@@ -9,6 +9,7 @@ import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import type { DestinationSuggestion } from '../../../shared/services/llm/llm'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
+import { useTranslation } from '../../../shared/i18n'
 
 interface Props {
   value: string
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function DestinationPanel({ value, onChange }: Props) {
+  const { t } = useTranslation()
   const [chips, setChips] = useState<DestinationSuggestion[]>(FALLBACK_DESTINATIONS)
   const [loadingChips, setLoadingChips] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -62,7 +64,7 @@ export function DestinationPanel({ value, onChange }: Props) {
       setChipSource(result.source)
       setRefreshBatch(nextBatch)
     } catch (e) {
-      setRefreshError(e instanceof Error ? e.message : '重新推荐失败，请稍后再试。')
+      setRefreshError(e instanceof Error ? e.message : t('destination.refreshFailed'))
     } finally {
       setRefreshing(false)
     }
@@ -75,9 +77,9 @@ export function DestinationPanel({ value, onChange }: Props) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-3xl">这次的目的地是哪儿呢？</h2>
+          <h2 className="font-display text-3xl">{t('destination.panelTitle')}</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
-            输入城市或地区，或点选下方热门目的地快速填入。
+            {t('destination.panelDesc')}
           </p>
         </div>
         {trimmed && (
@@ -86,20 +88,20 @@ export function DestinationPanel({ value, onChange }: Props) {
             onClick={() => setConfirmClearOpen(true)}
             className="rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)]"
           >
-            清空目的地
+            {t('destination.clearButton')}
           </button>
         )}
       </div>
 
       <div className="rounded-2xl sm:rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl transition-colors">
         <label className="block text-sm">
-          <span className="text-[var(--stone)]">目的地</span>
+          <span className="text-[var(--stone)]">{t('destination.inputLabel')}</span>
           <input
             type="text"
             value={value}
             onChange={(e) => commit(e.target.value)}
             className="mt-1 w-full rounded-xl border border-[var(--mist)] bg-[var(--paper)] px-3 py-2.5 outline-none focus:border-[var(--sage)]"
-            placeholder="例如 巴黎、东京、罗马…"
+            placeholder={t('destination.inputPlaceholder')}
             autoComplete="off"
             spellCheck={false}
           />
@@ -107,12 +109,12 @@ export function DestinationPanel({ value, onChange }: Props) {
 
         <div className="mt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-[var(--stone)]">热门目的地</p>
+            <p className="text-sm text-[var(--stone)]">{t('destination.popularTitle')}</p>
             <div className="flex flex-wrap items-center gap-2">
               {loadingChips && (
                 <LoadingIndicator
-                  thinkingLabel="正在思考推荐…"
-                  generatingLabel="正在生成推荐…"
+                  thinkingLabel={t('destination.thinkingLabel')}
+                  generatingLabel={t('destination.generatingLabel')}
                   size="sm"
                   showDots
                   mode="thinking"
@@ -120,7 +122,7 @@ export function DestinationPanel({ value, onChange }: Props) {
                 />
               )}
               {!loadingChips && chipSource === 'fallback' && (
-                <p className="text-xs text-[var(--mist)]">推荐暂用默认列表</p>
+                <p className="text-xs text-[var(--mist)]">{t('destination.fallbackNotice')}</p>
               )}
               {canRefresh && (
                 <button
@@ -131,7 +133,7 @@ export function DestinationPanel({ value, onChange }: Props) {
                   className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stone)]/30 px-3 py-1.5 text-sm hover:border-[var(--sage)] disabled:opacity-50"
                 >
                   {refreshing && <ButtonSpinner mode="thinking" task="destinationSuggest" />}
-                  {refreshing ? '生成中…' : '再给我来一批'}
+                  {refreshing ? t('destination.refreshBusy') : t('destination.refreshIdle')}
                 </button>
               )}
             </div>
@@ -145,8 +147,8 @@ export function DestinationPanel({ value, onChange }: Props) {
               <LoadingIndicator
                 variant="block"
                 className="w-full py-4"
-                thinkingLabel="正在挑选热门目的地…"
-                generatingLabel="正在挑选热门目的地…"
+                thinkingLabel={t('destination.candidatesLoadingThinking')}
+                generatingLabel={t('destination.candidatesLoadingGenerating')}
                 showDots
                 size="sm"
                 mode="thinking"
@@ -183,8 +185,8 @@ export function DestinationPanel({ value, onChange }: Props) {
           {refreshing && chips.length > 0 && (
             <div className="mt-2">
               <LoadingIndicator
-                thinkingLabel="正在想下一批热门目的地…"
-                generatingLabel="正在生成下一批热门目的地…"
+                thinkingLabel={t('destination.candidatesRefreshThinking')}
+                generatingLabel={t('destination.candidatesRefreshGenerating')}
                 size="sm"
                 showDots
                 mode="thinking"
@@ -203,9 +205,9 @@ export function DestinationPanel({ value, onChange }: Props) {
         open={confirmClearOpen}
         onClose={() => setConfirmClearOpen(false)}
         onConfirm={clearDestination}
-        title="清空目的地"
-        description="确定清空当前选中的目的地吗？"
-        confirmText="清空"
+        title={t('destination.clearConfirmTitle')}
+        description={t('destination.clearConfirmDesc')}
+        confirmText={t('destination.clearConfirmButton')}
         tone="warning"
         icon="alert"
       />

@@ -64,10 +64,9 @@ export function ChatWorkStepsPanel({
 }) {
   void onToggle
   // UI request: don't display skipped steps.
+  const { t, locale } = useTranslation()
   const visible = steps.filter((step) => step.status !== 'skipped')
   if (!visible.length) return null
-
-  const { t, locale } = useTranslation()
   // "Skipped: " prefix used for the inline skipped-step label.
   const skippedPrefix = t('chat.workStepSkippedPrefix' as never) ||
     (locale === 'en' ? 'Skipped: ' : '已跳过：')

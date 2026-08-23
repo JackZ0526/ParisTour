@@ -7,6 +7,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceSourceMark } from './PlaceSourceMark'
+import { useTranslation } from '../../../shared/i18n'
 import {
   placeSourceLabel,
   type PlaceInfoSource,
@@ -156,6 +157,7 @@ export function PlacePhotoGallery({
   const lastTapTime = useRef(0)
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([])
   const heroImgRef = useRef<HTMLImageElement>(null)
+  const { t } = useTranslation()
 
   const galleryLength = photos.length
   const displayPhoto = photos[photoIndex] || photos[0] || ''
@@ -300,7 +302,7 @@ export function PlacePhotoGallery({
         {photoSource && photoSource !== 'wikimedia' && displayPhoto && heroReady && (
           <span
             className="absolute bottom-2 left-2 z-10"
-            aria-label={`图片来自 ${placeSourceLabel(photoSource)}`}
+            aria-label={t('place.photoAttributionAria', { source: placeSourceLabel(photoSource) })}
           >
             <PlaceSourceMark source={photoSource} onPhoto />
           </span>
@@ -310,7 +312,7 @@ export function PlacePhotoGallery({
           <>
             <button
               type="button"
-              aria-label="上一张"
+              aria-label={t('place.photoPrevAria')}
               onClick={() => stepPhoto(-1)}
               className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity hover:bg-black/65 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
             >
@@ -318,7 +320,7 @@ export function PlacePhotoGallery({
             </button>
             <button
               type="button"
-              aria-label="下一张"
+              aria-label={t('place.photoNextAria')}
               onClick={() => stepPhoto(1)}
               disabled={lazyAdvance?.loading}
               className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity hover:bg-black/65 active:scale-95 disabled:opacity-60"

@@ -86,12 +86,11 @@ const recommendTabKeys: Record<RecommendPlaceType, string> = {
   restaurant: 'place.addRestaurantOption',
 }
 
-const GOOGLE_PLACE_LABELS = {
-  title: '行程顾问点评',
-  intro: '地点简介',
-  reason: '为什么推荐',
-  loadingText: '正在生成地点简介与推荐理由…',
-}
+// Note: We intentionally do NOT pass a `labels` prop to `GooglePlacePage`.
+// The page falls back to the i18n keys `place.advisorNoteTitle`,
+// `place.intro`, `place.whyRecommend`, and `place.aiGeneratingLabel`,
+// which are locale-aware. Hardcoding English here would shadow those
+// translations for the AddPlaceDialog flow.
 
 export function AddPlaceDialog({
   open,
@@ -306,7 +305,7 @@ export function AddPlaceDialog({
     try {
       const verifiedCandidates = await loadVerifiedCandidates(types)
       if (!verifiedCandidates.length) {
-        throw new Error('Google 暂时没有返回附近候选，请稍后重试。')
+        throw new Error(t('errors.googleNoCandidates'))
       }
       let list = await recommendPlacesForDay({
         day: dayNumber,
@@ -411,10 +410,10 @@ export function AddPlaceDialog({
       if (epoch !== recommendationEpochRef.current) return false
       const message =
         err instanceof SyntaxError
-          ? '推荐结果解析失败，请再试一次。'
+          ? t('errors.googleParseRecsFailed')
           : err instanceof Error
             ? err.message
-            : '推荐加载失败，请稍后再试。'
+            : t('errors.googleRecsLoadFailed')
       setRecErrors((prev) => ({
         ...prev,
         ...Object.fromEntries(types.map((type) => [type, message])),
@@ -567,7 +566,7 @@ export function AddPlaceDialog({
       const query = placeDetailsQuery(item.name, item.nameLocal)
       if (!query) {
         setDetailsByKey((prev) => ({ ...prev, [key]: null }))
-        setError('缺少地点原文名称，无法查询 Google 详情。')
+        setError(t('errors.googleNeedOriginalName'))
         return null
       }
       const details = await fetchGooglePlaceDetails(query, undefined, {
@@ -651,7 +650,7 @@ export function AddPlaceDialog({
       return resolved
     } catch {
       setDetailsByKey((prev) => ({ ...prev, [key]: null }))
-      setError('加载 Google 地点详情失败。')
+      setError(t('errors.googleLoadDetailsFailed'))
       return null
     } finally {
       setLoadingDetailsKey(null)
@@ -683,17 +682,17 @@ export function AddPlaceDialog({
     try {
       const query = placeDetailsQuery(name)
       if (!cached?.location && !query) {
-        throw new Error('缺少地点原文名称，无法查询 Google 详情。')
+        throw new Error(t('errors.googleNeedOriginalName'))
       }
       const details = cached?.location
         ? cached
         : await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
-        throw new Error('未找到该地点或缺少坐标，请换个关键词。')
+        throw new Error(t('errors.googleNotFound'))
       }
 
       let description =
-        intro || details.summary || details.address || '自定义添加的地点'
+        intro || details.summary || details.address || t('place.fallbackDescription')
       // AI 推荐已有 intro 时不再二次生成简介，避免重复烧 token。
       const hasUsefulIntro = Boolean(intro && intro.trim().length >= 12)
       if (isLlmConfigured() && !hasUsefulIntro) {
@@ -771,7 +770,7 @@ export function AddPlaceDialog({
       // Parent also closes; dismiss detail + add sheet after join.
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '添加失败')
+      setError(e instanceof Error ? e.message : t('errors.googleAddFailed'))
     } finally {
       setSearching(false)
       setAddingName(null)
@@ -786,15 +785,15 @@ export function AddPlaceDialog({
     try {
       const query = placeDetailsQuery(q)
       if (!query) {
-        throw new Error('请使用地点的原文名称搜索。')
+        throw new Error(t('errors.googleSearchOriginal'))
       }
       const details = await fetchGooglePlaceDetails(query, undefined)
       if (!details?.location) {
-        throw new Error('未找到该地点或缺少坐标，请换个关键词。')
+        throw new Error(t('errors.googleNotFound'))
       }
       setGoogleDetail({ details, type: googleType })
     } catch (e) {
-      setError(e instanceof Error ? e.message : '搜索失败')
+      setError(e instanceof Error ? e.message : t('errors.googleSearchFailed'))
     } finally {
       setSearching(false)
     }
@@ -1116,8 +1115,8 @@ export function AddPlaceDialog({
               {loadingRecs && !refreshingRecs ? (
                 <LoadingIndicator
                   variant="block"
-                  thinkingLabel="AI 正在思考推荐"
-                  generatingLabel="AI 正在根据行程推荐"
+                  thinkingLabel={t('place.aiThinkingLabel')}
+                  generatingLabel={t('place.aiGeneratingLabel')}
                   showDots
                   size="md"
                   mode="thinking"
@@ -1187,7 +1186,7 @@ export function AddPlaceDialog({
                                 <div className="space-y-3 px-3 pb-3 pt-3">
                                   {loadingDetails ? (
                                     <LoadingIndicator
-                                      label="正在加载 Google 照片…"
+                                      label={t('place.loadingGooglePhoto')}
                                       showDots
                                       size="sm"
                                     />
@@ -1236,7 +1235,7 @@ export function AddPlaceDialog({
                                       <div className="space-y-2 text-sm leading-relaxed text-[var(--ink)]/90">
                                         <p>{item.intro}</p>
                                         <p className="text-[var(--stone)]">
-                                          <span className="font-medium text-[var(--ink)]">为何适合今天：</span>
+                                          <span className="font-medium text-[var(--ink)]">{t('place.aiFitReason')}</span>
                                           {item.reason}
                                         </p>
                                       </div>
@@ -1258,7 +1257,7 @@ export function AddPlaceDialog({
                                           className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                                         >
                                           {busyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
-                                          {busyBest ? '加入中…' : '最顺路'}
+                                          {busyBest ? t('place.addingBusy') : t('place.addBestOnRoute')}
                                         </button>
                                         <button
                                           type="button"
@@ -1280,7 +1279,7 @@ export function AddPlaceDialog({
                                         </button>
                                       </div>
                                       <p className="text-xs text-[var(--stone)]">
-                                        「最顺路」会插到当天更合适的位置；「加到最后」追加到当天末尾。
+                                        {t('place.fitReasonHint')}
                                       </p>
                                     </>
                                   )}
@@ -1328,7 +1327,7 @@ export function AddPlaceDialog({
                 enterKeyHint="search"
                 value={googleQuery}
                 onChange={(e) => setGoogleQuery(e.target.value)}
-                placeholder="例如：Musée Rodin Paris"
+                placeholder={t('place.addPlaceSearchPlaceholder')}
                 className="w-full rounded-xl border border-[var(--mist)] dark:border-white/10 bg-white/80 dark:bg-black/35 px-3 py-2 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--stone)]/55 focus:border-[var(--sage)]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -1338,16 +1337,16 @@ export function AddPlaceDialog({
                 }}
               />
               <label className="block text-sm">
-                <span className="text-[var(--stone)]">类型</span>
+                <span className="text-[var(--stone)]">{t('place.type')}</span>
                 <select
                   value={googleType}
                   onChange={(e) => setGoogleType(e.target.value as PlaceType)}
                   className="mt-1 w-full rounded-xl border border-[var(--mist)] dark:border-white/10 bg-white/80 dark:bg-black/35 px-3 py-2 text-base text-[var(--ink)]"
                 >
-                  <option value="attraction">景点</option>
+                  <option value="attraction">{t('place.typeAttraction')}</option>
                   <option value="cafe">{t('place.addCafeOption')}</option>
                   <option value="restaurant">{t('place.addRestaurantOption')}</option>
-                  <option value="transport">交通</option>
+                  <option value="transport">{t('place.typeTransport')}</option>
                 </select>
               </label>
               <button
@@ -1358,7 +1357,7 @@ export function AddPlaceDialog({
                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5 text-sm text-[var(--paper)] disabled:opacity-50"
               >
                 {searching && <ButtonSpinner />}
-                {searching ? '搜索中…' : '搜索地点'}
+                {searching ? t('place.searching') : t('place.searchButton')}
               </button>
               {error && <p className="text-sm text-red-700">{error}</p>}
             </div>
@@ -1397,7 +1396,6 @@ export function AddPlaceDialog({
                     : undefined),
                 reason: googleStory?.reason || undefined,
                 loading: googleStoryLoading,
-                labels: GOOGLE_PLACE_LABELS,
                 onRegenerate: isLlmConfigured()
                   ? () => setGoogleStoryRegenToken((n) => n + 1)
                   : undefined,
@@ -1425,7 +1423,7 @@ export function AddPlaceDialog({
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
                 >
                   {googleBusyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
-                  {googleBusyBest ? '加入中…' : '最顺路'}
+                  {googleBusyBest ? t('place.addingBusy') : t('place.addBestOnRoute')}
                 </button>
                 <button
                   type="button"
@@ -1447,7 +1445,7 @@ export function AddPlaceDialog({
                 </button>
               </div>
               <p className="text-xs text-[var(--stone)]">
-                「最顺路」按当日路线插入最佳位置；「加到最后」追加到当天末尾。
+                {t('place.fitReasonHintShort')}
               </p>
             </div>
           ) : null

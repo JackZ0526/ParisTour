@@ -13,32 +13,33 @@ import {
 import { SyncOrbitIcon } from '../../../shared/components/LoadingIndicator'
 import { Check, CircleAlert, Save } from 'lucide-react'
 import { isCloudSyncEnabled } from '../../../shared/lib/supabase'
+import { useTranslation } from '../../../shared/i18n'
 
 type ToastKind = 'save' | 'sync'
 
-function saveLabel(status: CloudSaveStatus, error: string | null): string {
+function saveLabel(status: CloudSaveStatus, error: string | null, t: ReturnType<typeof useTranslation>['t']): string {
   switch (status) {
     case 'pending':
-      return '即将保存…'
+      return t('cloud.saveLabelPending')
     case 'saving':
-      return '正在保存…'
+      return t('cloud.saveLabelSaving')
     case 'saved':
-      return '行程已保存'
+      return t('cloud.saveLabelSaved')
     case 'error': {
-      const reason = (error || '').replace(/^保存失败[:：]?\s*/, '').trim()
-      return reason && reason !== '保存失败' ? `保存失败：${reason}` : '保存失败'
+      const reason = (error || '').replace(/^(保存失败|Save failed)[:：]?\s*/, '').trim()
+      return reason ? t('cloud.saveLabelErrorWithReason', { reason }) : t('cloud.saveLabelError')
     }
     default:
       return ''
   }
 }
 
-function syncLabel(status: CloudSyncStatus): string {
+function syncLabel(status: CloudSyncStatus, t: ReturnType<typeof useTranslation>['t']): string {
   switch (status) {
     case 'syncing':
-      return '正在同步同伴更改…'
+      return t('cloud.syncLabelSyncing')
     case 'synced':
-      return '行程已同步'
+      return t('cloud.syncLabelSynced')
     default:
       return ''
   }
@@ -57,6 +58,7 @@ function FloppyIcon({ spinning }: { spinning?: boolean }) {
 
 export function CloudSaveIndicator() {
   const isEnabled = isCloudSyncEnabled()
+  const { t } = useTranslation()
 
   const [saveStatus, setSaveStatus] = useState<CloudSaveStatus>(() => getCloudSaveStatus())
   const [saveError, setSaveError] = useState<string | null>(() => getCloudSaveError())
@@ -91,7 +93,7 @@ export function CloudSaveIndicator() {
   if (typeof document === 'undefined') return null
 
   const isSave = kind === 'save'
-  const label = isSave ? saveLabel(saveStatus, saveError) : syncLabel(syncStatus)
+  const label = isSave ? saveLabel(saveStatus, saveError, t) : syncLabel(syncStatus, t)
   const tone =
     isSave && saveStatus === 'error'
       ? 'is-error'
@@ -173,7 +175,7 @@ export function CloudSaveIndicator() {
           </AnimatePresence>
         </div>
         <div className="cloud-save-copy">
-          <span className="cloud-save-kicker">{isSave ? 'AUTO SAVE' : 'LIVE SYNC'}</span>
+          <span className="cloud-save-kicker">{isSave ? t('cloud.saveKicker') : t('cloud.syncKicker')}</span>
           <span className="cloud-save-label">{label}</span>
         </div>
       </div>
