@@ -2004,10 +2004,22 @@ export function TripChatPanel({
               const badges = detail
                 ? visualAnalysisStepBadges(detail.imageCount, detail.isProxy, locale)
                 : undefined
-              return prev.map((s) =>
+              const next = prev.map((s) =>
                 s.id === 'visualAnalysis'
-                  ? { ...s, status: 'done' as const, badges: badges || s.badges }
+                  ? {
+                      ...s,
+                      status: 'done' as const,
+                      label: chatWorkStepLabel('visualAnalysis', locale),
+                      badges: badges || s.badges,
+                    }
                   : s,
+              )
+              const hasWebSearchPending = next.some(
+                (s) => s.id === 'webSearch' && s.status === 'pending',
+              )
+              return activateChatWorkStep(
+                next,
+                hasWebSearchPending ? 'webSearch' : 'generate',
               )
             })
             return

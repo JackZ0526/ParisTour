@@ -501,8 +501,9 @@ export function buildOpenAIChatBody(
   messages: OpenAIChatMessage[],
   thinking: ResolvedThinking,
   task?: LlmTaskKind,
+  overrideModel?: string,
 ): Record<string, unknown> {
-  const model = getOpenAIModel()
+  const model = overrideModel || getOpenAIModel()
   const backend = chatBackendForModel(model)
   const thinkingOn = thinking.enabled
   const budget = completionTokenBudget(thinking, task)
@@ -555,13 +556,13 @@ export function prepareOpenAIChatBody(
   options?: ChatCallOptions,
   stream = false,
 ): { body: Record<string, unknown>; backend: ChatBackend; url: string } {
-  const model = getOpenAIModel()
+  const model = options?.model || getOpenAIModel()
   const backend = chatBackendForModel(model)
   const url = chatCompletionsUrl(model)
   const thinking =
     options?.thinking ??
     resolveThinkingForTask(getThinkingMode(), options?.userText, options?.task || 'default')
-  const body = buildOpenAIChatBody(messages, thinking, options?.task)
+  const body = buildOpenAIChatBody(messages, thinking, options?.task, model)
 
   // DeepSeek chat uses max_tokens (OpenAI-compatible); thinking needs more headroom for CoT.
   if (backend === 'deepseek') {

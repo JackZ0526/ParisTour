@@ -973,8 +973,8 @@ export async function fetchTripChatVisualAnalysis(input: {
   try {
     const prompt =
       input.locale === 'en'
-        ? 'You are a travel visual research assistant. Analyze the user\'s uploaded image(s) in detail. Extract place names (in French and English), addresses/districts, opening hours, ticket prices/fees, menu dishes, signs, transportation clues, or any visual facts relevant to travel planning. Output a concise factual bullet summary.'
-        : '你是旅行视觉识别助手。请详细分析用户上传的图片，提取其中的地点名称（法语/中文）、地址/街区、营业时间、门票价格、特色菜品、路牌标识、交通线索等一切与旅行规划相关的客观事实。输出精炼的事实要点列表。'
+        ? 'You are a visual recognition assistant. Analyze the user\'s uploaded image(s) in detail. Identify buildings, landmarks, scenes, monuments, place names, text/signs, menu dishes, or any visual clues relevant to the user\'s question. Output a concise and clear factual analysis.'
+        : '你是视觉识别助手。请详细分析用户上传的图片，准确识别其中的建筑、地标、景点名称、图案/LOGO、招牌文字、菜单菜品或与用户提问相关的画面特征。输出精炼准确的事实分析与结论。'
 
     const contentParts: ChatMessageContentPart[] = [
       {
