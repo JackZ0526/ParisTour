@@ -20,7 +20,7 @@ import {
   setLlmProvider,
   getProviderLabel,
 } from '../provider-state'
-import { callGemini, callOpenAIMessages } from '../transport'
+import { callGemini, callOpenAIMessages, callOpenAIMessagesStream } from '../transport'
 import { extractJsonObject } from '../json'
 import type {
   ChatCallOptions,
@@ -48,13 +48,14 @@ async function callOpenAI(
   user: string,
   options?: ChatCallOptions,
 ): Promise<string> {
-  return callOpenAIMessages(
-    [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    options,
-  )
+  const messages = [
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
+  ]
+  if (typeof options?.onDelta === 'function') {
+    return callOpenAIMessagesStream(messages, options)
+  }
+  return callOpenAIMessages(messages, options)
 }
 
 async function callProvider(

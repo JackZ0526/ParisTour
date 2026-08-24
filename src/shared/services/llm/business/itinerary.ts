@@ -1276,7 +1276,23 @@ export async function translateItineraryText(
   const { days, sourceLocale, targetLocale, signal, onProgress } = input
   const langRule = getLlmLanguageInstruction(targetLocale)
   const system = buildTranslateSystemPrompt(targetLocale, sourceLocale, langRule)
-  const user = JSON.stringify({ days })
+
+  // Send only human-readable fields to keep prompt compact and response fast
+  const compactDays = days.map((d) => ({
+    day: d.day,
+    title: d.title,
+    theme: d.theme,
+    summary: d.summary,
+    metroHintFromArea: d.metroHintFromArea,
+    stops: d.stops.map((s) => ({
+      time: s.time,
+      placeId: s.placeId,
+      note: s.note,
+      duration: s.duration,
+      transport: s.transport,
+    })),
+  }))
+  const user = JSON.stringify({ days: compactDays })
 
   // Emit initial empty template so UI immediately displays graceful skeleton shimmers
   if (onProgress) {
