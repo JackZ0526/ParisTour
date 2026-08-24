@@ -65,6 +65,7 @@ export function ChatWorkStepsPanel({
   completed?: boolean
 }) {
   void onToggle
+  const [reasoningExpanded, setReasoningExpanded] = useState(false)
   // UI request: don't display skipped steps.
   const { t, locale } = useTranslation()
   const visible = steps.filter((step) => step.status !== 'skipped')
@@ -168,7 +169,7 @@ export function ChatWorkStepsPanel({
       <button
         type="button"
         onClick={onToggle}
-        className="group flex w-full items-center gap-1.5 rounded-sm text-left text-[var(--stone)]/78 outline-none transition hover:text-[var(--stone)] focus-visible:ring-1 focus-visible:ring-[var(--sage)]/25"
+        className="group flex w-full items-center gap-1.5 rounded-sm text-left text-[var(--stone)]/78 outline-none transition hover:text-[var(--stone)] focus-visible:ring-1 focus-visible:ring-[var(--sage)]/25 cursor-pointer"
         aria-expanded={open}
       >
         <span className="shrink-0" aria-hidden>
@@ -189,58 +190,70 @@ export function ChatWorkStepsPanel({
         aria-hidden={!open}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="ml-[1.375rem] mt-1.5 space-y-2 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
-            {hasReasoning && (
-              <div className="rounded-xl border border-[var(--sage)]/20 bg-[var(--sage)]/5 dark:bg-[var(--sage)]/10 p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--sage)] dark:text-[#a3c2b1] mb-1">
-                  <Sparkles size={13} strokeWidth={2} />
-                  <span>{locale === 'en' ? 'Reasoning Process' : '深度思考过程'}</span>
-                </div>
-                <div className="max-h-36 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--stone)]/80 dark:text-zinc-300">
-                  {reasoning!.trim()}
-                </div>
-              </div>
-            )}
-
-            {visible.length > 0 && (
-              <ol className="space-y-1">
-                {visible.map((step) => {
-                  const done = step.status === 'done'
-                  const { label: cleanLabel, badges } = parseStepDisplay(step)
-                  return (
-                    <li
-                      key={step.id}
-                      className={`flex items-start gap-1.5 py-0.5 ${
-                        done
-                          ? 'text-[var(--stone)]/62'
-                          : 'text-[var(--stone)]/45'
-                      }`}
+          <div className="ml-[1.375rem] mt-1 space-y-1 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
+            <ol className="space-y-1">
+              {hasReasoning && (
+                <li className="flex items-start gap-1.5 py-0.5 text-[var(--stone)]/62">
+                  <span className="flex h-5 w-4 shrink-0 items-center justify-center text-[var(--sage)] dark:text-[#9fc4b1]" aria-hidden>
+                    <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setReasoningExpanded((v) => !v)}
+                      className="group flex min-h-[1.25rem] w-full items-center justify-between gap-1.5 leading-5 text-left font-medium hover:text-[var(--stone)]/90 cursor-pointer outline-none"
                     >
-                      <span className="flex h-5 w-4 shrink-0 items-center justify-center" aria-hidden>
-                        <ChatWorkStepIcon id={step.id} status={step.status} />
+                      <span>{locale === 'en' ? 'Reasoning Process' : '深度思考过程'}</span>
+                      <span className="inline-flex items-center gap-0.5 rounded px-1 text-[10px] text-[var(--stone)]/60 group-hover:text-[var(--stone)]/80">
+                        <span>{reasoningExpanded ? (locale === 'en' ? 'Collapse' : '收起') : (locale === 'en' ? 'View' : '展开')}</span>
+                        <ChevronRight size={12} className={`transition-transform duration-200 ${reasoningExpanded ? 'rotate-90' : ''}`} />
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-h-[1.25rem] items-center gap-1.5 leading-5">
-                          <span className="font-medium">{cleanLabel}</span>
-                        </div>
-                        {badges.length > 0 && (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            {badges.map((badge, bIdx) => (
-                              <span
-                                key={bIdx}
-                                className="inline-flex items-center rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 dark:border-[var(--sage)]/35 dark:bg-[var(--sage)]/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--sage)] dark:text-[#9fc4b1] select-none"
-                              >
-                                {badge}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                    </button>
+                    {reasoningExpanded && (
+                      <div className="mt-1.5 max-h-48 overflow-y-auto rounded-lg border-l-2 border-[var(--sage)]/40 bg-black/[0.02] dark:bg-white/[0.03] px-2.5 py-2 text-[11px] leading-relaxed text-[var(--stone)]/75 dark:text-zinc-300 select-text [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {reasoning!.trim()}
                       </div>
-                    </li>
-                  )
-                })}
-              </ol>
-            )}
+                    )}
+                  </div>
+                </li>
+              )}
+
+              {visible.map((step) => {
+                const done = step.status === 'done'
+                const { label: cleanLabel, badges } = parseStepDisplay(step)
+                return (
+                  <li
+                    key={step.id}
+                    className={`flex items-start gap-1.5 py-0.5 ${
+                      done
+                        ? 'text-[var(--stone)]/62'
+                        : 'text-[var(--stone)]/45'
+                    }`}
+                  >
+                    <span className="flex h-5 w-4 shrink-0 items-center justify-center" aria-hidden>
+                      <ChatWorkStepIcon id={step.id} status={step.status} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-h-[1.25rem] items-center gap-1.5 leading-5">
+                        <span className="font-medium">{cleanLabel}</span>
+                      </div>
+                      {badges.length > 0 && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          {badges.map((badge, bIdx) => (
+                            <span
+                              key={bIdx}
+                              className="inline-flex items-center rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 dark:border-[var(--sage)]/35 dark:bg-[var(--sage)]/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--sage)] dark:text-[#9fc4b1] select-none"
+                            >
+                              {badge}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
           </div>
         </div>
       </div>
