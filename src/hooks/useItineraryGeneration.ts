@@ -63,6 +63,7 @@ import {
   syncDaysCopyToHotelArea,
 } from '../appHelpers'
 import { isRemoteQuietPeriodActive, holdTripCloudSaves, releaseTripCloudSaves } from '../features/cloud-sync/services/tripCloud'
+import { getLlmArtifact, setLlmArtifact } from '../shared/services/llm/llmArtifactStore'
 import {
   clampIsoDate,
   itineraryDayCount,
@@ -1076,22 +1077,32 @@ export function useItineraryGeneration(
       const structureKey = computeDaysStructureKey(currentDays)
       const sourceLocale = detectLocaleFromDays(currentDays)
 
-      // Ensure source days are saved in the multi-language cache
+      // Ensure source days are saved in the multi-language cache and artifact store
       if (
         !localeCopyCacheRef.current[sourceLocale] ||
         localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey
       ) {
         localeCopyCacheRef.current[sourceLocale] = { structureKey, days: currentDays }
+        setLlmArtifact(`itinerary:locale-copy:v1:${structureKey}:${sourceLocale}`, currentDays)
       }
 
       if (sourceLocale === targetLocale) return
 
       holdTripCloudSaves()
       try {
-        // Instant 0ms cache hit: if target locale copy exists for this exact structure, swap immediately!
-        const cachedTarget = localeCopyCacheRef.current[targetLocale]
-        if (cachedTarget && cachedTarget.structureKey === structureKey) {
-          setDays(cachedTarget.days)
+        // Instant 0ms cache hit: check memory cache or synced LLM artifact store
+        const cachedTarget =
+          (localeCopyCacheRef.current[targetLocale]?.structureKey === structureKey
+            ? localeCopyCacheRef.current[targetLocale]?.days
+            : undefined) ??
+          getLlmArtifact<DayPlan[]>(`itinerary:locale-copy:v1:${structureKey}:${targetLocale}`)
+
+        if (cachedTarget) {
+          localeCopyCacheRef.current[targetLocale] = {
+            structureKey,
+            days: cachedTarget,
+          }
+          setDays(cachedTarget)
           setItineraryGenError(null)
           return
         }
@@ -1112,6 +1123,7 @@ export function useItineraryGeneration(
           structureKey,
           days: translatedDays,
         }
+        setLlmArtifact(`itinerary:locale-copy:v1:${structureKey}:${targetLocale}`, translatedDays)
       } catch (err) {
         // Rollback to current days on failure
         setDays(currentDays)
@@ -1247,15 +1259,7 @@ export function useItineraryGeneration(
   // toggles don't get swallowed by a stale ref value.
   // -----------------------------------------------------------------------
   const [autoRegenOnLocaleChange, setAutoRegenOnLocaleChange] = useState(false)
-  const lastAutoRegenLocaleRef = useRef<Locale | null>(null)
   useEffect(() => {
-    if (lastAutoRegenLocaleRef.current === null) {
-      // First mount: seed the ref with the active locale so the very first
-      // user-initiated switch can be detected.
-      lastAutoRegenLocaleRef.current = locale
-      return
-    }
-    if (lastAutoRegenLocaleRef.current === locale) return
     if (!itineraryGenerated) return
     if (
       itineraryGenerating ||
@@ -1265,16 +1269,34 @@ export function useItineraryGeneration(
     ) {
       return
     }
-    // Update the ref synchronously so a quick second switch (e.g. en →
-    // zh-CN → en) is still detected by the next effect run.
-    const targetLocale = locale
-    lastAutoRegenLocaleRef.current = targetLocale
+    if (!days || days.length === 0) return
 
-    // Fast path: if target locale is already cached for the exact same structure,
-    // swap instantly in 0ms without waiting for debounce or triggering translation!
-    const currentStructureKey = computeDaysStructureKey(days)
-    const cachedTarget = localeCopyCacheRef.current[targetLocale]
-    if (cachedTarget && cachedTarget.structureKey === currentStructureKey) {
+    const sourceLocale = detectLocaleFromDays(days)
+    const structureKey = computeDaysStructureKey(days)
+
+    // Save current days under sourceLocale if not already cached
+    if (
+      !localeCopyCacheRef.current[sourceLocale] ||
+      localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey
+    ) {
+      localeCopyCacheRef.current[sourceLocale] = { structureKey, days }
+      setLlmArtifact(`itinerary:locale-copy:v1:${structureKey}:${sourceLocale}`, days)
+    }
+
+    if (sourceLocale === locale) {
+      return
+    }
+
+    const targetLocale = locale
+    // Fast path: if target locale copy exists in memory or artifact store, swap instantly in 0ms!
+    const cachedTarget =
+      (localeCopyCacheRef.current[targetLocale]?.structureKey === structureKey
+        ? localeCopyCacheRef.current[targetLocale]?.days
+        : undefined) ??
+      getLlmArtifact<DayPlan[]>(`itinerary:locale-copy:v1:${structureKey}:${targetLocale}`)
+
+    if (cachedTarget) {
+      localeCopyCacheRef.current[targetLocale] = { structureKey, days: cachedTarget }
       void handleTranslateItinerary(targetLocale)
       return
     }
