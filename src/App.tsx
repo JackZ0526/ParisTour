@@ -275,6 +275,7 @@ export default function App() {
     setDayRegenError,
     dayRestoring,
     setDayRestoring,
+    itineraryTranslating,
     autoRegenOnLocaleChange,
     itineraryLoadingLine,
     itineraryStartDate,
@@ -1110,6 +1111,7 @@ export default function App() {
                                 dayRegenError={dayRegenError}
                                 dayRestoring={dayRestoring}
                                 dayPending={dayPending}
+                                itineraryTranslating={itineraryTranslating}
                                 isLastDay={day.day === lastDayNum}
                                 onSelectPlace={handleSelectPlace}
                                 onReorder={handleReorder}

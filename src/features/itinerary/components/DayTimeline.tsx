@@ -456,6 +456,8 @@ interface Props {
   dayPending?: boolean
   /** True while a baseline restore is sequencing removals before insertions. */
   dayRestoring?: boolean
+  /** True while the entire itinerary text is being translated after a language switch. */
+  itineraryTranslating?: boolean
   /** True when this day is the trip's return day (hotel origin-only, no overnight pin). */
   isLastDay?: boolean
   onSelectPlace: (id: string) => void
@@ -551,6 +553,7 @@ export function DayTimeline({
   dayRegenError = null,
   dayPending = false,
   dayRestoring = false,
+  itineraryTranslating = false,
   isLastDay = false,
   onSelectPlace,
   onReorder,
@@ -1589,17 +1592,21 @@ export function DayTimeline({
             {dayRegenError}
           </p>
         )}
-        {(dayPending || dayRegenerating) && (
+        {(itineraryTranslating || dayPending || dayRegenerating) && (
           <div className="mt-3 rounded-xl border border-[var(--sage)]/20 dark:border-[var(--sage)]/30 bg-white/50 dark:bg-black/30 px-3 py-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] backdrop-blur-md">
             <LoadingIndicator
               variant="inline"
               thinkingLabel={
-                dayPending
+                itineraryTranslating
+                  ? t('itinerary.translatingItinerary')
+                  : dayPending
                   ? t('itinerary.dayPendingGenerating', { day: day.day })
                   : t('itinerary.dayRegenThinking')
               }
               generatingLabel={
-                dayPending
+                itineraryTranslating
+                  ? t('itinerary.translatingItinerary')
+                  : dayPending
                   ? t('itinerary.dayPendingGenerating', { day: day.day })
                   : t('itinerary.dayRegenRegenerating')
               }
@@ -1608,7 +1615,11 @@ export function DayTimeline({
               mode="thinking"
               task="itineraryDayGenerate"
             />
-            {dayPending ? (
+            {itineraryTranslating ? (
+              <p className="mt-1.5 text-xs text-[var(--stone)]">
+                {t('itinerary.translatingItineraryHint')}
+              </p>
+            ) : dayPending ? (
               <p className="mt-1.5 text-xs text-[var(--stone)]">
                 {t('itinerary.dayPendingHint')}
               </p>

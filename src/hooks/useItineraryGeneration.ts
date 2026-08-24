@@ -158,6 +158,8 @@ export interface UseItineraryGenerationResult {
   dayRegenerating: boolean
   dayRegenError: string | null
   dayRestoring: boolean
+  /** True while translating the entire itinerary text on language switch. */
+  itineraryTranslating: boolean
   /**
    * True when the current itinerary generation cycle was triggered
    * automatically by a locale change (vs. a manual "regenerate" click).
@@ -276,6 +278,7 @@ export function useItineraryGeneration(
   const [dayRegenerating, setDayRegenerating] = useState(false)
   const [dayRegenError, setDayRegenError] = useState<string | null>(null)
   const [dayRestoring, setDayRestoring] = useState(false)
+  const [itineraryTranslating, setItineraryTranslating] = useState(false)
   const [copyRefreshing, setCopyRefreshing] = useState(false)
   const [itineraryLoadingLineIndex, setItineraryLoadingLineIndex] = useState(
     () => Math.floor(Math.random() * generatingLines.length),
@@ -1078,7 +1081,7 @@ export function useItineraryGeneration(
       const sourceLocale = detectLocaleFromDays(currentDays)
       if (sourceLocale === targetLocale) return
       setItineraryGenError(null)
-      setItineraryGenerating(true)
+      setItineraryTranslating(true)
       setAutoRegenOnLocaleChange(true)
       try {
         const { days: translatedDays } = await translateItineraryText({
@@ -1091,11 +1094,11 @@ export function useItineraryGeneration(
         const detail = err instanceof Error ? err.message : String(err)
         setItineraryGenError(detail)
       } finally {
-        setItineraryGenerating(false)
+        setItineraryTranslating(false)
         setAutoRegenOnLocaleChange(false)
       }
     },
-    [itineraryGenerated, days, isLlmConfigured],
+    [itineraryGenerated, days, isLlmConfigured, setDays],
   )
 
   const handleRestoreDefault = useCallback(() => {
@@ -1229,7 +1232,12 @@ export function useItineraryGeneration(
     }
     if (lastAutoRegenLocaleRef.current === locale) return
     if (!itineraryGenerated) return
-    if (itineraryGenerating || itineraryIncrementalGenerating || dayRegenerating) {
+    if (
+      itineraryGenerating ||
+      itineraryIncrementalGenerating ||
+      itineraryTranslating ||
+      dayRegenerating
+    ) {
       return
     }
     // Update the ref synchronously so a quick second switch (e.g. en →
@@ -1245,6 +1253,7 @@ export function useItineraryGeneration(
     itineraryGenerated,
     itineraryGenerating,
     itineraryIncrementalGenerating,
+    itineraryTranslating,
     dayRegenerating,
     handleTranslateItinerary,
   ])
@@ -1252,10 +1261,18 @@ export function useItineraryGeneration(
   // Clear the "auto-regen" badge once generation finishes so the next
   // manual regeneration doesn't show the locale-change notice.
   useEffect(() => {
-    if (!itineraryGenerating && !itineraryIncrementalGenerating) {
+    if (
+      !itineraryGenerating &&
+      !itineraryIncrementalGenerating &&
+      !itineraryTranslating
+    ) {
       setAutoRegenOnLocaleChange(false)
     }
-  }, [itineraryGenerating, itineraryIncrementalGenerating])
+  }, [
+    itineraryGenerating,
+    itineraryIncrementalGenerating,
+    itineraryTranslating,
+  ])
 
   // -- Restore gating --------------------------------------------------------
   const canRestoreDefault = hasMatchingBaseline(
@@ -1295,6 +1312,7 @@ export function useItineraryGeneration(
     dayRegenerating,
     dayRegenError,
     dayRestoring,
+    itineraryTranslating,
     autoRegenOnLocaleChange,
     itineraryLoadingLine,
     itineraryLoadingLineIndex,

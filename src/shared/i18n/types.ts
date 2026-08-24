@@ -247,6 +247,8 @@ export interface I18nSchema {
     // Day-level generation loading text
     dayPendingGenerating: string
     dayPendingHint: string
+    translatingItinerary: string
+    translatingItineraryHint: string
     dayRegenThinking: string
     dayRegenRegenerating: string
     dayCopyThinking: string

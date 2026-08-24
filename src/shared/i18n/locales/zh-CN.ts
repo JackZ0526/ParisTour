@@ -236,6 +236,8 @@ export const zhCN: I18nSchema = {
     regenDayDesc: '确定要重新生成第 {day} 天（{title}）的行程吗？当天的排期与景点将被重新规划。',
     dayPendingGenerating: '正在生成第 {day} 天行程…',
     dayPendingHint: '其他天可先查看，这一天生成好后会自动更新。',
+    translatingItinerary: '正在翻译行程文案…',
+    translatingItineraryHint: '保留当前地点与路线规划，正在切换每日标题、主题与亮点说明…',
     dayRegenThinking: '正在仔细规划今天的行程…',
     dayRegenRegenerating: '正在重新生成今天的行程…',
     dayCopyThinking: '文案思考中',
@@ -883,7 +885,7 @@ export const zhCN: I18nSchema = {
     dayPlanLabel: '{count}行程规划',
     restoreDefaultsTitle: '恢复默认推荐',
     regenerateAllTitle: '重新生成全部',
-    autoRegenOnLocaleChange: '已切换语言，正在重新生成对应语言版本的行程…',
+    autoRegenOnLocaleChange: '已切换语言，正在翻译行程文案…',
     regenerateDialog: {
       title: '重新生成全部行程',
       description: '确定要重新生成全部天数的行程吗？当前自定义调整与已选景点将被新生成的行程替换。',

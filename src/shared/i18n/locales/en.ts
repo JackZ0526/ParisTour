@@ -236,6 +236,8 @@ export const en: I18nSchema = {
     regenDayDesc: 'Regenerate itinerary for Day {day} ({title})? Current stops and timing will be recalculated.',
     dayPendingGenerating: 'Generating day {day} itinerary…',
     dayPendingHint: 'Other days are viewable — this one will refresh automatically when it’s done.',
+    translatingItinerary: 'Translating itinerary text…',
+    translatingItineraryHint: 'Keeping your route and places intact, updating titles, themes, and notes…',
     dayRegenThinking: 'Carefully planning today’s itinerary…',
     dayRegenRegenerating: 'Regenerating today’s itinerary…',
     dayCopyThinking: 'Drafting copy…',
@@ -883,7 +885,7 @@ export const en: I18nSchema = {
     dayPlanLabel: '{count}-Day Plan',
     restoreDefaultsTitle: 'Restore defaults',
     regenerateAllTitle: 'Regenerate all',
-    autoRegenOnLocaleChange: 'Switched to English — regenerating your trip in English now…',
+    autoRegenOnLocaleChange: 'Language switched — translating itinerary text…',
     regenerateDialog: {
       title: 'Regenerate Entire Itinerary',
       description: 'Are you sure you want to regenerate all days? Custom modifications and selected places will be replaced.',
