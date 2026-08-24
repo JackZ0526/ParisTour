@@ -2379,8 +2379,8 @@ export function TripChatPanel({
           <div className="border-b border-white/85 dark:border-white/10 px-4 py-3 bg-white/40 dark:bg-black/20 backdrop-blur-md">
             <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-display text-lg leading-tight text-[var(--ink)] mr-0.5">{t('chat.title')}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-display text-lg leading-tight text-[var(--ink)]">{t('chat.title')}</h3>
                   {/* Model & Thinking Status Capsule */}
                   {(() => {
                     const brandTheme = getModelBrandTheme(model)
@@ -2404,7 +2404,8 @@ export function TripChatPanel({
                       </span>
                     )
                   })()}
-
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {/* Current Day Capsule */}
                   <span className="inline-flex items-center gap-1 rounded-full border border-[#b5c7ba]/60 dark:border-[#668b7a]/40 bg-[#f4f8f5]/85 dark:bg-[#668b7a]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--sage)] shadow-2xs backdrop-blur-sm">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
