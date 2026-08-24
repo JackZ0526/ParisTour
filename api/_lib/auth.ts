@@ -29,6 +29,34 @@ export function extractBearerToken(req: Request): string | null {
   return m?.[1]?.trim() || null
 }
 
+function envFlag(name: string): string {
+  try {
+    return (
+      (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[
+        name
+      ]?.trim() || ''
+    )
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Vite `npm run dev` loads `api/*.ts` via ssrLoadModule. Local-only mode
+ * skips login, so JWT + allowlist must not run here. Vercel (`VERCEL`) and
+ * `VITE_ENABLE_CLOUD_SYNC_ON_LOCAL=true` keep the real gate.
+ */
+function skipAllowlistInLocalDev(): boolean {
+  if (envFlag('VERCEL')) return false
+  if (envFlag('VITE_ENABLE_CLOUD_SYNC_ON_LOCAL') === 'true') return false
+  return envFlag('NODE_ENV') !== 'production'
+}
+
+const LOCAL_DEBUG_USER: AuthedUser = {
+  id: 'local-user',
+  email: 'local@localhost',
+}
+
 /**
  * Returns the allowlisted user, or an error Response.
  * Does not consume the request body.
@@ -36,6 +64,10 @@ export function extractBearerToken(req: Request): string | null {
 export async function requireAllowlistedUser(
   req: Request,
 ): Promise<{ ok: true; user: AuthedUser } | { ok: false; response: Response }> {
+  if (skipAllowlistInLocalDev()) {
+    return { ok: true, user: LOCAL_DEBUG_USER }
+  }
+
   const token = extractBearerToken(req)
   if (!token) {
     return { ok: false, response: unauthorized('Missing Authorization bearer token') }

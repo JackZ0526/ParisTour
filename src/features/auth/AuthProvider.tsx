@@ -26,7 +26,7 @@ import {
   subscribeTripRealtime,
   type AccessibleTrip,
 } from '../cloud-sync/services/tripCloud'
-import { subscribeLlmArtifacts } from '../../shared/services/llm/llmArtifactStore'
+import { hasArtifactCloudDiff, subscribeLlmArtifacts } from '../../shared/services/llm/llmArtifactStore'
 import {
   getThemePreference,
   setThemePreference,
@@ -57,6 +57,7 @@ function localDebugTrip(): AccessibleTrip {
     isPrimary: true,
     role: 'owner',
     updatedAt: new Date().toISOString(),
+    artifactsRev: 0,
     snapshot: emptyTripSnapshot(),
     label: '本地调试行程',
   }
@@ -219,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTrips(accessible)
         const preferred = pickPreferredTrip(accessible, next.user.id)
         if (preferred) {
-          applyAccessibleTripLocally(preferred)
+          await applyAccessibleTripLocally(preferred)
           setActiveTripId(preferred.id)
           rememberLastTripId(next.user.id, preferred.id)
         }
@@ -405,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (activeTripId && !accessible.some((t) => t.id === activeTripId)) {
       const preferred = pickPreferredTrip(accessible, user.id)
       if (preferred) {
-        applyAccessibleTripLocally(preferred)
+        await applyAccessibleTripLocally(preferred)
         setActiveTripId(preferred.id)
         rememberLastTripId(user.id, preferred.id)
         setBootKey((k) => k + 1)
@@ -423,7 +424,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTrips(accessible)
       const next = accessible.find((t) => t.id === tripId)
       if (!next) throw new Error(t('auth.errorTripNotFound'))
-      applyAccessibleTripLocally(next)
+      await applyAccessibleTripLocally(next)
       setActiveTripId(next.id)
       rememberLastTripId(user.id, next.id)
       setBootKey((k) => k + 1)
@@ -444,6 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Durable generated artifacts live in the trip snapshot — autosave on writes.
   useEffect(() => {
     return subscribeLlmArtifacts(() => {
+      if (!hasArtifactCloudDiff()) return
       notifyTripChanged({ artifactsOnly: true })
     })
   }, [notifyTripChanged])

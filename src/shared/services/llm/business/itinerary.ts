@@ -1187,6 +1187,15 @@ function detectLocaleFromDays(days: DayPlan[]): Locale {
   return cjk / (cjk + nonCjk) >= 0.3 ? 'zh-CN' : 'en'
 }
 
+/** True when cached itinerary copy is actually written in `locale`. */
+export function itineraryCopyMatchesLocale(
+  days: DayPlan[] | undefined | null,
+  locale: Locale,
+): boolean {
+  if (!days || days.length === 0) return false
+  return detectLocaleFromDays(days) === locale
+}
+
 function isCjk(ch: string): boolean {
   const code = ch.charCodeAt(0)
   return code >= 0x3400 && code <= 0x9fff
@@ -1374,6 +1383,15 @@ export async function translateItineraryText(
   const translatedDays = await Promise.all(
     days.map((d, i) => translateSingleDay(d, i)),
   )
+
+  if (!itineraryCopyMatchesLocale(translatedDays, targetLocale)) {
+    throw new LlmRequestError(
+      targetLocale === 'en'
+        ? 'Itinerary translation did not complete. Please try again.'
+        : '行程文案翻译未完成，请重试。',
+      'translate_incomplete',
+    )
+  }
 
   return { days: translatedDays }
 }

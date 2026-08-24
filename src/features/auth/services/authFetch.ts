@@ -1,8 +1,14 @@
 /**
  * Attach Supabase access token to paid /api/* calls.
  * Server verifies the JWT then replaces Authorization with the provider key.
+ * Local-only localhost mode has no session — skip JWT so we don't 401 the
+ * Vite paid-API gate or refresh a cloud token just to call DeepSeek.
  */
-import { getSupabase, isSupabaseConfigured } from '../../../shared/lib/supabase'
+import {
+  getSupabase,
+  isCloudSyncEnabled,
+  isSupabaseConfigured,
+} from '../../../shared/lib/supabase'
 import {
   classifyApiRequest,
   recordApiRequest,
@@ -19,7 +25,7 @@ export async function authApiHeaders(
     })
   }
 
-  if (!isSupabaseConfigured()) return base
+  if (!isSupabaseConfigured() || !isCloudSyncEnabled()) return base
 
   try {
     const sb = getSupabase()

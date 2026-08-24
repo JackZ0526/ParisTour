@@ -23,7 +23,7 @@ import { loadTripDates, saveTripDates } from '../../itinerary/services/tripDates
 import {
   clearLlmArtifacts,
   loadLlmArtifacts,
-  saveLlmArtifacts,
+  mergeCloudArtifacts,
 } from '../../../shared/services/llm/llmArtifactStore'
 import { clearLlmMemo, seedLlmMemo } from '../../../shared/services/llm/llmMemo'
 import {
@@ -104,7 +104,10 @@ export function collectTripSnapshot(): TripSnapshot {
 }
 
 /** Write snapshot into localStorage (App remount reads from there). */
-export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
+export function applyTripSnapshot(
+  snapshot: TripSnapshot | null | undefined,
+  opts?: { hydrateArtifacts?: boolean },
+) {
   const snap = snapshot && typeof snapshot === 'object' ? snapshot : emptyTripSnapshot()
 
   saveTripDates(snap.dates ?? null)
@@ -161,13 +164,14 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
     clearRecommendationPreferences()
   }
 
-  clearMapRouteCache()
-  if (snap.mapRoutes && typeof snap.mapRoutes === 'object') {
+  if (snap.mapRoutes && typeof snap.mapRoutes === 'object' && Object.keys(snap.mapRoutes).length) {
     saveMapRouteCache(snap.mapRoutes)
   }
 
   const artifacts = snap.llmArtifacts
-  if (artifacts && typeof artifacts === 'object') {
+  if (opts?.hydrateArtifacts === false) {
+    seedMemoFromArtifacts(loadLlmArtifacts())
+  } else if (artifacts && typeof artifacts === 'object') {
     hydrateTripArtifacts(artifacts)
   } else {
     // Legacy snapshot without llmArtifacts — keep whatever is already local.
@@ -175,15 +179,18 @@ export function applyTripSnapshot(snapshot: TripSnapshot | null | undefined) {
   }
 }
 
-/** Replace local durable artifacts from a cloud row without treating it as a local edit. */
+/** Merge cloud LLM copy into local durable artifacts without wiping API caches. */
 export function hydrateTripArtifacts(map: LlmArtifactMap | null | undefined) {
-  const artifacts = map && typeof map === 'object' ? map : {}
-  saveLlmArtifacts(artifacts, { silent: true })
-  seedMemoFromArtifacts(artifacts)
+  mergeCloudArtifacts({
+    upserts: map && typeof map === 'object' ? map : {},
+    silent: true,
+  })
+  seedMemoFromArtifacts(loadLlmArtifacts())
 }
 
 export function clearLocalTripStorage() {
   applyTripSnapshot(emptyTripSnapshot())
+  clearMapRouteCache()
   clearLlmArtifacts({ silent: true })
   clearLlmMemo()
 }

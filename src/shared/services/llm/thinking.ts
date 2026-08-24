@@ -13,7 +13,7 @@ import type {
   ThinkingEffortUi,
   ThinkingMode,
 } from './types'
-import { getLocale } from '../../i18n'
+import { translate } from '../../i18n'
 
 /** UI "低/中/高" → DeepSeek `low|high|max`. */
 export function uiEffortToApi(effort: ThinkingEffortUi): DeepSeekReasoningEffort {
@@ -191,11 +191,9 @@ export function resolveLlmBusyVisual(options?: {
 }
 
 export function llmBusyDefaultLabel(visual: LlmBusyVisual): string {
-  const isEn = getLocale() === 'en'
-  if (isEn) {
-    return visual === 'thinking' ? 'Thinking' : 'Generating'
-  }
-  return visual === 'thinking' ? '正在思考' : '正在生成'
+  return visual === 'thinking'
+    ? translate('llm.busyThinking')
+    : translate('llm.busyGenerating')
 }
 
 export function llmBusyLabel(options: {

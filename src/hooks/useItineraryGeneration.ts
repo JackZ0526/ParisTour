@@ -50,6 +50,7 @@ import {
 } from '../features/itinerary/services/itineraryGenerate'
 import {
   detectLocaleFromDays,
+  itineraryCopyMatchesLocale,
   translateItineraryText,
 } from '../shared/services/llm/business/itinerary'
 import {
@@ -63,7 +64,11 @@ import {
   syncDaysCopyToHotelArea,
 } from '../appHelpers'
 import { isRemoteQuietPeriodActive, holdTripCloudSaves, releaseTripCloudSaves } from '../features/cloud-sync/services/tripCloud'
-import { getLlmArtifact, setLlmArtifact } from '../shared/services/llm/llmArtifactStore'
+import {
+  getLlmArtifact,
+  removeLlmArtifact,
+  setLlmArtifact,
+} from '../shared/services/llm/llmArtifactStore'
 import {
   clampIsoDate,
   itineraryDayCount,
@@ -223,6 +228,34 @@ function computeDaysStructureKey(days: DayPlan[]): string {
         `${d.day}:${d.pace}:[${d.stops.map((s) => `${s.placeId}@${s.time}`).join(',')}]`,
     )
     .join('|')
+}
+
+function localeCopyArtifactKey(structureKey: string, locale: Locale): string {
+  return `itinerary:locale-copy:v1:${structureKey}:${locale}`
+}
+
+/** Ignore persisted copies whose text is still in the other language. */
+function readValidLocaleCopy(structureKey: string, locale: Locale): DayPlan[] | undefined {
+  const key = localeCopyArtifactKey(structureKey, locale)
+  const cached = getLlmArtifact<DayPlan[]>(key)
+  if (!itineraryCopyMatchesLocale(cached, locale)) {
+    if (cached) removeLlmArtifact(key)
+    return undefined
+  }
+  return cached
+}
+
+function takeValidCachedCopy(
+  memory: Partial<Record<Locale, { structureKey: string; days: DayPlan[] }>>,
+  structureKey: string,
+  locale: Locale,
+): DayPlan[] | undefined {
+  const mem = memory[locale]
+  if (mem?.structureKey === structureKey && itineraryCopyMatchesLocale(mem.days, locale)) {
+    return mem.days
+  }
+  if (mem) delete memory[locale]
+  return readValidLocaleCopy(structureKey, locale)
 }
 
 export function useItineraryGeneration(
@@ -1079,23 +1112,23 @@ export function useItineraryGeneration(
 
       // Ensure source days are saved in the multi-language cache and artifact store
       if (
-        !localeCopyCacheRef.current[sourceLocale] ||
-        localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey
+        itineraryCopyMatchesLocale(currentDays, sourceLocale) &&
+        (!localeCopyCacheRef.current[sourceLocale] ||
+          localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey)
       ) {
         localeCopyCacheRef.current[sourceLocale] = { structureKey, days: currentDays }
-        setLlmArtifact(`itinerary:locale-copy:v1:${structureKey}:${sourceLocale}`, currentDays)
+        setLlmArtifact(localeCopyArtifactKey(structureKey, sourceLocale), currentDays)
       }
 
       if (sourceLocale === targetLocale) return
 
       holdTripCloudSaves()
       try {
-        // Instant 0ms cache hit: check memory cache or synced LLM artifact store
-        const cachedTarget =
-          (localeCopyCacheRef.current[targetLocale]?.structureKey === structureKey
-            ? localeCopyCacheRef.current[targetLocale]?.days
-            : undefined) ??
-          getLlmArtifact<DayPlan[]>(`itinerary:locale-copy:v1:${structureKey}:${targetLocale}`)
+        const cachedTarget = takeValidCachedCopy(
+          localeCopyCacheRef.current,
+          structureKey,
+          targetLocale,
+        )
 
         if (cachedTarget) {
           localeCopyCacheRef.current[targetLocale] = {
@@ -1118,12 +1151,20 @@ export function useItineraryGeneration(
             setDays(partialDays)
           },
         })
+        if (!itineraryCopyMatchesLocale(translatedDays, targetLocale)) {
+          throw new LlmRequestError(
+            targetLocale === 'en'
+              ? 'Itinerary translation did not complete. Please try again.'
+              : '行程文案翻译未完成，请重试。',
+            'translate_incomplete',
+          )
+        }
         setDays(translatedDays)
         localeCopyCacheRef.current[targetLocale] = {
           structureKey,
           days: translatedDays,
         }
-        setLlmArtifact(`itinerary:locale-copy:v1:${structureKey}:${targetLocale}`, translatedDays)
+        setLlmArtifact(localeCopyArtifactKey(structureKey, targetLocale), translatedDays)
       } catch (err) {
         // Rollback to current days on failure
         setDays(currentDays)
@@ -1276,11 +1317,12 @@ export function useItineraryGeneration(
 
     // Save current days under sourceLocale if not already cached
     if (
-      !localeCopyCacheRef.current[sourceLocale] ||
-      localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey
+      itineraryCopyMatchesLocale(days, sourceLocale) &&
+      (!localeCopyCacheRef.current[sourceLocale] ||
+        localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey)
     ) {
       localeCopyCacheRef.current[sourceLocale] = { structureKey, days }
-      setLlmArtifact(`itinerary:locale-copy:v1:${structureKey}:${sourceLocale}`, days)
+      setLlmArtifact(localeCopyArtifactKey(structureKey, sourceLocale), days)
     }
 
     if (sourceLocale === locale) {
@@ -1288,12 +1330,11 @@ export function useItineraryGeneration(
     }
 
     const targetLocale = locale
-    // Fast path: if target locale copy exists in memory or artifact store, swap instantly in 0ms!
-    const cachedTarget =
-      (localeCopyCacheRef.current[targetLocale]?.structureKey === structureKey
-        ? localeCopyCacheRef.current[targetLocale]?.days
-        : undefined) ??
-      getLlmArtifact<DayPlan[]>(`itinerary:locale-copy:v1:${structureKey}:${targetLocale}`)
+    const cachedTarget = takeValidCachedCopy(
+      localeCopyCacheRef.current,
+      structureKey,
+      targetLocale,
+    )
 
     if (cachedTarget) {
       localeCopyCacheRef.current[targetLocale] = { structureKey, days: cachedTarget }

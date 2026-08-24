@@ -6,7 +6,7 @@
  * fields contain stray characters in the other script.
  */
 import { describe, it, expect } from 'vitest'
-import { detectLocaleFromDays } from '../shared/services/llm/business/itinerary'
+import { detectLocaleFromDays, itineraryCopyMatchesLocale } from '../shared/services/llm/business/itinerary'
 import type { DayPlan } from '../types'
 
 const baseDay: DayPlan = {
@@ -87,5 +87,24 @@ describe('detectLocaleFromDays', () => {
 
   it('handles empty days gracefully', () => {
     expect(detectLocaleFromDays([])).toBe('en')
+  })
+
+  it('rejects a Chinese itinerary stored under the English cache key', () => {
+    const zhDay: DayPlan = {
+      ...baseDay,
+      title: '抵达巴黎',
+      theme: '落地 · 安顿',
+      summary: '抵达 CDG 后直奔酒店办理入住。',
+      stops: [
+        {
+          ...baseDay.stops[0],
+          note: '办理入住，稍作休息。',
+          duration: '30–45 分钟',
+        },
+      ],
+    }
+    expect(itineraryCopyMatchesLocale([zhDay], 'en')).toBe(false)
+    expect(itineraryCopyMatchesLocale([zhDay], 'zh-CN')).toBe(true)
+    expect(itineraryCopyMatchesLocale([baseDay], 'en')).toBe(true)
   })
 })

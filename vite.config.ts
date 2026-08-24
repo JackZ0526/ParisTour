@@ -31,11 +31,20 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-/** Gate paid Vite proxies behind Supabase JWT + allowlist (mirrors api/_lib/auth.ts). */
-function paidApiAuthPlugin(supabaseUrl: string, anonKey: string): Plugin {
+/**
+ * Gate paid Vite proxies behind Supabase JWT + allowlist (mirrors api/_lib/auth.ts).
+ * Local-only localhost mode skips login, so this gate must also be off or LLM /
+ * Places calls 401 before the provider key is injected.
+ */
+function paidApiAuthPlugin(
+  supabaseUrl: string,
+  anonKey: string,
+  requireAuth: boolean,
+): Plugin {
   return {
     name: 'paristour-paid-api-auth',
     configureServer(server) {
+      if (!requireAuth) return
       server.middlewares.use(async (req, res, next) => {
         const url = req.url || ''
         const path = url.split('?')[0] || ''
@@ -433,7 +442,11 @@ export default defineConfig(({ mode }) => {
           type: 'module',
         },
       }),
-      paidApiAuthPlugin(supabaseUrl, supabaseAnon),
+      paidApiAuthPlugin(
+        supabaseUrl,
+        supabaseAnon,
+        env.VITE_ENABLE_CLOUD_SYNC_ON_LOCAL === 'true',
+      ),
       shareInviteDevPlugin(),
       placeWebsiteDevPlugin(),
       googlePlacesDevPlugin(),
@@ -550,6 +563,7 @@ export default defineConfig(({ mode }) => {
           },
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req) => {
+              proxyReq.removeHeader('authorization')
               if (openaiKey) {
                 proxyReq.setHeader('Authorization', `Bearer ${openaiKey}`)
               }
@@ -575,6 +589,7 @@ export default defineConfig(({ mode }) => {
           },
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req) => {
+              proxyReq.removeHeader('authorization')
               if (deepseekKey) {
                 proxyReq.setHeader('Authorization', `Bearer ${deepseekKey}`)
               }

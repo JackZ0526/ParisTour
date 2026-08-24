@@ -593,6 +593,7 @@ export interface I18nSchema {
     ratingSrLabel: string
     // PlaceName translation badge
     translating: string
+    translatingName: string
     translatedBadgeAria: string
     translatedBadgeTitle: string
     // AddPlaceDialog
@@ -743,6 +744,9 @@ export interface I18nSchema {
     durationMinutes45: string
   }
   llm: {
+    // Shared busy-chip labels (LoadingIndicator / LlmHudBadge)
+    busyThinking: string
+    busyGenerating: string
     // LlmModelPicker sections
     thinkingSection: string
     modelSection: string

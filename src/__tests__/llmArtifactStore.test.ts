@@ -5,6 +5,7 @@ import {
   flushLlmArtifactsToStorage,
   getLlmArtifact,
   hasArtifactCloudDiff,
+  mergeCloudArtifacts,
   peekArtifactCloudDiff,
   removeLlmArtifact,
   resetLlmArtifactStoreForTests,
@@ -51,15 +52,25 @@ describe('llmArtifactStore', () => {
   })
 
   it('tracks upserts and deletes for cloud patches', () => {
-    setLlmArtifact('keep', { n: 1 })
-    setLlmArtifact('gone', { n: 2 })
+    setLlmArtifact('place-detail:keep', { n: 1 })
+    setLlmArtifact('place-detail:gone', { n: 2 })
     expect(hasArtifactCloudDiff()).toBe(true)
-    expect(Object.keys(peekArtifactCloudDiff().upserts).sort()).toEqual(['gone', 'keep'])
+    expect(Object.keys(peekArtifactCloudDiff().upserts).sort()).toEqual([
+      'place-detail:gone',
+      'place-detail:keep',
+    ])
 
-    removeLlmArtifact('gone')
+    removeLlmArtifact('place-detail:gone')
     const diff = peekArtifactCloudDiff()
-    expect(Object.keys(diff.upserts)).toEqual(['keep'])
-    expect(diff.deletes).toEqual(['gone'])
+    expect(Object.keys(diff.upserts)).toEqual(['place-detail:keep'])
+    expect(diff.deletes).toEqual(['place-detail:gone'])
+  })
+
+  it('does not queue third-party API caches for cloud sync', () => {
+    setLlmArtifact('rapid-google-place:v4:id:abc', { photos: ['x'] })
+    setLlmArtifact('tripadvisor-gallery:v18:1', { urls: ['y'] })
+    expect(hasArtifactCloudDiff()).toBe(false)
+    expect(getLlmArtifact('rapid-google-place:v4:id:abc')).toEqual({ photos: ['x'] })
   })
 
   it('does not treat a cloud hydrate as a local edit', () => {
@@ -72,25 +83,38 @@ describe('llmArtifactStore', () => {
     expect(getLlmArtifact('local')).toBeUndefined()
   })
 
+  it('merges cloud copy without wiping local API caches', () => {
+    setLlmArtifact('rapid-google-place:v4:id:abc', { photos: ['x'] })
+    mergeCloudArtifacts({
+      upserts: {
+        'place-detail:v3:zh-CN:louvre': { value: { intro: 'hi' }, generatedAt: 9 },
+      },
+      silent: true,
+    })
+    expect(getLlmArtifact('rapid-google-place:v4:id:abc')).toEqual({ photos: ['x'] })
+    expect(getLlmArtifact('place-detail:v3:zh-CN:louvre')).toEqual({ intro: 'hi' })
+    expect(hasArtifactCloudDiff()).toBe(false)
+  })
+
   it('keeps a key pending when it changes after the patch was sent', () => {
-    setLlmArtifact('k', { n: 1 })
+    setLlmArtifact('place-detail:k', { n: 1 })
     const sent = peekArtifactCloudDiff()
-    setLlmArtifact('k', { n: 2 })
+    setLlmArtifact('place-detail:k', { n: 2 })
     ackArtifactCloudDiff(sent)
     expect(hasArtifactCloudDiff()).toBe(true)
-    expect(peekArtifactCloudDiff().upserts.k?.value).toEqual({ n: 2 })
+    expect(peekArtifactCloudDiff().upserts['place-detail:k']?.value).toEqual({ n: 2 })
   })
 
   it('records a full clear as deletes', () => {
-    setLlmArtifact('a', { n: 1 })
-    setLlmArtifact('b', { n: 2 })
+    setLlmArtifact('place-detail:a', { n: 1 })
+    setLlmArtifact('place-detail:b', { n: 2 })
     saveLlmArtifacts({
-      a: { value: { n: 1 }, generatedAt: 1 },
-      b: { value: { n: 2 }, generatedAt: 1 },
+      'place-detail:a': { value: { n: 1 }, generatedAt: 1 },
+      'place-detail:b': { value: { n: 2 }, generatedAt: 1 },
     })
     clearLlmArtifacts()
     const diff = peekArtifactCloudDiff()
-    expect(diff.deletes.sort()).toEqual(['a', 'b'])
+    expect(diff.deletes.sort()).toEqual(['place-detail:a', 'place-detail:b'])
     expect(diff.upserts).toEqual({})
   })
 })

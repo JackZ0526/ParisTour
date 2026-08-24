@@ -534,6 +534,7 @@ export const zhCN: I18nSchema = {
     ratingSrLabel: '{source} 评分 ',
     // PlaceName translation badge
     translating: '翻译中',
+    translatingName: '正在翻译名称…',
     translatedBadgeAria: '非公认中文名，由 AI 翻译',
     translatedBadgeTitle: '非公认中文名，由 AI 翻译',
     // AddPlaceDialog
@@ -719,6 +720,9 @@ export const zhCN: I18nSchema = {
     durationMinutes45: '45 分钟',
   },
   llm: {
+    // Shared busy-chip labels (LoadingIndicator / LlmHudBadge)
+    busyThinking: '思考中',
+    busyGenerating: '生成中',
     // LlmModelPicker sections
     thinkingSection: '思考',
     modelSection: '模型',

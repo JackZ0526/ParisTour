@@ -6,7 +6,14 @@
  *
  * Reads hit an in-memory map. JSON.stringify + localStorage writes are deferred
  * so hotel/detail loading does not stall shimmer on the main thread.
+ *
+ * Only allowlisted LLM copy is queued for cloud sync; third-party API caches
+ * stay local. See `artifactCloudPolicy.ts`.
  */
+import {
+  filterCloudArtifactMap,
+  isCloudSyncedArtifactKey,
+} from './artifactCloudPolicy'
 
 const STORAGE_KEY = 'paris-tour-llm-artifacts-v1'
 const PERSIST_DEBOUNCE_MS = 320
@@ -141,7 +148,7 @@ function writeAll(map: LlmArtifactMap, options?: WriteOptions) {
 
 function markKeysUpserted(keys: string[]) {
   for (const key of keys) {
-    if (!key) continue
+    if (!isCloudSyncedArtifactKey(key)) continue
     pendingDeleteKeys.delete(key)
     pendingUpsertKeys.add(key)
   }
@@ -149,7 +156,7 @@ function markKeysUpserted(keys: string[]) {
 
 function markKeysDeleted(keys: string[]) {
   for (const key of keys) {
-    if (!key) continue
+    if (!isCloudSyncedArtifactKey(key)) continue
     pendingUpsertKeys.delete(key)
     pendingDeleteKeys.add(key)
   }
@@ -168,13 +175,60 @@ export function peekArtifactCloudDiff(): ArtifactCloudDiff {
   const map = ensureMemory()
   const upserts: LlmArtifactMap = {}
   for (const key of pendingUpsertKeys) {
+    if (!isCloudSyncedArtifactKey(key)) continue
     const entry = map[key]
     if (entry) upserts[key] = entry
   }
   return {
     upserts,
-    deletes: [...pendingDeleteKeys],
+    deletes: [...pendingDeleteKeys].filter(isCloudSyncedArtifactKey),
   }
+}
+
+/** `{ key: generatedAt }` for incremental `pull_trip_artifacts`. */
+export function cloudArtifactKnownMap(): Record<string, number> {
+  const known: Record<string, number> = {}
+  for (const [key, entry] of Object.entries(filterCloudArtifactMap(ensureMemory()))) {
+    known[key] = entry.generatedAt
+  }
+  return known
+}
+
+/**
+ * Merge server artifact upserts/deletes into local storage without wiping
+ * third-party API caches or in-flight local cloud edits.
+ */
+export function mergeCloudArtifacts(options: {
+  upserts?: LlmArtifactMap | null
+  deletes?: string[] | null
+  silent?: boolean
+}) {
+  const map = ensureMemory()
+  let changed = false
+  for (const key of options.deletes || []) {
+    if (!isCloudSyncedArtifactKey(key)) continue
+    if (pendingUpsertKeys.has(key)) continue
+    if (!(key in map)) continue
+    delete map[key]
+    pendingDeleteKeys.delete(key)
+    changed = true
+  }
+  for (const [key, entry] of Object.entries(options.upserts || {})) {
+    if (!isCloudSyncedArtifactKey(key) || !entry || typeof entry !== 'object') continue
+    if (pendingUpsertKeys.has(key) || pendingDeleteKeys.has(key)) continue
+    map[key] = {
+      value: entry.value,
+      generatedAt:
+        typeof entry.generatedAt === 'number' && Number.isFinite(entry.generatedAt)
+          ? entry.generatedAt
+          : Date.now(),
+      model: typeof entry.model === 'string' ? entry.model : undefined,
+    }
+    pendingUpsertKeys.delete(key)
+    changed = true
+  }
+  if (!changed) return
+  writeAll(map, { silent: options.silent !== false, flush: true })
 }
 
 export function artifactCloudDiffIsEmpty(diff: ArtifactCloudDiff): boolean {

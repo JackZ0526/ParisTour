@@ -14,9 +14,18 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
+- 行程 LLM 文案改为增量拉取：`pull_trip_artifacts` 只同步本地没有或已过期的 key，避免每次打开都下载整包缓存。
+
 ### 变更
 
+- Google / Tripadvisor / Booking 等第三方地点缓存只留在浏览器，不再写入 Supabase，显著降低出站流量。
+- 登录、切行程与 Realtime 默认不再整包 `select artifacts`；本机刚写过的版本号一致时跳过拉取。
+- 本地 Vite 开发跳过付费 API 的 JWT 白名单，localhost 不再误报 401。
+
 ### 修复
+
+- 中文界面下顾问点评加载态不再显示英文 “Thinking...”。
+- 切换界面语言时不再把未译完的中文行程文案误存为英文缓存。
 
 ## [0.10.1] - 2026-08-24
 

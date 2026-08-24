@@ -1552,8 +1552,8 @@ export function GooglePlacePage({
             <div className="flex min-h-[2rem] flex-wrap items-center gap-2">
               {showNameLoader ? (
                 <LoadingIndicator
-                  thinkingLabel="正在翻译名称…"
-                  generatingLabel="正在翻译名称…"
+                  thinkingLabel={t('place.translatingName')}
+                  generatingLabel={t('place.translatingName')}
                   mode="thinking"
                   task="translate"
                   userText={originalLabel}
@@ -2015,9 +2015,9 @@ export function GooglePlacePage({
                   <>
                 {displayNarrative.loading && !displayNarrative.intro && !displayNarrative.reason && (
                   <LoadingIndicator
-                    thinkingLabel="Thinking"
+                    thinkingLabel={t('llm.busyThinking')}
                     generatingLabel={
-                      displayNarrative.labels?.loadingText || 'Loading'
+                      displayNarrative.labels?.loadingText || t('common.loading')
                     }
                     showDots
                     size="sm"

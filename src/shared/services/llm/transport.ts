@@ -416,6 +416,17 @@ export function friendlyLlmError(
     }
     return new LlmRequestError('Gemini 额度不足或触发限流。', code || 'rate_limit')
   }
+  const combined = `${apiMessage} ${body}`
+  if (
+    /Missing Authorization bearer token|Invalid or expired session|Invalid user/i.test(
+      combined,
+    )
+  ) {
+    return new LlmRequestError('当前没有有效登录，无法调用付费 API。', code || 'auth_error')
+  }
+  if (/invite-allowlisted|Allowlist check failed/i.test(combined)) {
+    return new LlmRequestError('当前账号不在邀请白名单，无法调用付费 API。', code || 'auth_error')
+  }
   if (status === 401 || status === 403 || /invalid.?key|incorrect api key/i.test(apiMessage)) {
     const keyHint =
       provider === 'deepseek'

@@ -257,7 +257,9 @@ export function LoadingIndicator({
         ? thinkingLabel
         : generatingLabel
       : label)
-  const text = stripTrailingEllipsis(rawText)
+  const text = stripTrailingEllipsis(
+    rawText ?? (llmVisual ? llmBusyDefaultLabel(llmVisual) : undefined),
+  )
   const active = showSpinner || showDots
   const thinking = visual === 'thinking'
   const generating = visual === 'generating'

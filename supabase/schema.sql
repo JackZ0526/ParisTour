@@ -96,6 +96,7 @@ create index if not exists trips_owner_id_idx on public.trips (owner_id);
 
 alter table public.trips add column if not exists hotel jsonb;
 alter table public.trips add column if not exists artifacts jsonb not null default '{}'::jsonb;
+alter table public.trips add column if not exists artifacts_rev integer not null default 0;
 
 alter table public.trips enable row level security;
 
@@ -529,22 +530,43 @@ create policy "trip_backups_delete"
   using (public.user_can_edit_trip(trip_id));
 
 -- ---------------------------------------------------------------------------
--- Incremental artifacts patch (avoid uploading the full JSONB blob)
+-- Incremental artifacts patch / pull (avoid transferring the full JSONB blob)
 -- ---------------------------------------------------------------------------
+create or replace function public.artifact_key_is_cloud(p_key text)
+returns boolean
+language sql
+immutable
+as $$
+  -- Keep in sync with src/shared/services/llm/artifactCloudPolicy.ts
+  select p_key like 'place-detail:%'
+      or p_key like 'hotel-detail:%'
+      or p_key like 'recommend:%'
+      or p_key like 'translations:%'
+      or p_key like 'place-names:%'
+      or p_key like 'itinerary:locale-copy:%';
+$$;
+
+grant execute on function public.artifact_key_is_cloud(text) to authenticated;
+
+drop function if exists public.patch_trip_artifacts(uuid, jsonb, text[]);
+
 create or replace function public.patch_trip_artifacts(
   p_trip_id uuid,
   p_upserts jsonb default '{}'::jsonb,
   p_deletes text[] default '{}'::text[]
 )
-returns timestamptz
+returns jsonb
 language plpgsql
 security invoker
 set search_path = public
 as $$
 declare
   new_updated_at timestamptz;
+  new_rev integer;
   upserts jsonb := coalesce(p_upserts, '{}'::jsonb);
   deletes text[] := coalesce(p_deletes, '{}'::text[]);
+  filtered jsonb := '{}'::jsonb;
+  k text;
 begin
   if jsonb_typeof(upserts) <> 'object' then
     raise exception 'p_upserts must be a JSON object'
@@ -556,24 +578,115 @@ begin
       using errcode = '42501';
   end if;
 
+  for k in select jsonb_object_keys(upserts)
+  loop
+    if public.artifact_key_is_cloud(k) then
+      filtered := filtered || jsonb_build_object(k, upserts -> k);
+    end if;
+  end loop;
+
   update public.trips
   set artifacts =
-    (coalesce(artifacts, '{}'::jsonb) - deletes) || upserts
+        (coalesce(artifacts, '{}'::jsonb) - deletes) || filtered,
+      artifacts_rev = coalesce(artifacts_rev, 0) + 1
   where id = p_trip_id
-  returning updated_at into new_updated_at;
+  returning updated_at, artifacts_rev into new_updated_at, new_rev;
 
   if new_updated_at is null then
     raise exception 'trip not found'
       using errcode = 'P0002';
   end if;
 
-  return new_updated_at;
+  return jsonb_build_object(
+    'updated_at', new_updated_at,
+    'rev', coalesce(new_rev, 0)
+  );
 end;
 $$;
 
 revoke execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) from public;
 revoke execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) from anon;
 grant execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) to authenticated;
+
+create or replace function public.pull_trip_artifacts(
+  p_trip_id uuid,
+  p_known jsonb default '{}'::jsonb
+)
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path = public
+as $$
+declare
+  current_artifacts jsonb;
+  current_rev integer;
+  known jsonb := coalesce(p_known, '{}'::jsonb);
+  upserts jsonb := '{}'::jsonb;
+  delete_keys text[] := '{}'::text[];
+  k text;
+  server_entry jsonb;
+  known_ts numeric;
+  server_ts numeric;
+begin
+  if jsonb_typeof(known) <> 'object' then
+    raise exception 'p_known must be a JSON object'
+      using errcode = '22023';
+  end if;
+
+  if not public.user_can_read_trip(p_trip_id) then
+    raise exception 'not authorized'
+      using errcode = '42501';
+  end if;
+
+  select t.artifacts, t.artifacts_rev
+    into current_artifacts, current_rev
+  from public.trips t
+  where t.id = p_trip_id;
+
+  if not found then
+    raise exception 'trip not found'
+      using errcode = 'P0002';
+  end if;
+
+  current_artifacts := coalesce(current_artifacts, '{}'::jsonb);
+
+  for k in select jsonb_object_keys(current_artifacts)
+  loop
+    if not public.artifact_key_is_cloud(k) then
+      continue;
+    end if;
+    server_entry := current_artifacts -> k;
+    begin
+      known_ts := nullif(known ->> k, '')::numeric;
+    exception
+      when invalid_text_representation then
+        known_ts := null;
+    end;
+    server_ts := coalesce((server_entry ->> 'generatedAt')::numeric, 0);
+    if known_ts is null or known_ts is distinct from server_ts then
+      upserts := upserts || jsonb_build_object(k, server_entry);
+    end if;
+  end loop;
+
+  for k in select jsonb_object_keys(known)
+  loop
+    if public.artifact_key_is_cloud(k) and not (current_artifacts ? k) then
+      delete_keys := array_append(delete_keys, k);
+    end if;
+  end loop;
+
+  return jsonb_build_object(
+    'rev', coalesce(current_rev, 0),
+    'upserts', upserts,
+    'deletes', to_jsonb(delete_keys)
+  );
+end;
+$$;
+
+revoke execute on function public.pull_trip_artifacts(uuid, jsonb) from public;
+revoke execute on function public.pull_trip_artifacts(uuid, jsonb) from anon;
+grant execute on function public.pull_trip_artifacts(uuid, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Bootstrap: add your email(s) to the allowlist, then sign up.

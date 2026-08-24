@@ -534,6 +534,7 @@ export const en: I18nSchema = {
     ratingSrLabel: '{source} rating ',
     // PlaceName translation badge
     translating: 'Translating',
+    translatingName: 'Translating name…',
     translatedBadgeAria: 'AI-translated name',
     translatedBadgeTitle: 'AI-translated name, not the canonical local name',
     // AddPlaceDialog
@@ -719,6 +720,9 @@ export const en: I18nSchema = {
     durationMinutes45: '45 min',
   },
   llm: {
+    // Shared busy-chip labels (LoadingIndicator / LlmHudBadge)
+    busyThinking: 'Thinking',
+    busyGenerating: 'Generating',
     // LlmModelPicker sections
     thinkingSection: 'Thinking',
     modelSection: 'Model',
