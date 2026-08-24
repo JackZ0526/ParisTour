@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
   Archive,
   CalendarDays,
@@ -968,110 +968,116 @@ export default function App() {
                   {showItineraryContent && (
                     <>
                       <div className="flex flex-col gap-3 sm:gap-3.5">
-                        <div
-                          className={`mobile-scroll-edge-fade flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                            dayRailHasLeftOverflow ? 'has-left-overflow' : ''
-                          }`}
-                          onScroll={(event) => {
-                            setDayRailHasLeftOverflow(
-                              event.currentTarget.scrollLeft > DAY_RAIL_LEFT_FADE_THRESHOLD_PX,
-                            )
-                          }}
-                        >
-                          {days.map((d, i) => {
-                            const cal = dateForTripDay(itineraryStartDate, d.day)
-                            return (
-                              <DayTabButton
-                                key={d.day}
-                                dayNumber={d.day}
-                                dateLabel={
-                                  cal ? formatTripDayLabel(cal, locale) : undefined
-                                }
-                                title={d.title}
-                                pending={isDayGenerationPending(d.day)}
-                                active={i === dayIndex}
-                                hasInteracted={hasInteractedDay}
-                                onSelect={() => {
-                                  setHasInteractedDay(true)
-                                  handleSelectDay(i)
-                                }}
-                              />
-                            )
-                          })}
-                        </div>
+                        <LayoutGroup id="itinerary-days-rail">
+                          <div
+                            className={`mobile-scroll-edge-fade flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                              dayRailHasLeftOverflow ? 'has-left-overflow' : ''
+                            }`}
+                            onScroll={(event) => {
+                              setDayRailHasLeftOverflow(
+                                event.currentTarget.scrollLeft > DAY_RAIL_LEFT_FADE_THRESHOLD_PX,
+                              )
+                            }}
+                          >
+                            {days.map((d, i) => {
+                              const cal = dateForTripDay(itineraryStartDate, d.day)
+                              return (
+                                <DayTabButton
+                                  key={d.day}
+                                  dayNumber={d.day}
+                                  dateLabel={
+                                    cal ? formatTripDayLabel(cal, locale) : undefined
+                                  }
+                                  title={d.title}
+                                  pending={isDayGenerationPending(d.day)}
+                                  active={i === dayIndex}
+                                  hasInteracted={hasInteractedDay}
+                                  onSelect={() => {
+                                    setHasInteractedDay(true)
+                                    handleSelectDay(i)
+                                  }}
+                                />
+                              )
+                            })}
+                          </div>
+                        </LayoutGroup>
 
-                        <div
-                          className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/70 p-1 shadow-sm backdrop-blur-xl lg:hidden"
-                          role="tablist"
-                          aria-label={t('app.itineraryViewAria')}
-                        >
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={mobileItineraryPane === 'timeline'}
-                            onClick={() => {
-                              setHasInteractedPane(true)
-                              setMobileItineraryPane('timeline')
-                            }}
-                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
+                        <LayoutGroup id="itinerary-mobile-pane-toggle">
+                          <div
+                            className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/70 p-1 shadow-sm backdrop-blur-xl lg:hidden"
+                            role="tablist"
+                            aria-label={t('app.itineraryViewAria')}
                           >
-                            {mobileItineraryPane === 'timeline' && (
-                              <motion.span
-                                layoutId="itinerary-pane-pill"
-                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                                animate={
-                                  hasInteractedPane
-                                    ? {
-                                        scaleX: [1, 1.16, 0.95, 1],
-                                        scaleY: [1, 0.88, 1.03, 1],
-                                      }
-                                    : undefined
-                                }
-                                transition={{
-                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                }}
-                              />
-                            )}
-                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                              {t('app.tabTimeline')}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={mobileItineraryPane === 'map'}
-                            onClick={() => {
-                              setHasInteractedPane(true)
-                              setMobileItineraryPane('map')
-                            }}
-                            className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
-                          >
-                            {mobileItineraryPane === 'map' && (
-                              <motion.span
-                                layoutId="itinerary-pane-pill"
-                                className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                                animate={
-                                  hasInteractedPane
-                                    ? {
-                                        scaleX: [1, 1.16, 0.95, 1],
-                                        scaleY: [1, 0.88, 1.03, 1],
-                                      }
-                                    : undefined
-                                }
-                                transition={{
-                                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                }}
-                              />
-                            )}
-                            <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                              {t('app.tabMap')}
-                            </span>
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              role="tab"
+                              aria-selected={mobileItineraryPane === 'timeline'}
+                              onClick={() => {
+                                setHasInteractedPane(true)
+                                setMobileItineraryPane('timeline')
+                              }}
+                              className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
+                            >
+                              {mobileItineraryPane === 'timeline' && (
+                                <motion.span
+                                  layoutId="itinerary-pane-pill"
+                                  layoutDependency={mobileItineraryPane}
+                                  className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                                  animate={
+                                    hasInteractedPane
+                                      ? {
+                                          scaleX: [1, 1.16, 0.95, 1],
+                                          scaleY: [1, 0.88, 1.03, 1],
+                                        }
+                                      : undefined
+                                  }
+                                  transition={{
+                                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  }}
+                                />
+                              )}
+                              <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                {t('app.tabTimeline')}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              role="tab"
+                              aria-selected={mobileItineraryPane === 'map'}
+                              onClick={() => {
+                                setHasInteractedPane(true)
+                                setMobileItineraryPane('map')
+                              }}
+                              className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
+                            >
+                              {mobileItineraryPane === 'map' && (
+                                <motion.span
+                                  layoutId="itinerary-pane-pill"
+                                  layoutDependency={mobileItineraryPane}
+                                  className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                                  animate={
+                                    hasInteractedPane
+                                      ? {
+                                          scaleX: [1, 1.16, 0.95, 1],
+                                          scaleY: [1, 0.88, 1.03, 1],
+                                        }
+                                      : undefined
+                                  }
+                                  transition={{
+                                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                  }}
+                                />
+                              )}
+                              <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                {t('app.tabMap')}
+                              </span>
+                            </button>
+                          </div>
+                        </LayoutGroup>
                       </div>
 
                       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">

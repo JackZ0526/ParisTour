@@ -91,6 +91,7 @@ export function DayTabButton({
       {active && (
         <motion.span
           layoutId="active-day-tab-ink"
+          layoutDependency={dayNumber}
           className="absolute inset-0 z-0 rounded-full bg-gradient-to-r from-[#b36b3c] to-[#9a542b] shadow-[0_3px_12px_rgba(179,107,60,0.26),inset_0_1px_1.5px_rgba(255,255,255,0.45)] border border-[#c47c4d]/50 before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white/70 before:to-transparent before:content-['']"
           animate={
             hasInteracted && isMountedRef.current
