@@ -1128,14 +1128,9 @@ export function AddPlaceDialog({
                             active ? 'text-white' : 'text-[var(--ink)] dark:text-zinc-300'
                           }`}
                         >
-                        {t(recommendTabKeys[tabId] as never)}
-                        <span className={`ml-1 ${active ? 'text-white/80' : 'opacity-70'}`}>
-                          {loadingByCategory[tabId] && !grouped[tabId].length
-                            ? '(…)'
-                            : `(${grouped[tabId].length})`}
+                          {t(recommendTabKeys[tabId] as never)}
                         </span>
-                      </span>
-                    </button>
+                      </button>
                   )
                 })}
                 </div>
