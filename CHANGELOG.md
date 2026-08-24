@@ -19,6 +19,13 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.9.1] - 2026-08-24
+
+### Fixed
+
+- support legacy Chinese values in localizeTravelChip
+
+
 ## [0.9.0] - 2026-08-24
 
 ### Added
@@ -634,7 +641,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...HEAD
+- [0.9.1]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...v0.9.1
 - [0.9.0]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...v0.9.0
 - [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
 - [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0

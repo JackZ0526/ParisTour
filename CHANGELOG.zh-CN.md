@@ -18,6 +18,13 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.9.1] - 2026-08-24
+
+### 修复
+
+- 修复时间轴行程卡片中的交通与步行强度胶囊（如「很少走」、「短步行」、「公共交通」等历史中文持久化数据）在切换语言时未翻译为英文的问题。
+
+
 ## [0.9.0] - 2026-08-24
 
 ### 新增
@@ -527,7 +534,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...HEAD
+- [0.9.1]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...v0.9.1
 - [0.9.0]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...v0.9.0
 - [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
 - [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0
