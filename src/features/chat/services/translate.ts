@@ -142,6 +142,8 @@ async function translateWithPrompt(
       ],
       {
         task: 'translate',
+        thinking: { enabled: false, effort: 'low', source: 'auto' },
+        preflight: false,
         userText: needTranslate[0],
         webSearch: false,
         responseFormat: 'json_object',
@@ -268,6 +270,8 @@ export async function translatePlaceNameToChinese(
         ],
         {
           task: 'translate',
+          thinking: { enabled: false, effort: 'low', source: 'auto' },
+          preflight: false,
           userText: key,
           webSearch: false,
           responseFormat: 'json_object',

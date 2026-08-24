@@ -113,14 +113,15 @@ function thinkingHeuristicBucket(
   task: LlmTaskKind | undefined,
   userText: string | undefined,
 ): 'off' | 'easy' | 'default' | 'hard' {
-  // Translation / day copywriting / structured extraction: pure text generation without 3-5s CoT reasoning latency.
+  // Translation / day copywriting / structured extraction / router: pure text generation without 3-5s CoT reasoning latency.
   if (
     task === 'dayCopy' ||
     task === 'destinationSuggest' ||
     task === 'placeName' ||
     task === 'itineraryTranslate' ||
     task === 'translate' ||
-    task === 'preferenceExtract'
+    task === 'preferenceExtract' ||
+    task === 'router'
   ) {
     return 'off'
   }

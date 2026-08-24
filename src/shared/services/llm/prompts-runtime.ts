@@ -60,7 +60,7 @@ const TASK_THINKING: Record<
   itineraryStart: { baseline: 'low', min: 'off', max: 'low' },
   destinationSuggest: { baseline: 'off', min: 'off', max: 'off' },
   preferenceExtract: { baseline: 'off', min: 'off', max: 'off' },
-  router: { baseline: 'low', min: 'off', max: 'low' },
+  router: { baseline: 'off', min: 'off', max: 'off' },
 }
 
 function clampEffort(
