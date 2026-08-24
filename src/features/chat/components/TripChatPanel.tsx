@@ -23,7 +23,7 @@ import {
   supportsThinkingControls,
   type HotelDetailCopy,
 } from '../../../shared/services/llm/llm'
-import { ChevronRight, Image as ImageIcon, X } from 'lucide-react'
+import { Image as ImageIcon, X } from 'lucide-react'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
 import { ModelBrandIcon } from './LlmModelPicker'
 import {
@@ -2525,17 +2525,16 @@ export function TripChatPanel({
                 <p className="text-xs font-medium text-[var(--stone)]">
                   {t('chat.tryAskingIntro')}
                 </p>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {SUGGESTIONS.map(({ text, tone }) => (
                     <button
                       key={text}
                       type="button"
                       disabled={busy}
                       onClick={() => void submit(t(text))}
-                      className={`group ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass[tone]} w-full flex items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:translate-x-0.5 active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-2xs`}
+                      className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass[tone]} inline-flex items-center px-3 py-1.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer`}
                     >
-                      <span className="min-w-0 flex-1 leading-relaxed">{t(text)}</span>
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity ml-2 text-[var(--stone)]" />
+                      {t(text)}
                     </button>
                   ))}
                 </div>

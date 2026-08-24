@@ -657,11 +657,11 @@ export const zhCN: I18nSchema = {
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: '关闭助手',
     // Suggested prompts
-    suggestHotelCurrent: '详细介绍一下我选中的酒店及周边配套',
-    suggestHotelsLeftBank: '在塞纳河左岸重新推荐几家高评分酒店',
-    suggestFirstPlace: '详细介绍今天行程的第一个地点与游览建议',
-    suggestAddCafe: '在今天的游玩路线附近推荐并添加一家特色咖啡馆',
-    suggestRemoveArc: '从今日行程中移除凯旋门并重新规划游览路线',
+    suggestHotelCurrent: '介绍下我当前选中的酒店',
+    suggestHotelsLeftBank: '重新推荐塞纳河左岸酒店',
+    suggestFirstPlace: '介绍今天行程的第一个地点',
+    suggestAddCafe: '在今天行程附近加家咖啡馆',
+    suggestRemoveArc: '从今天的行程中删掉凯旋门',
     // Work-step pipeline labels (ChatWorkStepList.tsx)
     workStepPreprocessPlan: '理解问题',
     workStepPreprocessFallback: '兜底路由',
