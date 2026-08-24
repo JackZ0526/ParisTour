@@ -657,11 +657,11 @@ export const en: I18nSchema = {
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: 'Close assistant',
     // Suggested prompts
-    suggestHotelCurrent: 'Tell me about my hotel',
-    suggestHotelsLeftBank: 'Re-recommend Left Bank hotels',
-    suggestFirstPlace: "What's the first stop today?",
-    suggestAddCafe: 'Add a nearby cafe today',
-    suggestRemoveArc: 'Drop the Arc de Triomphe',
+    suggestHotelCurrent: 'Tell me more about my selected hotel and nearby area',
+    suggestHotelsLeftBank: 'Recommend top-rated hotels on the Left Bank instead',
+    suggestFirstPlace: "Give me detailed visitor tips for today's first stop",
+    suggestAddCafe: "Find and add a cozy local cafe near today's route",
+    suggestRemoveArc: 'Remove the Arc de Triomphe and re-optimize the schedule',
     // Work-step pipeline labels (ChatWorkStepList.tsx)
     workStepPreprocessPlan: 'Understanding the question',
     workStepPreprocessFallback: 'Fallback routing',
