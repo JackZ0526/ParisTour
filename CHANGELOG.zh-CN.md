@@ -18,6 +18,16 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.10.1] - 2026-08-24
+
+### 修复
+
+- **聊天助手空回复与连续用户消息交互修复**：
+- 彻底移除硬编码空回复回退为“好的。”的逻辑；当模型未生成实质性解答时显式抛出错误并在界面友好提示重试，杜绝敷衍假回复；
+- 将应用状态、视觉数据、网络检索与用户提问合并为标准单 Turn 消息体，解决连续 `user` 角色消息导致模型混淆的问题；
+- 强化 System Prompt 中 `reply` 的信息量与实质性解答要求。
+
+
 ## [0.10.0] - 2026-08-24
 
 ### 新增
@@ -595,7 +605,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...HEAD
+- [0.10.1]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...v0.10.1
 - [0.10.0]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...v0.10.0
 - [0.9.5]: https://github.com/JackZ0526/ParisTour/compare/v0.9.4...v0.9.5
 - [0.9.4]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...v0.9.4
