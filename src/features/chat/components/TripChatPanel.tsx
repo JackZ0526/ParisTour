@@ -339,8 +339,16 @@ export function TripChatPanel({
   const [attachedImages, setAttachedImages] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-  const SUPPORTED_IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+  const SUPPORTED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/heic',
+    'image/heif',
+  ]
+  const SUPPORTED_IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif']
 
   function isSupportedImageFile(file: File): boolean {
     const type = (file.type || '').toLowerCase()
@@ -349,9 +357,35 @@ export function TripChatPanel({
     return SUPPORTED_IMAGE_EXTS.some((ext) => name.endsWith(ext))
   }
 
+  function isHeicFile(file: File): boolean {
+    const type = (file.type || '').toLowerCase()
+    const name = (file.name || '').toLowerCase()
+    return (
+      type.includes('heic') ||
+      type.includes('heif') ||
+      name.endsWith('.heic') ||
+      name.endsWith('.heif')
+    )
+  }
+
   async function processImageFile(file: File): Promise<string> {
     if (!isSupportedImageFile(file)) {
       throw new Error('unsupported_format')
+    }
+    let imageBlob: Blob = file
+    if (isHeicFile(file)) {
+      try {
+        const heic2any = (await import('heic2any')).default
+        const converted = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.85,
+        })
+        imageBlob = Array.isArray(converted) ? converted[0] : converted
+      } catch (err) {
+        console.warn('[TripChatPanel] HEIC conversion failed:', err)
+        throw new Error('unsupported_format')
+      }
     }
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -389,8 +423,39 @@ export function TripChatPanel({
         img.src = src
       }
       reader.onerror = () => reject(new Error('read_failed'))
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(imageBlob)
     })
+  }
+
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const dragCounterRef = useRef(0)
+
+  const handlePanelDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current += 1
+    if (e.dataTransfer?.types?.includes('Files')) {
+      setIsDraggingOver(true)
+    }
+  }
+
+  const handlePanelDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0
+      setIsDraggingOver(false)
+    }
+  }
+
+  const handlePanelDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handlePanelDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current = 0
+    setIsDraggingOver(false)
+    await handleDrop(e)
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2368,8 +2433,29 @@ export function TripChatPanel({
           }}
           inert={!open || undefined}
           aria-hidden={!open}
+          onDragEnter={handlePanelDragEnter}
+          onDragOver={handlePanelDragOver}
+          onDragLeave={handlePanelDragLeave}
+          onDrop={handlePanelDrop}
           className="absolute inset-0 flex flex-col"
         >
+          {/* Full-panel Drag & Drop Overlay */}
+          {isDraggingOver && (
+            <div className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[var(--sage)] bg-white/92 dark:bg-black/92 backdrop-blur-lg shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--sage)]/15 text-[var(--sage)] border border-[var(--sage)]/30 shadow-inner">
+                <ImageIcon className="h-8 w-8 animate-bounce" strokeWidth={1.8} />
+              </div>
+              <div className="text-center px-6">
+                <p className="text-sm font-semibold text-[var(--ink)]">
+                  {t('chat.dropImagePrompt')}
+                </p>
+                <p className="text-xs text-[var(--stone)] mt-1 font-medium">
+                  {t('chat.supportedFormatsHint')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Top Specular Streaming Reflection Line */}
           <span
             aria-hidden
@@ -2621,7 +2707,7 @@ export function TripChatPanel({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif"
                 multiple
                 className="hidden"
                 onChange={handleFileChange}
