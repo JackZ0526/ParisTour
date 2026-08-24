@@ -337,6 +337,7 @@ export function TripChatPanel({
     undefined,
   )
   const [attachedImages, setAttachedImages] = useState<string[]>([])
+  const [convertingCount, setConvertingCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const SUPPORTED_IMAGE_TYPES = [
@@ -374,6 +375,7 @@ export function TripChatPanel({
     }
     let imageBlob: Blob = file
     if (isHeicFile(file)) {
+      setConvertingCount((c) => c + 1)
       try {
         const { heicTo } = await import('heic-to')
         const converted = await heicTo({
@@ -385,6 +387,8 @@ export function TripChatPanel({
       } catch (err) {
         console.warn('[TripChatPanel] HEIC conversion failed:', err)
         throw new Error('unsupported_format')
+      } finally {
+        setConvertingCount((c) => Math.max(0, c - 1))
       }
     }
     return new Promise((resolve, reject) => {
@@ -2681,7 +2685,7 @@ export function TripChatPanel({
               void submit(input)
             }}
           >
-            {attachedImages.length > 0 && (
+            {(attachedImages.length > 0 || convertingCount > 0) && (
               <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
                 {attachedImages.map((img, idx) => (
                   <div key={idx} className="group relative inline-block">
@@ -2701,6 +2705,17 @@ export function TripChatPanel({
                     </button>
                   </div>
                 ))}
+                {Array.from({ length: convertingCount }).map((_, idx) => (
+                  <div
+                    key={`converting-${idx}`}
+                    className="relative inline-flex h-12 items-center gap-2 rounded-lg border border-[var(--sage)]/50 bg-[var(--sage)]/10 dark:bg-[var(--sage)]/15 px-3 py-1 shadow-2xs backdrop-blur-sm animate-pulse select-none"
+                  >
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent shrink-0" />
+                    <span className="text-[11px] font-medium text-[var(--sage)] dark:text-[#9fc4b1] whitespace-nowrap">
+                      {t('chat.convertingImage')}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
             <div className="flex items-center gap-2">
@@ -2715,7 +2730,7 @@ export function TripChatPanel({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={busy || !open}
+                disabled={busy || !open || convertingCount > 0}
                 title={t('chat.uploadImage')}
                 aria-label={t('chat.uploadImage')}
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/30 text-[var(--stone)] transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40"
@@ -2726,8 +2741,8 @@ export function TripChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={handlePaste}
-                placeholder={t('chat.sendPromptPlaceholder')}
-                disabled={busy || !open}
+                placeholder={convertingCount > 0 ? t('chat.convertingImage') : t('chat.sendPromptPlaceholder')}
+                disabled={busy || !open || convertingCount > 0}
                 tabIndex={open ? undefined : -1}
                 aria-busy={busy || undefined}
                 enterKeyHint="send"
@@ -2753,10 +2768,10 @@ export function TripChatPanel({
               ) : (
                 <button
                   type="submit"
-                  disabled={(!input.trim() && attachedImages.length === 0) || !open}
+                  disabled={((!input.trim() && attachedImages.length === 0) || !open || convertingCount > 0)}
                   tabIndex={open ? undefined : -1}
                   className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
-                    (input.trim() || attachedImages.length > 0) && open
+                    (input.trim() || attachedImages.length > 0) && open && convertingCount === 0
                       ? 'border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_4px_14px_rgba(35,42,38,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.4)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35)] backdrop-blur-md hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.03] hover:shadow-[0_6px_18px_rgba(35,42,38,0.32)] dark:hover:shadow-[0_6px_18px_rgba(212,131,84,0.45)] active:scale-95 cursor-pointer'
                       : 'border border-black/[0.08] dark:border-white/10 bg-black/[0.07] dark:bg-white/5 text-[var(--stone)] dark:text-zinc-500 shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-none backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
                   }`}

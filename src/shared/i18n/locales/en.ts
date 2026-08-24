@@ -644,6 +644,7 @@ export const en: I18nSchema = {
     removeImage: 'Remove image',
     imageUploadFailed: 'Failed to read image, please try again',
     imageFormatUnsupported: 'Unsupported image format. Please upload JPG, PNG, WebP, GIF, or HEIC images',
+    convertingImage: 'Converting iPhone HEIC photo…',
     dropImagePrompt: 'Drop image to attach',
     supportedFormatsHint: 'Supports JPG, PNG, WebP, GIF, HEIC',
     thinkingNow: 'Thinking',
