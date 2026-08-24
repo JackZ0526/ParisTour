@@ -2744,22 +2744,22 @@ export function TripChatPanel({
                 transition={{
                   layout: { type: 'spring', stiffness: 320, damping: 34, mass: 0.6 },
                 }}
-                className={`inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 ${
+                className={`h-8 max-h-8 min-h-8 inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 box-border ${
                   busy
-                    ? 'h-8 px-3 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
+                    ? 'px-3 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
                     : ((input.trim() || attachedImages.length > 0) && open && convertingCount === 0) || colorKeepActive
-                      ? 'h-8 w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
-                      : 'h-8 w-8 bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
+                      ? 'w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 cursor-pointer'
+                      : 'w-8 bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
                 }`}
               >
                 {busy ? (
                   <motion.div
                     key="busy-content"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex items-center gap-1.5 whitespace-nowrap"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex h-full items-center gap-1.5 whitespace-nowrap"
                   >
                     {(() => {
                       const activeWorkStep = workSteps.find((s) => s.status === 'active')
@@ -2821,10 +2821,10 @@ export function TripChatPanel({
                           <AnimatePresence mode="popLayout" initial={false}>
                             <motion.span
                               key={dynamicLabel}
-                              initial={{ opacity: 0, y: 3 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -3 }}
-                              transition={{ duration: 0.18 }}
+                              initial={{ opacity: 0, x: 4 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -4 }}
+                              transition={{ duration: 0.15 }}
                               className="tracking-wide text-[11px] font-medium"
                             >
                               {dynamicLabel}
@@ -2837,11 +2837,11 @@ export function TripChatPanel({
                 ) : (
                   <motion.div
                     key="arrow-content"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="flex items-center justify-center"
+                    className="flex h-full items-center justify-center"
                   >
                     <ArrowUp size={16} strokeWidth={2.4} />
                   </motion.div>
