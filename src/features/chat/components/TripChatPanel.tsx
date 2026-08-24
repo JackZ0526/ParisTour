@@ -22,7 +22,6 @@ import {
   type HotelDetailCopy,
 } from '../../../shared/services/llm/llm'
 import { Image as ImageIcon, X } from 'lucide-react'
-import { isModelVisionCapable } from '../../../config/llmModels'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
 import { ModelBrandIcon } from './LlmModelPicker'
 import {
@@ -336,13 +335,6 @@ export function TripChatPanel({
   )
   const [attachedImages, setAttachedImages] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const isVisionCapable = isModelVisionCapable(model)
-
-  useEffect(() => {
-    if (!isVisionCapable && attachedImages.length > 0) {
-      setAttachedImages([])
-    }
-  }, [isVisionCapable, attachedImages.length])
 
   async function processImageFile(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -412,7 +404,6 @@ export function TripChatPanel({
   }
 
   const handlePaste = async (e: React.ClipboardEvent) => {
-    if (!isVisionCapable) return
     const items = e.clipboardData?.items
     if (!items) return
     const imageFiles: File[] = []
@@ -441,7 +432,6 @@ export function TripChatPanel({
   }
 
   const handleDrop = async (e: React.DragEvent) => {
-    if (!isVisionCapable) return
     e.preventDefault()
     const files = e.dataTransfer?.files
     if (!files || files.length === 0) return
@@ -1912,7 +1902,7 @@ export function TripChatPanel({
 
   async function submit(text: string) {
     const message = text.trim()
-    const imagesToSend = isVisionCapable ? [...attachedImages] : []
+    const imagesToSend = [...attachedImages]
     if ((!message && imagesToSend.length === 0) || busy) return
     if (!isLlmConfigured()) {
       setError(t('chat.chatUnavailable'))
@@ -2518,28 +2508,24 @@ export function TripChatPanel({
               </div>
             )}
             <div className="flex items-center gap-2">
-              {isVisionCapable && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={busy || !open}
-                    title={t('chat.uploadImage')}
-                    aria-label={t('chat.uploadImage')}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/30 text-[var(--stone)] transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40"
-                  >
-                    <ImageIcon size={17} />
-                  </button>
-                </>
-              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy || !open}
+                title={t('chat.uploadImage')}
+                aria-label={t('chat.uploadImage')}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/30 text-[var(--stone)] transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40"
+              >
+                <ImageIcon size={17} />
+              </button>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

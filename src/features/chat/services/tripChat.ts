@@ -31,7 +31,9 @@ import {
   getRouterExamples,
   jsonContract,
 } from '../../../shared/services/llm/prompts'
-import { getLocale, getLlmLanguageInstruction } from '../../../shared/i18n'
+import { getLocale, getLlmLanguageInstruction, type Locale } from '../../../shared/i18n'
+import { getOpenAIModel } from '../../../shared/services/llm/model-state'
+import { isModelVisionCapable } from '../../../config/llmModels'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
   | { type: 'select_place'; placeName: string }
@@ -940,18 +942,74 @@ export async function fetchTripChatWebResearch(input: {
   }
 }
 
+/**
+ * Preflight visual analysis proxy for non-vision models (e.g. DeepSeek V4 Pro).
+ * Calls V4 Flash Vision in the background to extract factual entities, OCR text,
+ * opening hours, dishes, and travel clues from uploaded images.
+ */
+export async function fetchTripChatVisualAnalysis(input: {
+  images: string[]
+  userMessage?: string
+  signal?: AbortSignal
+  locale?: Locale
+}): Promise<string | null> {
+  if (!input.images || input.images.length === 0) return null
+  try {
+    const prompt =
+      input.locale === 'en'
+        ? 'You are a travel visual research assistant. Analyze the user\'s uploaded image(s) in detail. Extract place names (in French and English), addresses/districts, opening hours, ticket prices/fees, menu dishes, signs, transportation clues, or any visual facts relevant to travel planning. Output a concise factual bullet summary.'
+        : '你是旅行视觉识别助手。请详细分析用户上传的图片，提取其中的地点名称（法语/中文）、地址/街区、营业时间、门票价格、特色菜品、路牌标识、交通线索等一切与旅行规划相关的客观事实。输出精炼的事实要点列表。'
+
+    const contentParts: ChatMessageContentPart[] = [
+      {
+        type: 'text',
+        text: input.userMessage
+          ? `用户问题：${input.userMessage}\n请结合用户问题重点提取图片中的相关事实信息。`
+          : '请提取图片中的关键旅行事实信息。',
+      },
+      ...input.images.map((img) => ({
+        type: 'image_url' as const,
+        image_url: { url: img },
+      })),
+    ]
+
+    const messages: OpenAIChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: contentParts },
+    ]
+
+    const rawText = await openaiChat(messages, {
+      task: 'tripChat',
+      model: 'deepseek-v4-flash-vision-exp',
+      preflight: true,
+      thinking: { enabled: false, effort: 'off', source: 'manual' },
+      signal: input.signal,
+    })
+
+    const trimmed = rawText.trim()
+    return trimmed || null
+  } catch (err) {
+    console.warn('[tripChat] visual analysis failed:', err)
+    return null
+  }
+}
+
 function buildTripChatMessages(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
   images?: string[]
   webResearch?: string | null
+  visualAnalysis?: string | null
   plan: TripChatRequestPlan
 }): OpenAIChatMessage[] {
+  const activeModel = getOpenAIModel()
+  const isVisionModel = isModelVisionCapable(activeModel)
+
   const messages: OpenAIChatMessage[] = [
     { role: 'system', content: systemPrompt(input.ctx, input.plan) },
     ...input.history.map((t) => {
-      if (t.role === 'user' && t.images && t.images.length > 0) {
+      if (t.role === 'user' && t.images && t.images.length > 0 && isVisionModel) {
         const parts: ChatMessageContentPart[] = [
           { type: 'text', text: t.content },
           ...t.images.map((img) => ({
@@ -981,6 +1039,20 @@ function buildTripChatMessages(input: {
       '</app_state_data>',
     ].join('\n'),
   })
+
+  const visual = String(input.visualAnalysis || '').trim()
+  if (visual) {
+    messages.push({
+      role: 'user',
+      content: [
+        '<visual_observation_data>',
+        '以下是由多模态视觉识别模型从用户上传的图片中提取的事实数据：',
+        visual,
+        '</visual_observation_data>',
+      ].join('\n'),
+    })
+  }
+
   const research = String(input.webResearch || '').trim()
   if (research) {
     const isGooglePlacesShortlist = research.includes('【Google Places 实时附近候选】')
@@ -1001,7 +1073,7 @@ function buildTripChatMessages(input: {
       ].join('\n'),
     })
   }
-  if (input.images && input.images.length > 0) {
+  if (input.images && input.images.length > 0 && isVisionModel) {
     const parts: ChatMessageContentPart[] = [
       { type: 'text', text: input.userMessage },
       ...input.images.map((img) => ({
@@ -1600,6 +1672,7 @@ export async function sendTripChatMessage(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
+  images?: string[]
   signal?: AbortSignal
   /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
   webSearch?: boolean | 'auto'
@@ -1610,7 +1683,18 @@ export async function sendTripChatMessage(input: {
   const plan = await planTripChatRequest(input)
   input.onRequestPlan?.('done', plan)
   const webResearch = await resolveTripChatWebResearch({ ...input, plan })
-  const messages = buildTripChatMessages({ ...input, webResearch, plan })
+  const activeModel = getOpenAIModel()
+  const isVisionModel = isModelVisionCapable(activeModel)
+  let visualAnalysis: string | null = null
+  if (input.images && input.images.length > 0 && !isVisionModel) {
+    visualAnalysis = await fetchTripChatVisualAnalysis({
+      images: input.images,
+      userMessage: input.userMessage,
+      signal: input.signal,
+      locale: getLocale(),
+    })
+  }
+  const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
   const rawText = await openaiChat(messages, {
     task: 'tripChat',
     userText: input.userMessage,
@@ -1658,7 +1742,18 @@ export async function sendTripChatMessageStream(input: {
   const plan = await planTripChatRequest(input)
   input.onRequestPlan?.('done', plan)
   const webResearch = await resolveTripChatWebResearch({ ...input, plan })
-  const messages = buildTripChatMessages({ ...input, webResearch, plan })
+  const activeModel = getOpenAIModel()
+  const isVisionModel = isModelVisionCapable(activeModel)
+  let visualAnalysis: string | null = null
+  if (input.images && input.images.length > 0 && !isVisionModel) {
+    visualAnalysis = await fetchTripChatVisualAnalysis({
+      images: input.images,
+      userMessage: input.userMessage,
+      signal: input.signal,
+      locale: getLocale(),
+    })
+  }
+  const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
   let lastEmitted = ''
 
   const rawText = await openaiChatStream(messages, {
