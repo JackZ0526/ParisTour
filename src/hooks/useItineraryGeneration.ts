@@ -80,7 +80,6 @@ import {
   hasUsableGeneratedItinerary,
   emptyItinerary,
   loadItineraryState,
-  resizeItineraryToLength,
   restoreDayFromBaseline,
   restoreFullFromBaseline,
   saveBaselineItinerary,
@@ -509,27 +508,7 @@ export function useItineraryGeneration(
     setSelectedPlaceId,
   ])
 
-  // Keep day tabs in sync with computed itinerary length.
-  useEffect(() => {
-    if (!tripDates?.startDate || !tripDates?.endDate) return
-    if (!itineraryGenerated) return
-    setDays((prev) => {
-      if (!prev.length) return prev
-      const next = resizeItineraryToLength(prev, numberOfDays)
-      return next === prev ? prev : next
-    })
-    setDayIndex((i) => {
-      const max = Math.max(0, numberOfDays - 1)
-      return i > max ? max : i
-    })
-  }, [
-    numberOfDays,
-    tripDates?.startDate,
-    tripDates?.endDate,
-    itineraryGenerated,
-    setDays,
-    setDayIndex,
-  ])
+
 
   // -- Handlers --------------------------------------------------------------
   const runFullItineraryGeneration = useCallback(
@@ -1107,18 +1086,19 @@ export function useItineraryGeneration(
 
       if (sourceLocale === targetLocale) return
 
-      // Instant 0ms cache hit: if target locale copy exists for this exact structure, swap immediately!
-      const cachedTarget = localeCopyCacheRef.current[targetLocale]
-      if (cachedTarget && cachedTarget.structureKey === structureKey) {
-        setDays(cachedTarget.days)
-        setItineraryGenError(null)
-        return
-      }
-
-      setItineraryGenError(null)
-      setItineraryTranslating(true)
-      setAutoRegenOnLocaleChange(true)
+      holdTripCloudSaves()
       try {
+        // Instant 0ms cache hit: if target locale copy exists for this exact structure, swap immediately!
+        const cachedTarget = localeCopyCacheRef.current[targetLocale]
+        if (cachedTarget && cachedTarget.structureKey === structureKey) {
+          setDays(cachedTarget.days)
+          setItineraryGenError(null)
+          return
+        }
+
+        setItineraryGenError(null)
+        setItineraryTranslating(true)
+        setAutoRegenOnLocaleChange(true)
         const { days: translatedDays } = await translateItineraryText({
           days: currentDays,
           sourceLocale,
@@ -1140,6 +1120,7 @@ export function useItineraryGeneration(
       } finally {
         setItineraryTranslating(false)
         setAutoRegenOnLocaleChange(false)
+        releaseTripCloudSaves()
       }
     },
     [itineraryGenerated, days, isLlmConfigured, setDays],

@@ -19,6 +19,7 @@ import { initialFlightsState, initialHotelState } from '../appHelpers'
 import { loadTripDates } from '../features/itinerary/services/tripDates'
 import { loadRecommendationPreferences } from '../features/place/services/recommendationPreferences'
 import { SELECTED_HOTEL_PLACE_ID } from '../features/itinerary/utils/dayOrigin'
+import { resolveItineraryStartSync } from '../shared/services/llm/business/itinerary'
 
 export interface UseTripSyncDeps {
   tripSyncEpoch: number
@@ -188,10 +189,19 @@ export function useTripSync(
     setHotelCandidates(nextHotels.candidates)
     setTripDates(nextDates)
     setFlights(nextFlights)
-    setItineraryStart(null)
-    setItineraryStartLoading(
-      Boolean(nextDates?.startDate && nextFlights.outbound?.flightNumber),
-    )
+    const resolvedStart =
+      nextDates?.startDate && nextFlights.outbound?.flightNumber
+        ? resolveItineraryStartSync({
+            tripStartDate: nextDates.startDate,
+            tripEndDate: nextDates.endDate,
+            destination: '巴黎',
+            hotelName: nextHotels.hotel ? nextHotels.hotel.name : null,
+            outbound: nextFlights.outbound,
+            returnFlight: nextFlights.returnFlight,
+          })
+        : null
+    setItineraryStart(resolvedStart)
+    setItineraryStartLoading(false)
     setDays(nextItinerary.days)
     setCustomPlaces(nextItinerary.customPlaces)
     setItineraryGenerated(Boolean(nextItinerary.generated && nextItinerary.days.length))

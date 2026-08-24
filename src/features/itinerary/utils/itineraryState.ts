@@ -243,13 +243,15 @@ export function resizeItineraryToLength(days: DayPlan[], count: number): DayPlan
     }
 
     if (dayNum === n) {
+      // If we had an old return day and we're expanding/shrinking to n, use the old return day
+      // unless dayNum was already present in existingByDay as a regular day.
       const oldLast = oldLastDayNum != null ? existingByDay.get(oldLastDayNum) : null
       out.push(cloneDay(oldLast || tmpl, n))
       continue
     }
 
     const ex = existingByDay.get(dayNum)
-    // Don't reuse the old return day as a middle day.
+    // If dayNum exists in existing days and is not the old last day being moved to day n, preserve it
     if (ex && dayNum !== oldLastDayNum) {
       out.push(cloneDay(ex, dayNum))
     } else {
