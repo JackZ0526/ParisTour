@@ -1166,7 +1166,11 @@ export function AddPlaceDialog({
                                 zhIsLlmTranslated
                               />
                               {!expanded && (
-                                <p className="mt-1.5 text-sm text-[var(--stone)] line-clamp-2">
+                                <p
+                                  className={`text-sm text-[var(--stone)] line-clamp-2 ${
+                                    locale === 'en' ? 'mt-1' : 'mt-1.5'
+                                  }`}
+                                >
                                   {item.intro || item.reason}
                                 </p>
                               )}

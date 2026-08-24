@@ -293,7 +293,7 @@ export function PlaceName({
     // reserved row and receives its source badge only after completion.
     const zhFromLlm = Boolean(chinese.isLlmTranslated)
     const displayedZh = chinese.zh
-    const reserveZhRow = excludePropCjk && enrichFromGoogle
+    const reserveZhRow = locale === 'zh-CN' && excludePropCjk && enrichFromGoogle
     const showBadgeOnTitle = zhFromLlm && !displayedZh
     const showBadgeOnZh = Boolean(
       zhFromLlm && displayedZh && !llmZhTranslating,
