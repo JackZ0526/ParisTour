@@ -16,6 +16,12 @@ Paris Tour 的重要变更记录于此。
 
 ### 变更
 
+### 修复
+
+## [0.10.3] - 2026-08-24
+
+### 新增
+
 - 行程按天增量同步：`patch_trip_days` / `pull_trip_days` 只传输有改动的天；两人改不同天不再互相覆盖整份行程。
 - Realtime 在行程核心未变时只拉取 artifacts，不再整页重水合；切走页面或隐藏标签会立刻 flush，并去掉 8 秒最短上传间隔。
 - 地图路线缓存、酒店折叠态与 `fetchedAt` 不再触发云端写入。
@@ -23,6 +29,7 @@ Paris Tour 的重要变更记录于此。
 ### 修复
 
 - 两人同时编辑时用 `updated_at` 乐观锁避免用过期快照覆盖；本机有未保存的行程改动时不套用远端核心，保存时保留本地修改。
+
 
 ## [0.10.2] - 2026-08-24
 
@@ -629,7 +636,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.2...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.3...HEAD
+- [0.10.3]: https://github.com/JackZ0526/ParisTour/compare/v0.10.2...v0.10.3
 - [0.10.2]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...v0.10.2
 - [0.10.1]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...v0.10.1
 - [0.10.0]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...v0.10.0

@@ -19,6 +19,13 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.10.3] - 2026-08-24
+
+### Fixed
+
+- patch itinerary days and stop stale collaborator overwrites
+
+
 ## [0.10.2] - 2026-08-24
 
 ### Fixed
@@ -730,7 +737,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.2...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.3...HEAD
+- [0.10.3]: https://github.com/JackZ0526/ParisTour/compare/v0.10.2...v0.10.3
 - [0.10.2]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...v0.10.2
 - [0.10.1]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...v0.10.1
 - [0.10.0]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...v0.10.0
