@@ -18,7 +18,6 @@ import {
   placeOriginalLabel,
   placeTitleLines,
 } from '../../../shared/utils/placeTitle'
-import { ActivityBars } from '../../../shared/components/LoadingIndicator'
 import { useTranslation } from '../../../shared/i18n'
 
 const EXCLUDE_PROP_CJK_OPTIONS = { excludePropCjk: true } as const
@@ -314,9 +313,13 @@ export function PlaceName({
               className="-mt-px flex min-h-[15px] min-w-0 items-center gap-1.5 text-xs font-normal leading-tight text-[var(--copper)]"
             >
               {llmZhTranslating && !displayedZh ? (
-                <span className="inline-flex min-w-0 items-center gap-1 text-[var(--stone)]/70">
-                  <ActivityBars size="sm" />
+                <span className="inline-flex min-w-0 items-center gap-0.5 text-[var(--stone)]/70">
                   <span>{t('place.translating')}</span>
+                  <span className="llm-think-chip-dots" aria-hidden>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
                 </span>
               ) : (
                 <span className="min-w-0 truncate">

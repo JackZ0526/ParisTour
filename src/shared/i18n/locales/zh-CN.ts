@@ -533,7 +533,7 @@ export const zhCN: I18nSchema = {
     sourceWebsite: '官网',
     ratingSrLabel: '{source} 评分 ',
     // PlaceName translation badge
-    translating: '翻译中…',
+    translating: '翻译中',
     translatedBadgeAria: '非公认中文名，由 AI 翻译',
     translatedBadgeTitle: '非公认中文名，由 AI 翻译',
     // AddPlaceDialog

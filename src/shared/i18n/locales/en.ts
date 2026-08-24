@@ -533,7 +533,7 @@ export const en: I18nSchema = {
     sourceWebsite: 'Official site',
     ratingSrLabel: '{source} rating ',
     // PlaceName translation badge
-    translating: 'Translating…',
+    translating: 'Translating',
     translatedBadgeAria: 'AI-translated name',
     translatedBadgeTitle: 'AI-translated name, not the canonical local name',
     // AddPlaceDialog
