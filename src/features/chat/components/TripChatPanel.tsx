@@ -839,10 +839,9 @@ export function TripChatPanel({
     setWorkStepsOpen(false)
     setReasoningText('')
     setReasoningOpen(false)
-    // The preflight classifier itself runs without thinking. Its result will
-    // update this before the answer model starts.
-    setRequestThinkingEnabled(false)
-    setShowReasoningUi(false)
+    const initialThinking = resolveThinkingForTask(getThinkingMode(), userText, 'tripChat').enabled
+    setRequestThinkingEnabled(initialThinking)
+    setShowReasoningUi(initialThinking)
   }
 
   function clearWorkPipeline() {
@@ -2762,18 +2761,78 @@ export function TripChatPanel({
                     transition={{ duration: 0.2 }}
                     className="flex items-center gap-1.5 whitespace-nowrap"
                   >
-                    <ButtonSpinner
-                      mode="thinking"
-                      task="tripChat"
-                      userText={busyUserText || input}
-                      thinkingEnabled={requestThinkingEnabled}
-                    />
-                    <span className="tracking-wide text-[11px] font-medium">
-                      {chatBusy.label({
+                    {(() => {
+                      const activeWorkStep = workSteps.find((s) => s.status === 'active')
+                      let dynamicLabel = chatBusy.label({
                         thinking: t('chat.thinkingAssistantLabel'),
                         generating: t('chat.answeringAssistantLabel'),
-                      })}
-                    </span>
+                      })
+                      let spinnerMode: 'thinking' | 'generating' = 'generating'
+
+                      if (activeWorkStep) {
+                        switch (activeWorkStep.id) {
+                          case 'preprocessPlan':
+                            dynamicLabel = locale === 'en' ? 'Planning…' : '规划策略中…'
+                            spinnerMode = requestThinkingEnabled ? 'thinking' : 'generating'
+                            break
+                          case 'visualAnalysis':
+                            dynamicLabel = locale === 'en' ? 'Analyzing images…' : '解析图片中…'
+                            spinnerMode = 'generating'
+                            break
+                          case 'webSearch':
+                            dynamicLabel = locale === 'en' ? 'Searching web…' : '搜索网络中…'
+                            spinnerMode = 'generating'
+                            break
+                          case 'generate':
+                            if (requestThinkingEnabled && !streamingReply) {
+                              dynamicLabel = locale === 'en' ? 'Thinking…' : '深度思考中…'
+                              spinnerMode = 'thinking'
+                            } else {
+                              dynamicLabel = locale === 'en' ? 'Generating…' : '生成回答中…'
+                              spinnerMode = 'generating'
+                            }
+                            break
+                          case 'parse':
+                            dynamicLabel = locale === 'en' ? 'Parsing actions…' : '解析动作中…'
+                            spinnerMode = 'generating'
+                            break
+                          case 'resolvePlaces':
+                            dynamicLabel = locale === 'en' ? 'Verifying places…' : '核对地点中…'
+                            spinnerMode = 'generating'
+                            break
+                          case 'apply':
+                            dynamicLabel = locale === 'en' ? 'Updating itinerary…' : '应用改动中…'
+                            spinnerMode = 'generating'
+                            break
+                          default:
+                            dynamicLabel = activeWorkStep.label || dynamicLabel
+                            spinnerMode = requestThinkingEnabled ? 'thinking' : 'generating'
+                        }
+                      }
+
+                      return (
+                        <>
+                          <ButtonSpinner
+                            mode={spinnerMode}
+                            task="tripChat"
+                            userText={busyUserText || input}
+                            thinkingEnabled={requestThinkingEnabled}
+                          />
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                              key={dynamicLabel}
+                              initial={{ opacity: 0, y: 3 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -3 }}
+                              transition={{ duration: 0.18 }}
+                              className="tracking-wide text-[11px] font-medium"
+                            >
+                              {dynamicLabel}
+                            </motion.span>
+                          </AnimatePresence>
+                        </>
+                      )
+                    })()}
                   </motion.div>
                 ) : (
                   <motion.div
