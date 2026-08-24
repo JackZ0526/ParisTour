@@ -304,7 +304,7 @@ export function TripChatPanel({
     } else if (colorKeepActive) {
       const timer = setTimeout(() => {
         setColorKeepActive(false)
-      }, 320)
+      }, 380)
       return () => clearTimeout(timer)
     }
   }, [busy, colorKeepActive])
@@ -2742,7 +2742,7 @@ export function TripChatPanel({
                 title={busy ? undefined : t('chat.sendButton')}
                 aria-label={busy ? undefined : t('chat.sendButton')}
                 transition={{
-                  layout: { type: 'spring', stiffness: 320, damping: 34, mass: 0.6 },
+                  layout: { type: 'spring', stiffness: 380, damping: 28, mass: 0.8 },
                 }}
                 className={`h-8 max-h-8 min-h-8 inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 box-border ${
                   busy
