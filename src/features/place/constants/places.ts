@@ -246,6 +246,7 @@ export const places: Record<string, Place> = {
   'attr-cdg': {
     id: 'attr-cdg',
     name: '戴高乐机场 CDG',
+    nameLocal: 'Aéroport Paris-Charles de Gaulle (CDG)',
     type: 'transport',
     description: '国际出发建议提前 3–3.5 小时到机场；RER B 或出租车/网约车皆可。',
     ratingHint: '—',

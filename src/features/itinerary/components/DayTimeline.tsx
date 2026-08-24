@@ -34,6 +34,7 @@ import { PATH_MODE_COLORS } from '../../map/services/googleNav'
 import type { RecommendationPreferences } from '../../place/services/recommendationPreferences'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../../../types'
 import {
+  CDG_PLACE_ID,
   getDayOrigin,
   isAirportPlace,
   isHotelPlace,
@@ -1822,7 +1823,13 @@ export function DayTimeline({
               </span>
               <div className="min-w-0 flex-1">
                 <span className="text-xs text-[var(--stone)]">{t('itinerary.todayLastStop')}</span>
-                <p className="mt-1 font-medium">{place.name}</p>
+                <p className="mt-1 font-medium">
+                  {isAirportStop || place.id === CDG_PLACE_ID
+                    ? t('itinerary.cdgAirportLabel')
+                    : locale === 'en'
+                      ? place.nameLocal || place.name
+                      : place.name}
+                </p>
               </div>
             </div>
           ) : (
