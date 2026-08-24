@@ -1080,7 +1080,7 @@ export function AddPlaceDialog({
             >
           {mainTab === 'ai' ? (
             <div className="space-y-3">
-              <p className="text-xs text-[var(--stone)]">
+              <p className="text-xs text-[var(--stone)] truncate">
                 {t('place.recsIntro', { title: dayTitle })}
               </p>
 

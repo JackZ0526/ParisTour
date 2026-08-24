@@ -561,7 +561,7 @@ export const zhCN: I18nSchema = {
     addingBusy: '加入中…',
     tabAiRecs: 'AI 推荐',
     tabGoogleSearch: 'Google 搜索',
-    recsIntro: '根据今天「{title}」给出推荐。点「换一批」可刷新列表；已加入行程的地点会暂时隐藏。',
+    recsIntro: '根据今日「{title}」智能推荐，已加入行程的地点自动隐藏。',
     recsEmpty: '这次没有可用推荐，请再点「换一批」或改用 Google 搜索。',
     recsUnavailable: '推荐助手暂不可用，请改用 Google 搜索。',
     recsCategoryEmpty: '这一类暂时没有推荐，可切换其他分类、换一批，或用 Google 搜索。',

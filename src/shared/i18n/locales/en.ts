@@ -561,7 +561,7 @@ export const en: I18nSchema = {
     addingBusy: 'Adding…',
     tabAiRecs: 'AI Recommend',
     tabGoogleSearch: 'Google Search',
-    recsIntro: 'Based on today\'s "{title}", here are recommendations. Tap "Refresh" to get a new batch; places already in your itinerary are temporarily hidden.',
+    recsIntro: 'Curated for today\'s "{title}". Places in your itinerary are hidden.',
     recsEmpty: 'No recommendations this time. Tap "Refresh" or switch to Google Search.',
     recsUnavailable: 'Recommendation assistant unavailable. Please use Google Search.',
     recsCategoryEmpty: 'No recommendations in this category. Try another category, refresh, or use Google Search.',
