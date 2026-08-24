@@ -15,6 +15,7 @@ import {
 } from '../prompts'
 import { LlmRequestError } from '../errors'
 import { extractJsonObject } from '../json'
+import { parsePartialJson } from '../stream'
 import {
   recommendationPreferencesPrompt,
   type RecommendationPreferences,
@@ -1141,6 +1142,7 @@ export interface TranslateItineraryTextInput {
   sourceLocale: Locale
   targetLocale: Locale
   signal?: AbortSignal
+  onProgress?: (partialDays: DayPlan[]) => void
 }
 
 export interface TranslateItineraryTextResult {
@@ -1271,16 +1273,41 @@ export async function translateItineraryText(
   if (input.sourceLocale === input.targetLocale) {
     return { days: input.days }
   }
-  const { days, sourceLocale, targetLocale, signal } = input
+  const { days, sourceLocale, targetLocale, signal, onProgress } = input
   const langRule = getLlmLanguageInstruction(targetLocale)
   const system = buildTranslateSystemPrompt(targetLocale, sourceLocale, langRule)
   const user = JSON.stringify({ days })
+
+  // Emit initial empty template so UI immediately displays graceful skeleton shimmers
+  if (onProgress) {
+    const initialBlank = days.map((source) =>
+      mergeTranslatedDay(source, undefined, true /* isStreaming */),
+    )
+    onProgress(initialBlank)
+  }
+
+  const onDelta = onProgress
+    ? (_delta: string, fullText: string) => {
+        const parsed = parsePartialJson<{ days?: unknown }>(fullText)
+        const partialDays = Array.isArray(parsed?.days)
+          ? (parsed!.days as Partial<DayPlan>[])
+          : null
+        if (partialDays) {
+          const merged: DayPlan[] = days.map((source, i) => {
+            const translated = partialDays[i] as DayPlan | undefined
+            return mergeTranslatedDay(source, translated, true /* isStreaming */)
+          })
+          onProgress(merged)
+        }
+      }
+    : undefined
 
   const raw = await generateText(system, user, {
     strict: true,
     task: 'itineraryTranslate',
     json: true,
     signal,
+    onDelta,
   })
   if (!raw) {
     throw new LlmRequestError('大模型没有返回翻译结果。')
@@ -1295,7 +1322,7 @@ export async function translateItineraryText(
   // walkLevel, or placeKey values. The LLM is only trusted with strings.
   const merged: DayPlan[] = days.map((source, i) => {
     const translated = parsedDays[i]
-    return mergeTranslatedDay(source, translated)
+    return mergeTranslatedDay(source, translated, false /* isStreaming */)
   })
   return { days: merged }
 }
@@ -1305,37 +1332,84 @@ export async function translateItineraryText(
  * (untrusted). The source's structured fields always win; the translated
  * object's string fields win, with safe fallbacks if the LLM dropped any.
  */
-function mergeTranslatedDay(source: DayPlan, translated: DayPlan | undefined): DayPlan {
-  if (!translated) return source
+function mergeTranslatedDay(
+  source: DayPlan,
+  translated: DayPlan | undefined,
+  isStreaming = false,
+): DayPlan {
+  if (!translated) {
+    if (isStreaming) {
+      return {
+        ...source,
+        title: '',
+        theme: '',
+        summary: '',
+        stops: source.stops.map((s) => ({ ...s, note: '', duration: '' })),
+      }
+    }
+    return source
+  }
   const merged: DayPlan = {
     ...source,
-    title: typeof translated.title === 'string' && translated.title.trim()
-      ? translated.title
-      : source.title,
-    theme: typeof translated.theme === 'string' && translated.theme.trim()
-      ? translated.theme
-      : source.theme,
-    summary: typeof translated.summary === 'string' && translated.summary.trim()
-      ? translated.summary
-      : source.summary,
+    title:
+      typeof translated.title === 'string'
+        ? isStreaming
+          ? translated.title
+          : translated.title.trim() || source.title
+        : isStreaming
+        ? ''
+        : source.title,
+    theme:
+      typeof translated.theme === 'string'
+        ? isStreaming
+          ? translated.theme
+          : translated.theme.trim() || source.theme
+        : isStreaming
+        ? ''
+        : source.theme,
+    summary:
+      typeof translated.summary === 'string'
+        ? isStreaming
+          ? translated.summary
+          : translated.summary.trim() || source.summary
+        : isStreaming
+        ? ''
+        : source.summary,
     metroHintFromArea: {
       ...source.metroHintFromArea,
       ...(translated.metroHintFromArea || {}),
     },
   }
-  if (Array.isArray(translated.stops) && translated.stops.length === source.stops.length) {
+  if (Array.isArray(translated.stops)) {
     merged.stops = source.stops.map((sourceStop, j) => {
       const trStop = translated.stops[j]
+      if (!trStop) {
+        return isStreaming
+          ? { ...sourceStop, note: '', duration: '' }
+          : sourceStop
+      }
       return {
         ...sourceStop,
-        note: typeof trStop?.note === 'string' && trStop.note.trim()
-          ? trStop.note
-          : sourceStop.note,
-        duration: typeof trStop?.duration === 'string' && trStop.duration.trim()
-          ? trStop.duration
-          : sourceStop.duration,
+        note:
+          typeof trStop?.note === 'string'
+            ? isStreaming
+              ? trStop.note
+              : trStop.note.trim() || sourceStop.note
+            : isStreaming
+            ? ''
+            : sourceStop.note,
+        duration:
+          typeof trStop?.duration === 'string'
+            ? isStreaming
+              ? trStop.duration
+              : trStop.duration.trim() || sourceStop.duration
+            : isStreaming
+            ? ''
+            : sourceStop.duration,
       }
     })
+  } else if (isStreaming) {
+    merged.stops = source.stops.map((s) => ({ ...s, note: '', duration: '' }))
   }
   return merged
 }

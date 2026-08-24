@@ -1088,9 +1088,14 @@ export function useItineraryGeneration(
           days: currentDays,
           sourceLocale,
           targetLocale,
+          onProgress: (partialDays) => {
+            setDays(partialDays)
+          },
         })
         setDays(translatedDays)
       } catch (err) {
+        // Rollback to current days on failure
+        setDays(currentDays)
         const detail = err instanceof Error ? err.message : String(err)
         setItineraryGenError(detail)
       } finally {

@@ -125,6 +125,7 @@ export {
   extractWebSearchQueries,
   openaiResponsesWithWebSearch,
   openaiWebSearchModel,
+  parsePartialJson,
 } from './stream'
 
 // ── HTTP transport (chat-completions / streaming / provider dispatch) ──

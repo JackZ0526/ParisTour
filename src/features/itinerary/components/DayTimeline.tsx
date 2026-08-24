@@ -1577,7 +1577,7 @@ export function DayTimeline({
           </div>
           )}
         </div>
-        {dayPending || itineraryTranslating ? (
+        {dayPending ? (
           <div className="mt-2 space-y-2" aria-hidden>
             <span className="block h-7 w-[48%] max-w-sm rounded-lg day-tab-shimmer" />
             <span className="block h-4 w-[32%] sm:w-[28%] rounded-md day-tab-shimmer" />
@@ -1589,15 +1589,31 @@ export function DayTimeline({
           </div>
         ) : (
           <>
-            <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl text-[var(--ink)]">
-              {day.title}
-            </h3>
-            <p className="break-words text-sm text-[var(--copper)]">
-              {day.theme}
-            </p>
-            <p className="mt-2 break-words text-sm text-[var(--stone)] dark:text-zinc-300">
-              {day.summary}
-            </p>
+            {day.title ? (
+              <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl text-[var(--ink)]">
+                {day.title}
+              </h3>
+            ) : (
+              <span className="mt-2 block h-7 w-[48%] max-w-sm rounded-lg day-tab-shimmer" />
+            )}
+            {day.theme ? (
+              <p className="break-words text-sm text-[var(--copper)]">
+                {day.theme}
+              </p>
+            ) : (
+              <span className="mt-1 block h-4 w-[32%] sm:w-[28%] rounded-md day-tab-shimmer" />
+            )}
+            {day.summary ? (
+              <p className="mt-2 break-words text-sm text-[var(--stone)] dark:text-zinc-300">
+                {day.summary}
+              </p>
+            ) : (
+              <div className="mt-2 pt-1 space-y-1.5" aria-hidden>
+                <span className="block h-3.5 w-full rounded-full day-tab-shimmer" />
+                <span className="block h-3.5 w-[96%] rounded-full day-tab-shimmer" />
+                <span className="block h-3.5 w-[56%] rounded-full day-tab-shimmer" />
+              </div>
+            )}
           </>
         )}
         {dayRegenError && (
@@ -1888,14 +1904,14 @@ export function DayTimeline({
                     nameLocal={place.nameLocal}
                     location={place.location}
                   />
-                  {itineraryTranslating ? (
+                  {stop.note ? (
+                    <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">{stop.note}</p>
+                  ) : itineraryTranslating ? (
                     <div className="mt-2 space-y-1.5" aria-hidden>
                       <span className="block h-3.5 w-3/4 rounded-full day-tab-shimmer" />
                       <span className="block h-3.5 w-1/2 rounded-full day-tab-shimmer" />
                     </div>
-                  ) : (
-                    <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">{stop.note}</p>
-                  )}
+                  ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>

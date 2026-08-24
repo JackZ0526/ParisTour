@@ -161,6 +161,108 @@ export function extractPartialJsonStringArray(
   return null
 }
 
+/**
+ * Safely parse a partial/incomplete JSON string while tokens stream in.
+ * Automatically closes unclosed strings, arrays, and objects.
+ * Returns `null` if the text cannot be repaired into a valid JSON value yet.
+ */
+export function parsePartialJson<T = unknown>(raw: string): T | null {
+  if (!raw || typeof raw !== 'string') return null
+  let text = raw.trim()
+  if (!text) return null
+
+  // Strip markdown code fences if model started with ```json or ```
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '')
+  }
+
+  // 1. Fast path: already valid complete JSON
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    // continue to repair
+  }
+
+  // 2. Repair incomplete JSON
+  const stack: Array<'{' | '['> = []
+  let inString = false
+  let isEscaped = false
+  let sanitized = ''
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!
+
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false
+        sanitized += ch
+      } else if (ch === '\\') {
+        isEscaped = true
+        sanitized += ch
+      } else if (ch === '"') {
+        inString = false
+        sanitized += ch
+      } else {
+        sanitized += ch
+      }
+    } else {
+      if (ch === '"') {
+        inString = true
+        sanitized += ch
+      } else if (ch === '{' || ch === '[') {
+        stack.push(ch)
+        sanitized += ch
+      } else if (ch === '}' || ch === ']') {
+        const expected = ch === '}' ? '{' : '['
+        if (stack.length > 0 && stack[stack.length - 1] === expected) {
+          stack.pop()
+        }
+        sanitized += ch
+      } else if (!/\s/.test(ch)) {
+        sanitized += ch
+      } else {
+        sanitized += ch
+      }
+    }
+  }
+
+  // If ended inside an open string:
+  if (inString) {
+    if (isEscaped || sanitized.endsWith('\\')) {
+      sanitized = sanitized.replace(/\\+$/, '')
+    }
+    sanitized = sanitized.replace(/\\u[0-9a-fA-F]{0,3}$/, '')
+    sanitized += '"'
+  }
+
+  sanitized = sanitized.trimEnd()
+
+  if (sanitized.endsWith(',')) {
+    sanitized = sanitized.slice(0, -1).trimEnd()
+  } else if (sanitized.endsWith(':')) {
+    sanitized += '""'
+  }
+
+  // Close unclosed brackets/braces in reverse order
+  while (stack.length > 0) {
+    const open = stack.pop()!
+    if (sanitized.endsWith(',')) {
+      sanitized = sanitized.slice(0, -1).trimEnd()
+    }
+    if (open === '{') {
+      sanitized += '}'
+    } else if (open === '[') {
+      sanitized += ']'
+    }
+  }
+
+  try {
+    return JSON.parse(sanitized) as T
+  } catch {
+    return null
+  }
+}
+
 // ── OpenAI Responses API payload shape ──
 
 export type OpenAIResponsesPayload = {

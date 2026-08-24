@@ -990,7 +990,7 @@ export default function App() {
                                     cal ? formatTripDayLabel(cal, locale) : undefined
                                   }
                                   title={d.title}
-                                  pending={isDayGenerationPending(d.day) || itineraryTranslating}
+                                  pending={isDayGenerationPending(d.day) || (itineraryTranslating && !d.title)}
                                   active={i === dayIndex}
                                   hasInteracted={hasInteractedDay}
                                   onSelect={() => {
