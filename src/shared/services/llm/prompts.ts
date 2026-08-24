@@ -65,6 +65,7 @@ export function getCommonRules(locale: Locale = promptLocale()): string {
 <output_format>
 - Output exactly one JSON object. No markdown. No \`\`\`json\`\`\` fence. No explanation.
 - Field order (stream-friendly): reply first (user-visible conversation reply, language must follow the system-set language rule), then actions.
+- reply must contain a complete, informative, and helpful answer to the user's inquiry; never emit an empty reply or generic acknowledgments like "Got it"; answer questions and concepts thoroughly.
 - reply and actions must agree semantically: saying "added/replaced" requires a matching action.
 </output_format>
 
@@ -91,6 +92,7 @@ export function getCommonRules(locale: Locale = promptLocale()): string {
 <output_format>
 - 严格只输出一个 JSON 对象；不要 markdown；不要 \`\`\`json\`\`\` fence；不要解释。
 - 字段顺序（流式友好）：先 reply（用户可见的对话回复，语言必须遵循系统设定的语言指令），再 actions。
+- reply 必须包含对用户问题的实质性、有信息量的完整回答；禁止输出空 reply 或敷衍的“好的/已收到”；针对问答与科普必须给出清晰解释。
 - reply 与 actions 的语义必须一致：答应"已加入/已替换"必须有对应 action。
 </output_format>
 
