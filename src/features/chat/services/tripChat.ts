@@ -1749,6 +1749,11 @@ export async function sendTripChatMessage(input: {
         imageCount: input.images.length,
         isProxy: false,
       })
+      await new Promise((r) => setTimeout(r, 600))
+      input.onVisualAnalysis?.('done', {
+        imageCount: input.images.length,
+        isProxy: false,
+      })
     }
   } else {
     input.onVisualAnalysis?.('skip')
@@ -1764,12 +1769,6 @@ export async function sendTripChatMessage(input: {
     responseFormat: 'json_object',
     signal: input.signal,
   })
-  if (isVisionModel && input.images && input.images.length > 0) {
-    input.onVisualAnalysis?.('done', {
-      imageCount: input.images.length,
-      isProxy: false,
-    })
-  }
   const text = await repairTripChatJson(rawText, input.signal)
   return parseTripChatResult(
     text,
@@ -1835,6 +1834,13 @@ export async function sendTripChatMessageStream(input: {
         imageCount: input.images.length,
         isProxy: false,
       })
+      // Give the multimodal visual inspection step a brief, smooth visual window (~600ms)
+      // so users can clearly perceive the active image recognition phase rather than an instantaneous flash.
+      await new Promise((r) => setTimeout(r, 600))
+      input.onVisualAnalysis?.('done', {
+        imageCount: input.images.length,
+        isProxy: false,
+      })
     }
   } else {
     input.onVisualAnalysis?.('skip')
@@ -1842,18 +1848,6 @@ export async function sendTripChatMessageStream(input: {
   const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
   let lastEmitted = ''
-
-  let visualMarkedDone = !isVisionModel
-  const markVisualDone = () => {
-    if (visualMarkedDone) return
-    visualMarkedDone = true
-    if (input.images && input.images.length > 0 && isVisionModel) {
-      input.onVisualAnalysis?.('done', {
-        imageCount: input.images.length,
-        isProxy: false,
-      })
-    }
-  }
 
   const rawText = await openaiChatStream(messages, {
     task: 'tripChat',
@@ -1864,7 +1858,6 @@ export async function sendTripChatMessageStream(input: {
     responseFormat: 'json_object',
     signal: input.signal,
     onDelta: (_delta, fullText) => {
-      markVisualDone()
       const partial =
         extractPartialJsonStringField(fullText, 'reply') ??
         extractPartialJsonStringField(fullText, 'message')
@@ -1873,11 +1866,9 @@ export async function sendTripChatMessageStream(input: {
       input.onReplyDelta?.(partial)
     },
     onReasoningDelta: (delta, fullReasoning) => {
-      markVisualDone()
       input.onReasoningDelta?.(delta, fullReasoning)
     },
   })
-  markVisualDone()
   const text = await repairTripChatJson(rawText, input.signal)
 
   const result = parseTripChatResult(
