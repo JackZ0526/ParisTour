@@ -2724,22 +2724,32 @@ export function TripChatPanel({
                 autoComplete="off"
                 className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 outline-none disabled:text-[var(--stone)]/60"
               />
-              <AnimatePresence mode="wait" initial={false}>
+              <motion.button
+                layout
+                type={busy ? 'button' : 'submit'}
+                disabled={!busy && ((!input.trim() && attachedImages.length === 0) || !open || convertingCount > 0)}
+                tabIndex={open ? undefined : -1}
+                title={busy ? undefined : t('chat.sendButton')}
+                aria-label={busy ? undefined : t('chat.sendButton')}
+                transition={{
+                  layout: { type: 'spring', stiffness: 380, damping: 28, mass: 0.8 },
+                }}
+                className={`inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 ${
+                  busy
+                    ? 'h-8 px-3 border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
+                    : (input.trim() || attachedImages.length > 0) && open && convertingCount === 0
+                      ? 'h-8 w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-105 active:scale-95 cursor-pointer'
+                      : 'h-8 w-8 bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
+                }`}
+              >
                 {busy ? (
                   <motion.div
-                    key="busy-pill"
-                    initial={{ opacity: 0, scale: 0.85, width: 32 }}
-                    animate={{ opacity: 1, scale: 1, width: 'auto' }}
-                    exit={{ opacity: 0, scale: 0.85, width: 32 }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 420,
-                      damping: 28,
-                      mass: 0.8,
-                    }}
-                    role="status"
-                    aria-live="polite"
-                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)]/95 text-white px-3 py-1.5 text-xs shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none overflow-hidden"
+                    key="busy-content"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <ButtonSpinner
                       mode="thinking"
@@ -2747,43 +2757,26 @@ export function TripChatPanel({
                       userText={busyUserText || input}
                       thinkingEnabled={requestThinkingEnabled}
                     />
-                    <motion.span
-                      initial={{ opacity: 0, x: 4 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -4 }}
-                      transition={{ duration: 0.2 }}
-                      className="tracking-wide text-[11px] whitespace-nowrap"
-                    >
-                      {chatBusy.label({ thinking: t('chat.thinkingAssistantLabel'), generating: t('chat.answeringAssistantLabel') })}
-                    </motion.span>
+                    <span className="tracking-wide text-[11px] font-medium">
+                      {chatBusy.label({
+                        thinking: t('chat.thinkingAssistantLabel'),
+                        generating: t('chat.answeringAssistantLabel'),
+                      })}
+                    </span>
                   </motion.div>
                 ) : (
-                  <motion.button
-                    key="send-arrow"
-                    type="submit"
-                    initial={{ opacity: 0, scale: 0.85 }}
+                  <motion.div
+                    key="arrow-content"
+                    initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.85 }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 450,
-                      damping: 28,
-                      mass: 0.8,
-                    }}
-                    disabled={((!input.trim() && attachedImages.length === 0) || !open || convertingCount > 0)}
-                    tabIndex={open ? undefined : -1}
-                    title={t('chat.sendButton')}
-                    aria-label={t('chat.sendButton')}
-                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
-                      (input.trim() || attachedImages.length > 0) && open && convertingCount === 0
-                        ? 'bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 active:scale-95 cursor-pointer'
-                        : 'bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
-                    }`}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center justify-center"
                   >
                     <ArrowUp size={16} strokeWidth={2.4} />
-                  </motion.button>
+                  </motion.div>
                 )}
-              </AnimatePresence>
+              </motion.button>
             </div>
           </form>
         </motion.div>
