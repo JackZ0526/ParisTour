@@ -608,7 +608,7 @@ export async function openaiResponsesWithWebSearch(input: {
     body: JSON.stringify({
       model,
       tools: [{ type: 'web_search' }],
-      tool_choice: 'required',
+      tool_choice: isDs ? 'auto' : 'required',
       instructions: input.instructions,
       input: input.user,
       stream: true,
