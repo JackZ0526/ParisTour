@@ -44,21 +44,21 @@ const TASK_THINKING: Record<
 > = {
   default: { baseline: 'low', min: 'off', max: 'medium' },
   tripChat: { baseline: 'low', min: 'off', max: 'high' },
-  dayCopy: { baseline: 'low', min: 'off', max: 'low' },
-  translate: { baseline: 'low', min: 'off', max: 'low' },
+  dayCopy: { baseline: 'off', min: 'off', max: 'off' },
+  translate: { baseline: 'off', min: 'off', max: 'off' },
   placeRecommend: { baseline: 'low', min: 'off', max: 'medium' },
   placeDescription: { baseline: 'low', min: 'off', max: 'medium' },
   placeDetail: { baseline: 'low', min: 'off', max: 'medium' },
-  placeName: { baseline: 'low', min: 'off', max: 'low' },
+  placeName: { baseline: 'off', min: 'off', max: 'off' },
   placeReviews: { baseline: 'low', min: 'off', max: 'medium' },
   hotelRecommend: { baseline: 'low', min: 'off', max: 'medium' },
   hotelDetail: { baseline: 'low', min: 'off', max: 'medium' },
-  // Structured JSON: thinking CoT shares max_tokens and often yields empty content.
+  // Structured JSON / pure copy: thinking CoT shares max_tokens and often yields empty content.
   itineraryGenerate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryDayGenerate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryTranslate: { baseline: 'off', min: 'off', max: 'off' },
   itineraryStart: { baseline: 'low', min: 'off', max: 'low' },
-  destinationSuggest: { baseline: 'low', min: 'off', max: 'low' },
+  destinationSuggest: { baseline: 'off', min: 'off', max: 'off' },
   preferenceExtract: { baseline: 'off', min: 'off', max: 'off' },
   router: { baseline: 'low', min: 'off', max: 'low' },
 }

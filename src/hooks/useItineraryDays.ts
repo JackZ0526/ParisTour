@@ -844,7 +844,7 @@ export function useItineraryDaysEffects(
             completeReorderSaveTransaction()
           }
         })
-    }, 900)
+    }, 400)
 
     return () => {
       cancelled = true

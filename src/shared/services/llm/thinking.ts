@@ -113,17 +113,16 @@ function thinkingHeuristicBucket(
   task: LlmTaskKind | undefined,
   userText: string | undefined,
 ): 'off' | 'easy' | 'default' | 'hard' {
-  // Translation / structured extraction: pure text mapping, CoT reasoning adds 3-8s TTFT before first token.
+  // Translation / day copywriting / structured extraction: pure text generation without 3-5s CoT reasoning latency.
   if (
+    task === 'dayCopy' ||
+    task === 'destinationSuggest' ||
+    task === 'placeName' ||
     task === 'itineraryTranslate' ||
     task === 'translate' ||
     task === 'preferenceExtract'
   ) {
     return 'off'
-  }
-  // Day copy / destination suggest / place name: easy.
-  if (task === 'dayCopy' || task === 'destinationSuggest' || task === 'placeName') {
-    return 'easy'
   }
   // Full / single-day itinerary: structured JSON with verified candidates —
   // medium planning is enough; "hard" would map UI-high → DeepSeek max CoT.

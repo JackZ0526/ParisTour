@@ -688,6 +688,8 @@ export async function generateDayCopy(input: {
       const text = await generateText(system, user, {
         task: 'dayCopy',
         json: true,
+        thinking: { enabled: false, effort: 'low' },
+        preflight: false,
         userText: input.placeNames.join(isEn ? ', ' : '、'),
       })
       if (!text) return fallbackDayCopy({ ...input, locale })
