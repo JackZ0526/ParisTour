@@ -767,6 +767,8 @@ export async function recommendPlacesForDay(input: {
   verifiedCandidates: VerifiedPlaceCandidate[]
   recommendationPreferences: RecommendationPreferences
   locale?: Locale
+  signal?: AbortSignal
+  onProgress?: (partial: PlaceRecommendation[]) => void
 }): Promise<PlaceRecommendation[]> {
   if (!isLlmConfigured()) return []
 
@@ -873,12 +875,82 @@ export async function recommendPlacesForDay(input: {
     ),
   })
 
-  // Non-stream chat: await full completion body before JSON parse (not SSE).
+  const verifiedById = new Map(
+    input.verifiedCandidates
+      .filter((candidate) => candidate.id)
+      .map((candidate) => [candidate.id!, candidate]),
+  )
+  const verifiedByName = new Map(
+    input.verifiedCandidates.map((candidate) => [
+      candidate.name.trim().toLowerCase(),
+      candidate,
+    ]),
+  )
+
+  const sanitizeRecommendations = (rawList: unknown[]): PlaceRecommendation[] => {
+    const outList: PlaceRecommendation[] = []
+    const seen = new Set<string>()
+    const typeCounts: Record<RecommendPlaceType, number> = {
+      attraction: 0,
+      cafe: 0,
+      restaurant: 0,
+    }
+    for (const item of rawList) {
+      if (!item || typeof item !== 'object') continue
+      const row = item as Record<string, unknown>
+      const proposedName = String(row.name || '').trim()
+      const proposedId = String(row.googlePlaceId || '').trim()
+      const verified =
+        (proposedId ? verifiedById.get(proposedId) : undefined) ||
+        verifiedByName.get(proposedName.toLowerCase())
+      const name = verified ? verified.name : proposedName
+      if (!name) continue
+      const key = name.toLowerCase()
+      if (itineraryExclude.has(key) || seen.has(key)) continue
+      const type = verified
+        ? verified.type
+        : requestedTypes.includes(row.type as RecommendPlaceType)
+          ? (row.type as RecommendPlaceType)
+          : requestedTypes[0]
+      if (!requestedTypes.includes(type) || typeCounts[type] >= countPerType) continue
+      const reason = String(
+        row.reason || (isEn ? "Fits well into today's rhythm." : '适合补充进今天的行程'),
+      ).trim()
+      const intro = String(row.intro || row.description || reason).trim()
+      seen.add(key)
+      typeCounts[type] += 1
+      outList.push({
+        googlePlaceId: verified?.id || (proposedId || undefined),
+        name,
+        nameLocal: String(row.nameLocal || '').trim() || undefined,
+        type,
+        reason,
+        intro: intro || reason,
+        area: String(row.area || verified?.address || '').trim() || undefined,
+      })
+    }
+    return outList
+  }
+
+  const onDelta = input.onProgress
+    ? (_delta: string, fullText: string) => {
+        const parsed = parsePartialJson<{ recommendations?: unknown[] }>(fullText)
+        if (parsed && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
+          const partialList = sanitizeRecommendations(parsed.recommendations)
+          if (partialList.length > 0) {
+            input.onProgress?.(partialList)
+          }
+        }
+      }
+    : undefined
+
   const text = await generateText(system, user, {
     strict: true,
     task: 'placeRecommend',
     json: true,
     webSearch: false,
+    signal: input.signal,
+    onDelta,
     preflightContext: {
       day: input.day,
       types: input.types,
@@ -902,53 +974,5 @@ export async function recommendPlacesForDay(input: {
     )
   }
 
-  const out: PlaceRecommendation[] = []
-  const seen = new Set<string>()
-  const typeCounts: Record<RecommendPlaceType, number> = {
-    attraction: 0,
-    cafe: 0,
-    restaurant: 0,
-  }
-  const verifiedById = new Map(
-    input.verifiedCandidates
-      .filter((candidate) => candidate.id)
-      .map((candidate) => [candidate.id!, candidate]),
-  )
-  const verifiedByName = new Map(
-    input.verifiedCandidates.map((candidate) => [
-      candidate.name.trim().toLowerCase(),
-      candidate,
-    ]),
-  )
-
-  for (const item of list) {
-    if (!item || typeof item !== 'object') continue
-    const row = item as Record<string, unknown>
-    const proposedName = String(row.name || '').trim()
-    const proposedId = String(row.googlePlaceId || '').trim()
-    const verified =
-      (proposedId ? verifiedById.get(proposedId) : undefined) ||
-      verifiedByName.get(proposedName.toLowerCase())
-    if (!verified) continue
-    const name = verified.name
-    const key = name.toLowerCase()
-    if (itineraryExclude.has(key) || seen.has(key)) continue
-    const type = verified.type
-    if (!requestedTypes.includes(type) || typeCounts[type] >= countPerType) continue
-    const reason = String(row.reason || '适合补充进今天的行程').trim()
-    const intro = String(row.intro || row.description || reason).trim()
-    out.push({
-      googlePlaceId: verified.id,
-      name,
-      nameLocal: String(row.nameLocal || '').trim() || undefined,
-      type,
-      reason,
-      intro: intro || reason,
-      area: String(row.area || '').trim() || undefined,
-    })
-    seen.add(key)
-    typeCounts[type] += 1
-  }
-
-  return out
+  return sanitizeRecommendations(list)
 }

@@ -323,6 +323,18 @@ export function AddPlaceDialog({
         verifiedCandidates,
         recommendationPreferences,
         locale,
+        onProgress: (partialList) => {
+          if (epoch !== recommendationEpochRef.current) return
+          if (!partialList.length) return
+          const partialTypes = new Set(partialList.map((item) => item.type))
+          const progressive = [
+            ...recommendationsRef.current.filter(
+              (item) => !partialTypes.has(item.type),
+            ),
+            ...partialList,
+          ]
+          setRecommendations(progressive)
+        },
       })
       if (epoch !== recommendationEpochRef.current) return false
 
@@ -517,6 +529,8 @@ export function AddPlaceDialog({
       .filter((item) => item.type === type)
       .map((item) => item.name)
     setRefreshingCategory(type)
+    setRecommendations((prev) => prev.filter((item) => item.type !== type))
+    recommendationsRef.current = recommendationsRef.current.filter((item) => item.type !== type)
     try {
       await fetchRecommendations({
         types: [type],
@@ -1315,7 +1329,21 @@ export function AddPlaceDialog({
                       </motion.li>
                     )
                   })}
-                  {!visible.length && (
+                  {loadingRecs && visible.length > 0 && visible.length < 4 &&
+                    Array.from({ length: 4 - visible.length }).map((_, idx) => (
+                      <li key={`shimmer-tail-${idx}`} aria-hidden>
+                        <div
+                          className={`overflow-hidden rounded-2xl border p-3.5 space-y-2.5 ${glassCardSurfaceClass}`}
+                        >
+                          <span className="block h-5 w-[44%] max-w-xs rounded-md day-tab-shimmer" />
+                          <div className="space-y-1.5 pt-0.5">
+                            <span className="block h-3.5 w-full rounded-full day-tab-shimmer" />
+                            <span className="block h-3.5 w-[84%] rounded-full day-tab-shimmer" />
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  {!visible.length && !loadingRecs && (
                     <p className="py-6 text-center text-sm text-[var(--stone)]">
                       {t('place.recsCategoryEmpty')}
                     </p>
