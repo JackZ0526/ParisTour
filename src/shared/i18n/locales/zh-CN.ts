@@ -637,6 +637,7 @@ export const zhCN: I18nSchema = {
     responseInterrupted: '回答中断：',
     // Trip chat panel
     currentDay: '第 {day} 天',
+    viewingPlace: '正在看「{name}」',
     tryAskingIntro: '试试问：酒店、地点或行程调整',
     sendButton: '发送',
     uploadImage: '上传图片或截图',

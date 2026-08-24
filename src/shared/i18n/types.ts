@@ -661,6 +661,7 @@ export interface I18nSchema {
     responseInterrupted: string
     // Trip chat panel
     currentDay: string
+    viewingPlace: string
     tryAskingIntro: string
     sendButton: string
     uploadImage: string

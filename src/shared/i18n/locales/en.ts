@@ -637,6 +637,7 @@ export const en: I18nSchema = {
     responseInterrupted: 'Response interrupted: ',
     // Trip chat panel
     currentDay: 'Day {day}',
+    viewingPlace: 'Viewing "{name}"',
     tryAskingIntro: 'Try asking: hotels, places, or itinerary changes',
     sendButton: 'Send',
     uploadImage: 'Upload image or screenshot',

@@ -2416,7 +2416,7 @@ export function TripChatPanel({
                   {viewing && (
                     <span className="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-full border border-[#d7a98a]/60 dark:border-[#d48354]/40 bg-[#f6e8de]/85 dark:bg-[#d48354]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--copper)] shadow-2xs backdrop-blur-sm">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--copper)]" />
-                      <span className="truncate">正在看「{viewing.name}」</span>
+                      <span className="truncate">{t('chat.viewingPlace', { name: viewing.name })}</span>
                     </span>
                   )}
                 </div>
