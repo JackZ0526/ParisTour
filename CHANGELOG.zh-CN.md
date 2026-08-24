@@ -14,6 +14,14 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
+### 变更
+
+### 修复
+
+## [0.9.0] - 2026-08-24
+
+### 新增
+
 - 引入多语言 0ms 秒切缓存机制（`localePrefetch` 与 `memoizePlaceDetailCopy`），在中英文切换时实现 0 延迟、0 网络请求与 0 骨架屏即时切换体验。
 - 地点推荐（Add Place）全面接入流式实时涌现输出（Streaming Partial JSON），推荐卡片逐张流式渲染并带有 1:1 Progressive Shimmer 渐进尾部骨架屏。
 - 地点推荐卡片展开详情页接入 1:1 照片画廊与元数据 Shimmer 骨架屏，后台拉取照片与详细信息期间不阻断用户阅读 AI 理由与添加行程。
@@ -22,12 +30,12 @@ Paris Tour 的重要变更记录于此。
 ### 变更
 
 - 大模型思考模式（Thinking）策略与耗时专项优化：
-  - 查词翻译助手与前置意图分类网关强制关闭思考，响应速度提升 80%+；
-  - 修改日程后的文案拟定关闭冗余推理，耗时从数秒大幅压缩至 300ms 级别；
-  - 保持各场景的智能前置路由判断架构。
+- 查词翻译助手与前置意图分类网关强制关闭思考，响应速度提升 80%+；
+- 修改日程后的文案拟定关闭冗余推理，耗时从数秒大幅压缩至 300ms 级别；
+- 保持各场景的智能前置路由判断架构。
 - 全站大模型 Thinking / Generating 思考加载动效全面升级：
-  - 移除原有均衡器柱条（`|||||`），升级为极简星芒与 3 阶错峰动态流光省略号（Dynamic Dots）；
-  - 全局自动清洗输入文案末尾的静态省略号（`Thinking...` ➔ `Thinking` / `正在思考…` ➔ `正在思考`），视觉更清爽干净。
+- 移除原有均衡器柱条（`|||||`），升级为极简星芒与 3 阶错峰动态流光省略号（Dynamic Dots）；
+- 全局自动清洗输入文案末尾的静态省略号（`Thinking...` ➔ `Thinking` / `正在思考…` ➔ `正在思考`），视觉更清爽干净。
 - 地点推荐弹窗分类胶囊去除冗余的括号与数量标记（如 `(4)`、`(...)`），视觉更紧凑极简。
 - 地点推荐顶部说明文案提炼为单行排版，彻底避免移动端与窄屏掉字折行。
 - 地点名称实时翻译状态全面统一为动态流光省略号。
@@ -36,6 +44,7 @@ Paris Tour 的重要变更记录于此。
 
 - 修复地点详情页「官方网站（Official Website）」胶囊按钮缺失外链图标的问题，补齐 `<ExternalLink />` 与悬浮微动效，与 Google Maps 地址按钮保持视觉对齐。
 - 修复多语言切换与预加载过程中的异步竞态与重复请求。
+
 
 ## [0.8.1] - 2026-08-22
 
@@ -518,7 +527,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...HEAD
+- [0.9.0]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...v0.9.0
 - [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
 - [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0
 - [0.7.0]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...v0.7.0

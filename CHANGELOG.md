@@ -19,6 +19,79 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.9.0] - 2026-08-24
+
+### Added
+
+- replace loadingGooglePhoto text with matching photo and details shimmer skeleton
+- enable live streaming output for place recommendations with progressive shimmer tail
+- add matching shimmer skeleton cards during recommendation refreshing
+- support streaming output and shimmer loading for drafting copy
+- implement 0ms instant multi-language switching with structure-keyed cache
+- support real-time progressive streaming for itinerary translation
+- add shimmer placeholders for day title, theme, summary, and stop notes while translating
+- full English UI + locale-change auto-translate
+- disable zh translation in en mode and localize hotel/place details & LLM prompts
+- complete localization for place, dialogs, backup, share, and login
+- introduce reactive type-safe multi-language support (zh-CN & en)
+
+### Changed
+
+- add release notes for v0.9.0
+- keep recsIntro on a single line in AddPlaceDialog
+- remove count and parenthesis from category tabs in AddPlaceDialog
+- replace ActivityBars with dynamic animated dots in PlaceName translating indicator
+- replace equalizer bars with dynamic animated dots for LLM thinking and strip static ellipsis
+- add ExternalLink icon to Official Website capsule
+- replace static ellipsis with dynamic animated dots in refresh button
+- adjust recommendation shimmer skeleton to 4 cards
+- disable thinking for translate and router tasks
+- disable thinking for dayCopy and reduce debounce for snappy copy updates
+- parallelize single-day translation streams and disable CoT thinking for zero-latency TTFT
+- move itinerary translation loading to top capsule badge
+- remove emojis from text and replace with standard Lucide icons
+- simplify themeDark label to Midnight
+- generalize English translations to be destination-agnostic
+- remove hover underline on website capsule button
+- polish model brand capsule colors for dark mode
+- improve selected capsule and warning banner contrast in dark mode
+
+### Fixed
+
+- use callOpenAIMessagesStream and compact payload for real-time translation streaming
+- remove duplicate trailing ellipsis from badge loading text
+- fix llm-think-chip and llm-gen-chip dark mode background invert
+- fix dark mode styling for glass capsule tones and loading badges
+- align day header skeleton exactly with multi-line text layout
+- use skeleton bar instead of text shimmer sweep in DayTabButton while pending
+- optimize shimmer skeleton colors and card background in dark mode
+- decouple itineraryTranslating from generation state with dedicated translation loading banner
+- localize duration chips and constrain place description note length
+- use locale-aware place name in delete stop confirm dialog
+- enforce concise day title length in prompts, parser, and tab buttons
+- localize map header status, day aria label, and drag hints in TripMap
+- filter out certification labels, partner badges, and footer containers from website photos
+- isolate layout animations in AddPlaceDialog, LoginPage, and ShareDialog tabs
+- refine place name typography and remove blank translation row in English mode
+- isolate day tab and mobile pane layout animations to prevent reflow jitter
+- isolate pill layout animations with LayoutGroup and layoutDependency to prevent reflow jitter
+- improve dark mode styling and error i18n in recommendation preferences dialog
+- localize place recommendations, day copy generation, and loading badges
+- route place source label "website" through the dictionary
+- route price-tier chip descriptors through the dictionary
+- stop LLM prompts from falling back to Chinese when locale=en
+- shorten Directions tooltip to fit on one line
+- close all residual hardcoded UI text and route every user-facing string through the dictionary
+- localize error and status toast messages across all dialogs and flows
+- shorten flight card titles to single line
+- streamline share, backup, and preferences copy to strictly align with Chinese
+- localize role badges and relative times in TripSelectorCapsule and ProfileTab
+- localize logistics header banner, readiness matrix, and quick summary
+- localize flight logistics, date range picker, hotel dialogs and trip dates
+- localize hotel picker custom card, district badge, blurb generation, ready banner and disclaimer
+- isolate hotel & place advisor memos by locale, localize spoken languages and clean reviews
+
+
 ## [0.8.1] - 2026-08-22
 
 ### Added
@@ -561,7 +634,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...HEAD
+- [0.9.0]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...v0.9.0
 - [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
 - [0.8.0]: https://github.com/JackZ0526/ParisTour/compare/v0.7.0...v0.8.0
 - [0.7.0]: https://github.com/JackZ0526/ParisTour/compare/v0.6.0...v0.7.0
