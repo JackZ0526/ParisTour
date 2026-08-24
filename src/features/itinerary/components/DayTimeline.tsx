@@ -1915,7 +1915,7 @@ export function DayTimeline({
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
-                        {localizeTravelChip(travelChip)}
+                        {localizeTravelChip(travelChip, locale)}
                       </span>
                     )}
                     {stop.duration && (
@@ -2258,12 +2258,12 @@ export function DayTimeline({
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                       {travelChip && (
                         <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
-                          {localizeTravelChip(travelChip)}
+                          {localizeTravelChip(travelChip, locale)}
                         </span>
                       )}
                       {stop.duration && (
                         <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.violet} px-2 py-1`}>
-                          {stop.duration}
+                          {localizeDuration(stop.duration, locale)}
                         </span>
                       )}
                     </div>

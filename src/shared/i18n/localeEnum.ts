@@ -106,10 +106,10 @@ export function localizeTransport(value: string | undefined, locale?: Locale): s
  */
 export function localizeTravelChip(value: string | undefined, locale?: Locale): string {
   if (!value) return ''
-  if (KNOWN_TRANSPORT_CODES.has(value)) {
+  if (KNOWN_TRANSPORT_CODES.has(value) || value in LEGACY_TRANSPORT) {
     return localizeTransport(value, locale)
   }
-  if (KNOWN_WALK_LEVEL_CODES.has(value)) {
+  if (KNOWN_WALK_LEVEL_CODES.has(value) || value in LEGACY_WALK_LEVEL) {
     return localizeWalkLevel(value, locale)
   }
   return value

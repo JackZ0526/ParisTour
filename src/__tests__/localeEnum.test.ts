@@ -71,8 +71,24 @@ describe('localeEnum helpers', () => {
 
     it('localizeTravelChip handles both transport and walkLevel', () => {
       setLocale('en')
-      expect(localizeTravelChip('transit')).toBeTruthy()
-      expect(localizeTravelChip('minimal')).toBeTruthy()
+      expect(localizeTravelChip('transit')).toBe('Transit')
+      expect(localizeTravelChip('minimal')).toBe('Minimal walking')
+      expect(localizeTravelChip('short')).toBe('Short walk')
+      expect(localizeTravelChip('moderate')).toBe('Moderate walk')
+    })
+
+    it('localizeTravelChip translates legacy Chinese values to English in en mode', () => {
+      setLocale('en')
+      expect(localizeTravelChip('很少走')).toBe('Minimal walking')
+      expect(localizeTravelChip('短步行')).toBe('Short walk')
+      expect(localizeTravelChip('中等步行')).toBe('Moderate walk')
+      expect(localizeTravelChip('公共交通')).toBe('Transit')
+      expect(localizeTravelChip('步行')).toBe('Walking')
+      expect(localizeTravelChip('驾车')).toBe('Driving')
+
+      setLocale('zh-CN')
+      expect(localizeTravelChip('很少走')).toBe('很少走')
+      expect(localizeTravelChip('minimal')).toBe('很少走')
     })
   })
 
