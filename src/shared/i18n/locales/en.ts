@@ -238,6 +238,8 @@ export const en: I18nSchema = {
     dayPendingHint: 'Other days are viewable — this one will refresh automatically when it’s done.',
     dayRegenThinking: 'Carefully planning today’s itinerary…',
     dayRegenRegenerating: 'Regenerating today’s itinerary…',
+    dayCopyThinking: 'Drafting copy…',
+    dayCopyUpdating: 'Updating copy…',
     // DayTimeline misc loading and action labels
     calculatingNavigation: 'Calculating navigation…',
     viewMapDirections: 'View map directions',

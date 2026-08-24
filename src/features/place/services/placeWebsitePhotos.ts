@@ -14,7 +14,7 @@ export interface PlaceWebsitePhotos {
   miss?: boolean
 }
 
-const ARTIFACT_PREFIX = 'place-website-photos:v6:'
+const ARTIFACT_PREFIX = 'place-website-photos:v7:'
 const PLACE_INDEX_PREFIX = 'place-website-photos-by-place:v1:'
 const memory = new Map<string, PlaceWebsitePhotos>()
 const inflight = new Map<string, Promise<PlaceWebsitePhotos>>()

@@ -528,26 +528,55 @@ function fallbackDayCopy(input: {
   pace: string
   placeNames: string[]
   totalDays?: number
+  locale?: Locale
 }): { title: string; theme: string; summary: string } {
-  const highlights = input.placeNames.slice(0, 3).join('、')
+  const locale = input.locale ?? getLocale()
+  const isEn = locale === 'en'
+  const separator = isEn ? ', ' : '、'
+  const highlights = input.placeNames.slice(0, 3).join(separator)
   const lastDay = input.totalDays && input.totalDays > 0 ? input.totalDays : undefined
-  const title =
-    input.pace === 'park'
-      ? '迪士尼日'
-      : input.pace === 'self-drive'
-        ? '近郊自驾'
-        : input.day === 1
-          ? '抵达巴黎'
-          : lastDay != null && input.day === lastDay
-            ? '返程日'
-            : highlights.slice(0, 6) || `第 ${input.day} 天`
+
+  let title: string
+  if (isEn) {
+    title =
+      input.pace === 'park'
+        ? 'Disney Day'
+        : input.pace === 'self-drive'
+          ? 'Scenic Drive'
+          : input.day === 1
+            ? 'Arrival in Paris'
+            : lastDay != null && input.day === lastDay
+              ? 'Departure Day'
+              : highlights.slice(0, 24) || `Day ${input.day}`
+  } else {
+    title =
+      input.pace === 'park'
+        ? '迪士尼日'
+        : input.pace === 'self-drive'
+          ? '近郊自驾'
+          : input.day === 1
+            ? '抵达巴黎'
+            : lastDay != null && input.day === lastDay
+              ? '返程日'
+              : highlights.slice(0, 6) || `第 ${input.day} 天`
+  }
+
+  const theme = isEn ? `${input.pace} pace` : `${input.pace}节奏`
+  let summary: string
+  if (isEn) {
+    summary = highlights
+      ? `Main stops today: ${highlights}${input.placeNames.length > 3 ? ', and more' : ''}. Adjust pace and timing based on real-time energy.`
+      : 'No places scheduled for today yet.'
+  } else {
+    summary = highlights
+      ? `今天主要安排：${highlights}${input.placeNames.length > 3 ? '等' : ''}。可根据体力微调顺序与停留时间。`
+      : '今天还没有安排地点。'
+  }
 
   return {
     title,
-    theme: `${input.pace}节奏`,
-    summary: highlights
-      ? `今天主要安排：${highlights}${input.placeNames.length > 3 ? '等' : ''}。可根据体力微调顺序与停留时间。`
-      : '今天还没有安排地点。',
+    theme,
+    summary,
   }
 }
 
@@ -557,19 +586,22 @@ export async function generateDayCopy(input: {
   pace: string
   placeNames: string[]
   hotelArea?: string
-  /** Chinese label for hotel district (e.g. 16区特罗卡德罗) — use this in 落脚点 copy */
+  /** Label for hotel district (e.g. 16区特罗卡德罗 / Trocadéro) */
   hotelAreaLabel?: string
   /** Calendar date for this itinerary day (YYYY-MM-DD), after timezone-aware start */
   calendarDate?: string
   /** Total daytime days in this itinerary (not a fixed 7) */
   totalDays?: number
+  locale?: Locale
 }): Promise<{ title: string; theme: string; summary: string } | null> {
+  const locale = input.locale ?? getLocale()
+  const isEn = locale === 'en'
+
   if (!input.placeNames.length) {
-    const en = getLocale() === 'en'
     return {
-      title: en ? `Day ${input.day}` : `第 ${input.day} 天`,
-      theme: en ? 'Free time' : '自由安排',
-      summary: en
+      title: isEn ? `Day ${input.day}` : `第 ${input.day} 天`,
+      theme: isEn ? 'Free time' : '自由安排',
+      summary: isEn
         ? 'No places added yet — pick spots on the map to start building this day.'
         : '今天还没有安排地点，添加景点后会自动生成标题与总结。',
     }
@@ -577,26 +609,55 @@ export async function generateDayCopy(input: {
 
   const totalDays = input.totalDays && input.totalDays > 0 ? input.totalDays : undefined
   const hotelLabel = (input.hotelAreaLabel || input.hotelArea || '').trim()
-  const key = `day-copy:${input.day}|${totalDays || ''}|${input.calendarDate || ''}|${input.pace}|${hotelLabel}|${input.placeNames.join('>')}`
+  const key = `day-copy:${locale}:${input.day}|${totalDays || ''}|${input.calendarDate || ''}|${input.pace}|${hotelLabel}|${input.placeNames.join('>')}`
   return memoizeLlmCall(
     key,
     async () => {
-      const lengthHint = totalDays ? `${totalDays} 日行程` : '本次行程'
-      const baseRule = hotelLabel
-        ? `<hard_rules>
+      const lengthHint = isEn
+        ? (totalDays ? `${totalDays}-day trip` : 'trip')
+        : (totalDays ? `${totalDays} 日行程` : '本次行程')
+
+      const baseRule = isEn
+        ? hotelLabel
+          ? `<hard_rules>
+- If mentioning the hotel area or home base, write "${hotelLabel}", never fabricate or substitute another area.
+- Output text in natural, elegant English.
+</hard_rules>`
+          : '<hard_rules>Do not fabricate wrong hotel districts. Output text in natural, elegant English.</hard_rules>'
+        : hotelLabel
+          ? `<hard_rules>
 - 若提到酒店落脚片区，必须写「${hotelLabel}」，不要写成其他区（如圣日耳曼、玛黑）。
 </hard_rules>`
-        : '<hard_rules>不要编造错误的酒店落脚片区。</hard_rules>'
-      const system = buildPrompt(
-        `巴黎${lengthHint}编辑。根据当天地点列表，用简体中文生成短标题、主题与总结。`,
-        null,
-        '<output_format>标题 2–6 字（如「西侧经典」「左岸轻松」），主题一句话，总结 2 句说明节奏与亮点。只输出 JSON。</output_format>',
-        baseRule,
-        jsonContract(
-          '{ title: "string", theme: "string", summary: "string" }',
-          '{ "title": "西侧经典", "theme": "埃菲尔铁塔与塞纳河", "summary": "上午登特罗卡德罗平台，下午沿塞纳河步道散步到特罗卡德罗。傍晚在附近小馆用餐，回 16区酒店。" }',
-        ),
-      )
+          : '<hard_rules>不要编造错误的酒店落脚片区。</hard_rules>'
+
+      const langRule = getLlmLanguageInstruction(locale)
+
+      const system = isEn
+        ? buildPrompt(
+            `Paris ${lengthHint} editor. Based on the day's places, generate a concise headline, theme, and 2-sentence summary in English.`,
+            null,
+            langRule,
+            '<output_format>Title 2–6 words (e.g. "Right Bank Classics", "Left Bank Highlights"), theme 3–6 words, summary 2 sentences describing rhythm and highlights. Output JSON only.</output_format>',
+            baseRule,
+            jsonContract(
+              '{ title: "string", theme: "string", summary: "string" }',
+              '{ "title": "Right Bank Classics", "theme": "Eiffel Tower & Seine Cruise", "summary": "Morning at Trocadéro platform, afternoon stroll along the Seine to the Eiffel Tower. Evening dinner at a local bistro before returning to the hotel." }',
+              locale,
+            ),
+          )
+        : buildPrompt(
+            `巴黎${lengthHint}编辑。根据当天地点列表，用简体中文生成短标题、主题与总结。`,
+            null,
+            langRule,
+            '<output_format>标题 2–6 字（如「西侧经典」「左岸轻松」），主题一句话，总结 2 句说明节奏与亮点。只输出 JSON。</output_format>',
+            baseRule,
+            jsonContract(
+              '{ title: "string", theme: "string", summary: "string" }',
+              '{ "title": "西侧经典", "theme": "埃菲尔铁塔与塞纳河", "summary": "上午登特罗卡德罗平台，下午沿塞纳河步道散步到特罗卡德罗。傍晚在附近小馆用餐，回 16区酒店。" }',
+              locale,
+            ),
+          )
+
       const user = JSON.stringify({
         day: input.day,
         totalDays: totalDays || null,
@@ -610,20 +671,20 @@ export async function generateDayCopy(input: {
       const text = await generateText(system, user, {
         task: 'dayCopy',
         json: true,
-        userText: input.placeNames.join('、'),
+        userText: input.placeNames.join(isEn ? ', ' : '、'),
       })
-      if (!text) return fallbackDayCopy(input)
+      if (!text) return fallbackDayCopy({ ...input, locale })
 
       const parsed = extractJsonObject(text)
-      if (!parsed) return fallbackDayCopy(input)
+      if (!parsed) return fallbackDayCopy({ ...input, locale })
 
       const title = String(parsed.title || '').trim()
       const theme = String(parsed.theme || '').trim()
       const summary = String(parsed.summary || '').trim()
-      if (!title || !summary) return fallbackDayCopy(input)
+      if (!title || !summary) return fallbackDayCopy({ ...input, locale })
 
       return {
-        title: title.slice(0, 12),
+        title: title.slice(0, isEn ? 40 : 12),
         theme: theme || input.pace,
         summary,
       }
@@ -660,6 +721,7 @@ export async function recommendPlacesForDay(input: {
   /** Google-verified candidates. The model may rank/select but must not invent names. */
   verifiedCandidates: VerifiedPlaceCandidate[]
   recommendationPreferences: RecommendationPreferences
+  locale?: Locale
 }): Promise<PlaceRecommendation[]> {
   if (!isLlmConfigured()) return []
 
@@ -678,18 +740,55 @@ export async function recommendPlacesForDay(input: {
     ...(input.tripPlaceNames || []),
     ...(input.excludeNames || []),
   ])
-  const locale = getLocale()
+  const locale = input.locale ?? getLocale()
+  const isEn = locale === 'en'
+  const langRule = getLlmLanguageInstruction(locale)
 
-  const system = buildPrompt(
-    '巴黎旅行顾问。根据游客当天已有行程和推荐偏好，从已验证候选中挑选互补、少重复的地点。',
-    null,
-    getCommonRules(locale),
-    getPlaceResearchDiscipline(locale),
-    getCafeVsRestaurantRule(locale),
-    `<hard_rules>
+  const system = isEn
+    ? buildPrompt(
+        'Paris travel advisor. Based on the traveler’s existing itinerary for today and recommendation preferences, select complementary, non-duplicative spots from verified candidates.',
+        null,
+        langRule,
+        getCommonRules(locale),
+        getPlaceResearchDiscipline(locale),
+        getCafeVsRestaurantRule(locale),
+        `<hard_rules>
+- ${langRule}
+- Only recommend categories in requestedTypes; strictly provide ${countPerType} spots per category, totaling ${
+          requestedTypes.length * countPerType
+        }.
+- cafe: Prioritize Google top-rated specialty coffee shops, sit-down bakeries, brunch spots; do NOT recommend sit-down meal brasseries / café-restaurants.
+- restaurant: Sit-down meals (lunch/dinner), including bistros, brasseries, international cuisines; do not use coffee or dessert-only shops.
+- Strictly avoid recommending spots in alreadyOnThisDay and alreadyOnTrip.
+- Avoid spots in avoidAlso (previous batch); when batch>1, provide distinctly different spots.
+- Use the official discoverable name on Google Maps; optionally include nameLocal.
+- ONLY select from verifiedCandidates; copy name and googlePlaceId verbatim without inventing names, addresses, ratings, or distances.
+- When comparing candidates, consider distance, rating, and review count; missing ratings does not mean low quality, but do not make up ratings.
+- ${
+          input.recommendationPreferences.avoidLouvreAndVersailles
+            ? 'Soft preference: Avoid Louvre and Versailles by default unless explicitly asked.'
+            : 'Louvre and Versailles can participate normally in candidate comparison.'
+        }
+- reason: One concise sentence explaining why it fits today.
+- intro: 2–3 sentence introduction in English.
+</hard_rules>`,
+        jsonContract(
+          '{ recommendations: [{ name, googlePlaceId?, nameLocal?, type: "cafe|attraction|restaurant", reason, intro, area? }] }',
+          '{ "recommendations": [{ "name": "Du Pain et des Idées", "googlePlaceId": "...", "type": "cafe", "reason": "Close to the 10th arr. canal with 4.6 rating, avoiding Marais crowds.", "intro": "Classic artisanal Parisian bakery with light seating, renowned for consistent quality and fresh pastries.", "area": "10th arr." }] }',
+          locale,
+        ),
+      )
+    : buildPrompt(
+        '巴黎旅行顾问。根据游客当天已有行程和推荐偏好，从已验证候选中挑选互补、少重复的地点。',
+        null,
+        langRule,
+        getCommonRules(locale),
+        getPlaceResearchDiscipline(locale),
+        getCafeVsRestaurantRule(locale),
+        `<hard_rules>
 - 只推荐 requestedTypes 中的类别；每个类别严格给出 ${countPerType} 个地点，共 ${
-      requestedTypes.length * countPerType
-    } 个。
+          requestedTypes.length * countPerType
+        } 个。
 - cafe 类：优先 Google 高分 specialty coffee、烘焙店可坐位、brunch/早午餐小店；不要推荐以正餐为主的 brasserie / café-restaurant。
 - restaurant 类：正餐（午餐/晚餐），可含 bistro、brasserie、各国菜；不要用咖啡店/纯甜品店凑数。
 - 严禁推荐 alreadyOnThisDay 与 alreadyOnTrip 中的地点。
@@ -698,18 +797,19 @@ export async function recommendPlacesForDay(input: {
 - 只能从 verifiedCandidates 选择地点；name 与 googlePlaceId 必须原样复制，禁止另造店名、地址、评分或距离。
 - 比较候选时同时考虑距离、评分和评论量；没有评分不等于低质量，但不得自行补评分。
 - ${
-    input.recommendationPreferences.avoidLouvreAndVersailles
-      ? '软偏好：默认避开卢浮宫和凡尔赛；用户明确要求时可以推荐。'
-      : '卢浮宫和凡尔赛可正常参与候选比较。'
-  }
+          input.recommendationPreferences.avoidLouvreAndVersailles
+            ? '软偏好：默认避开卢浮宫和凡尔赛；用户明确要求时可以推荐。'
+            : '卢浮宫和凡尔赛可正常参与候选比较。'
+        }
 - reason：一句话说明为何适合插入今天。
 - intro：2–3 句中文介绍。
 </hard_rules>`,
-    jsonContract(
-      '{ recommendations: [{ name, googlePlaceId?, nameLocal?, type: "cafe|attraction|restaurant", reason, intro, area? }] }',
-      '{ "recommendations": [{ "name": "Du Pain et des Idées", "googlePlaceId": "...", "type": "cafe", "reason": "近 10区运河，brunch 评分 4.6，避开玛黑热门点。", "intro": "巴黎老牌手工面包与早午餐小店，店面小巧但出品稳定。", "area": "10区" }] }',
-    ),
-  )
+        jsonContract(
+          '{ recommendations: [{ name, googlePlaceId?, nameLocal?, type: "cafe|attraction|restaurant", reason, intro, area? }] }',
+          '{ "recommendations": [{ "name": "Du Pain et des Idées", "googlePlaceId": "...", "type": "cafe", "reason": "近 10区运河，brunch 评分 4.6，避开玛黑热门点。", "intro": "巴黎老牌手工面包与早午餐小店，店面小巧但出品稳定。", "area": "10区" }] }',
+          locale,
+        ),
+      )
   const user = JSON.stringify({
     day: input.day,
     title: input.title,

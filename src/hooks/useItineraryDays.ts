@@ -13,12 +13,14 @@ import type { DayNavPlan } from '../features/map/services/googleNav'
 import type { DayPlan, ItineraryStop, Place, SelectedHotel } from '../types'
 import {
   AREA_KEY_CN,
+  AREA_KEY_EN,
   EMPTY_DAY_FALLBACK,
   ensureStopId,
   hotelAreaShort,
   isHotelSelected,
   syncDaysCopyToHotelArea,
 } from '../appHelpers'
+import { getLocale } from '../shared/i18n'
 import { dateForTripDay } from '../features/itinerary/services/tripDates'
 import {
   SELECTED_HOTEL_PLACE_ID,
@@ -785,11 +787,14 @@ export function useItineraryDaysEffects(
     const timer = window.setTimeout(() => {
       if (cancelled) return
 
+      const locale = getLocale()
       const places = placesWithHotelRef.current
       const hotelNow = hotelRef.current
       const areaKey = hotelNow.areaKey
       const areaLabel =
-        AREA_KEY_CN[areaKey] || hotelAreaShort(hotelNow) || undefined
+        hotelAreaShort(hotelNow, locale) ||
+        (locale === 'en' ? AREA_KEY_EN[areaKey] : AREA_KEY_CN[areaKey]) ||
+        undefined
 
       const names = dayStopsRef.current.map((s) => {
         try {
@@ -808,6 +813,7 @@ export function useItineraryDaysEffects(
         hotelAreaLabel: areaLabel,
         calendarDate,
         totalDays,
+        locale,
       })
         .then((copy) => {
           if (

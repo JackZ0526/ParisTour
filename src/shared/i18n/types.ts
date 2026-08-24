@@ -249,6 +249,8 @@ export interface I18nSchema {
     dayPendingHint: string
     dayRegenThinking: string
     dayRegenRegenerating: string
+    dayCopyThinking: string
+    dayCopyUpdating: string
     // DayTimeline misc loading and action labels
     calculatingNavigation: string
     viewMapDirections: string

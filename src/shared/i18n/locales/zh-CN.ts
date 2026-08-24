@@ -238,6 +238,8 @@ export const zhCN: I18nSchema = {
     dayPendingHint: '其他天可先查看，这一天生成好后会自动更新。',
     dayRegenThinking: '正在仔细规划今天的行程…',
     dayRegenRegenerating: '正在重新生成今天的行程…',
+    dayCopyThinking: '文案思考中',
+    dayCopyUpdating: '文案更新中',
     // DayTimeline misc loading and action labels
     calculatingNavigation: '正在计算导航…',
     viewMapDirections: '查看地图导航',

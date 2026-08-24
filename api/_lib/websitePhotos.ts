@@ -234,17 +234,25 @@ function looksLikeImageUrl(value: string): boolean {
 
 /** Hotel-builder filenames often encode size as `-1200-627-crop`. Drop logos/thumbs. */
 export function photoDimensionsFromUrl(url: string): { width: number; height: number } {
-  const crop = url.match(/-(\d{2,4})-(\d{2,4})-(?:crop|exact|landscape|auto)/i)
+  let decoded = url
+  try {
+    decoded = decodeURIComponent(url)
+  } catch {
+    /* ignore malformed url encoding */
+  }
+  const pxMatch = decoded.match(/(?:^|[_-]|\s)(\d{2,5})x(\d{2,5})(?:px)?(?=\.[a-z0-9]+|$|[?#])/i)
+  if (pxMatch) return { width: Number(pxMatch[1]), height: Number(pxMatch[2]) }
+  const crop = decoded.match(/-(\d{2,4})-(\d{2,4})-(?:crop|exact|landscape|auto)/i)
   if (crop) return { width: Number(crop[1]), height: Number(crop[2]) }
-  const wp = url.match(/-(\d{2,5})x(\d{2,5})(?=\.(?:jpe?g|webp|png))/i)
+  const wp = decoded.match(/-(\d{2,5})x(\d{2,5})(?=\.(?:jpe?g|webp|png))/i)
   if (wp) return { width: Number(wp[1]), height: Number(wp[2]) }
   const resize =
-    url.match(/[?&]resize=(\d+)%2C(\d+)/i) || url.match(/[?&]resize=(\d+),(\d+)/i)
+    decoded.match(/[?&]resize=(\d+)%2C(\d+)/i) || decoded.match(/[?&]resize=(\d+),(\d+)/i)
   if (resize) return { width: Number(resize[1]), height: Number(resize[2]) }
-  const width = Number(url.match(/[?&]w=(\d+)/i)?.[1] || 0)
-  const height = Number(url.match(/[?&]h=(\d+)/i)?.[1] || 0)
+  const width = Number(decoded.match(/[?&](?:w|width)=(\d+)/i)?.[1] || 0)
+  const height = Number(decoded.match(/[?&](?:h|height)=(\d+)/i)?.[1] || 0)
   if (width || height) return { width, height }
-  const godaddy = url.match(/\/rs=(?:w|h):(\d+)/i)
+  const godaddy = decoded.match(/\/rs=(?:w|h):(\d+)/i)
   if (godaddy) {
     const size = Number(godaddy[1])
     return { width: size, height: size }
@@ -256,6 +264,8 @@ function isTinyPhoto(url: string, width = 0): boolean {
   if (width > 0 && width < MIN_PHOTO_WIDTH) return true
   const crop = url.match(/-(\d{2,4})-(\d{2,4})-(?:crop|exact|landscape|auto)/i)
   if (crop) return Math.max(Number(crop[1]), Number(crop[2])) < MIN_PHOTO_WIDTH
+  const px = url.match(/(?:^|[_-]|\s)(\d{2,5})x(\d{2,5})(?:px)?(?=\.[a-z0-9]+|$|[?#])/i)
+  if (px && Math.max(Number(px[1]), Number(px[2])) < MIN_PHOTO_WIDTH) return true
   const godaddy = url.match(/\/rs=(?:w|h):(\d+)/i)
   if (godaddy) return Number(godaddy[1]) < 200
   return false
@@ -263,14 +273,20 @@ function isTinyPhoto(url: string, width = 0): boolean {
 
 function isLogoPhoto(url: string): boolean {
   try {
-    const parsed = new URL(url)
+    let decodedUrl = url
+    try {
+      decodedUrl = decodeURIComponent(url)
+    } catch {
+      /* ignore malformed url encoding */
+    }
+    const parsed = new URL(decodedUrl)
     const host = parsed.hostname.toLowerCase()
     const path = parsed.pathname.toLowerCase()
     if (path.includes('/_si/') || path === '/_si') return true
     if (host === 's0.wp.com' || host === 's1.wp.com' || host === 's2.wp.com') return true
     if (path.includes('/wp-content/plugins/') || path.includes('/wp-includes/')) return true
     if (
-      /(?:^|\/)(?:logo|favicon|icon|webclip|site-icon|custom-logo|apple-touch-icon)[^/]*$/i.test(
+      /(?:^|\/|[_-]|%20|\s)(?:logo|favicon|icon|webclip|site-icon|custom-logo|apple-touch-icon|touch-icon|splash)[^/]*$/i.test(
         path,
       )
     ) {
@@ -284,9 +300,9 @@ function isLogoPhoto(url: string): boolean {
 }
 
 const JUNK_NAME =
-  /\b(logo|favicon|icon|webclip|avatar|headshot|portrait|wordmark|badge|sprite|branding)\b/i
+  /(?:^|[\/_. -]|%20|\b)(?:logo|favicon|icon|webclip|avatar|headshot|portrait|wordmark|badge|sprite|branding|splash|startup|site-icon|apple-touch|touch-icon)(?:[\/_. -]|%20|\b|$)/i
 const PEOPLE_ALT =
-  /\b(team|staff|owner|chef|equipe|équipe|fondateur|founder|portrait|headshot|avatar)\b/i
+  /(?:^|[\/_. -]|%20|\b)(?:team|staff|owner|chef|equipe|équipe|fondateur|founder|portrait|headshot|avatar)(?:[\/_. -]|%20|\b|$)/i
 
 export function isJunkWebsitePhoto(
   url: string,
@@ -294,10 +310,16 @@ export function isJunkWebsitePhoto(
   className = '',
 ): boolean {
   if (isLogoPhoto(url)) return true
-  const blob = `${url} ${alt} ${className}`
+  let decodedUrl = url
+  try {
+    decodedUrl = decodeURIComponent(url)
+  } catch {
+    /* ignore malformed url encoding */
+  }
+  const blob = `${decodedUrl} ${alt} ${className}`
   if (JUNK_NAME.test(blob)) return true
   if (PEOPLE_ALT.test(alt) || PEOPLE_ALT.test(className)) return true
-  if (/\/(?:team|staff|about|bio|people|portraits?|chefs?)\//i.test(url)) return true
+  if (/\/(?:team|staff|about|bio|people|portraits?|chefs?)\//i.test(decodedUrl)) return true
   return false
 }
 
@@ -379,25 +401,23 @@ function metaContents(html: string, key: string): string[] {
   return out
 }
 
-function collectJsonLdImages(value: unknown, out: string[]) {
+function collectJsonImages(value: unknown, out: string[]) {
   if (!value) return
   if (typeof value === 'string') {
-    out.push(value)
+    if (looksLikeImageUrl(value) && (value.startsWith('http') || value.startsWith('/'))) {
+      out.push(value)
+    }
     return
   }
   if (Array.isArray(value)) {
-    for (const item of value) collectJsonLdImages(item, out)
+    for (const item of value) collectJsonImages(item, out)
     return
   }
   if (typeof value !== 'object') return
   const record = value as Record<string, unknown>
-  if (record.image) collectJsonLdImages(record.image, out)
-  if (record.thumbnailUrl) collectJsonLdImages(record.thumbnailUrl, out)
-  if (record.photo) collectJsonLdImages(record.photo, out)
-  if (record.url && record['@type'] && /image/i.test(String(record['@type']))) {
-    collectJsonLdImages(record.url, out)
+  for (const key of Object.keys(record)) {
+    collectJsonImages(record[key], out)
   }
-  if (record['@graph']) collectJsonLdImages(record['@graph'], out)
 }
 
 function tagAttr(tag: string, name: string): string {
@@ -450,18 +470,40 @@ export function extractWebsitePhotos(html: string, baseUrl: string): string[] {
       })
     }
   }
+
+  // Parse scripts (JSON-LD & inline SPA bootstrap states like Square Online, Next.js, Nuxt, etc.)
   const scripts = html.matchAll(
-    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+    /<script\b[^>]*>([\s\S]*?)<\/script>/gi,
   )
   for (const script of scripts) {
+    const fullTag = script[0]
+    const body = script[1] || ''
     const found: string[] = []
-    try {
-      collectJsonLdImages(JSON.parse(script[1] || 'null'), found)
-    } catch {
-      /* ignore broken JSON-LD */
+    if (/type=["']application\/(?:ld\+)?json["']/i.test(fullTag)) {
+      try {
+        collectJsonImages(JSON.parse(body), found)
+      } catch {
+        /* ignore broken JSON */
+      }
+    } else if (
+      body.includes('__BOOTSTRAP_STATE__') ||
+      body.includes('__NEXT_DATA__') ||
+      body.includes('__NUXT__')
+    ) {
+      const idx = body.indexOf('{')
+      const lastIdx = body.lastIndexOf('}')
+      if (idx !== -1 && lastIdx > idx) {
+        try {
+          const jsonStr = body.slice(idx, lastIdx + 1)
+          collectJsonImages(JSON.parse(jsonStr), found)
+        } catch {
+          /* ignore broken inline JSON */
+        }
+      }
     }
     for (const content of found) pushCandidate(candidates, content, baseUrl)
   }
+
   const imgTags = html.matchAll(/<img\b[^>]*>/gi)
   for (const img of imgTags) {
     const tag = img[0]
@@ -483,12 +525,16 @@ export function extractWebsitePhotos(html: string, baseUrl: string): string[] {
       pushCandidate(candidates, src, baseUrl, { width, height, alt, className })
     }
   }
-  const attrRe =
-    /\b(?:href|data-desktop-bg)=["']([^"']+)["']/gi
-  let attr: RegExpExecArray | null
-  while ((attr = attrRe.exec(html))) {
-    if (!attr[1] || attr[1].startsWith('data:') || !looksLikeImageUrl(attr[1])) continue
-    pushCandidate(candidates, attr[1], baseUrl)
+
+  // Parse <a> hrefs and data-desktop-bg (explicitly excluding <link> headers)
+  const aTags = html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)
+  for (const a of aTags) {
+    if (looksLikeImageUrl(a[1])) pushCandidate(candidates, a[1], baseUrl)
   }
+  const bgAttrs = html.matchAll(/\bdata-desktop-bg=["']([^"']+)["']/gi)
+  for (const bg of bgAttrs) {
+    if (looksLikeImageUrl(bg[1])) pushCandidate(candidates, bg[1], baseUrl)
+  }
+
   return selectBestWebsitePhotos(candidates)
 }

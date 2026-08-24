@@ -244,6 +244,7 @@ export function AddPlaceDialog({
       model: getOpenAIModel(),
       recommendations: recommendationsRef.current,
       fetchedAt: Date.now(),
+      locale,
     })
   }
 
@@ -321,6 +322,7 @@ export function AddPlaceDialog({
         countPerType: 4,
         verifiedCandidates,
         recommendationPreferences,
+        locale,
       })
       if (epoch !== recommendationEpochRef.current) return false
 
@@ -361,6 +363,7 @@ export function AddPlaceDialog({
             countPerType: missingCount,
             verifiedCandidates,
             recommendationPreferences,
+            locale,
           })
           if (epoch !== recommendationEpochRef.current) return false
           list = [...list, ...topUp]
@@ -444,7 +447,7 @@ export function AddPlaceDialog({
     setGoogleStory(null)
     setGoogleStoryLoading(false)
 
-    const cached = getDayRecommendCache(dayNumber)
+    const cached = getDayRecommendCache(dayNumber, locale)
     if (cached) {
       applyCachedRecommendations(
         cached.recommendations,

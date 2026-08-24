@@ -158,4 +158,26 @@ describe('place website photos', () => {
       'https://cdn.example/2f50da-1200-627-crop.jpeg?q=1',
     ])
   })
+
+  it('extracts real photos from SPA inline bootstrap states and drops link favicons and splash screens', () => {
+    const html = `
+      <meta property="og:image" content="https://oats.example/uploads/Oats%20SEO%20Social%201200x630.jpg" />
+      <link rel="shortcut icon" href="https://oats.example/uploads/Oats%20Coffee%20House%20logo%20Favicon%2064x64px.png" />
+      <link rel="apple-touch-startup-image" href="https://oats.example/uploads/splash_2048x4435_abc.jpg?width=750&height=1334" />
+      <script>
+        window.__BOOTSTRAP_STATE__ = {
+          "store": {
+            "hero": "https://oats.example/uploads/store_atmosphere.png",
+            "signature": "https://cdn.example/einspanner_coffee_2000x2000.png"
+          }
+        };
+      </script>
+    `
+    const photos = extractWebsitePhotos(html, 'https://oats.example/')
+    expect(photos).toContain('https://oats.example/uploads/Oats%20SEO%20Social%201200x630.jpg')
+    expect(photos).toContain('https://oats.example/uploads/store_atmosphere.png')
+    expect(photos).toContain('https://cdn.example/einspanner_coffee_2000x2000.png')
+    expect(photos).not.toContain('https://oats.example/uploads/Oats%20Coffee%20House%20logo%20Favicon%2064x64px.png')
+    expect(photos).not.toContain('https://oats.example/uploads/splash_2048x4435_abc.jpg')
+  })
 })

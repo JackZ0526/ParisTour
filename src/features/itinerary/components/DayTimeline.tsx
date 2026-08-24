@@ -1513,8 +1513,8 @@ export function DayTimeline({
             {copyRefreshing && !dayRegenerating && (
               <LoadingIndicator
                 variant="badge"
-                thinkingLabel="文案思考中"
-                generatingLabel="文案更新中"
+                thinkingLabel={t('itinerary.dayCopyThinking')}
+                generatingLabel={t('itinerary.dayCopyUpdating')}
                 size="sm"
                 showDots
                 mode="thinking"
@@ -1524,8 +1524,8 @@ export function DayTimeline({
             {dayRegenerating && (
               <LoadingIndicator
                 variant="badge"
-                thinkingLabel="正在思考今天的行程…"
-                generatingLabel="正在重新生成今天…"
+                thinkingLabel={t('itinerary.dayRegenThinking')}
+                generatingLabel={t('itinerary.dayRegenRegenerating')}
                 size="sm"
                 showDots
                 mode="thinking"
