@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import { motion } from 'framer-motion'
+import { LayoutGroup, motion } from 'framer-motion'
 import {
   Archive,
   CalendarDays,
@@ -596,72 +596,75 @@ export function ProfileTab({
           </span>
         </div>
 
-        <div className="relative grid grid-cols-3 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
-          {(
-            [
-              { id: 'light', label: t('auth.themeLight'), Icon: Sun, activeColor: 'text-amber-600 dark:text-amber-300' },
-              { id: 'dark', label: t('auth.themeDark'), Icon: Moon, activeColor: 'text-indigo-500 dark:text-amber-200' },
-              { id: 'system', label: t('auth.themeSystem'), Icon: Laptop, activeColor: 'text-[var(--copper)] dark:text-amber-200' },
-            ] as const
-          ).map(({ id, label, Icon, activeColor }) => {
-            const isActive = themePreference === id
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  setHasThemeInteracted(true)
-                  setThemePreference(id)
-                }}
-                className="relative isolate flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="theme-preference-pill"
-                    className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
-                    animate={
-                      hasThemeInteracted
-                        ? {
-                            scaleX: [1, 1.12, 0.96, 1],
-                            scaleY: [1, 0.9, 1.03, 1],
-                          }
-                        : undefined
-                    }
-                    transition={{
-                      layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                      scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                      scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                    }}
-                  >
-                    {/* Top specular light reflection highlight */}
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
-                    />
-                  </motion.div>
-                )}
-                <Icon
-                  size={15}
-                  strokeWidth={2.2}
-                  className={`relative z-10 transition-colors ${
-                    isActive
-                      ? activeColor
-                      : 'text-[var(--stone)] dark:text-zinc-400'
-                  }`}
-                />
-                <span
-                  className={`relative z-10 transition-colors ${
-                    isActive
-                      ? 'text-[var(--ink)] dark:text-white font-bold'
-                      : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
-                  }`}
+        <LayoutGroup id="profile-theme-selector">
+          <div className="relative grid grid-cols-3 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
+            {(
+              [
+                { id: 'light', label: t('auth.themeLight'), Icon: Sun, activeColor: 'text-amber-600 dark:text-amber-300' },
+                { id: 'dark', label: t('auth.themeDark'), Icon: Moon, activeColor: 'text-indigo-500 dark:text-amber-200' },
+                { id: 'system', label: t('auth.themeSystem'), Icon: Laptop, activeColor: 'text-[var(--copper)] dark:text-amber-200' },
+              ] as const
+            ).map(({ id, label, Icon, activeColor }) => {
+              const isActive = themePreference === id
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setHasThemeInteracted(true)
+                    setThemePreference(id)
+                  }}
+                  className="relative isolate flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
                 >
-                  {label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                  {isActive && (
+                    <motion.div
+                      layoutId="theme-preference-pill"
+                      layoutDependency={themePreference}
+                      className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
+                      animate={
+                        hasThemeInteracted
+                          ? {
+                              scaleX: [1, 1.12, 0.96, 1],
+                              scaleY: [1, 0.9, 1.03, 1],
+                            }
+                          : undefined
+                      }
+                      transition={{
+                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                        scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                        scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                      }}
+                    >
+                      {/* Top specular light reflection highlight */}
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
+                      />
+                    </motion.div>
+                  )}
+                  <Icon
+                    size={15}
+                    strokeWidth={2.2}
+                    className={`relative z-10 transition-colors ${
+                      isActive
+                        ? activeColor
+                        : 'text-[var(--stone)] dark:text-zinc-400'
+                    }`}
+                  />
+                  <span
+                    className={`relative z-10 transition-colors ${
+                      isActive
+                        ? 'text-[var(--ink)] dark:text-white font-bold'
+                        : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </LayoutGroup>
       </div>
 
       {/* ========================================================================= */}
@@ -678,62 +681,65 @@ export function ProfileTab({
           </span>
         </div>
 
-        <div className="relative grid grid-cols-2 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
-          {(
-            [
-              { id: 'zh-CN', label: '简体中文' },
-              { id: 'en', label: 'English' },
-            ] as const
-          ).map(({ id, label }) => {
-            const isActive = locale === id
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  setHasLanguageInteracted(true)
-                  setLocale(id as Locale)
-                }}
-                className="relative isolate flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="language-preference-pill"
-                    className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
-                    animate={
-                      hasLanguageInteracted
-                        ? {
-                            scaleX: [1, 1.12, 0.96, 1],
-                            scaleY: [1, 0.9, 1.03, 1],
-                          }
-                        : undefined
-                    }
-                    transition={{
-                      layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                      scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                      scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                    }}
-                  >
-                    {/* Top specular light reflection highlight */}
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
-                    />
-                  </motion.div>
-                )}
-                <span
-                  className={`relative z-10 transition-colors ${
-                    isActive
-                      ? 'text-[var(--ink)] dark:text-white font-bold'
-                      : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
-                  }`}
+        <LayoutGroup id="profile-language-selector">
+          <div className="relative grid grid-cols-2 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
+            {(
+              [
+                { id: 'zh-CN', label: '简体中文' },
+                { id: 'en', label: 'English' },
+              ] as const
+            ).map(({ id, label }) => {
+              const isActive = locale === id
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setHasLanguageInteracted(true)
+                    setLocale(id as Locale)
+                  }}
+                  className="relative isolate flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
                 >
-                  {label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                  {isActive && (
+                    <motion.div
+                      layoutId="language-preference-pill"
+                      layoutDependency={locale}
+                      className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
+                      animate={
+                        hasLanguageInteracted
+                          ? {
+                              scaleX: [1, 1.12, 0.96, 1],
+                              scaleY: [1, 0.9, 1.03, 1],
+                            }
+                          : undefined
+                      }
+                      transition={{
+                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                        scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                        scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                      }}
+                    >
+                      {/* Top specular light reflection highlight */}
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
+                      />
+                    </motion.div>
+                  )}
+                  <span
+                    className={`relative z-10 transition-colors ${
+                      isActive
+                        ? 'text-[var(--ink)] dark:text-white font-bold'
+                        : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </LayoutGroup>
       </div>
 
       {/* ========================================================================= */}

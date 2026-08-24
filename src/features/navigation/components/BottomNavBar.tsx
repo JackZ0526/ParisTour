@@ -77,6 +77,7 @@ export function BottomNavBar({
               {isActive && (
                 <motion.div
                   layoutId="semi-translucent-active-pill"
+                  layoutDependency={activeTab}
                   className="absolute inset-0 overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
                   animate={
                     hasInteracted
