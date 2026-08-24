@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { LayoutGroup, motion } from 'framer-motion'
 import { useAuth } from '../authContext'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 import { useTranslation } from '../../../shared/i18n'
@@ -128,93 +128,97 @@ export function LoginPage() {
         )}
 
         {/* Animated Segmented Switcher */}
-        <div
-          className="relative mt-6 inline-flex rounded-full border border-white/80 dark:border-white/12 bg-white/70 dark:bg-black/35 p-1 shadow-sm dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] backdrop-blur-xl text-sm"
-          role="tablist"
-          aria-label={t('auth.signInOrUpAria')}
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'signin'}
-            className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none cursor-pointer"
-            onClick={() => {
-              setHasSwitched(true)
-              setMode('signin')
-              setError(null)
-            }}
+        <LayoutGroup id="auth-mode-tabs">
+          <div
+            className="relative mt-6 inline-flex rounded-full border border-white/80 dark:border-white/12 bg-white/70 dark:bg-black/35 p-1 shadow-sm dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] backdrop-blur-xl text-sm"
+            role="tablist"
+            aria-label={t('auth.signInOrUpAria')}
           >
-            {mode === 'signin' && (
-              <motion.span
-                layoutId="auth-mode-pill"
-                className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
-                animate={
-                  hasSwitched
-                    ? {
-                        scaleX: [1, 1.18, 0.94, 1],
-                        scaleY: [1, 0.86, 1.04, 1],
-                      }
-                    : undefined
-                }
-                transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                }}
-              />
-            )}
-            <span
-              className={`relative z-10 transition-colors duration-200 ${
-                mode === 'signin'
-                  ? 'font-semibold text-[var(--paper)] dark:text-white'
-                  : 'text-[var(--stone)] dark:text-zinc-400 hover:text-[var(--ink)] dark:hover:text-zinc-200'
-              }`}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'signin'}
+              className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none cursor-pointer"
+              onClick={() => {
+                setHasSwitched(true)
+                setMode('signin')
+                setError(null)
+              }}
             >
-              {t('auth.signIn')}
-            </span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'signup'}
-            className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none cursor-pointer"
-            onClick={() => {
-              setHasSwitched(true)
-              setMode('signup')
-              setError(null)
-              setInfo(null)
-            }}
-          >
-            {mode === 'signup' && (
-              <motion.span
-                layoutId="auth-mode-pill"
-                className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
-                animate={
-                  hasSwitched
-                    ? {
-                        scaleX: [1, 1.18, 0.94, 1],
-                        scaleY: [1, 0.86, 1.04, 1],
-                      }
-                    : undefined
-                }
-                transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                }}
-              />
-            )}
-            <span
-              className={`relative z-10 transition-colors duration-200 ${
-                mode === 'signup'
-                  ? 'font-semibold text-[var(--paper)] dark:text-white'
-                  : 'text-[var(--stone)] dark:text-zinc-400 hover:text-[var(--ink)] dark:hover:text-zinc-200'
-              }`}
+              {mode === 'signin' && (
+                <motion.span
+                  layoutId="auth-mode-pill"
+                  layoutDependency={mode}
+                  className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
+                  animate={
+                    hasSwitched
+                      ? {
+                          scaleX: [1, 1.18, 0.94, 1],
+                          scaleY: [1, 0.86, 1.04, 1],
+                        }
+                      : undefined
+                  }
+                  transition={{
+                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  }}
+                />
+              )}
+              <span
+                className={`relative z-10 transition-colors duration-200 ${
+                  mode === 'signin'
+                    ? 'font-semibold text-[var(--paper)] dark:text-white'
+                    : 'text-[var(--stone)] dark:text-zinc-400 hover:text-[var(--ink)] dark:hover:text-zinc-200'
+                }`}
+              >
+                {t('auth.signIn')}
+              </span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'signup'}
+              className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none cursor-pointer"
+              onClick={() => {
+                setHasSwitched(true)
+                setMode('signup')
+                setError(null)
+                setInfo(null)
+              }}
             >
-              {t('auth.signUp')}
-            </span>
-          </button>
-        </div>
+              {mode === 'signup' && (
+                <motion.span
+                  layoutId="auth-mode-pill"
+                  layoutDependency={mode}
+                  className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
+                  animate={
+                    hasSwitched
+                      ? {
+                          scaleX: [1, 1.18, 0.94, 1],
+                          scaleY: [1, 0.86, 1.04, 1],
+                        }
+                      : undefined
+                  }
+                  transition={{
+                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  }}
+                />
+              )}
+              <span
+                className={`relative z-10 transition-colors duration-200 ${
+                  mode === 'signup'
+                    ? 'font-semibold text-[var(--paper)] dark:text-white'
+                    : 'text-[var(--stone)] dark:text-zinc-400 hover:text-[var(--ink)] dark:hover:text-zinc-200'
+                }`}
+              >
+                {t('auth.signUp')}
+              </span>
+            </button>
+          </div>
+        </LayoutGroup>
 
         {/* Login / Register Form */}
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>

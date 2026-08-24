@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
   AlertCircle,
   CheckCircle2,
@@ -57,60 +57,63 @@ function RoleToggle({
   const [hasInteracted, setHasInteracted] = useState(false)
 
   return (
-    <div
-      className="relative inline-flex rounded-full border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/10 p-1 shadow-sm backdrop-blur-xl"
-      role="group"
-      aria-label={t('app.roleGroupAria')}
-    >
-      {(
-        [
-          { id: 'viewer', label: t('auth.roleViewer') },
-          { id: 'editor', label: t('auth.roleEditor') },
-        ] as const
-      ).map((opt) => {
-        const active = value === opt.id
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            name={name}
-            disabled={disabled}
-            aria-pressed={active}
-            onClick={() => {
-              if (active || disabled) return
-              setHasInteracted(true)
-              onChange(opt.id)
-            }}
-            className={`relative isolate min-w-[3.75rem] sm:min-w-[4rem] rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none cursor-pointer ${
-              active
-                ? 'text-[var(--paper)] dark:text-white'
-                : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
-            } disabled:cursor-default`}
-          >
-            {active && (
-              <motion.div
-                layoutId={`role-toggle-pill-${name}`}
-                className="absolute inset-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)]"
-                animate={
-                  hasInteracted
-                    ? {
-                        scaleX: [1, 1.12, 0.96, 1],
-                        scaleY: [1, 0.9, 1.03, 1],
-                      }
-                    : undefined
-                }
-                transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                }}
-              />
-            )}
-            <span className="relative z-10">{opt.label}</span>
-          </button>
-        )
-      })}
-    </div>
+    <LayoutGroup id={`role-toggle-${name}`}>
+      <div
+        className="relative inline-flex rounded-full border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/10 p-1 shadow-sm backdrop-blur-xl"
+        role="group"
+        aria-label={t('app.roleGroupAria')}
+      >
+        {(
+          [
+            { id: 'viewer', label: t('auth.roleViewer') },
+            { id: 'editor', label: t('auth.roleEditor') },
+          ] as const
+        ).map((opt) => {
+          const active = value === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              name={name}
+              disabled={disabled}
+              aria-pressed={active}
+              onClick={() => {
+                if (active || disabled) return
+                setHasInteracted(true)
+                onChange(opt.id)
+              }}
+              className={`relative isolate min-w-[3.75rem] sm:min-w-[4rem] rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none cursor-pointer ${
+                active
+                  ? 'text-[var(--paper)] dark:text-white'
+                  : 'text-[var(--stone)] hover:text-[var(--ink)] dark:text-zinc-400 dark:hover:text-zinc-100'
+              } disabled:cursor-default`}
+            >
+              {active && (
+                <motion.div
+                  layoutId={`role-toggle-pill-${name}`}
+                  layoutDependency={value}
+                  className="absolute inset-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)]"
+                  animate={
+                    hasInteracted
+                      ? {
+                          scaleX: [1, 1.12, 0.96, 1],
+                          scaleY: [1, 0.9, 1.03, 1],
+                        }
+                      : undefined
+                  }
+                  transition={{
+                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                    scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                    scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                  }}
+                />
+              )}
+              <span className="relative z-10">{opt.label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </LayoutGroup>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
   fetchGooglePlaceDetails,
   placeDetailsQuery,
@@ -954,94 +954,98 @@ export function AddPlaceDialog({
           </div>
 
           <div className="px-4 pt-3">
-            <div
-              className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/50 dark:bg-black/35 p-1 shadow-sm dark:shadow-none backdrop-blur-md"
-              role="tablist"
-              aria-label={t('place.addPlaceView')}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mainTab === 'ai'}
-                onClick={() => {
-                  setHasSwitchedMainTab(true)
-                  setMainTab('ai')
-                  closeGoogleDetail()
-                }}
-                className="relative isolate flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+            <LayoutGroup id="add-place-main-tabs">
+              <div
+                className="relative flex gap-1 rounded-full border border-white/80 dark:border-white/10 bg-white/50 dark:bg-black/35 p-1 shadow-sm dark:shadow-none backdrop-blur-md"
+                role="tablist"
+                aria-label={t('place.addPlaceView')}
               >
-                {mainTab === 'ai' &&
-                  (tabsInteractive ? (
-                    <motion.span
-                      layoutId="add-place-main-tab-pill"
-                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
-                      animate={
-                        hasSwitchedMainTab
-                          ? {
-                              scaleX: [1, 1.16, 0.95, 1],
-                              scaleY: [1, 0.88, 1.03, 1],
-                            }
-                          : undefined
-                      }
-                      transition={{
-                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                        scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                        scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                      }}
-                    />
-                  ) : (
-                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
-                  ))}
-                <span
-                  className={`relative z-10 transition-colors duration-200 ${
-                    mainTab === 'ai' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
-                  }`}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === 'ai'}
+                  onClick={() => {
+                    setHasSwitchedMainTab(true)
+                    setMainTab('ai')
+                    closeGoogleDetail()
+                  }}
+                  className="relative isolate flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
                 >
-                  {t('place.tabAiRecs')}
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mainTab === 'google'}
-                onClick={() => {
-                  setHasSwitchedMainTab(true)
-                  setMainTab('google')
-                  closeGoogleDetail()
-                }}
-                className="relative isolate flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
-              >
-                {mainTab === 'google' &&
-                  (tabsInteractive ? (
-                    <motion.span
-                      layoutId="add-place-main-tab-pill"
-                      className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
-                      animate={
-                        hasSwitchedMainTab
-                          ? {
-                              scaleX: [1, 1.16, 0.95, 1],
-                              scaleY: [1, 0.88, 1.03, 1],
-                            }
-                          : undefined
-                      }
-                      transition={{
-                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                        scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                        scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                      }}
-                    />
-                  ) : (
-                    <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
-                  ))}
-                <span
-                  className={`relative z-10 transition-colors duration-200 ${
-                    mainTab === 'google' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
-                  }`}
+                  {mainTab === 'ai' &&
+                    (tabsInteractive ? (
+                      <motion.span
+                        layoutId="add-place-main-tab-pill"
+                        layoutDependency={mainTab}
+                        className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
+                        animate={
+                          hasSwitchedMainTab
+                            ? {
+                                scaleX: [1, 1.16, 0.95, 1],
+                                scaleY: [1, 0.88, 1.03, 1],
+                              }
+                            : undefined
+                        }
+                        transition={{
+                          layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                          scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                          scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                        }}
+                      />
+                    ) : (
+                      <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
+                    ))}
+                  <span
+                    className={`relative z-10 transition-colors duration-200 ${
+                      mainTab === 'ai' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
+                    }`}
+                  >
+                    {t('place.tabAiRecs')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === 'google'}
+                  onClick={() => {
+                    setHasSwitchedMainTab(true)
+                    setMainTab('google')
+                    closeGoogleDetail()
+                  }}
+                  className="relative isolate flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
                 >
-                  {t('place.tabGoogleSearch')}
-                </span>
-              </button>
-            </div>
+                  {mainTab === 'google' &&
+                    (tabsInteractive ? (
+                      <motion.span
+                        layoutId="add-place-main-tab-pill"
+                        layoutDependency={mainTab}
+                        className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
+                        animate={
+                          hasSwitchedMainTab
+                            ? {
+                                scaleX: [1, 1.16, 0.95, 1],
+                                scaleY: [1, 0.88, 1.03, 1],
+                              }
+                            : undefined
+                        }
+                        transition={{
+                          layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                          scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                          scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                        }}
+                      />
+                    ) : (
+                      <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
+                    ))}
+                  <span
+                    className={`relative z-10 transition-colors duration-200 ${
+                      mainTab === 'google' ? 'text-[var(--paper)] dark:text-white' : 'text-[var(--ink)] dark:text-zinc-300'
+                    }`}
+                  >
+                    {t('place.tabGoogleSearch')}
+                  </span>
+                </button>
+              </div>
+            </LayoutGroup>
           </div>
         </div>
 
@@ -1061,48 +1065,50 @@ export function AddPlaceDialog({
                 {t('place.recsIntro', { title: dayTitle })}
               </p>
 
-              <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {(Object.keys(recommendTabKeys) as RecommendPlaceType[]).map((tabId) => {
-                  const active = category === tabId
-                  return (
-                    <button
-                      key={tabId}
-                      type="button"
-                      onClick={() => {
-                        setHasSwitchedCategory(true)
-                        setCategory(tabId)
-                        setExpandedKey(null)
-                        void ensureRecommendationCategory(tabId)
-                      }}
-                      className="relative isolate shrink-0 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/5 px-3 py-1.5 text-sm transition-colors hover:bg-white/90 dark:hover:bg-white/15"
-                    >
-                      {active &&
-                        (tabsInteractive ? (
-                          <motion.span
-                            layoutId="add-place-category-pill"
-                            className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-[0_2px_8px_rgba(99,136,112,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.25)]"
-                            animate={
-                              hasSwitchedCategory
-                                ? {
-                                    scaleX: [1, 1.14, 0.96, 1],
-                                    scaleY: [1, 0.88, 1.03, 1],
-                                  }
-                                : undefined
-                            }
-                            transition={{
-                              layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                              scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                              scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                            }}
-                          />
-                        ) : (
-                          <span className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm" />
-                        ))}
-                      <span
-                        className={`relative z-10 font-medium transition-colors duration-200 ${
-                          active ? 'text-white' : 'text-[var(--ink)] dark:text-zinc-300'
-                        }`}
+              <LayoutGroup id="add-place-category-tabs">
+                <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {(Object.keys(recommendTabKeys) as RecommendPlaceType[]).map((tabId) => {
+                    const active = category === tabId
+                    return (
+                      <button
+                        key={tabId}
+                        type="button"
+                        onClick={() => {
+                          setHasSwitchedCategory(true)
+                          setCategory(tabId)
+                          setExpandedKey(null)
+                          void ensureRecommendationCategory(tabId)
+                        }}
+                        className="relative isolate shrink-0 rounded-full border border-white/80 dark:border-white/10 bg-white/70 dark:bg-white/5 px-3 py-1.5 text-sm transition-colors hover:bg-white/90 dark:hover:bg-white/15"
                       >
+                        {active &&
+                          (tabsInteractive ? (
+                            <motion.span
+                              layoutId="add-place-category-pill"
+                              layoutDependency={category}
+                              className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-[0_2px_8px_rgba(99,136,112,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.25)]"
+                              animate={
+                                hasSwitchedCategory
+                                  ? {
+                                      scaleX: [1, 1.14, 0.96, 1],
+                                      scaleY: [1, 0.88, 1.03, 1],
+                                    }
+                                  : undefined
+                              }
+                              transition={{
+                                layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
+                                scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                                scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                              }}
+                            />
+                          ) : (
+                            <span className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm" />
+                          ))}
+                        <span
+                          className={`relative z-10 font-medium transition-colors duration-200 ${
+                            active ? 'text-white' : 'text-[var(--ink)] dark:text-zinc-300'
+                          }`}
+                        >
                         {t(recommendTabKeys[tabId] as never)}
                         <span className={`ml-1 ${active ? 'text-white/80' : 'opacity-70'}`}>
                           {loadingByCategory[tabId] && !grouped[tabId].length
@@ -1113,7 +1119,8 @@ export function AddPlaceDialog({
                     </button>
                   )
                 })}
-              </div>
+                </div>
+              </LayoutGroup>
 
               {loadingRecs && !refreshingRecs ? (
                 <LoadingIndicator
