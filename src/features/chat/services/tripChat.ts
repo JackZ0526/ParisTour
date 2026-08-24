@@ -512,6 +512,12 @@ ${langRule} 可以介绍地点/酒店、解释节奏、建议改动，并在需�
     `<current_day>第 ${ctx.currentDay} 天${currentDayLabel}（默认操作日；未点名其它天时所有行程改动都作用于此日）</current_day>`,
   )
 
+  contextParts.push(
+    activeLocale === 'en'
+      ? '<image_handling>When the user uploads an image, the visual observation data is provided. Treat this visual description as the verified ground truth of what is in the image and answer directly; never claim you cannot see images.</image_handling>'
+      : '<image_handling>当用户上传图片时，系统会提供前置多模态视觉模型的解析结果。请将其作为用户展示给你的图片事实依据直接回答，禁止声称自己看不到图片或没有看图功能。</image_handling>',
+  )
+
   const context = contextParts.join('\n\n')
 
   // -----------------------------------------------------------------------
@@ -1073,15 +1079,27 @@ function buildTripChatMessages(input: {
       ].join('\n'),
     })
   }
-  if (input.images && input.images.length > 0 && isVisionModel) {
-    const parts: ChatMessageContentPart[] = [
-      { type: 'text', text: input.userMessage },
-      ...input.images.map((img) => ({
-        type: 'image_url' as const,
-        image_url: { url: img },
-      })),
-    ]
-    messages.push({ role: 'user', content: parts })
+  if (input.images && input.images.length > 0) {
+    if (isVisionModel) {
+      const parts: ChatMessageContentPart[] = [
+        { type: 'text', text: input.userMessage },
+        ...input.images.map((img) => ({
+          type: 'image_url' as const,
+          image_url: { url: img },
+        })),
+      ]
+      messages.push({ role: 'user', content: parts })
+    } else {
+      const visualSummary = visual || '未能从图片中提取到具体文字内容。'
+      const combinedUserMessage = [
+        '【用户上传了图片，以下是前置多模态视觉模型提取的图片画面与事实解析】',
+        visualSummary,
+        '',
+        '【用户提问】',
+        input.userMessage || '请根据上传的图片分析并结合行程给出建议。',
+      ].join('\n')
+      messages.push({ role: 'user', content: combinedUserMessage })
+    }
   } else {
     messages.push({ role: 'user', content: input.userMessage })
   }
