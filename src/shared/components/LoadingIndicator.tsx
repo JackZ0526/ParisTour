@@ -293,12 +293,12 @@ export function LoadingIndicator({
         role="status"
         aria-live="polite"
         aria-busy="true"
-        className={`${pulseClass} ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center ${s.gap} px-2.5 py-1 ${s.text} text-[var(--ink)] ${className}`}
+        className={`${pulseClass} ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center ${s.gap} px-2.5 py-1 ${s.text} text-[var(--ink)] dark:text-[var(--gold)] ${className}`}
       >
         {active && (
-          <Orbit size={s.orbit} className={`shrink-0 text-[var(--copper)]`} />
+          <Orbit size={s.orbit} className="shrink-0 text-[var(--copper)] dark:text-[var(--gold)]" />
         )}
-        {active && <Bars size={size} className="text-[var(--copper)]" />}
+        {active && <Bars size={size} className="text-[var(--copper)] dark:text-[var(--gold)]" />}
         {text != null && text !== '' && <span>{text}</span>}
       </span>
     )

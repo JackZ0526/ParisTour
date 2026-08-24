@@ -3,13 +3,13 @@ export const glassCapsuleSurfaceClass =
   "glass-surface-capsule relative overflow-hidden rounded-full border shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.65)] backdrop-blur-md backdrop-saturate-[180%] before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/30 before:to-transparent before:content-['']"
 
 export const glassCapsuleToneClass = {
-  copper: 'border-[#d7a98a]/70 bg-[#f6e8de]/75 dark:border-[#d48354]/25 dark:bg-[#d48354]/10',
-  sage: 'border-[#a8bcae]/70 bg-[#e7efe9]/75 dark:border-[#668b7a]/25 dark:bg-[#668b7a]/10',
-  blue: 'border-[#aabcca]/70 bg-[#e8eff3]/75 dark:border-[#7b9e9c]/25 dark:bg-[#7b9e9c]/10',
-  gold: 'border-[#d4bd91]/75 bg-[#f3ead8]/80 dark:border-[#deb881]/25 dark:bg-[#deb881]/10',
-  violet: 'border-[#b6accd]/70 bg-[#ede9f5]/75 dark:border-[#a89bc5]/25 dark:bg-[#a89bc5]/10',
-  rose: 'border-[#f2bebe]/75 bg-[#fdf2f2]/80 dark:border-[#e57373]/25 dark:bg-[#e57373]/10',
-  neutral: 'border-white/80 bg-white/55 dark:border-white/14 dark:bg-white/[0.08]',
+  copper: 'glass-capsule-copper',
+  sage: 'glass-capsule-sage',
+  blue: 'glass-capsule-blue',
+  gold: 'glass-capsule-gold',
+  violet: 'glass-capsule-violet',
+  rose: 'glass-capsule-rose',
+  neutral: 'glass-capsule-neutral',
 } as const
 
 /** Shared liquid frosted-glass card surface used by timeline cards & panels. */
