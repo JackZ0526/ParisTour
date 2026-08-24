@@ -161,53 +161,70 @@ function extractSearchKeyword(rawQuery: string): string | null {
 }
 
 export function requestPlanStepLabel(
-  plan: TripChatRequestPlan,
+  _plan?: TripChatRequestPlan,
   locale: Locale = getLocale(),
 ): string {
+  return (
+    translate('chat.workStepPlanLabel' as never, undefined, locale) ||
+    (locale === 'en' ? 'Analyzing question' : '分析问题')
+  )
+}
+
+export function requestPlanStepBadges(
+  plan: TripChatRequestPlan,
+  locale: Locale = getLocale(),
+): string[] {
   const intent = plan.intent
 
   const intentLabel =
     intent === 'recommend'
       ? (translate('chat.workStepPlanIntentRecommend' as never, undefined, locale) ||
-          (locale === 'en' ? 'recommend' : '推荐'))
+          (locale === 'en' ? 'Recommend' : '推荐'))
       : intent === 'mutate'
         ? (translate('chat.workStepPlanIntentMutate' as never, undefined, locale) ||
-            (locale === 'en' ? 'itinerary edit' : '行程调整'))
+            (locale === 'en' ? 'Edit Plan' : '行程调整'))
         : intent === 'answer'
           ? (translate('chat.workStepPlanIntentAnswer' as never, undefined, locale) ||
-              (locale === 'en' ? 'information query' : '信息查询'))
+              (locale === 'en' ? 'Info Query' : '信息查询'))
           : (translate('chat.workStepPlanIntentUnderstand' as never, undefined, locale) ||
-              (locale === 'en' ? 'understanding the question' : '理解问题'))
+              (locale === 'en' ? 'Analyze' : '理解问题'))
 
   const needsWebLabel = plan.needsWeb
-    ? (translate('chat.workStepPlanNeedsWebYes' as never, undefined, locale) ||
-        (locale === 'en' ? 'web needed' : '需要联网'))
-    : (translate('chat.workStepPlanNeedsWebNo' as never, undefined, locale) ||
-        (locale === 'en' ? 'no web needed' : '无需联网'))
+    ? (locale === 'en' ? 'Web Search' : '联网搜索')
+    : (locale === 'en' ? 'No Web' : '无需联网')
 
   const effort = plan.recommendedEffort
   const effortLabel =
     effort === 'off'
-      ? 'off'
+      ? (locale === 'en' ? 'Reasoning: Off' : '推理: 关')
       : effort === 'low'
-        ? (translate('chat.workStepPlanEffortLow' as never, undefined, locale) ||
-            (locale === 'en' ? 'low' : '低'))
+        ? (locale === 'en' ? 'Reasoning: Low' : '推理: 低')
         : effort === 'medium'
-          ? (translate('chat.workStepPlanEffortMedium' as never, undefined, locale) ||
-              (locale === 'en' ? 'medium' : '中'))
-          : (translate('chat.workStepPlanEffortHigh' as never, undefined, locale) ||
-              (locale === 'en' ? 'high' : '高'))
+          ? (locale === 'en' ? 'Reasoning: Med' : '推理: 中')
+          : (locale === 'en' ? 'Reasoning: High' : '推理: 高')
 
-  // Preprocess step: explicitly show routing + whether we’ll do web search
-  // and the chosen reasoning depth. Separator is `·` in both locales for parity.
-  const planLabel = translate('chat.workStepPlanLabel' as never, undefined, locale) ||
-    (locale === 'en' ? 'Analyzing the question' : '分析问题')
-  return `${planLabel}：${intentLabel} · ${needsWebLabel} · ${effortLabelLabel(locale)} ${effortLabel}`
+  return [intentLabel, needsWebLabel, effortLabel]
 }
 
-/** "Reasoning effort" prefix used in the plan-step label (locale-aware). */
-function effortLabelLabel(locale: Locale): string {
-  return locale === 'en' ? 'Reasoning effort:' : '推理强度：'
+export function parseStepDisplay(step: TripChatWorkStep): { label: string; badges: string[] } {
+  if (step.badges && step.badges.length > 0) {
+    return { label: step.label, badges: step.badges }
+  }
+  // Fallback for legacy persisted format: "分析问题：信息查询 · 无需联网 · 推理强度：中"
+  const colonIdx =
+    step.label.indexOf('：') !== -1 ? step.label.indexOf('：') : step.label.indexOf(':')
+  if (colonIdx !== -1 && step.label.includes('·')) {
+    const mainLabel = step.label.slice(0, colonIdx).trim()
+    const rawBadges = step.label
+      .slice(colonIdx + 1)
+      .split('·')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (rawBadges.length > 0) {
+      return { label: mainLabel, badges: rawBadges }
+    }
+  }
+  return { label: step.label, badges: [] }
 }
 
 export function activateChatWorkStep(

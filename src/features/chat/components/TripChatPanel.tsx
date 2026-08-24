@@ -209,6 +209,7 @@ import {
   activateChatWorkStep,
   finishChatWorkSteps,
   initialChatWorkSteps,
+  requestPlanStepBadges,
   requestPlanStepLabel,
   searchStepLabel,
   type ChatWorkStep,
@@ -1353,7 +1354,11 @@ export function TripChatPanel({
           setWorkSteps((prev) => {
             const relabeled = prev.map((step) => {
               if (step.id === 'preprocessPlan') {
-                return { ...step, label: requestPlanStepLabel(plan) }
+                return {
+                  ...step,
+                  label: requestPlanStepLabel(plan),
+                  badges: requestPlanStepBadges(plan),
+                }
               }
               if (step.id === 'preprocessFallback') {
                 return plan.source === 'fallback'
@@ -1920,7 +1925,11 @@ export function TripChatPanel({
           setWorkSteps((prev) => {
             const relabeled = prev.map((step) => {
               if (step.id === 'preprocessPlan') {
-                return { ...step, label: requestPlanStepLabel(plan) }
+                return {
+                  ...step,
+                  label: requestPlanStepLabel(plan),
+                  badges: requestPlanStepBadges(plan),
+                }
               }
               if (step.id === 'preprocessFallback') {
                 return plan.source === 'fallback'

@@ -121,6 +121,7 @@ export interface TripChatResult {
 export interface TripChatWorkStep {
   id: string
   label: string
+  badges?: string[]
   status: 'pending' | 'active' | 'done' | 'skipped'
 }
 

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import type { TripChatWorkStep } from '../services/tripChat'
 import { useTranslation } from '../../../shared/i18n'
-import { completedWorkSummary } from './ChatWorkStepList'
+import { completedWorkSummary, parseStepDisplay } from './ChatWorkStepList'
 
 function ChatWorkStepIcon({
   id,
@@ -103,19 +103,20 @@ export function ChatWorkStepsPanel({
             const done = step.status === 'done'
             const activeStep = step.status === 'active'
             const skipped = step.status === 'skipped'
+            const { label: cleanLabel, badges } = parseStepDisplay(step)
             const label =
               step.status === 'pending'
                 ? locale === 'zh-CN'
-                  ? step.label.replace(/^正在/, '等待')
-                  : `${waitingPrefix}${step.label}`
+                  ? cleanLabel.replace(/^正在/, '等待')
+                  : `${waitingPrefix}${cleanLabel}`
                 : skipped
-                  ? `${skippedPrefix}${step.label}`
-                  : step.label
+                  ? `${skippedPrefix}${cleanLabel}`
+                  : cleanLabel
 
             return (
               <li
                 key={step.id}
-                className={`flex items-center gap-1.5 ${
+                className={`flex items-start sm:items-center gap-1.5 py-0.5 ${
                   activeStep
                     ? 'text-[var(--stone)]/90'
                     : done
@@ -125,28 +126,27 @@ export function ChatWorkStepsPanel({
                         : 'text-[var(--stone)]/45'
                 }`}
               >
-                <span className="w-4 shrink-0" aria-hidden>
+                <span className="mt-0.5 sm:mt-0 w-4 shrink-0" aria-hidden>
                   <ChatWorkStepIcon id={step.id} status={step.status} />
                 </span>
 
-                {/* Stable text + active shimmer overlay for smooth active→done transition */}
-                <span className="relative inline-block max-w-[16rem] shrink-0">
-                  <span
-                    aria-hidden
-                    className={`absolute left-0 top-0 whitespace-nowrap overflow-hidden text-ellipsis transition-opacity duration-250 ${
-                      activeStep ? 'opacity-100' : 'opacity-0'
-                    } chat-step-shimmer ${activeStep ? '' : 'chat-step-shimmer-paused'}`}
-                  >
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1 leading-snug">
+                  <span className={activeStep ? 'chat-step-shimmer' : ''}>
                     {label}
                   </span>
-                  <span
-                    className={`whitespace-nowrap overflow-hidden text-ellipsis transition-opacity duration-250 ${
-                      activeStep ? 'opacity-0' : 'opacity-100'
-                    }`}
-                  >
-                    {label}
-                  </span>
-                </span>
+                  {badges.length > 0 && (
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      {badges.map((badge, bIdx) => (
+                        <span
+                          key={bIdx}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium tracking-tight bg-black/[0.04] dark:bg-white/[0.08] text-[var(--stone)]/90 dark:text-zinc-300 border border-black/[0.06] dark:border-white/[0.08] select-none"
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
               </li>
             )
           })}
@@ -188,19 +188,34 @@ export function ChatWorkStepsPanel({
           <ol className="ml-[1.375rem] space-y-0.5 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
             {visible.map((step) => {
               const done = step.status === 'done'
+              const { label: cleanLabel, badges } = parseStepDisplay(step)
               return (
                 <li
                   key={step.id}
-                  className={`flex items-center gap-1.5 ${
+                  className={`flex items-start sm:items-center gap-1.5 py-0.5 ${
                     done
                       ? 'text-[var(--stone)]/62'
                       : 'text-[var(--stone)]/45'
                   }`}
                 >
-                  <span className="w-4 shrink-0" aria-hidden>
+                  <span className="mt-0.5 sm:mt-0 w-4 shrink-0" aria-hidden>
                     <ChatWorkStepIcon id={step.id} status={step.status} />
                   </span>
-                  <span className="truncate">{step.label}</span>
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1 leading-snug">
+                    <span>{cleanLabel}</span>
+                    {badges.length > 0 && (
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        {badges.map((badge, bIdx) => (
+                          <span
+                            key={bIdx}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium tracking-tight bg-black/[0.04] dark:bg-white/[0.08] text-[var(--stone)]/90 dark:text-zinc-300 border border-black/[0.06] dark:border-white/[0.08] select-none"
+                          >
+                            {badge}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
                 </li>
               )
             })}

@@ -7,7 +7,9 @@ import {
   chatWorkStepLabel,
   getChatWorkStepLabels,
   initialChatWorkSteps,
+  requestPlanStepBadges,
   requestPlanStepLabel,
+  parseStepDisplay,
   searchStepLabel,
   completedWorkSummary,
 } from '../features/chat/components/ChatWorkStepList'
@@ -52,7 +54,7 @@ describe('chat work-step labels are locale-aware', () => {
     expect(zhSteps[0]?.label).toBe('理解问题')
   })
 
-  it('requestPlanStepLabel returns English parts in en mode', () => {
+  it('requestPlanStepLabel and requestPlanStepBadges return English parts in en mode', () => {
     setLocale('en')
     const plan: TripChatRequestPlan = {
       intent: 'answer',
@@ -61,15 +63,13 @@ describe('chat work-step labels are locale-aware', () => {
       thinking: { enabled: true, effort: 'low' },
       source: 'model',
     }
-    const out = requestPlanStepLabel(plan, 'en')
-    expect(out).toContain('Analyzing the question')
-    expect(out).toContain('information query')
-    expect(out).toContain('no web needed')
-    expect(out).toContain('low')
-    expect(out).not.toMatch(/[\u4e00-\u9fff]/)
+    const label = requestPlanStepLabel(plan, 'en')
+    const badges = requestPlanStepBadges(plan, 'en')
+    expect(label).toBe('Analyzing question')
+    expect(badges).toEqual(['Info Query', 'No Web', 'Reasoning: Low'])
   })
 
-  it('requestPlanStepLabel returns Chinese parts in zh-CN mode', () => {
+  it('requestPlanStepLabel and requestPlanStepBadges return Chinese parts in zh-CN mode', () => {
     setLocale('zh-CN')
     const plan: TripChatRequestPlan = {
       intent: 'recommend',
@@ -78,11 +78,31 @@ describe('chat work-step labels are locale-aware', () => {
       thinking: { enabled: true, effort: 'high' },
       source: 'model',
     }
-    const out = requestPlanStepLabel(plan, 'zh-CN')
-    expect(out).toContain('分析问题')
-    expect(out).toContain('推荐')
-    expect(out).toContain('需要联网')
-    expect(out).toContain('高')
+    const label = requestPlanStepLabel(plan, 'zh-CN')
+    const badges = requestPlanStepBadges(plan, 'zh-CN')
+    expect(label).toBe('分析问题')
+    expect(badges).toEqual(['推荐', '联网搜索', '推理: 高'])
+  })
+
+  it('parseStepDisplay handles badges and legacy string formatting', () => {
+    // Native badges
+    const native = parseStepDisplay({
+      id: 'preprocessPlan',
+      label: '分析问题',
+      badges: ['推荐', '联网搜索'],
+      status: 'done',
+    })
+    expect(native.label).toBe('分析问题')
+    expect(native.badges).toEqual(['推荐', '联网搜索'])
+
+    // Legacy concatenated string format
+    const legacy = parseStepDisplay({
+      id: 'preprocessPlan',
+      label: '分析问题：信息查询 · 无需联网 · 推理强度：中',
+      status: 'done',
+    })
+    expect(legacy.label).toBe('分析问题')
+    expect(legacy.badges).toEqual(['信息查询', '无需联网', '推理强度：中'])
   })
 
   it('searchStepLabel uses locale-aware prefix', () => {
