@@ -566,7 +566,7 @@ export const zhCN: I18nSchema = {
     recsUnavailable: '推荐助手暂不可用，请改用 Google 搜索。',
     recsCategoryEmpty: '这一类暂时没有推荐，可切换其他分类、换一批，或用 Google 搜索。',
     refreshRecs: '换一批',
-    refreshingRecs: '正在换一批…',
+    refreshingRecs: '正在换一批',
     addCafeOption: '咖啡馆',
     addRestaurantOption: '餐厅',
     aiOrGoogle: 'AI 推荐 / Google 地点',

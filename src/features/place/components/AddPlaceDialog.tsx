@@ -1362,7 +1362,18 @@ export function AddPlaceDialog({
                   {refreshingRecs && (
                     <ButtonSpinner mode="thinking" task="placeRecommend" />
                   )}
-                  {refreshingRecs ? t('place.refreshingRecs') : t('place.refreshRecs')}
+                  {refreshingRecs ? (
+                    <span className="inline-flex items-center gap-0.5">
+                      <span>{t('place.refreshingRecs')}</span>
+                      <span className="llm-think-chip-dots" aria-hidden>
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    </span>
+                  ) : (
+                    t('place.refreshRecs')
+                  )}
                 </button>
               )}
 

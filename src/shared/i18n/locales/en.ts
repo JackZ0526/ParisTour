@@ -566,7 +566,7 @@ export const en: I18nSchema = {
     recsUnavailable: 'Recommendation assistant unavailable. Please use Google Search.',
     recsCategoryEmpty: 'No recommendations in this category. Try another category, refresh, or use Google Search.',
     refreshRecs: 'Refresh',
-    refreshingRecs: 'Refreshing…',
+    refreshingRecs: 'Refreshing',
     addCafeOption: 'Café',
     addRestaurantOption: 'Restaurant',
     aiOrGoogle: 'AI Recommend / Google Place',
