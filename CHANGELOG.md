@@ -19,6 +19,53 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.10.0] - 2026-08-24
+
+### Added
+
+- dynamically display active WorkStep in bottom capsule with smooth popLayout slide transition
+- adjust max attached images per message to 6
+- increase image upload limit to 9 with limit notification and scrollable preview
+- render all N skeleton slots upfront and process multi-image uploads concurrently
+- display loading spinner animation during HEIC image transcoding
+- add HEIC/HEIF auto-transcoding and full-panel drag-and-drop dropzone overlay
+- provide smooth pacing for native vision step to ensure clear visual progression
+- show live visual analysis step in real-time for all models
+- add first-class visual analysis work step and prevent redundant search for image recognition
+- enable universal image uploads with visual analysis proxy for text-only models
+- unify run summary card with reasoning and add rich step badges for places, actions and search
+
+### Changed
+
+- restore bouncy spring elasticity on input capsule morphing
+- eliminate vertical scale and Y offsets on capsule layout animation
+- soften spring bounce on input capsule morphing animation
+- morph send button to busy pill via single-element layout spring and smooth color fade
+- add spring fluid morphing animation between send arrow and busy status pill
+- implement unified Liquid Glass Capsule input bar with integrated media and send controls
+- use compact 48x48 thumbnail shimmer skeleton with centered spinner for HEIC decoding
+- restore original capsule pill aesthetic with balanced single-row prompt copy
+- enrich prompt suggestions copy and render full-width single-row cards
+- update shortLabel to V4 Flash Vision for clearer model distinction
+- position Day and viewing context capsules on the second row of chat header
+- align model capsule and day tag inline next to Trip Assistant title
+- integrate reasoning process smoothly into timeline with hidden scrollbar
+- align step checkmarks and apply global glass capsule pill styling
+
+### Fixed
+
+- support general knowledge questions and add locale-aware parse fallbacks
+- fix flash of white border and delay color fade until circle shrink settles
+- upgrade to modern heic-to decoder for flawless iOS HEIC/HEIF photo support
+- localize viewing place context capsule in chat header
+- validate image format on upload, localize unsupported image errors, and align error dot
+- honor options.model in transport to fix visual analysis for text models and streamline live visual step
+- seamlessly integrate visual observation data and prompt rules into text-only models
+- use tool_choice auto for DeepSeek responses web search to ensure synthesis text generation
+- fix deepseek web search model routing and search error status handling
+- redesign work-step pipeline with badge pills to prevent text truncation
+
+
 ## [0.9.5] - 2026-08-24
 
 ### Added
@@ -669,7 +716,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...HEAD
+- [0.10.0]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...v0.10.0
 - [0.9.5]: https://github.com/JackZ0526/ParisTour/compare/v0.9.4...v0.9.5
 - [0.9.4]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...v0.9.4
 - [0.9.3]: https://github.com/JackZ0526/ParisTour/compare/v0.9.2...v0.9.3
