@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   Globe2,
+  Image as ImageIcon,
   MapPin,
   MessageSquareText,
   Sparkles,
@@ -31,6 +32,9 @@ function ChatWorkStepIcon({
     ) : (
       <TriangleAlert aria-hidden className={common} strokeWidth={1.8} />
     )
+  }
+  if (id === 'visualAnalysis') {
+    return <ImageIcon aria-hidden className={common} strokeWidth={1.8} />
   }
   if (id === 'webSearch') {
     return <Globe2 aria-hidden className={common} strokeWidth={1.8} />

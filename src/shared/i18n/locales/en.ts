@@ -661,6 +661,7 @@ export const en: I18nSchema = {
     // Work-step pipeline labels (ChatWorkStepList.tsx)
     workStepPreprocessPlan: 'Understanding the question',
     workStepPreprocessFallback: 'Fallback routing',
+    workStepVisualAnalysis: 'Analyzing image',
     workStepWebSearch: 'Searching the web',
     workStepGenerate: 'Generating answer',
     workStepParse: 'Parsing actions',

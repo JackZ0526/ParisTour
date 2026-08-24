@@ -22,6 +22,7 @@ import { getLocale, translate, type Locale } from '../../../shared/i18n'
 export type ChatWorkStepId =
   | 'preprocessPlan'
   | 'preprocessFallback'
+  | 'visualAnalysis'
   | 'webSearch'
   | 'generate'
   | 'parse'
@@ -33,6 +34,7 @@ export type ChatWorkStep = TripChatWorkStep & { id: ChatWorkStepId }
 type WorkStepLabelKey =
   | 'chat.workStepPreprocessPlan'
   | 'chat.workStepPreprocessFallback'
+  | 'chat.workStepVisualAnalysis'
   | 'chat.workStepWebSearch'
   | 'chat.workStepGenerate'
   | 'chat.workStepParse'
@@ -42,6 +44,7 @@ type WorkStepLabelKey =
 const STEP_LABEL_KEYS: Record<ChatWorkStepId, WorkStepLabelKey> = {
   preprocessPlan: 'chat.workStepPreprocessPlan',
   preprocessFallback: 'chat.workStepPreprocessFallback',
+  visualAnalysis: 'chat.workStepVisualAnalysis',
   webSearch: 'chat.workStepWebSearch',
   generate: 'chat.workStepGenerate',
   parse: 'chat.workStepParse',
@@ -74,6 +77,7 @@ export function chatWorkStepLabel(id: ChatWorkStepId, locale: Locale = getLocale
 const FALLBACK_LABELS_ZH: Record<ChatWorkStepId, string> = {
   preprocessPlan: '理解问题',
   preprocessFallback: '兜底路由',
+  visualAnalysis: '解析图片',
   webSearch: '搜索网络',
   generate: '生成回答',
   parse: '解析动作',
@@ -81,11 +85,12 @@ const FALLBACK_LABELS_ZH: Record<ChatWorkStepId, string> = {
   apply: '应用改动',
 }
 
-export function initialChatWorkSteps(_userText: string): ChatWorkStep[] {
+export function initialChatWorkSteps(_userText: string, hasImages = false): ChatWorkStep[] {
   const labels = getChatWorkStepLabels()
   return [
     { id: 'preprocessPlan', label: labels.preprocessPlan, status: 'active' },
     { id: 'preprocessFallback', label: labels.preprocessFallback, status: 'skipped' },
+    { id: 'visualAnalysis', label: labels.visualAnalysis, status: hasImages ? 'pending' : 'skipped' },
     { id: 'webSearch', label: labels.webSearch, status: 'pending' },
     { id: 'generate', label: labels.generate, status: 'pending' },
     { id: 'parse', label: labels.parse, status: 'pending' },
@@ -173,21 +178,30 @@ export function requestPlanStepLabel(
 export function requestPlanStepBadges(
   plan: TripChatRequestPlan,
   locale: Locale = getLocale(),
+  hasImages = false,
 ): string[] {
   const intent = plan.intent
 
-  const intentLabel =
-    intent === 'recommend'
-      ? (translate('chat.workStepPlanIntentRecommend' as never, undefined, locale) ||
-          (locale === 'en' ? 'Recommend' : '推荐'))
-      : intent === 'mutate'
-        ? (translate('chat.workStepPlanIntentMutate' as never, undefined, locale) ||
-            (locale === 'en' ? 'Edit Plan' : '行程调整'))
-        : intent === 'answer'
-          ? (translate('chat.workStepPlanIntentAnswer' as never, undefined, locale) ||
-              (locale === 'en' ? 'Info Query' : '信息查询'))
-          : (translate('chat.workStepPlanIntentUnderstand' as never, undefined, locale) ||
-              (locale === 'en' ? 'Analyze' : '理解问题'))
+  let intentLabel: string
+  if (hasImages && intent === 'answer') {
+    intentLabel = locale === 'en' ? 'Visual Recognition' : '识图识别'
+  } else if (intent === 'recommend') {
+    intentLabel =
+      translate('chat.workStepPlanIntentRecommend' as never, undefined, locale) ||
+      (locale === 'en' ? 'Recommend' : '推荐')
+  } else if (intent === 'mutate') {
+    intentLabel =
+      translate('chat.workStepPlanIntentMutate' as never, undefined, locale) ||
+      (locale === 'en' ? 'Edit Plan' : '行程调整')
+  } else if (intent === 'answer') {
+    intentLabel =
+      translate('chat.workStepPlanIntentAnswer' as never, undefined, locale) ||
+      (locale === 'en' ? 'Info Query' : '信息查询')
+  } else {
+    intentLabel =
+      translate('chat.workStepPlanIntentUnderstand' as never, undefined, locale) ||
+      (locale === 'en' ? 'Analyze' : '理解问题')
+  }
 
   const needsWebLabel = plan.needsWeb
     ? (locale === 'en' ? 'Web Search' : '联网搜索')
@@ -225,6 +239,27 @@ export function parseStepDisplay(step: TripChatWorkStep): { label: string; badge
     }
   }
   return { label: step.label, badges: [] }
+}
+
+export function visualAnalysisStepBadges(
+  imageCount: number,
+  isProxy: boolean,
+  locale: Locale = getLocale(),
+): string[] {
+  const badges: string[] = []
+  if (isProxy) {
+    badges.push(locale === 'en' ? 'V4 Vision Proxy' : '调用 V4 Vision')
+  } else {
+    badges.push(locale === 'en' ? 'Multimodal Vision' : '多模态识图')
+  }
+  if (imageCount > 0) {
+    badges.push(
+      locale === 'en'
+        ? `${imageCount} ${imageCount === 1 ? 'image' : 'images'}`
+        : `${imageCount} 张图片`,
+    )
+  }
+  return badges
 }
 
 export function searchStepBadges(
@@ -324,6 +359,7 @@ export function completedWorkSummary(
   const doneSteps = visible.filter((s) => s.status === 'done')
   const doneCount = doneSteps.length || visible.length
   const doneIds = new Set(doneSteps.map((s) => s.id))
+  const hasVisual = doneIds.has('visualAnalysis')
   const hasWebSearch = doneIds.has('webSearch')
   const hasApply = doneIds.has('apply')
   const hasResolvePlaces = doneIds.has('resolvePlaces')
@@ -331,6 +367,7 @@ export function completedWorkSummary(
   if (locale === 'en') {
     const parts: string[] = []
     if (hasReasoning) parts.push('Thought')
+    if (hasVisual) parts.push('Analyzed image')
     if (hasWebSearch) parts.push('Web searched')
     if (hasApply) parts.push('Applied changes')
     else if (hasResolvePlaces) parts.push('Verified places')
@@ -342,6 +379,7 @@ export function completedWorkSummary(
   // zh-CN
   const parts: string[] = []
   if (hasReasoning) parts.push('思考完成')
+  if (hasVisual) parts.push('已解析图片')
   if (hasWebSearch) parts.push('联网搜索')
   if (hasApply) parts.push('已调整行程')
   else if (hasResolvePlaces) parts.push('已核实地点')

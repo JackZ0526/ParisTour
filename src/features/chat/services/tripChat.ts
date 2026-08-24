@@ -706,9 +706,9 @@ user: "第三天加个咖啡馆" → actions[].day=3
 }
 
 /** Heuristic: user is asking for live/public facts beyond the itinerary plan. */
-export function tripChatNeedsWebResearch(userMessage: string): boolean {
+export function tripChatNeedsWebResearch(userMessage: string, hasImages = false): boolean {
   const text = userMessage.trim()
-  if (!text) return false
+  if (!text && !hasImages) return false
   // An explicit request to browse always wins over the automatic heuristic.
   if (
     /联网|上网|网络搜索|网页搜索|web\s*search|search\s+the\s+web|搜一下|搜索一下|网上查|查查网上/i.test(
@@ -716,6 +716,16 @@ export function tripChatNeedsWebResearch(userMessage: string): boolean {
     )
   ) {
     return true
+  }
+  // Pure visual recognition questions on attached images (e.g. "这是什么地方", "图中是什么建筑")
+  // should not trigger web search unless explicitly asking for live details.
+  if (
+    hasImages &&
+    !/价格|价位|人均|多少钱|贵不贵|便宜吗|营业|开门|关门|几点开|几点关|open(ing)?\s*hours?|门票|票价|预约|天气|几度|下雨/i.test(
+      text,
+    )
+  ) {
+    return false
   }
   // Open-ended recommendations need live candidates and ratings before the
   // model chooses a place. This is handled primarily by Google Places below.
@@ -1456,6 +1466,12 @@ export interface TripChatWebSearchDetail {
   sourcesCount?: number
 }
 
+export type TripChatVisualAnalysisPhase = 'start' | 'done' | 'skip'
+export interface TripChatVisualAnalysisDetail {
+  imageCount: number
+  isProxy: boolean
+}
+
 export type TripChatRequestPlanPhase = 'start' | 'done'
 
 /** Preflight decision made before search, generation, or itinerary actions. */
@@ -1490,6 +1506,7 @@ function planningContext(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
+  images?: string[]
 }) {
   const destination = buildDestinationSnapshot(input.ctx)
   const dates = buildTripDatesSnapshot(input.ctx)
@@ -1497,8 +1514,10 @@ function planningContext(input: {
   const recentHistory = input.history
     .slice(-4)
     .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 500) }))
+  const attachedImagesCount = input.images ? input.images.length : 0
   return {
     request: input.userMessage,
+    attachedImagesCount,
     destination,
     dates,
     currentDay: input.ctx.currentDay,
@@ -1515,10 +1534,12 @@ export async function planTripChatRequest(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
+  images?: string[]
   signal?: AbortSignal
   webSearch?: boolean | 'auto'
 }): Promise<TripChatRequestPlan> {
-  const fallbackNeedsWeb = tripChatNeedsWebResearch(input.userMessage)
+  const hasImages = Boolean(input.images && input.images.length > 0)
+  const fallbackNeedsWeb = tripChatNeedsWebResearch(input.userMessage, hasImages)
   const fallbackThinking = resolveThinkingForTask(
     getThinkingMode(),
     input.userMessage,
@@ -1558,19 +1579,19 @@ export async function planTripChatRequest(input: {
 true when the answer depends on current / third-party public facts:
 opening hours / price / tickets / weather / strikes and transit status / recent events / ratings and reviews / open-ended place or restaurant recommendations / whether a place actually exists / anything that should be verified to be reliable
 
-false when current itinerary alone is enough:
-add / remove / change / reorder / switch days / summarise existing content / write copy / general knowledge that does not require fresh facts
+false when current itinerary alone is enough, OR when attachedImagesCount > 0 and user is asking for image / scene / landmark recognition without explicitly requiring external live pricing/status:
+add / remove / change / reorder / switch days / summarise existing content / write copy / visual landmark identification / general knowledge that does not require fresh facts
 
-Do not only look for the keyword "internet"; understand the reference, context, and the real information needed. When the information may change or is uncertain, prefer web search.
+Do not only look for the keyword "internet"; understand the reference, context, and the real information needed. When the user uploads images to recognize what/where it is ("这是什么地方", "图中是什么建筑"), needsWeb must be false.
 </needsWeb>`
               : `<needsWeb>
 true 时（答案依赖当前或第三方公开事实）：
 营业时间/价格/票务/天气/罢工与交通状态/近期活动/评分评论/开放式地点或餐厅推荐/地点是否真实存在/任何应先核实才可靠的信息
 
-false 时（仅根据当前行程即可完成）：
-增删改排/切换日期/概括现有内容/写作文案/一般常识且不要求最新事实
+false 时（仅根据当前行程或附带图片视觉识别即可完成）：
+增删改排/切换日期/概括现有内容/写作文案/图片建筑识别/一般常识且不要求最新事实
 
-不要只看"联网"关键词，要理解指代、上下文和任务真正需要的信息。信息可能变化或不确定时宁可联网。
+不要只看"联网"关键词，要理解指代、上下文和任务真正需要的信息。当用户上传了图片询问“这是什么地方/图里是什么建筑/帮我看看这张图”等识图问题时，needsWeb 必须为 false（直接由视觉模型识别），除非用户明确要求查询实时票价或最新营业状态。
 </needsWeb>`,
             routerIsEn
               ? `<reasoning_effort>
@@ -1695,23 +1716,44 @@ export async function sendTripChatMessage(input: {
   /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
   webSearch?: boolean | 'auto'
   onRequestPlan?: (phase: TripChatRequestPlanPhase, plan?: TripChatRequestPlan) => void
+  onVisualAnalysis?: (
+    phase: TripChatVisualAnalysisPhase,
+    detail?: TripChatVisualAnalysisDetail,
+  ) => void
   onWebSearch?: (phase: TripChatWebSearchPhase, detail?: TripChatWebSearchDetail) => void
 }): Promise<TripChatResult> {
   input.onRequestPlan?.('start')
-  const plan = await planTripChatRequest(input)
+  const plan = await planTripChatRequest({ ...input, images: input.images })
   input.onRequestPlan?.('done', plan)
-  const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const activeModel = getOpenAIModel()
   const isVisionModel = isModelVisionCapable(activeModel)
   let visualAnalysis: string | null = null
-  if (input.images && input.images.length > 0 && !isVisionModel) {
-    visualAnalysis = await fetchTripChatVisualAnalysis({
-      images: input.images,
-      userMessage: input.userMessage,
-      signal: input.signal,
-      locale: getLocale(),
-    })
+  if (input.images && input.images.length > 0) {
+    if (!isVisionModel) {
+      input.onVisualAnalysis?.('start', {
+        imageCount: input.images.length,
+        isProxy: true,
+      })
+      visualAnalysis = await fetchTripChatVisualAnalysis({
+        images: input.images,
+        userMessage: input.userMessage,
+        signal: input.signal,
+        locale: getLocale(),
+      })
+      input.onVisualAnalysis?.('done', {
+        imageCount: input.images.length,
+        isProxy: true,
+      })
+    } else {
+      input.onVisualAnalysis?.('done', {
+        imageCount: input.images.length,
+        isProxy: false,
+      })
+    }
+  } else {
+    input.onVisualAnalysis?.('skip')
   }
+  const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
   const rawText = await openaiChat(messages, {
     task: 'tripChat',
@@ -1750,6 +1792,10 @@ export async function sendTripChatMessageStream(input: {
   /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
   webSearch?: boolean | 'auto'
   onRequestPlan?: (phase: TripChatRequestPlanPhase, plan?: TripChatRequestPlan) => void
+  onVisualAnalysis?: (
+    phase: TripChatVisualAnalysisPhase,
+    detail?: TripChatVisualAnalysisDetail,
+  ) => void
   onWebSearch?: (phase: TripChatWebSearchPhase, detail?: TripChatWebSearchDetail) => void
   /** Progressive user-visible reply extracted from the streaming JSON buffer. */
   onReplyDelta?: (reply: string) => void
@@ -1757,20 +1803,37 @@ export async function sendTripChatMessageStream(input: {
   onReasoningDelta?: (delta: string, fullReasoning: string) => void
 }): Promise<TripChatResult> {
   input.onRequestPlan?.('start')
-  const plan = await planTripChatRequest(input)
+  const plan = await planTripChatRequest({ ...input, images: input.images })
   input.onRequestPlan?.('done', plan)
-  const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const activeModel = getOpenAIModel()
   const isVisionModel = isModelVisionCapable(activeModel)
   let visualAnalysis: string | null = null
-  if (input.images && input.images.length > 0 && !isVisionModel) {
-    visualAnalysis = await fetchTripChatVisualAnalysis({
-      images: input.images,
-      userMessage: input.userMessage,
-      signal: input.signal,
-      locale: getLocale(),
-    })
+  if (input.images && input.images.length > 0) {
+    if (!isVisionModel) {
+      input.onVisualAnalysis?.('start', {
+        imageCount: input.images.length,
+        isProxy: true,
+      })
+      visualAnalysis = await fetchTripChatVisualAnalysis({
+        images: input.images,
+        userMessage: input.userMessage,
+        signal: input.signal,
+        locale: getLocale(),
+      })
+      input.onVisualAnalysis?.('done', {
+        imageCount: input.images.length,
+        isProxy: true,
+      })
+    } else {
+      input.onVisualAnalysis?.('done', {
+        imageCount: input.images.length,
+        isProxy: false,
+      })
+    }
+  } else {
+    input.onVisualAnalysis?.('skip')
   }
+  const webResearch = await resolveTripChatWebResearch({ ...input, plan })
   const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
   let lastEmitted = ''
 

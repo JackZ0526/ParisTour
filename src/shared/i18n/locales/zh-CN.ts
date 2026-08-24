@@ -661,6 +661,7 @@ export const zhCN: I18nSchema = {
     // Work-step pipeline labels (ChatWorkStepList.tsx)
     workStepPreprocessPlan: '理解问题',
     workStepPreprocessFallback: '兜底路由',
+    workStepVisualAnalysis: '解析图片',
     workStepWebSearch: '搜索网络',
     workStepGenerate: '生成回答',
     workStepParse: '解析动作',

@@ -685,6 +685,7 @@ export interface I18nSchema {
     // Work-step pipeline labels (ChatWorkStepList.tsx)
     workStepPreprocessPlan: string
     workStepPreprocessFallback: string
+    workStepVisualAnalysis: string
     workStepWebSearch: string
     workStepGenerate: string
     workStepParse: string

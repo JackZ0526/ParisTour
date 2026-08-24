@@ -12,11 +12,13 @@ import { fetchTripadvisorAttractionInfo } from '../../place/services/tripadvisor
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
+  getOpenAIModel,
   getOpenAIModelShortLabel,
   getThinkingMode,
   getThinkingModeLabel,
   isDeepSeekModel,
   isLlmConfigured,
+  isModelVisionCapable,
   resolveThinkingForTask,
   supportsThinkingControls,
   type HotelDetailCopy,
@@ -214,6 +216,7 @@ import {
   resolvePlacesStepBadges,
   searchStepBadges,
   searchStepLabel,
+  visualAnalysisStepBadges,
   type ChatWorkStep,
 } from './ChatWorkStepList'
 import {
@@ -728,8 +731,8 @@ export function TripChatPanel({
     }
   }, [open, isDesktop])
 
-  function beginWorkPipeline(userText: string) {
-    setWorkSteps(initialChatWorkSteps(userText))
+  function beginWorkPipeline(userText: string, hasImages = false) {
+    setWorkSteps(initialChatWorkSteps(userText, hasImages))
     setWorkStepsOpen(false)
     setReasoningText('')
     setReasoningOpen(false)
@@ -1916,7 +1919,7 @@ export function TripChatPanel({
     // New user turn supersedes any lingering recommend-confirm sheet.
     setPendingPlaces([])
     setBusyUserText(message || (locale === 'en' ? 'Analyzing image…' : '分析图片中…'))
-    beginWorkPipeline(message || (locale === 'en' ? 'Image message' : '图片消息'))
+    beginWorkPipeline(message || (locale === 'en' ? 'Image message' : '图片消息'), imagesToSend.length > 0)
     setInput('')
     setAttachedImages([])
     setHistory((prev) => [
@@ -1942,7 +1945,7 @@ export function TripChatPanel({
                 return {
                   ...step,
                   label: requestPlanStepLabel(plan),
-                  badges: requestPlanStepBadges(plan),
+                  badges: requestPlanStepBadges(plan, locale, imagesToSend.length > 0),
                 }
               }
               if (step.id === 'preprocessFallback') {
@@ -1954,6 +1957,20 @@ export function TripChatPanel({
             })
 
             // Planning must finish before search/generation can begin.
+            if (imagesToSend.length > 0) {
+              return activateChatWorkStep(relabeled, 'visualAnalysis', {
+                labels: {
+                  visualAnalysis: locale === 'en' ? 'Analyzing image…' : '正在分析图片…',
+                },
+                badges: {
+                  visualAnalysis: visualAnalysisStepBadges(
+                    imagesToSend.length,
+                    !isModelVisionCapable(getOpenAIModel()),
+                    locale,
+                  ),
+                },
+              })
+            }
             if (plan.needsWeb) {
               return activateChatWorkStep(relabeled, 'webSearch', {
                 labels: {
@@ -1964,6 +1981,42 @@ export function TripChatPanel({
 
             return activateChatWorkStep(relabeled, 'generate')
           })
+        },
+        onVisualAnalysis: (phase, detail) => {
+          if (abortRef.current !== ac) return
+          if (phase === 'start') {
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'visualAnalysis', {
+                labels: {
+                  visualAnalysis: locale === 'en' ? 'Analyzing image…' : '正在分析图片…',
+                },
+                badges: {
+                  visualAnalysis: detail
+                    ? visualAnalysisStepBadges(detail.imageCount, detail.isProxy, locale)
+                    : undefined,
+                },
+              }),
+            )
+            return
+          }
+          if (phase === 'done') {
+            setWorkSteps((prev) => {
+              const badges = detail
+                ? visualAnalysisStepBadges(detail.imageCount, detail.isProxy, locale)
+                : undefined
+              return prev.map((s) =>
+                s.id === 'visualAnalysis'
+                  ? { ...s, status: 'done' as const, badges: badges || s.badges }
+                  : s,
+              )
+            })
+            return
+          }
+          if (phase === 'skip') {
+            setWorkSteps((prev) =>
+              prev.map((s) => (s.id === 'visualAnalysis' ? { ...s, status: 'skipped' as const } : s)),
+            )
+          }
         },
         onWebSearch: (phase, detail) => {
           if (abortRef.current !== ac) return

@@ -28,6 +28,7 @@ export {
   OPENAI_ONLY_MODEL_OPTIONS,
   defaultOpenAIModelFromEnv,
   isLlmConfigured,
+  isModelVisionCapable,
   llmStorageKeys,
   type OpenAIModelId,
 } from '../../../config/llmModels'
