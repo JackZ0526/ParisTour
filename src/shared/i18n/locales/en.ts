@@ -552,7 +552,7 @@ export const en: I18nSchema = {
     recPrefAddAria: 'Add {name}',
     recPrefAddTitle: 'Add: {name}',
     // AddPlaceDialog loading labels
-    loadingGooglePhoto: 'Loading Google photos…',
+    loadingGooglePhoto: 'Loading photos',
     aiThinkingLabel: 'AI is thinking about recommendations',
     aiGeneratingLabel: 'AI is generating based on your trip',
     // AddPlaceDialog action buttons

@@ -552,7 +552,7 @@ export const zhCN: I18nSchema = {
     recPrefAddAria: '添加 {name}',
     recPrefAddTitle: '添加：{name}',
     // AddPlaceDialog loading labels
-    loadingGooglePhoto: '正在加载 Google 照片…',
+    loadingGooglePhoto: '正在加载地点照片',
     aiThinkingLabel: 'AI 正在思考推荐',
     aiGeneratingLabel: 'AI 正在根据行程推荐',
     // AddPlaceDialog action buttons

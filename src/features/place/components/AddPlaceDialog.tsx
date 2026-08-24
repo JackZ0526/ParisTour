@@ -38,7 +38,7 @@ import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { GooglePlacePage } from './GooglePlacePage'
-import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
+import { ButtonSpinner } from '../../../shared/components/LoadingIndicator'
 import {
   glassCapsuleSurfaceClass,
   glassCapsuleToneClass,
@@ -1223,11 +1223,71 @@ export function AddPlaceDialog({
                               >
                                 <div className="space-y-3 px-3 pb-3 pt-3">
                                   {loadingDetails ? (
-                                    <LoadingIndicator
-                                      label={t('place.loadingGooglePhoto')}
-                                      showDots
-                                      size="sm"
-                                    />
+                                    <div className="space-y-3" aria-hidden>
+                                      <div className="h-44 sm:h-56 w-full rounded-2xl day-tab-shimmer" />
+                                      <div className="flex gap-2 overflow-hidden">
+                                        <span className="h-10 w-14 rounded-lg day-tab-shimmer shrink-0" />
+                                        <span className="h-10 w-14 rounded-lg day-tab-shimmer shrink-0" />
+                                        <span className="h-10 w-14 rounded-lg day-tab-shimmer shrink-0" />
+                                        <span className="h-10 w-14 rounded-lg day-tab-shimmer shrink-0" />
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-1 text-xs text-[var(--sage)]`}>
+                                          {item.type}
+                                        </span>
+                                        <span className="h-6 w-20 rounded-full day-tab-shimmer" />
+                                        <span className="h-6 w-14 rounded-full day-tab-shimmer" />
+                                      </div>
+                                      <span className="block h-3.5 w-3/4 rounded-full day-tab-shimmer" />
+                                      <div className="space-y-2 text-sm leading-relaxed text-[var(--ink)]/90">
+                                        <p>{item.intro}</p>
+                                        <p className="text-[var(--stone)]">
+                                          <span className="font-medium text-[var(--ink)]">{t('place.aiFitReason')}</span>
+                                          {item.reason}
+                                        </p>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                          type="button"
+                                          disabled={searching}
+                                          onClick={() =>
+                                            void resolveAndAdd(
+                                              item.name,
+                                              item.type,
+                                              'best',
+                                              item.intro || item.reason,
+                                              details,
+                                            )
+                                          }
+                                          aria-busy={busyBest || undefined}
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--sage)] px-3 py-2.5 text-sm text-white disabled:opacity-50"
+                                        >
+                                          {busyBest && <ButtonSpinner mode="thinking" task="placeDetail" />}
+                                          {busyBest ? t('place.addingBusy') : t('place.addBestOnRoute')}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={searching}
+                                          onClick={() =>
+                                            void resolveAndAdd(
+                                              item.name,
+                                              item.type,
+                                              'end',
+                                              item.intro || item.reason,
+                                              details,
+                                            )
+                                          }
+                                          aria-busy={busyEnd || undefined}
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] dark:bg-[var(--copper)] px-3 py-2.5 text-sm text-[var(--paper)] dark:text-white disabled:opacity-50"
+                                        >
+                                          {busyEnd && <ButtonSpinner mode="thinking" task="placeDetail" />}
+                                          {busyEnd ? t('place.addingBusy') : t('place.addToEnd')}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-[var(--stone)]">
+                                        {t('place.fitReasonHint')}
+                                      </p>
+                                    </div>
                                   ) : (
                                     <>
                                       {photos.length > 0 ? (
