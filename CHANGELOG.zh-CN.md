@@ -18,6 +18,13 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.9.4] - 2026-08-24
+
+### 修复
+
+- 修复返程日（最后一天的「今日终点」/「Today's last stop」）卡片中戴高乐机场名称在英文模式下仍显示为中文的问题。
+
+
 ## [0.9.3] - 2026-08-24
 
 ### 修复
@@ -554,7 +561,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.4...HEAD
+- [0.9.4]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...v0.9.4
 - [0.9.3]: https://github.com/JackZ0526/ParisTour/compare/v0.9.2...v0.9.3
 - [0.9.2]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...v0.9.2
 - [0.9.1]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...v0.9.1

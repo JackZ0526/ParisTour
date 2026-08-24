@@ -19,6 +19,13 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.9.4] - 2026-08-24
+
+### Fixed
+
+- localize return airport name on last day card
+
+
 ## [0.9.3] - 2026-08-24
 
 ### Fixed
@@ -655,7 +662,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.4...HEAD
+- [0.9.4]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...v0.9.4
 - [0.9.3]: https://github.com/JackZ0526/ParisTour/compare/v0.9.2...v0.9.3
 - [0.9.2]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...v0.9.2
 - [0.9.1]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...v0.9.1
