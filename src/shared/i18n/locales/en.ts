@@ -625,7 +625,7 @@ export const en: I18nSchema = {
     gptDesc: 'Ultra-fast responses for quick adjustments and venue Q&A',
     claudeDesc: 'Literary elegance, exceptional for culture, history, and dining',
     geminiDesc: 'Multimodal brilliance and spatial map understanding',
-    sendPromptPlaceholder: 'Tell the assistant how to tailor your trip…',
+    sendPromptPlaceholder: 'Ask or adjust your trip plan…',
     applyChanges: 'Apply to Itinerary',
     applied: 'Applied to Itinerary',
     suggestedPrompts: 'Try asking',

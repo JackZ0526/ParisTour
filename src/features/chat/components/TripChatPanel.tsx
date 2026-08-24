@@ -23,7 +23,7 @@ import {
   supportsThinkingControls,
   type HotelDetailCopy,
 } from '../../../shared/services/llm/llm'
-import { Image as ImageIcon, X } from 'lucide-react'
+import { ArrowUp, Image as ImageIcon, X } from 'lucide-react'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
 import { ModelBrandIcon } from './LlmModelPicker'
 import {
@@ -2693,7 +2693,7 @@ export function TripChatPanel({
                 ))}
               </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="relative flex items-center gap-1.5 rounded-full border border-white/90 dark:border-white/10 bg-white/80 dark:bg-black/35 p-1.5 pl-2 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all focus-within:border-[var(--copper)]/70 focus-within:bg-white dark:focus-within:bg-black/50 focus-within:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)]">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2708,7 +2708,7 @@ export function TripChatPanel({
                 disabled={busy || !open || convertingCount > 0}
                 title={t('chat.uploadImage')}
                 aria-label={t('chat.uploadImage')}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/30 text-[var(--stone)] transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition-colors hover:bg-black/5 dark:hover:bg-white/10 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40 cursor-pointer"
               >
                 <ImageIcon size={17} />
               </button>
@@ -2722,13 +2722,13 @@ export function TripChatPanel({
                 aria-busy={busy || undefined}
                 enterKeyHint="send"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-full border border-white/90 dark:border-white/10 bg-white/85 dark:bg-black/35 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)] disabled:bg-white/60 dark:disabled:bg-black/20 disabled:text-[var(--stone)]/60"
+                className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 outline-none disabled:text-[var(--stone)]/60"
               />
               {busy ? (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)]/95 text-white px-3.5 py-1.5 text-xs shadow-[0_3px_12px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.35)] dark:shadow-[0_3px_14px_rgba(212,131,84,0.35)] backdrop-blur-md select-none"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)]/95 text-white px-3 py-1.5 text-xs shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none"
                 >
                   <ButtonSpinner
                     mode="thinking"
@@ -2736,7 +2736,7 @@ export function TripChatPanel({
                     userText={busyUserText || input}
                     thinkingEnabled={requestThinkingEnabled}
                   />
-                  <span className="tracking-wide">
+                  <span className="tracking-wide text-[11px]">
                     {chatBusy.label({ thinking: t('chat.thinkingAssistantLabel'), generating: t('chat.answeringAssistantLabel') })}
                   </span>
                 </div>
@@ -2745,13 +2745,15 @@ export function TripChatPanel({
                   type="submit"
                   disabled={((!input.trim() && attachedImages.length === 0) || !open || convertingCount > 0)}
                   tabIndex={open ? undefined : -1}
-                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+                  title={t('chat.sendButton')}
+                  aria-label={t('chat.sendButton')}
+                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
                     (input.trim() || attachedImages.length > 0) && open && convertingCount === 0
-                      ? 'border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_4px_14px_rgba(35,42,38,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.4)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35)] backdrop-blur-md hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.03] hover:shadow-[0_6px_18px_rgba(35,42,38,0.32)] dark:hover:shadow-[0_6px_18px_rgba(212,131,84,0.45)] active:scale-95 cursor-pointer'
-                      : 'border border-black/[0.08] dark:border-white/10 bg-black/[0.07] dark:bg-white/5 text-[var(--stone)] dark:text-zinc-500 shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-none backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
+                      ? 'bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-105 active:scale-95 cursor-pointer'
+                      : 'bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
                   }`}
                 >
-                  {t('chat.sendButton')}
+                  <ArrowUp size={16} strokeWidth={2.4} />
                 </button>
               )}
             </div>
