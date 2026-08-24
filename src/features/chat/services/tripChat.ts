@@ -1588,7 +1588,11 @@ async function resolveTripChatWebResearch(input: {
     signal: input.signal,
     onSearch: (detail) => input.onWebSearch?.('start', detail),
   })
-  input.onWebSearch?.('done')
+  if (!research) {
+    input.onWebSearch?.('skip')
+  } else {
+    input.onWebSearch?.('done')
+  }
   return research
 }
 
