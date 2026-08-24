@@ -1566,30 +1566,29 @@ export function DayTimeline({
           </div>
           )}
         </div>
-        <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl text-[var(--ink)]">
-          {dayPending || itineraryTranslating ? (
-            <span className="mt-1 inline-block h-8 w-2/3 rounded-full day-tab-shimmer" />
-          ) : (
-            day.title
-          )}
-        </h3>
-        <p className="break-words text-sm text-[var(--copper)]">
-          {dayPending || itineraryTranslating ? (
-            <span className="inline-block h-4 w-1/2 rounded-full day-tab-shimmer" />
-          ) : (
-            day.theme
-          )}
-        </p>
-        <div className="mt-2 text-sm text-[var(--stone)] dark:text-zinc-300">
-          {dayPending || itineraryTranslating ? (
-            <span className="mt-1 block space-y-2" aria-hidden>
-              <span className="inline-block h-3.5 w-full rounded-full day-tab-shimmer" />
-              <span className="inline-block h-3.5 w-4/5 rounded-full day-tab-shimmer" />
-            </span>
-          ) : (
-            <p className="break-words">{day.summary}</p>
-          )}
-        </div>
+        {dayPending || itineraryTranslating ? (
+          <div className="mt-2 space-y-2" aria-hidden>
+            <span className="block h-7 w-[48%] max-w-sm rounded-lg day-tab-shimmer" />
+            <span className="block h-4 w-[32%] sm:w-[28%] rounded-md day-tab-shimmer" />
+            <div className="pt-1 space-y-1.5">
+              <span className="block h-3.5 w-full rounded-full day-tab-shimmer" />
+              <span className="block h-3.5 w-[96%] rounded-full day-tab-shimmer" />
+              <span className="block h-3.5 w-[56%] rounded-full day-tab-shimmer" />
+            </div>
+          </div>
+        ) : (
+          <>
+            <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl text-[var(--ink)]">
+              {day.title}
+            </h3>
+            <p className="break-words text-sm text-[var(--copper)]">
+              {day.theme}
+            </p>
+            <p className="mt-2 break-words text-sm text-[var(--stone)] dark:text-zinc-300">
+              {day.summary}
+            </p>
+          </>
+        )}
         {dayRegenError && (
           <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-red-50/60 dark:bg-red-950/40 px-3 py-2 text-left text-xs text-[var(--copper)] backdrop-blur-sm">
             {dayRegenError}
