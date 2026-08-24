@@ -127,6 +127,7 @@ export function localizeDuration(value: string | undefined, locale: Locale = get
     if (trimmed === '自定' || trimmed === '自定义') return 'Custom'
     if (trimmed === '全天') return 'Full day'
     return trimmed
+      .replace(/办理入住\s*/g, 'Check-in ')
       .replace(/入住\s*/g, 'Check-in ')
       .replace(/交通\s*/g, 'Transit ')
       .replace(/（含登顶）/g, ' (summit)')

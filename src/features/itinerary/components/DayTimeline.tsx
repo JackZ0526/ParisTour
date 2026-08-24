@@ -1567,26 +1567,29 @@ export function DayTimeline({
           )}
         </div>
         <h3 className="font-display mt-2 break-words text-xl sm:text-2xl md:text-3xl text-[var(--ink)]">
-          {dayPending ? (
+          {dayPending || itineraryTranslating ? (
             <span className="mt-1 inline-block h-8 w-2/3 rounded-full day-tab-shimmer" />
           ) : (
             day.title
           )}
         </h3>
         <p className="break-words text-sm text-[var(--copper)]">
-          {dayPending ? (
+          {dayPending || itineraryTranslating ? (
             <span className="inline-block h-4 w-1/2 rounded-full day-tab-shimmer" />
           ) : (
             day.theme
           )}
         </p>
-        <p className="mt-2 break-words text-sm text-[var(--stone)] dark:text-zinc-300">
-          {dayPending ? (
-            <span className="mt-1 inline-block h-4 w-full rounded-full day-tab-shimmer" />
+        <div className="mt-2 text-sm text-[var(--stone)] dark:text-zinc-300">
+          {dayPending || itineraryTranslating ? (
+            <span className="mt-1 block space-y-2" aria-hidden>
+              <span className="inline-block h-3.5 w-full rounded-full day-tab-shimmer" />
+              <span className="inline-block h-3.5 w-4/5 rounded-full day-tab-shimmer" />
+            </span>
           ) : (
-            day.summary
+            <p className="break-words">{day.summary}</p>
           )}
-        </p>
+        </div>
         {dayRegenError && (
           <p className="mt-2 whitespace-pre-line break-words rounded-xl border border-[var(--copper)]/30 bg-red-50/60 dark:bg-red-950/40 px-3 py-2 text-left text-xs text-[var(--copper)] backdrop-blur-sm">
             {dayRegenError}
@@ -1883,7 +1886,14 @@ export function DayTimeline({
                     nameLocal={place.nameLocal}
                     location={place.location}
                   />
-                  <p className="mt-1.5 text-sm text-[var(--stone)]">{stop.note}</p>
+                  {itineraryTranslating ? (
+                    <div className="mt-2 space-y-1.5" aria-hidden>
+                      <span className="block h-3.5 w-3/4 rounded-full day-tab-shimmer" />
+                      <span className="block h-3.5 w-1/2 rounded-full day-tab-shimmer" />
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">{stop.note}</p>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
