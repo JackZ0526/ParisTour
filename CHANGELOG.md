@@ -19,6 +19,13 @@ To cut a release: `npm run release:patch` (or `:minor` / `:major`), then push th
 
 ### Fixed
 
+## [0.10.2] - 2026-08-24
+
+### Fixed
+
+- cut Supabase egress and localize thinking loaders
+
+
 ## [0.10.1] - 2026-08-24
 
 ### Fixed
@@ -723,7 +730,8 @@ First full trip-planner shape after the initial autumn itinerary scaffold (2026-
 
 Compare ranges use commit SHAs until git tags are published.
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.2...HEAD
+- [0.10.2]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...v0.10.2
 - [0.10.1]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...v0.10.1
 - [0.10.0]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...v0.10.0
 - [0.9.5]: https://github.com/JackZ0526/ParisTour/compare/v0.9.4...v0.9.5

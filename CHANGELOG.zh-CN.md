@@ -14,6 +14,14 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
+### 变更
+
+### 修复
+
+## [0.10.2] - 2026-08-24
+
+### 新增
+
 - 行程 LLM 文案改为增量拉取：`pull_trip_artifacts` 只同步本地没有或已过期的 key，避免每次打开都下载整包缓存。
 
 ### 变更
@@ -26,6 +34,7 @@ Paris Tour 的重要变更记录于此。
 
 - 中文界面下顾问点评加载态不再显示英文 “Thinking...”。
 - 切换界面语言时不再把未译完的中文行程文案误存为英文缓存。
+
 
 ## [0.10.1] - 2026-08-24
 
@@ -614,7 +623,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.10.2...HEAD
+- [0.10.2]: https://github.com/JackZ0526/ParisTour/compare/v0.10.1...v0.10.2
 - [0.10.1]: https://github.com/JackZ0526/ParisTour/compare/v0.10.0...v0.10.1
 - [0.10.0]: https://github.com/JackZ0526/ParisTour/compare/v0.9.5...v0.10.0
 - [0.9.5]: https://github.com/JackZ0526/ParisTour/compare/v0.9.4...v0.9.5
