@@ -459,7 +459,7 @@ export function TripChatPanel({
     await handleDrop(e)
   }
 
-  const MAX_ATTACHED_IMAGES = 9
+  const MAX_ATTACHED_IMAGES = 6
 
   const enqueueImageFiles = async (files: File[]) => {
     if (!files || files.length === 0) return
