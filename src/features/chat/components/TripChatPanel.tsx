@@ -2708,12 +2708,9 @@ export function TripChatPanel({
                 {Array.from({ length: convertingCount }).map((_, idx) => (
                   <div
                     key={`converting-${idx}`}
-                    className="relative inline-flex h-12 items-center gap-2 rounded-lg border border-[var(--sage)]/50 bg-[var(--sage)]/10 dark:bg-[var(--sage)]/15 px-3 py-1 shadow-2xs backdrop-blur-sm animate-pulse select-none"
+                    className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-black/10 dark:border-white/15 bg-black/5 dark:bg-white/10 shadow-sm animate-pulse backdrop-blur-xs select-none"
                   >
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent shrink-0" />
-                    <span className="text-[11px] font-medium text-[var(--sage)] dark:text-[#9fc4b1] whitespace-nowrap">
-                      {t('chat.convertingImage')}
-                    </span>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--copper)] border-t-transparent dark:border-[var(--copper)]/90 dark:border-t-transparent" />
                   </div>
                 ))}
               </div>
@@ -2741,7 +2738,7 @@ export function TripChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={handlePaste}
-                placeholder={convertingCount > 0 ? t('chat.convertingImage') : t('chat.sendPromptPlaceholder')}
+                placeholder={t('chat.sendPromptPlaceholder')}
                 disabled={busy || !open || convertingCount > 0}
                 tabIndex={open ? undefined : -1}
                 aria-busy={busy || undefined}
