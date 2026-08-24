@@ -639,6 +639,9 @@ export const zhCN: I18nSchema = {
     currentDay: '第 {day} 天',
     tryAskingIntro: '试试问：酒店、地点或行程调整',
     sendButton: '发送',
+    uploadImage: '上传图片或截图',
+    removeImage: '移除图片',
+    imageUploadFailed: '图片读取失败，请重试',
     thinkingNow: '思考中',
     thinkingDone: '思考完成',
     thinkingPrefix: '思考：',
@@ -730,6 +733,7 @@ export const zhCN: I18nSchema = {
     thinkingModeHigh: '高',
     thinkingModeCurrentSr: '当前模式',
     // Model descriptions
+    deepseekV4FlashVisionDesc: '极速 · 多模态视觉',
     deepseekV4FlashDesc: '极速 · 日常问答',
     deepseekV4ProDesc: '深度 · 复杂行程',
     gpt56LunaDesc: '轻量 · 快速微调',

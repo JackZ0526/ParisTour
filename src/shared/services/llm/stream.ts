@@ -566,8 +566,8 @@ export async function consumeResponsesStream(
 export function openaiWebSearchModel(): string {
   const current = getOpenAIModel()
   if (!isDeepSeekModel(current)) return current
-  if (current === 'deepseek-v4-flash') return current
-  return 'deepseek-v4-flash'
+  if (current === 'deepseek-v4-flash-vision-exp' || current === 'deepseek-v4-flash') return current
+  return 'deepseek-v4-flash-vision-exp'
 }
 
 /**

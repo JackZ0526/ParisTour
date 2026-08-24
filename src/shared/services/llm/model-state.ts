@@ -127,9 +127,9 @@ function readStoredThinking(preferMode?: ThinkingMode): ThinkingStore {
 function migrateStoredModel(raw: string): { model: string; thinkingMode?: ThinkingMode } {
   const id = raw.trim()
   if (OPENAI_MODEL_IDS.has(id)) return { model: id }
-  if (id === 'deepseek-reasoner') return { model: 'deepseek-v4-flash', thinkingMode: 'medium' }
-  if (id === 'deepseek-chat' || /^deepseek/i.test(id)) {
-    return { model: 'deepseek-v4-flash' }
+  if (id === 'deepseek-reasoner') return { model: 'deepseek-v4-flash-vision-exp', thinkingMode: 'medium' }
+  if (id === 'deepseek-chat' || id === 'deepseek-v4-flash' || /^deepseek/i.test(id)) {
+    return { model: 'deepseek-v4-flash-vision-exp' }
   }
   if (/^gpt-5\.6/i.test(id)) return { model: 'gpt-5.6-luna' }
   if (/^gpt-/i.test(id)) return { model: 'gpt-5.6-luna' }

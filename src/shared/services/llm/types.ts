@@ -58,8 +58,13 @@ export type ResolvedThinking = {
   overrideToOff?: boolean
 }
 
+export type ChatMessageContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } }
+
 export type OpenAIChatMessage =
-  | { role: 'system' | 'user' | 'assistant'; content: string }
+  | { role: 'system' | 'assistant'; content: string }
+  | { role: 'user'; content: string | ChatMessageContentPart[] }
   | { role: 'tool'; tool_call_id: string; content: string }
 
 export type ChatCallOptions = {

@@ -37,6 +37,7 @@ export type {
   ChatCallOptions,
   ChatStreamOptions,
   DeepSeekReasoningEffort,
+  ChatMessageContentPart,
   HotelDetailCopy,
   ItineraryStartInput,
   ItineraryStartResult,

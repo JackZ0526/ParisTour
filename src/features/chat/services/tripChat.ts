@@ -15,6 +15,7 @@ import {
   openaiChatStream,
   openaiResponsesWithWebSearch,
   resolveThinkingForTask,
+  type ChatMessageContentPart,
   type OpenAIChatMessage,
   type ResolvedThinking,
   type ResolvedThinkingEffort,
@@ -126,6 +127,7 @@ export interface TripChatWorkStep {
 export interface TripChatTurn {
   role: 'user' | 'assistant'
   content: string
+  images?: string[]
   /** When true, kept in API history but not shown as a chat bubble. */
   hidden?: boolean
   /** Pipeline steps persisted after a successful assistant reply. */
@@ -929,12 +931,25 @@ function buildTripChatMessages(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
+  images?: string[]
   webResearch?: string | null
   plan: TripChatRequestPlan
 }): OpenAIChatMessage[] {
   const messages: OpenAIChatMessage[] = [
     { role: 'system', content: systemPrompt(input.ctx, input.plan) },
-    ...input.history.map((t) => ({ role: t.role, content: t.content })),
+    ...input.history.map((t) => {
+      if (t.role === 'user' && t.images && t.images.length > 0) {
+        const parts: ChatMessageContentPart[] = [
+          { type: 'text', text: t.content },
+          ...t.images.map((img) => ({
+            type: 'image_url' as const,
+            image_url: { url: img },
+          })),
+        ]
+        return { role: 'user' as const, content: parts }
+      }
+      return { role: t.role, content: t.content }
+    }),
   ]
   messages.push({
     role: 'user',
@@ -973,7 +988,18 @@ function buildTripChatMessages(input: {
       ].join('\n'),
     })
   }
-  messages.push({ role: 'user', content: input.userMessage })
+  if (input.images && input.images.length > 0) {
+    const parts: ChatMessageContentPart[] = [
+      { type: 'text', text: input.userMessage },
+      ...input.images.map((img) => ({
+        type: 'image_url' as const,
+        image_url: { url: img },
+      })),
+    ]
+    messages.push({ role: 'user', content: parts })
+  } else {
+    messages.push({ role: 'user', content: input.userMessage })
+  }
   return messages
 }
 
@@ -1599,6 +1625,7 @@ export async function sendTripChatMessageStream(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
+  images?: string[]
   signal?: AbortSignal
   /** auto (default) = heuristic; true/false force on/off. Uses OpenAI web_search. */
   webSearch?: boolean | 'auto'

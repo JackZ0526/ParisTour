@@ -26,7 +26,7 @@ export const llmStorageKeys = {
 } as const
 
 /** Hard-coded fallback when no env var or stored value is available. */
-export const DEFAULT_LLM_MODEL_ID = 'deepseek-v4-flash' as const
+export const DEFAULT_LLM_MODEL_ID = 'deepseek-v4-flash-vision-exp' as const
 
 /** Hard-coded fallback model id for the Gemini provider (off by default). */
 export const GEMINI_MODEL = 'gemini-2.0-flash'
@@ -34,10 +34,10 @@ export const GEMINI_MODEL = 'gemini-2.0-flash'
 /** DeepSeek V4 models shown in the global picker. */
 export const DEEPSEEK_MODEL_OPTIONS = [
   {
-    id: 'deepseek-v4-flash',
-    label: 'DeepSeek V4 Flash',
-    shortLabel: 'V4 Flash',
-    descriptionKey: 'llm.deepseekV4FlashDesc' as TranslationKey,
+    id: 'deepseek-v4-flash-vision-exp',
+    label: 'DeepSeek V4 Flash Vision',
+    shortLabel: 'V4 Vision',
+    descriptionKey: 'llm.deepseekV4FlashVisionDesc' as TranslationKey,
     provider: 'deepseek' as const,
   },
   {
@@ -48,6 +48,18 @@ export const DEEPSEEK_MODEL_OPTIONS = [
     provider: 'deepseek' as const,
   },
 ] as const
+
+/**
+ * Returns true if the model supports multimodal image/vision input.
+ * DeepSeek V4 Pro is text-only; V4 Flash Vision Exp, OpenAI GPT-5.6, and Gemini support vision.
+ */
+export function isModelVisionCapable(modelId?: string | null): boolean {
+  if (!modelId) return true
+  if (/deepseek-v4-pro/i.test(modelId)) return false
+  if (/deepseek-v4-flash-vision/i.test(modelId)) return true
+  if (/deepseek/i.test(modelId)) return false
+  return true
+}
 
 /** GPT-5.6 variants kept in the picker (older GPT-5.5/5.4 dropped). */
 export const OPENAI_ONLY_MODEL_OPTIONS = [

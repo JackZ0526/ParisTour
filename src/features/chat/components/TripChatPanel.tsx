@@ -21,6 +21,8 @@ import {
   supportsThinkingControls,
   type HotelDetailCopy,
 } from '../../../shared/services/llm/llm'
+import { Image as ImageIcon, X } from 'lucide-react'
+import { isModelVisionCapable } from '../../../config/llmModels'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
 import { ModelBrandIcon } from './LlmModelPicker'
 import {
@@ -329,6 +331,133 @@ export function TripChatPanel({
   const [requestThinkingEnabled, setRequestThinkingEnabled] = useState<boolean | undefined>(
     undefined,
   )
+  const [attachedImages, setAttachedImages] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const isVisionCapable = isModelVisionCapable(model)
+
+  useEffect(() => {
+    if (!isVisionCapable && attachedImages.length > 0) {
+      setAttachedImages([])
+    }
+  }, [isVisionCapable, attachedImages.length])
+
+  async function processImageFile(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Only images are supported'))
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const src = e.target?.result as string
+        if (!src) {
+          reject(new Error('Failed to read image'))
+          return
+        }
+        const img = new Image()
+        img.onload = () => {
+          const MAX_DIM = 1600
+          let { width, height } = img
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIM) / width)
+              width = MAX_DIM
+            } else {
+              width = Math.round((width * MAX_DIM) / height)
+              height = MAX_DIM
+            }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            resolve(src)
+            return
+          }
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.85))
+        }
+        img.onerror = () => resolve(src)
+        img.src = src
+      }
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    try {
+      const processed: string[] = []
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file && file.type.startsWith('image/')) {
+          const dataUrl = await processImageFile(file)
+          processed.push(dataUrl)
+        }
+      }
+      if (processed.length > 0) {
+        setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
+      }
+    } catch {
+      setError(t('chat.imageUploadFailed'))
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    if (!isVisionCapable) return
+    const items = e.clipboardData?.items
+    if (!items) return
+    const imageFiles: File[] = []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item && item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) imageFiles.push(file)
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault()
+      try {
+        const processed: string[] = []
+        for (const file of imageFiles) {
+          const dataUrl = await processImageFile(file)
+          processed.push(dataUrl)
+        }
+        if (processed.length > 0) {
+          setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
+        }
+      } catch {
+        setError(t('chat.imageUploadFailed'))
+      }
+    }
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    if (!isVisionCapable) return
+    e.preventDefault()
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+    try {
+      const processed: string[] = []
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file && file.type.startsWith('image/')) {
+          const dataUrl = await processImageFile(file)
+          processed.push(dataUrl)
+        }
+      }
+      if (processed.length > 0) {
+        setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
+      }
+    } catch {
+      setError(t('chat.imageUploadFailed'))
+    }
+  }
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const wasOpenRef = useRef(false)
@@ -1754,7 +1883,8 @@ export function TripChatPanel({
 
   async function submit(text: string) {
     const message = text.trim()
-    if (!message || busy) return
+    const imagesToSend = isVisionCapable ? [...attachedImages] : []
+    if ((!message && imagesToSend.length === 0) || busy) return
     if (!isLlmConfigured()) {
       setError(t('chat.chatUnavailable'))
       return
@@ -1766,12 +1896,13 @@ export function TripChatPanel({
     setActionNotes([])
     // New user turn supersedes any lingering recommend-confirm sheet.
     setPendingPlaces([])
-    setBusyUserText(message)
-    beginWorkPipeline(message)
+    setBusyUserText(message || (locale === 'en' ? 'Analyzing image…' : '分析图片中…'))
+    beginWorkPipeline(message || (locale === 'en' ? 'Image message' : '图片消息'))
     setInput('')
+    setAttachedImages([])
     setHistory((prev) => [
       ...prev,
-      { role: 'user', content: message },
+      { role: 'user', content: message, images: imagesToSend.length > 0 ? imagesToSend : undefined },
       { role: 'assistant', content: '' },
     ])
     const ac = beginChatRequest()
@@ -1780,6 +1911,7 @@ export function TripChatPanel({
         ctx: buildChatContext(),
         history,
         userMessage: message,
+        images: imagesToSend.length > 0 ? imagesToSend : undefined,
         signal: ac.signal,
         onRequestPlan: (phase, plan) => {
           if (abortRef.current !== ac || phase !== 'done' || !plan) return
@@ -2255,10 +2387,24 @@ export function TripChatPanel({
                           />
                         ) : (
                           <>
-                            <InlineMarkdown
-                              text={turn.content}
-                              className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 dark:[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
-                            />
+                            {turn.role === 'user' && turn.images && turn.images.length > 0 && (
+                              <div className="mb-2 flex flex-wrap gap-1.5">
+                                {turn.images.map((img, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={img}
+                                    alt="Attached"
+                                    className="max-h-40 max-w-full rounded-lg object-cover shadow-sm ring-1 ring-white/20"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {turn.content ? (
+                              <InlineMarkdown
+                                text={turn.content}
+                                className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 dark:[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
+                              />
+                            ) : null}
                             {isStreamingAssistant && streamingReply ? (
                               <span
                                 className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.1em] animate-pulse bg-[var(--sage)] align-text-bottom"
@@ -2291,53 +2437,102 @@ export function TripChatPanel({
           </div>
 
           <form
-            className="relative flex items-center gap-2 border-t border-white/85 dark:border-white/10 bg-white/50 dark:bg-black/20 p-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent before:opacity-95"
+            className="relative flex flex-col border-t border-white/85 dark:border-white/10 bg-white/50 dark:bg-black/20 p-2.5 sm:p-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-[1.5px] before:rounded-full before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/20 before:to-transparent before:opacity-95"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
             onSubmit={(e) => {
               e.preventDefault()
               void submit(input)
             }}
           >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t('chat.sendPromptPlaceholder')}
-              disabled={busy || !open}
-              tabIndex={open ? undefined : -1}
-              aria-busy={busy || undefined}
-              enterKeyHint="send"
-              autoComplete="off"
-              className="min-w-0 flex-1 rounded-full border border-white/90 dark:border-white/10 bg-white/85 dark:bg-black/35 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)] disabled:bg-white/60 dark:disabled:bg-black/20 disabled:text-[var(--stone)]/60"
-            />
-            {busy ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)]/95 text-white shadow-[0_3px_12px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.35)] dark:shadow-[0_3px_14px_rgba(212,131,84,0.35)] backdrop-blur-md select-none"
-              >
-                <ButtonSpinner
-                  mode="thinking"
-                  task="tripChat"
-                  userText={busyUserText || input}
-                  thinkingEnabled={requestThinkingEnabled}
-                />
-                <span className="tracking-wide">
-                  {chatBusy.label({ thinking: t('chat.thinkingAssistantLabel'), generating: t('chat.answeringAssistantLabel') })}
-                </span>
+            {attachedImages.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                {attachedImages.map((img, idx) => (
+                  <div key={idx} className="group relative inline-block">
+                    <img
+                      src={img}
+                      alt="Preview"
+                      className="h-12 w-12 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/20 shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
+                      className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-black transition-colors"
+                      title={t('chat.removeImage')}
+                      aria-label={t('chat.removeImage')}
+                    >
+                      <X size={10} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <button
-                type="submit"
-                disabled={!input.trim() || !open}
-                tabIndex={open ? undefined : -1}
-                className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
-                  input.trim() && open
-                    ? 'border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_4px_14px_rgba(35,42,38,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.4)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35)] backdrop-blur-md hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.03] hover:shadow-[0_6px_18px_rgba(35,42,38,0.32)] dark:hover:shadow-[0_6px_18px_rgba(212,131,84,0.45)] active:scale-95 cursor-pointer'
-                    : 'border border-black/[0.08] dark:border-white/10 bg-black/[0.07] dark:bg-white/5 text-[var(--stone)] dark:text-zinc-500 shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-none backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
-                }`}
-              >
-                {t('chat.sendButton')}
-              </button>
             )}
+            <div className="flex items-center gap-2">
+              {isVisionCapable && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={busy || !open}
+                    title={t('chat.uploadImage')}
+                    aria-label={t('chat.uploadImage')}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/30 text-[var(--stone)] transition-colors hover:bg-white dark:hover:bg-white/15 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40"
+                  >
+                    <ImageIcon size={17} />
+                  </button>
+                </>
+              )}
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onPaste={handlePaste}
+                placeholder={t('chat.sendPromptPlaceholder')}
+                disabled={busy || !open}
+                tabIndex={open ? undefined : -1}
+                aria-busy={busy || undefined}
+                enterKeyHint="send"
+                autoComplete="off"
+                className="min-w-0 flex-1 rounded-full border border-white/90 dark:border-white/10 bg-white/85 dark:bg-black/35 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--stone)]/65 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_6px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md outline-none transition-all focus:border-[var(--copper)]/70 focus:bg-white dark:focus:bg-black/50 focus:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)] disabled:bg-white/60 dark:disabled:bg-black/20 disabled:text-[var(--stone)]/60"
+              />
+              {busy ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)]/95 text-white px-3.5 py-1.5 text-xs shadow-[0_3px_12px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.35)] dark:shadow-[0_3px_14px_rgba(212,131,84,0.35)] backdrop-blur-md select-none"
+                >
+                  <ButtonSpinner
+                    mode="thinking"
+                    task="tripChat"
+                    userText={busyUserText || input}
+                    thinkingEnabled={requestThinkingEnabled}
+                  />
+                  <span className="tracking-wide">
+                    {chatBusy.label({ thinking: t('chat.thinkingAssistantLabel'), generating: t('chat.answeringAssistantLabel') })}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={(!input.trim() && attachedImages.length === 0) || !open}
+                  tabIndex={open ? undefined : -1}
+                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+                    (input.trim() || attachedImages.length > 0) && open
+                      ? 'border border-white/20 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_4px_14px_rgba(35,42,38,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.3),inset_0_-1px_1px_rgba(0,0,0,0.4)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35)] backdrop-blur-md hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.03] hover:shadow-[0_6px_18px_rgba(35,42,38,0.32)] dark:hover:shadow-[0_6px_18px_rgba(212,131,84,0.45)] active:scale-95 cursor-pointer'
+                      : 'border border-black/[0.08] dark:border-white/10 bg-black/[0.07] dark:bg-white/5 text-[var(--stone)] dark:text-zinc-500 shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.04),inset_0_-1px_1px_rgba(255,255,255,0.6)] dark:shadow-none backdrop-blur-sm cursor-not-allowed pointer-events-none select-none'
+                  }`}
+                >
+                  {t('chat.sendButton')}
+                </button>
+              )}
+            </div>
           </form>
         </motion.div>
       </motion.div>

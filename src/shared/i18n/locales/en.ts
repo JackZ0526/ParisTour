@@ -639,6 +639,9 @@ export const en: I18nSchema = {
     currentDay: 'Day {day}',
     tryAskingIntro: 'Try asking: hotels, places, or itinerary changes',
     sendButton: 'Send',
+    uploadImage: 'Upload image or screenshot',
+    removeImage: 'Remove image',
+    imageUploadFailed: 'Failed to read image, please try again',
     thinkingNow: 'Thinking',
     thinkingDone: 'Thought complete',
     thinkingPrefix: 'Thinking: ',
@@ -730,6 +733,7 @@ export const en: I18nSchema = {
     thinkingModeHigh: 'High',
     thinkingModeCurrentSr: 'Current mode',
     // Model descriptions
+    deepseekV4FlashVisionDesc: 'Fast · Multimodal Vision',
     deepseekV4FlashDesc: 'Fast · Daily Q&A',
     deepseekV4ProDesc: 'Deep · Complex trips',
     gpt56LunaDesc: 'Light · Quick edits',

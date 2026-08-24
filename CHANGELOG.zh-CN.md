@@ -14,9 +14,9 @@ Paris Tour 的重要变更记录于此。
 
 ### 新增
 
-### 变更
-
-### 修复
+- 升级默认 DeepSeek 模型为官方最新 `deepseek-v4-flash-vision-exp` 多模态视觉模型：
+  - AI 聊天助手（TripChatPanel）支持上传图片、截图粘贴（Cmd+V / Ctrl+V）和拖拽上传；
+  - 支持多模态模型能力动态感知：当用户选择支持多模态的模型（`deepseek-v4-flash-vision-exp`、`gpt-5.6-*` 等）时展示图片上传入口；切换至纯文本模型（如 `deepseek-v4-pro`）时自动隐藏上传按钮，保持界面精炼。
 
 ## [0.9.4] - 2026-08-24
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * HTTP transport for the LLM layer.
  *
  * Owns:
@@ -41,8 +41,8 @@ const DEEPSEEK_RESPONSES_ITINERARY_TASKS = new Set<LlmTaskKind>([
   'itineraryDayGenerate',
 ])
 
-/** Responses API currently only supports deepseek-v4-flash. */
-const DEEPSEEK_RESPONSES_MODEL = 'deepseek-v4-flash'
+/** Responses API supports deepseek-v4-flash-vision-exp. */
+const DEEPSEEK_RESPONSES_MODEL = 'deepseek-v4-flash-vision-exp'
 
 /** Shared completion budget: thinking CoT counts toward the same cap as visible content. */
 function completionTokenBudget(

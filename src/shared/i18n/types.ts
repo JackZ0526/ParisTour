@@ -663,6 +663,9 @@ export interface I18nSchema {
     currentDay: string
     tryAskingIntro: string
     sendButton: string
+    uploadImage: string
+    removeImage: string
+    imageUploadFailed: string
     thinkingNow: string
     thinkingDone: string
     thinkingPrefix: string
@@ -754,6 +757,7 @@ export interface I18nSchema {
     thinkingModeHigh: string
     thinkingModeCurrentSr: string
     // Model descriptions
+    deepseekV4FlashVisionDesc: string
     deepseekV4FlashDesc: string
     deepseekV4ProDesc: string
     gpt56LunaDesc: string
