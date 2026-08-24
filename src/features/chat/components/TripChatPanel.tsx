@@ -375,13 +375,13 @@ export function TripChatPanel({
     let imageBlob: Blob = file
     if (isHeicFile(file)) {
       try {
-        const heic2any = (await import('heic2any')).default
-        const converted = await heic2any({
+        const { heicTo } = await import('heic-to')
+        const converted = await heicTo({
           blob: file,
-          toType: 'image/jpeg',
+          type: 'image/jpeg',
           quality: 0.85,
         })
-        imageBlob = Array.isArray(converted) ? converted[0] : converted
+        imageBlob = converted
       } catch (err) {
         console.warn('[TripChatPanel] HEIC conversion failed:', err)
         throw new Error('unsupported_format')

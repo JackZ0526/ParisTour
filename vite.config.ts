@@ -377,6 +377,7 @@ export default defineConfig(({ mode }) => {
           'splash.png',
         ],
         workbox: {
+          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
           cleanupOutdatedCaches: true,
           // Take over the current page as soon as a new SW activates.
