@@ -63,6 +63,7 @@ import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { useTranslation, getLocale, translate } from '../../../shared/i18n'
 import { localizePace, localizeTravelChip } from '../../../shared/i18n'
+import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -563,7 +564,7 @@ export function DayTimeline({
   readOnly = false,
   direction = 1,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [addOpen, setAddOpen] = useState(false)
   const [drag, setDrag] = useState<DragSession | null>(null)
   const [floatPos, setFloatPos] = useState({ x: 0, y: 0 })
@@ -1915,10 +1916,14 @@ export function DayTimeline({
                   onClick={(e) => {
                     e.stopPropagation()
                     if (liveIndex == null) return
+                    const placeName =
+                      locale === 'en'
+                        ? placeOriginalLabel(place.name, place.nameLocal)
+                        : place.name || place.nameLocal || ''
                     setPendingDeleteStop({
                       stopKey,
                       liveIndex,
-                      name: place.name,
+                      name: placeName,
                     })
                   }}
                   className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.neutral} text-[var(--stone)]/80 dark:text-zinc-400 shadow-xs backdrop-blur-md transition-colors hover:border-[#b8433e]/30 hover:bg-white dark:hover:bg-white/10 hover:text-[#b8433e] active:scale-95 disabled:pointer-events-none disabled:opacity-40`}
