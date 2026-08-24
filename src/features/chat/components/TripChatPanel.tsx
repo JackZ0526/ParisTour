@@ -339,17 +339,26 @@ export function TripChatPanel({
   const [attachedImages, setAttachedImages] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+  const SUPPORTED_IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+
+  function isSupportedImageFile(file: File): boolean {
+    const type = (file.type || '').toLowerCase()
+    const name = (file.name || '').toLowerCase()
+    if (type && SUPPORTED_IMAGE_TYPES.includes(type)) return true
+    return SUPPORTED_IMAGE_EXTS.some((ext) => name.endsWith(ext))
+  }
+
   async function processImageFile(file: File): Promise<string> {
+    if (!isSupportedImageFile(file)) {
+      throw new Error('unsupported_format')
+    }
     return new Promise((resolve, reject) => {
-      if (!file.type.startsWith('image/')) {
-        reject(new Error('Only images are supported'))
-        return
-      }
       const reader = new FileReader()
       reader.onload = (e) => {
         const src = e.target?.result as string
         if (!src) {
-          reject(new Error('Failed to read image'))
+          reject(new Error('unsupported_format'))
           return
         }
         const img = new Image()
@@ -376,10 +385,10 @@ export function TripChatPanel({
           ctx.drawImage(img, 0, 0, width, height)
           resolve(canvas.toDataURL('image/jpeg', 0.85))
         }
-        img.onerror = () => resolve(src)
+        img.onerror = () => reject(new Error('unsupported_format'))
         img.src = src
       }
-      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.onerror = () => reject(new Error('read_failed'))
       reader.readAsDataURL(file)
     })
   }
@@ -387,20 +396,30 @@ export function TripChatPanel({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
+    let hasUnsupported = false
     try {
       const processed: string[] = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        if (file && file.type.startsWith('image/')) {
-          const dataUrl = await processImageFile(file)
-          processed.push(dataUrl)
+        if (!isSupportedImageFile(file)) {
+          hasUnsupported = true
+          continue
         }
+        const dataUrl = await processImageFile(file)
+        processed.push(dataUrl)
       }
       if (processed.length > 0) {
         setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
       }
-    } catch {
-      setError(t('chat.imageUploadFailed'))
+      if (hasUnsupported) {
+        setError(t('chat.imageFormatUnsupported'))
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'unsupported_format') {
+        setError(t('chat.imageFormatUnsupported'))
+      } else {
+        setError(t('chat.imageUploadFailed'))
+      }
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -410,14 +429,21 @@ export function TripChatPanel({
     const items = e.clipboardData?.items
     if (!items) return
     const imageFiles: File[] = []
+    let hasUnsupported = false
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (item && item.type.startsWith('image/')) {
         const file = item.getAsFile()
-        if (file) imageFiles.push(file)
+        if (file) {
+          if (isSupportedImageFile(file)) {
+            imageFiles.push(file)
+          } else {
+            hasUnsupported = true
+          }
+        }
       }
     }
-    if (imageFiles.length > 0) {
+    if (imageFiles.length > 0 || hasUnsupported) {
       e.preventDefault()
       try {
         const processed: string[] = []
@@ -428,8 +454,15 @@ export function TripChatPanel({
         if (processed.length > 0) {
           setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
         }
-      } catch {
-        setError(t('chat.imageUploadFailed'))
+        if (hasUnsupported) {
+          setError(t('chat.imageFormatUnsupported'))
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'unsupported_format') {
+          setError(t('chat.imageFormatUnsupported'))
+        } else {
+          setError(t('chat.imageUploadFailed'))
+        }
       }
     }
   }
@@ -438,20 +471,32 @@ export function TripChatPanel({
     e.preventDefault()
     const files = e.dataTransfer?.files
     if (!files || files.length === 0) return
+    let hasUnsupported = false
     try {
       const processed: string[] = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        if (file && file.type.startsWith('image/')) {
-          const dataUrl = await processImageFile(file)
-          processed.push(dataUrl)
+        if (file && (file.type.startsWith('image/') || isSupportedImageFile(file))) {
+          if (isSupportedImageFile(file)) {
+            const dataUrl = await processImageFile(file)
+            processed.push(dataUrl)
+          } else {
+            hasUnsupported = true
+          }
         }
       }
       if (processed.length > 0) {
         setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
       }
-    } catch {
-      setError(t('chat.imageUploadFailed'))
+      if (hasUnsupported) {
+        setError(t('chat.imageFormatUnsupported'))
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'unsupported_format') {
+        setError(t('chat.imageFormatUnsupported'))
+      } else {
+        setError(t('chat.imageUploadFailed'))
+      }
     }
   }
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -2534,7 +2579,7 @@ export function TripChatPanel({
 
             {error && (
               <div className="flex items-start gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 dark:border-red-900/50 dark:bg-red-950/40 p-3 text-xs leading-relaxed text-red-900 dark:text-red-300 shadow-2xs backdrop-blur-md">
-                <span className="shrink-0 mt-0.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" />
+                <span className="shrink-0 mt-[5px] h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
                 <p className="min-w-0 flex-1">{error}</p>
               </div>
             )}
@@ -2576,7 +2621,7 @@ export function TripChatPanel({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 multiple
                 className="hidden"
                 onChange={handleFileChange}

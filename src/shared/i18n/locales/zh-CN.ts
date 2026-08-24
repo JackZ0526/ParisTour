@@ -642,6 +642,7 @@ export const zhCN: I18nSchema = {
     uploadImage: '上传图片或截图',
     removeImage: '移除图片',
     imageUploadFailed: '图片读取失败，请重试',
+    imageFormatUnsupported: '图片格式不支持，请上传 JPG、PNG、WebP 或 GIF 格式的图片',
     thinkingNow: '思考中',
     thinkingDone: '思考完成',
     thinkingPrefix: '思考：',

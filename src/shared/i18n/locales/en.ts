@@ -642,6 +642,7 @@ export const en: I18nSchema = {
     uploadImage: 'Upload image or screenshot',
     removeImage: 'Remove image',
     imageUploadFailed: 'Failed to read image, please try again',
+    imageFormatUnsupported: 'Unsupported image format. Please upload JPG, PNG, WebP, or GIF images',
     thinkingNow: 'Thinking',
     thinkingDone: 'Thought complete',
     thinkingPrefix: 'Thinking: ',

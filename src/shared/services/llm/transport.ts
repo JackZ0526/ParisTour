@@ -12,6 +12,7 @@
  * how to put a body on the wire and read a response back.
  */
 import { isLlmConfigured, GEMINI_MODEL } from '../../../config/llmModels'
+import { getLocale } from '../../i18n/i18nStore'
 import { LlmRequestError } from './errors'
 import {
   getActiveLlmLabel,
@@ -423,6 +424,18 @@ export function friendlyLlmError(
           ? 'OpenAI API Key 无效。'
           : 'Gemini API Key 无效。'
     return new LlmRequestError(keyHint, code || 'auth_error')
+  }
+
+  if (
+    /unsupported image|invalid image|formats: webp, png, jpeg/i.test(apiMessage) ||
+    /unsupported image/i.test(body)
+  ) {
+    const locale = getLocale()
+    const msg =
+      locale === 'en'
+        ? 'Unsupported image format. Please upload JPG, PNG, WebP, or GIF images.'
+        : '图片格式不支持，请上传 JPG、PNG、WebP 或 GIF 格式的图片。'
+    return new LlmRequestError(msg, code || 'unsupported_image')
   }
 
   const detail = apiMessage || body.slice(0, 160) || `HTTP ${status}`

@@ -666,6 +666,7 @@ export interface I18nSchema {
     uploadImage: string
     removeImage: string
     imageUploadFailed: string
+    imageFormatUnsupported: string
     thinkingNow: string
     thinkingDone: string
     thinkingPrefix: string
