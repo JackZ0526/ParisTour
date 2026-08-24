@@ -375,7 +375,6 @@ export function TripChatPanel({
     }
     let imageBlob: Blob = file
     if (isHeicFile(file)) {
-      setConvertingCount((c) => c + 1)
       try {
         const { heicTo } = await import('heic-to')
         const converted = await heicTo({
@@ -387,8 +386,6 @@ export function TripChatPanel({
       } catch (err) {
         console.warn('[TripChatPanel] HEIC conversion failed:', err)
         throw new Error('unsupported_format')
-      } finally {
-        setConvertingCount((c) => Math.max(0, c - 1))
       }
     }
     return new Promise((resolve, reject) => {
@@ -462,33 +459,57 @@ export function TripChatPanel({
     await handleDrop(e)
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
+  const enqueueImageFiles = async (files: File[]) => {
     if (!files || files.length === 0) return
+    const remainingSlots = Math.max(0, 4 - attachedImages.length)
+    if (remainingSlots <= 0) return
+
+    const validFiles: File[] = []
     let hasUnsupported = false
-    try {
-      const processed: string[] = []
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        if (!isSupportedImageFile(file)) {
-          hasUnsupported = true
-          continue
+
+    for (const f of files) {
+      if (isSupportedImageFile(f)) {
+        if (validFiles.length < remainingSlots) {
+          validFiles.push(f)
         }
-        const dataUrl = await processImageFile(file)
-        processed.push(dataUrl)
-      }
-      if (processed.length > 0) {
-        setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
-      }
-      if (hasUnsupported) {
-        setError(t('chat.imageFormatUnsupported'))
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message === 'unsupported_format') {
-        setError(t('chat.imageFormatUnsupported'))
       } else {
-        setError(t('chat.imageUploadFailed'))
+        hasUnsupported = true
       }
+    }
+
+    if (hasUnsupported) {
+      setError(t('chat.imageFormatUnsupported'))
+    }
+
+    if (validFiles.length === 0) return
+
+    // Immediately show N skeletons upfront for all incoming valid files
+    setConvertingCount((c) => c + validFiles.length)
+
+    await Promise.all(
+      validFiles.map(async (file) => {
+        try {
+          const dataUrl = await processImageFile(file)
+          setAttachedImages((prev) => [...prev, dataUrl].slice(0, 4))
+        } catch (err) {
+          console.warn('[TripChatPanel] Image processing failed:', err)
+          if (err instanceof Error && err.message === 'unsupported_format') {
+            setError(t('chat.imageFormatUnsupported'))
+          } else {
+            setError(t('chat.imageUploadFailed'))
+          }
+        } finally {
+          setConvertingCount((c) => Math.max(0, c - 1))
+        }
+      })
+    )
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : []
+    if (files.length === 0) return
+    try {
+      await enqueueImageFiles(files)
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -498,75 +519,24 @@ export function TripChatPanel({
     const items = e.clipboardData?.items
     if (!items) return
     const imageFiles: File[] = []
-    let hasUnsupported = false
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (item && item.type.startsWith('image/')) {
         const file = item.getAsFile()
-        if (file) {
-          if (isSupportedImageFile(file)) {
-            imageFiles.push(file)
-          } else {
-            hasUnsupported = true
-          }
-        }
+        if (file) imageFiles.push(file)
       }
     }
-    if (imageFiles.length > 0 || hasUnsupported) {
+    if (imageFiles.length > 0) {
       e.preventDefault()
-      try {
-        const processed: string[] = []
-        for (const file of imageFiles) {
-          const dataUrl = await processImageFile(file)
-          processed.push(dataUrl)
-        }
-        if (processed.length > 0) {
-          setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
-        }
-        if (hasUnsupported) {
-          setError(t('chat.imageFormatUnsupported'))
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message === 'unsupported_format') {
-          setError(t('chat.imageFormatUnsupported'))
-        } else {
-          setError(t('chat.imageUploadFailed'))
-        }
-      }
+      await enqueueImageFiles(imageFiles)
     }
   }
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
-    const files = e.dataTransfer?.files
-    if (!files || files.length === 0) return
-    let hasUnsupported = false
-    try {
-      const processed: string[] = []
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        if (file && (file.type.startsWith('image/') || isSupportedImageFile(file))) {
-          if (isSupportedImageFile(file)) {
-            const dataUrl = await processImageFile(file)
-            processed.push(dataUrl)
-          } else {
-            hasUnsupported = true
-          }
-        }
-      }
-      if (processed.length > 0) {
-        setAttachedImages((prev) => [...prev, ...processed].slice(0, 4))
-      }
-      if (hasUnsupported) {
-        setError(t('chat.imageFormatUnsupported'))
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message === 'unsupported_format') {
-        setError(t('chat.imageFormatUnsupported'))
-      } else {
-        setError(t('chat.imageUploadFailed'))
-      }
-    }
+    const files = e.dataTransfer?.files ? Array.from(e.dataTransfer?.files) : []
+    if (files.length === 0) return
+    await enqueueImageFiles(files)
   }
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
