@@ -18,6 +18,17 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.9.2] - 2026-08-24
+
+### 修复
+
+- 修复多人协同场景下切换语言导致天数错误扩容（如 6 天变 7 天且插入空白天）及云端双向覆盖导致中英文混杂的问题：
+- 多语言翻译期间全程阻断云端自动保存（hold cloud saves），客户端语言切换不再覆盖云端基准行程；
+- 移除对已生成行程的响应式自动扩缩容监听，消除天数波动带来的日程破坏；
+- 协同水合期间同步解析行程起算日，避免日期闪跳；
+- 修复 `resizeItineraryToLength` 扩容时的日程复制逻辑。
+
+
 ## [0.9.1] - 2026-08-24
 
 ### 修复
@@ -534,7 +545,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.2...HEAD
+- [0.9.2]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...v0.9.2
 - [0.9.1]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...v0.9.1
 - [0.9.0]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...v0.9.0
 - [0.8.1]: https://github.com/JackZ0526/ParisTour/compare/v0.8.0...v0.8.1
