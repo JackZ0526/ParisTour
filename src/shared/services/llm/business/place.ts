@@ -547,7 +547,7 @@ function fallbackDayCopy(input: {
             ? 'Arrival in Paris'
             : lastDay != null && input.day === lastDay
               ? 'Departure Day'
-              : highlights.slice(0, 24) || `Day ${input.day}`
+              : highlights.slice(0, 18) || `Day ${input.day}`
   } else {
     title =
       input.pace === 'park'
@@ -637,7 +637,7 @@ export async function generateDayCopy(input: {
             `Paris ${lengthHint} editor. Based on the day's places, generate a concise headline, theme, and 2-sentence summary in English.`,
             null,
             langRule,
-            '<output_format>Title 2–6 words (e.g. "Right Bank Classics", "Left Bank Highlights"), theme 3–6 words, summary 2 sentences describing rhythm and highlights. Output JSON only.</output_format>',
+            '<output_format>Title: short and punchy, 2–4 words, max 18 characters (e.g. "Right Bank Classics", "Eiffel & Left Bank", "Marais Stroll"). Do NOT chain multiple long landmark names together (e.g. avoid "Champs-Élysées & Arc de Triomphe", use "Etoile Stroll" or "Champs-Élysées"). Theme 3–6 words, summary 2 sentences describing rhythm and highlights. Output JSON only.</output_format>',
             baseRule,
             jsonContract(
               '{ title: "string", theme: "string", summary: "string" }',
@@ -649,7 +649,7 @@ export async function generateDayCopy(input: {
             `巴黎${lengthHint}编辑。根据当天地点列表，用简体中文生成短标题、主题与总结。`,
             null,
             langRule,
-            '<output_format>标题 2–6 字（如「西侧经典」「左岸轻松」），主题一句话，总结 2 句说明节奏与亮点。只输出 JSON。</output_format>',
+            '<output_format>标题极简：2–5 字（如「西侧经典」「左岸轻松」），切勿罗列多个长地名。主题一句话，总结 2 句说明节奏与亮点。只输出 JSON。</output_format>',
             baseRule,
             jsonContract(
               '{ title: "string", theme: "string", summary: "string" }',
@@ -678,13 +678,18 @@ export async function generateDayCopy(input: {
       const parsed = extractJsonObject(text)
       if (!parsed) return fallbackDayCopy({ ...input, locale })
 
-      const title = String(parsed.title || '').trim()
+      const rawTitle = String(parsed.title || '').trim()
       const theme = String(parsed.theme || '').trim()
       const summary = String(parsed.summary || '').trim()
-      if (!title || !summary) return fallbackDayCopy({ ...input, locale })
+      if (!rawTitle || !summary) return fallbackDayCopy({ ...input, locale })
+
+      const title = rawTitle
+        .slice(0, isEn ? 20 : 8)
+        .replace(/\s*[&,，、·\-]\s*$/, '')
+        .trim()
 
       return {
-        title: title.slice(0, isEn ? 40 : 12),
+        title: title || rawTitle.slice(0, isEn ? 20 : 8),
         theme: theme || input.pace,
         summary,
       }

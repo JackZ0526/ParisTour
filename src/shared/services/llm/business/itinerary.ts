@@ -321,7 +321,7 @@ export function buildFullItineraryPrompt(
     return {
       role: `${destination} ${season} travel planner. Generate a complete multi-day itinerary from the traveler's dates, flights, hotel, and verified place candidates.`,
       hardRules: `<hard_rules>
-- Output exactly ${n} days (the "day" field is 1..${n}), each with title / theme / pace / summary / stops.
+- Output exactly ${n} days (the "day" field is 1..${n}), each with title / theme / pace / summary / stops. Day title: short and punchy, 2–4 words, max 18 characters (e.g. "Eiffel & Left Bank", "Louvre Classics", "Marais Stroll"). Never list multiple long place names together (e.g. avoid "Champs-Élysées & Arc de Triomphe").
 - Day 1 (arrival): the first stop MUST be hotel check-in (placeKey "hotel-selected", type hotel). Keep it light, beat the jet lag first; do not require a coffee shop opener on Day 1.
 - For all days except the last: the last stop MUST be returning to the hotel (placeKey "hotel-selected", type hotel). On Day 1, if there are outbound stops too, include both check-in and end-of-day hotel; mid-trip days start from the hotel (the hotel is the origin and need not appear at the top of stops) but the last stop must still be hotel-selected.
 - ${
@@ -374,7 +374,7 @@ export function buildFullItineraryPrompt(
   return {
     role: `${destination}${season}旅行规划师。根据旅客的日期、航班、酒店和已验证地点候选生成完整多日行程。`,
     hardRules: `<hard_rules>
-- 必须输出恰好 ${n} 天（day 字段为 1..${n}），每天都有 title/theme/pace/summary/stops。
+- 必须输出恰好 ${n} 天（day 字段为 1..${n}），每天都有 title/theme/pace/summary/stops。标题极简：2–5 字（如「西侧经典」「左岸轻松」），切勿罗列多个长地名。
 - Day 1：抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；Day 1 不强制咖啡馆开场。
 - 除最后一天外：每一天的最后一站必须是回酒店过夜（placeKey "hotel-selected"，type hotel）。Day 1 若还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）；中间日早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站仍须写回酒店。
 - ${
@@ -730,9 +730,11 @@ export async function generateFullItinerary(
         ? (row.metroHintFromArea as Record<string, string>)
         : { custom: '按导航或地铁前往下一个地点。' }
 
+    const rawTitle = String(row.title || `第 ${dayNum} 天`).trim()
+    const cleanTitle = rawTitle.slice(0, 20).replace(/\s*[&,，、·\-]\s*$/, '').trim()
     days.push({
       day: dayNum,
-      title: String(row.title || `第 ${dayNum} 天`).trim().slice(0, 16),
+      title: cleanTitle || rawTitle.slice(0, 20),
       theme: String(row.theme || '').trim() || '巴黎日程',
       pace,
       summary: String(row.summary || '').trim() || '今天按地图与体力微调即可。',
@@ -827,9 +829,11 @@ function parseItineraryDay(
       ? (row.metroHintFromArea as Record<string, string>)
       : { custom: '按导航或地铁前往下一个地点。' }
 
+  const rawTitle = String(row.title || `第 ${day} 天`).trim()
+  const cleanTitle = rawTitle.slice(0, 20).replace(/\s*[&,，、·\-]\s*$/, '').trim()
   return {
     day,
-    title: String(row.title || `第 ${day} 天`).trim().slice(0, 16),
+    title: cleanTitle || rawTitle.slice(0, 20),
     theme: String(row.theme || '').trim() || '巴黎日程',
     pace,
     summary: String(row.summary || '').trim() || '今天按地图与体力微调即可。',
@@ -853,13 +857,16 @@ function extractStreamingDayPreview(
   text: string,
   fallbackDay: number,
 ): { day: number; title?: string; theme?: string } | null {
-  const title = pickJsonStringField(text, 'title')
-  const theme = pickJsonStringField(text, 'theme')
-  if (!title && !theme) return null
+  const rawTitle = pickJsonStringField(text, 'title')?.trim()
+  const theme = pickJsonStringField(text, 'theme')?.trim()
+  if (!rawTitle && !theme) return null
+  const cleanTitle = rawTitle
+    ? rawTitle.slice(0, 20).replace(/\s*[&,，、·\-]\s*$/, '').trim()
+    : undefined
   return {
     day: fallbackDay,
-    title: title?.trim().slice(0, 16) || undefined,
-    theme: theme?.trim() || undefined,
+    title: cleanTitle || rawTitle?.slice(0, 20) || undefined,
+    theme: theme || undefined,
   }
 }
 
@@ -948,7 +955,7 @@ export async function generateSingleDayItinerary(
   const hardRules = isEn
     ? `<hard_rules>
 - Output only Day ${dayNumber} (the "day" field must equal ${dayNumber}), plus any non-reserved places from the day's "places[]".
-- Output structure (hard rule): the top level must include an object field "day" (with title / theme / pace / summary / stops). Do NOT spread title / stops at the root. "day.day" must be the number ${dayNumber}.
+- Output structure (hard rule): the top level must include an object field "day" (with title / theme / pace / summary / stops). Do NOT spread title / stops at the root. "day.day" must be the number ${dayNumber}. Day title: short and punchy, 2–4 words, max 18 characters.
 ${roleRules.map((r) => `- ${r}`).join('\n')}
 - Dedup (hard rule): do not use attractions / landmarks already present in occupiedElsewhere (same official name or same placeId); not within today either. The hotel "hotel-selected" and the airport "attr-cdg" are exempt; the Disney day allows exactly one "attr-disney".
 - Soft preference: ordinary sightseeing days start around ${prefs.dayStartTime}; flights, reservations, opening hours, and explicit user requests take priority.
@@ -971,7 +978,7 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
 </hard_rules>`
     : `<hard_rules>
 - 只输出 Day ${dayNumber} 这一天（day 字段必须为 ${dayNumber}），以及 places[] 中当天用到的非特殊地点。
-- 输出结构硬规则：顶层必须包含对象字段 "day"（含 title/theme/pace/summary/stops），不要把 title/stops 直接摊在根上；"day.day" 必须是数字 ${dayNumber}。
+- 输出结构硬规则：顶层必须包含对象字段 "day"（含 title/theme/pace/summary/stops），不要把 title/stops 直接摊在根上；"day.day" 必须是数字 ${dayNumber}。标题极简 2–5 字。
 ${roleRules.map((r) => `- ${r}`).join('\n')}
 - 去重（硬规则）：不要使用 occupiedElsewhere 中已出现的景点/地标（同一正式名或同一 placeId）；当天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。
 - 软偏好：普通游览日约 ${prefs.dayStartTime} 开始；航班、预约、营业时间和用户明确要求优先。

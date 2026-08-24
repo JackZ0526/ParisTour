@@ -129,7 +129,8 @@ export function DayTabButton({
             />
           ) : (
             <span
-              className={`block max-w-[9.5rem] truncate sm:max-w-none ${
+              title={title}
+              className={`block max-w-[9rem] truncate sm:max-w-[10.5rem] ${
                 streamingTitle ? 'chat-step-shimmer' : ''
               }`}
             >
