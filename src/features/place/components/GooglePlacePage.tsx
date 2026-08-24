@@ -1928,9 +1928,15 @@ export function GooglePlacePage({
                 href={displayWebsite}
                 target="_blank"
                 rel="noreferrer"
-                className={`${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] dark:text-emerald-300 transition-all hover:bg-[#dce9df]/90 dark:hover:bg-[#668b7a]/25 hover:border-[#a8bcae] dark:hover:border-[#668b7a]/40 active:scale-95 cursor-pointer`}
+                className={`group ${placeDetailCapsuleClass} ${glassCapsuleToneClass.sage} font-medium text-[var(--sage)] dark:text-emerald-300 transition-all hover:bg-[#dce9df]/90 dark:hover:bg-[#668b7a]/25 hover:border-[#a8bcae] dark:hover:border-[#668b7a]/40 active:scale-95 cursor-pointer`}
               >
-                {t('place.website')}
+                <span>{t('place.website')}</span>
+                <ExternalLink
+                  size={14}
+                  strokeWidth={1.9}
+                  className="ml-0.5 shrink-0 text-[var(--sage)]/80 dark:text-emerald-400 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--sage)] dark:group-hover:text-emerald-300"
+                  aria-hidden
+                />
               </a>
             )}
           </div>
