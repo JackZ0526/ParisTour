@@ -115,6 +115,40 @@ export function localizeTravelChip(value: string | undefined, locale?: Locale): 
   return value
 }
 
+/**
+ * Localize stop duration hints (e.g. '自定' → 'Custom', '45 分钟' → '45 min', '2.5–3.5 小时' → '2.5–3.5 hr').
+ */
+export function localizeDuration(value: string | undefined, locale: Locale = getLocale()): string {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  if (locale === 'en') {
+    if (trimmed === '自定' || trimmed === '自定义') return 'Custom'
+    if (trimmed === '全天') return 'Full day'
+    return trimmed
+      .replace(/入住\s*/g, 'Check-in ')
+      .replace(/交通\s*/g, 'Transit ')
+      .replace(/（含登顶）/g, ' (summit)')
+      .replace(/\(含登顶\)/g, ' (summit)')
+      .replace(/分钟/g, 'min')
+      .replace(/小时/g, 'hr')
+  }
+
+  if (locale === 'zh-CN') {
+    if (trimmed.toLowerCase() === 'custom') return '自定'
+    if (trimmed.toLowerCase() === 'full day') return '全天'
+    return trimmed
+      .replace(/Check-in\s*/gi, '入住 ')
+      .replace(/Transit\s*/gi, '交通 ')
+      .replace(/\(summit\)/gi, '（含登顶）')
+      .replace(/\bmin(?:utes?)?\b/gi, '分钟')
+      .replace(/\bhr(?:s|hours?)?\b/gi, '小时')
+  }
+
+  return trimmed
+}
+
 // Useful when callers need the underlying code (e.g. for an `<option value>`).
 export function paceToCode(value: string | undefined): string | undefined {
   if (!value) return undefined

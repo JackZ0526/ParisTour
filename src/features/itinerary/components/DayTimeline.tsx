@@ -62,7 +62,7 @@ import {
 import { ExternalLink, GripVertical, History, Pin, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { useTranslation, getLocale, translate } from '../../../shared/i18n'
-import { localizePace, localizeTravelChip } from '../../../shared/i18n'
+import { localizeDuration, localizePace, localizeTravelChip } from '../../../shared/i18n'
 import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
 
 /** Dissolve + petal flight before slot collapse. */
@@ -1881,7 +1881,7 @@ export function DayTimeline({
                     )}
                     {stop.duration && (
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.violet} px-2 py-1`}>
-                        {stop.duration}
+                        {localizeDuration(stop.duration, locale)}
                       </span>
                     )}
                   </div>

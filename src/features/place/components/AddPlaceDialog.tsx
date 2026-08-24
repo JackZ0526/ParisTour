@@ -696,8 +696,8 @@ export function AddPlaceDialog({
 
       let description =
         intro || details.summary || details.address || t('place.fallbackDescription')
-      // AI 推荐已有 intro 时不再二次生成简介，避免重复烧 token。
-      const hasUsefulIntro = Boolean(intro && intro.trim().length >= 12)
+      // AI 推荐已有适中长度 intro 时不再二次生成简介，避免重复烧 token。
+      const hasUsefulIntro = Boolean(intro && intro.trim().length >= 12 && intro.trim().length <= 160)
       if (isLlmConfigured() && !hasUsefulIntro) {
         const blurb = await generatePlaceDescription({
           name: details.name,
@@ -706,6 +706,11 @@ export function AddPlaceDialog({
           googleSummary: details.summary || intro,
         })
         if (blurb) description = blurb
+      } else if (!isLlmConfigured() && description.length > 200) {
+        const sentenceMatch = description.slice(0, 180).match(/^(.*?[.!?。！？])\s/s)
+        if (sentenceMatch?.[1]) {
+          description = sentenceMatch[1].trim()
+        }
       }
 
       const isRestaurantOrCafe = type === 'restaurant' || type === 'cafe'
@@ -765,7 +770,7 @@ export function AddPlaceDialog({
           : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
               details.nameOriginal || details.name,
             )}`,
-        durationHint: '自定',
+        durationHint: locale === 'en' ? 'Custom' : '自定',
       }
       onAddCustom(place, mode)
       setGoogleQuery('')

@@ -247,33 +247,50 @@ export async function generatePlaceDescription(input: {
   googleSummary?: string
 }): Promise<string | null> {
   const activeLocale = getLocale()
-  const langRule = getLlmLanguageInstruction()
-  const key = `place-desc:v2:${activeLocale}:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
+  const langRule = getLlmLanguageInstruction(activeLocale)
+  const isEn = activeLocale === 'en'
+  const key = `place-desc:v3:${activeLocale}:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
   return memoizeLlmCall(
     key,
     async () => {
       const system = buildPrompt(
-        activeLocale === 'en'
-          ? 'Travel copywriter. Write a concise place introduction.'
-          : '旅行文案助手。用简洁中文为地点写简介。',
+        isEn
+          ? 'Travel copywriter. Write a concise, punchy 1-2 sentence itinerary note for a stop.'
+          : '旅行文案助手。用简短精炼的 1–2 句话为行程地点写游玩亮点。',
         null,
         `<hard_rules>
 - ${langRule}
-- <output_format>2–3 句正文，不要列表，不要夸张营销套话，不要标题。</output_format>
+- ${
+          isEn
+            ? '<output_format>1–2 short sentences (maximum 30 words). Focus strictly on what to do or see here. Do NOT write an encyclopedia essay, background history, or marketing fluff. No title, no bullet points.</output_format>'
+            : '<output_format>1–2 句精炼游玩亮点（不超过 40 字）。突出游览体验，切勿写长篇百科历史。不要标题，不要列表。</output_format>'
+        }
 </hard_rules>`,
         getCafeVsRestaurantRule(activeLocale),
       )
-      const user = [
-        `地点：${input.name}`,
-        `类型：${input.type}`,
-        input.address ? `地址：${input.address}` : '',
-        input.googleSummary ? `参考信息：${input.googleSummary}` : '',
-        '请直接输出简介正文，不要标题。',
-      ]
-        .filter(Boolean)
-        .join('\n')
+      const user = isEn
+        ? [
+            `Place: ${input.name}`,
+            `Type: ${input.type}`,
+            input.address ? `Address: ${input.address}` : '',
+            input.googleSummary ? `Reference: ${input.googleSummary}` : '',
+            'Output the short note directly without any title or formatting.',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : [
+            `地点：${input.name}`,
+            `类型：${input.type}`,
+            input.address ? `地址：${input.address}` : '',
+            input.googleSummary ? `参考信息：${input.googleSummary}` : '',
+            '请直接输出简短亮点正文，不要标题。',
+          ]
+            .filter(Boolean)
+            .join('\n')
 
-      return generateText(system, user, { task: 'placeDescription', userText: input.name })
+      const raw = await generateText(system, user, { task: 'placeDescription', userText: input.name })
+      if (!raw) return null
+      return raw.trim().replace(/^["']|["']$/g, '')
     },
     { durable: true },
   )

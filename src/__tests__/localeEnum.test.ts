@@ -5,6 +5,7 @@ import {
   localizeWalkLevel,
   localizeTransport,
   localizeTravelChip,
+  localizeDuration,
 } from '../shared/i18n/localeEnum'
 import { setLocale } from '../shared/i18n/i18nStore'
 
@@ -72,6 +73,28 @@ describe('localeEnum helpers', () => {
       setLocale('en')
       expect(localizeTravelChip('transit')).toBeTruthy()
       expect(localizeTravelChip('minimal')).toBeTruthy()
+    })
+  })
+
+  describe('localizeDuration', () => {
+    it('translates Chinese durations to English in en mode', () => {
+      setLocale('en')
+      expect(localizeDuration('自定')).toBe('Custom')
+      expect(localizeDuration('自定义')).toBe('Custom')
+      expect(localizeDuration('45 分钟')).toBe('45 min')
+      expect(localizeDuration('40–60 分钟')).toBe('40–60 min')
+      expect(localizeDuration('60–90 分钟（含登顶）')).toBe('60–90 min (summit)')
+      expect(localizeDuration('2.5–3.5 小时')).toBe('2.5–3.5 hr')
+      expect(localizeDuration('全天')).toBe('Full day')
+      expect(localizeDuration('入住 30–45 分钟')).toBe('Check-in 30–45 min')
+    })
+
+    it('translates English durations to Chinese in zh-CN mode', () => {
+      setLocale('zh-CN')
+      expect(localizeDuration('Custom')).toBe('自定')
+      expect(localizeDuration('Full day')).toBe('全天')
+      expect(localizeDuration('60 min')).toBe('60 分钟')
+      expect(localizeDuration('2.5–3.5 hr')).toBe('2.5–3.5 小时')
     })
   })
 
