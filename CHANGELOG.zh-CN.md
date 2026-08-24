@@ -18,6 +18,15 @@ Paris Tour 的重要变更记录于此。
 
 ### 修复
 
+## [0.9.3] - 2026-08-24
+
+### 修复
+
+- 修复协同场景下收到英文行程后中文端未自动对齐为中文界面的问题：
+- 自动检测加载/同步行程与当前 UI 语言的不匹配（`detectLocaleFromDays`），不一致时自动 0ms 命中本地/云端多语言副本并即时对齐；
+- 多语言行程副本持久化接入云端 `llmArtifactStore`，双方共享多语言版本且互不覆盖。
+
+
 ## [0.9.2] - 2026-08-24
 
 ### 修复
@@ -545,7 +554,8 @@ Paris Tour 的重要变更记录于此。
 
 在正式打上 git tag 之前，对比范围使用提交 SHA。
 
-- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.2...HEAD
+- [Unreleased]: https://github.com/JackZ0526/ParisTour/compare/v0.9.3...HEAD
+- [0.9.3]: https://github.com/JackZ0526/ParisTour/compare/v0.9.2...v0.9.3
 - [0.9.2]: https://github.com/JackZ0526/ParisTour/compare/v0.9.1...v0.9.2
 - [0.9.1]: https://github.com/JackZ0526/ParisTour/compare/v0.9.0...v0.9.1
 - [0.9.0]: https://github.com/JackZ0526/ParisTour/compare/v0.8.1...v0.9.0
