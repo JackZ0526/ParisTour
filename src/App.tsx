@@ -254,9 +254,6 @@ export default function App() {
     },
     [setSelectedPlaceId],
   )
-  const handleRouteCacheChanged = useCallback(() => {
-    notifyTripChanged()
-  }, [notifyTripChanged])
   const {
     setItineraryStart,
     setItineraryStartLoading,
@@ -359,7 +356,6 @@ export default function App() {
     void (async () => {
       const requests = routePrefetchPlanRef.current
       let nextIndex = 0
-      let fetchedAny = false
       const worker = async () => {
         while (active) {
           if (isOpenRouteServiceDisabled()) return
@@ -370,11 +366,10 @@ export default function App() {
           for (let attempt = 0; attempt < 2 && active; attempt += 1) {
             if (isOpenRouteServiceDisabled()) return
             try {
-              const result = await getOrFetchMapRouteSegments(
+              await getOrFetchMapRouteSegments(
                 request.profile,
                 dayRouteSegmentsToRequests(request.segments),
               )
-              if (result.fetchedFromNetwork) fetchedAny = true
               break
             } catch {
               if (attempt === 0 && !isOpenRouteServiceDisabled()) {
@@ -391,7 +386,6 @@ export default function App() {
           () => worker(),
         ),
       )
-      if (active && fetchedAny && !readOnly) notifyTripChanged()
     })()
 
     return () => {
@@ -402,8 +396,6 @@ export default function App() {
     dayRestoring,
     itineraryGenerating,
     itineraryIncrementalGenerating,
-    notifyTripChanged,
-    readOnly,
     routePrefetchFingerprint,
     showItineraryContent,
   ])
@@ -1156,7 +1148,6 @@ export default function App() {
                                 customPlaces={placesWithHotel}
                                 selectedPlaceId={selectedPlaceId}
                                 onSelectPlace={handleSelectPlace}
-                                onRouteCacheChanged={handleRouteCacheChanged}
                               />
                             </React.Suspense>
                           </MapErrorBoundary>

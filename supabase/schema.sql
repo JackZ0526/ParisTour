@@ -97,6 +97,9 @@ create index if not exists trips_owner_id_idx on public.trips (owner_id);
 alter table public.trips add column if not exists hotel jsonb;
 alter table public.trips add column if not exists artifacts jsonb not null default '{}'::jsonb;
 alter table public.trips add column if not exists artifacts_rev integer not null default 0;
+alter table public.trips add column if not exists itinerary_days jsonb not null default '{}'::jsonb;
+alter table public.trips add column if not exists itinerary_day_hashes jsonb not null default '{}'::jsonb;
+alter table public.trips add column if not exists days_rev integer not null default 0;
 
 alter table public.trips enable row level security;
 
@@ -687,6 +690,145 @@ $$;
 revoke execute on function public.pull_trip_artifacts(uuid, jsonb) from public;
 revoke execute on function public.pull_trip_artifacts(uuid, jsonb) from anon;
 grant execute on function public.pull_trip_artifacts(uuid, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Incremental itinerary-day patch / pull (one day at a time)
+-- ---------------------------------------------------------------------------
+drop function if exists public.patch_trip_days(uuid, jsonb, jsonb, text[]);
+
+create or replace function public.patch_trip_days(
+  p_trip_id uuid,
+  p_upserts jsonb default '{}'::jsonb,
+  p_hashes jsonb default '{}'::jsonb,
+  p_deletes text[] default '{}'::text[]
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  new_updated_at timestamptz;
+  new_rev integer;
+  upserts jsonb := coalesce(p_upserts, '{}'::jsonb);
+  hashes jsonb := coalesce(p_hashes, '{}'::jsonb);
+  deletes text[] := coalesce(p_deletes, '{}'::text[]);
+  filtered jsonb := '{}'::jsonb;
+  filtered_hashes jsonb := '{}'::jsonb;
+  k text;
+begin
+  if jsonb_typeof(upserts) <> 'object' or jsonb_typeof(hashes) <> 'object' then
+    raise exception 'p_upserts and p_hashes must be JSON objects'
+      using errcode = '22023';
+  end if;
+
+  if not public.user_can_edit_trip(p_trip_id) then
+    raise exception 'not authorized'
+      using errcode = '42501';
+  end if;
+
+  for k in select jsonb_object_keys(upserts)
+  loop
+    if k ~ '^[0-9]+$' then
+      filtered := filtered || jsonb_build_object(k, upserts -> k);
+      if hashes ? k then
+        filtered_hashes := filtered_hashes || jsonb_build_object(k, hashes -> k);
+      end if;
+    end if;
+  end loop;
+
+  update public.trips
+  set itinerary_days =
+        (coalesce(itinerary_days, '{}'::jsonb) - deletes) || filtered,
+      itinerary_day_hashes =
+        (coalesce(itinerary_day_hashes, '{}'::jsonb) - deletes) || filtered_hashes,
+      days_rev = coalesce(days_rev, 0) + 1
+  where id = p_trip_id
+  returning updated_at, days_rev into new_updated_at, new_rev;
+
+  if new_updated_at is null then
+    raise exception 'trip not found'
+      using errcode = 'P0002';
+  end if;
+
+  return jsonb_build_object(
+    'updated_at', new_updated_at,
+    'rev', coalesce(new_rev, 0)
+  );
+end;
+$$;
+
+revoke execute on function public.patch_trip_days(uuid, jsonb, jsonb, text[]) from public;
+revoke execute on function public.patch_trip_days(uuid, jsonb, jsonb, text[]) from anon;
+grant execute on function public.patch_trip_days(uuid, jsonb, jsonb, text[]) to authenticated;
+
+create or replace function public.pull_trip_days(
+  p_trip_id uuid,
+  p_known jsonb default '{}'::jsonb
+)
+returns jsonb
+language plpgsql
+stable
+security invoker
+set search_path = public
+as $$
+declare
+  current_days jsonb;
+  current_hashes jsonb;
+  current_rev integer;
+  known jsonb := coalesce(p_known, '{}'::jsonb);
+  upserts jsonb := '{}'::jsonb;
+  delete_keys text[] := '{}'::text[];
+  k text;
+begin
+  if jsonb_typeof(known) <> 'object' then
+    raise exception 'p_known must be a JSON object'
+      using errcode = '22023';
+  end if;
+
+  if not public.user_can_read_trip(p_trip_id) then
+    raise exception 'not authorized'
+      using errcode = '42501';
+  end if;
+
+  select t.itinerary_days, t.itinerary_day_hashes, t.days_rev
+    into current_days, current_hashes, current_rev
+  from public.trips t
+  where t.id = p_trip_id;
+
+  if not found then
+    raise exception 'trip not found'
+      using errcode = 'P0002';
+  end if;
+
+  current_days := coalesce(current_days, '{}'::jsonb);
+  current_hashes := coalesce(current_hashes, '{}'::jsonb);
+
+  for k in select jsonb_object_keys(current_days)
+  loop
+    if known ->> k is distinct from current_hashes ->> k then
+      upserts := upserts || jsonb_build_object(k, current_days -> k);
+    end if;
+  end loop;
+
+  for k in select jsonb_object_keys(known)
+  loop
+    if not (current_days ? k) then
+      delete_keys := array_append(delete_keys, k);
+    end if;
+  end loop;
+
+  return jsonb_build_object(
+    'rev', coalesce(current_rev, 0),
+    'upserts', upserts,
+    'deletes', to_jsonb(delete_keys)
+  );
+end;
+$$;
+
+revoke execute on function public.pull_trip_days(uuid, jsonb) from public;
+revoke execute on function public.pull_trip_days(uuid, jsonb) from anon;
+grant execute on function public.pull_trip_days(uuid, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Bootstrap: add your email(s) to the allowlist, then sign up.

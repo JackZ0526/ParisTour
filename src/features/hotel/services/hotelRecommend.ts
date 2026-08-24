@@ -1,7 +1,7 @@
 import { getOpenAIModel, recommendHotelsForTrip } from '../../../shared/services/llm/llm'
 import { translate } from '../../../shared/i18n'
 import { clearLlmMemo } from '../../../shared/services/llm/llmMemo'
-import { loadHotelCache, saveHotelCache } from './hotelCache'
+import { hotelSelectionFingerprint, loadHotelCache, saveHotelCache } from './hotelCache'
 import {
   candidateToSelected,
   resolveHotelCandidate,
@@ -32,12 +32,15 @@ export function persistHotelState(
       : hasRealSelection
         ? true
         : Boolean(prev?.othersCollapsed)
+  const sameSelection =
+    hotelSelectionFingerprint(prev?.candidates || [], prev?.selected?.id) ===
+    hotelSelectionFingerprint(candidates, selected?.id)
   saveHotelCache({
     candidates,
     selected,
     model: getOpenAIModel(),
     batch: 1,
-    fetchedAt: Date.now(),
+    fetchedAt: sameSelection ? prev?.fetchedAt ?? Date.now() : Date.now(),
     lastPreferences,
     othersCollapsed,
   })

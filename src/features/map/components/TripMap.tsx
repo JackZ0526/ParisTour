@@ -62,7 +62,6 @@ interface Props {
   customPlaces?: Record<string, Place>
   selectedPlaceId: string | null
   onSelectPlace: (id: string) => void
-  onRouteCacheChanged?: () => void
 }
 
 function markerElement(
@@ -132,7 +131,6 @@ export function TripMap({
   customPlaces = {},
   selectedPlaceId,
   onSelectPlace,
-  onRouteCacheChanged,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null)
@@ -244,7 +242,6 @@ export function TripMap({
         }
         setSegmentEntries(result.segments)
         setRouteError(null)
-        if (result.fetchedFromNetwork) onRouteCacheChanged?.()
       } catch (error: unknown) {
         if (cancelled) return
         if (attempt === 0) {
@@ -262,7 +259,6 @@ export function TripMap({
       if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
   }, [
-    onRouteCacheChanged,
     routeRequest.fingerprint,
     routeRequest.profile,
     segments,

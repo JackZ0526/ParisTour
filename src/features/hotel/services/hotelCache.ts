@@ -136,6 +136,14 @@ export function loadHotelCache(): HotelCacheState | null {
   return ensureMemory()
 }
 
+export function hotelSelectionFingerprint(
+  candidates: Array<{ id?: string; bookingHotelId?: string | null }>,
+  selectedId: string | null | undefined,
+): string {
+  const ids = candidates.map((card) => card.bookingHotelId || card.id || '')
+  return `${selectedId ?? ''}|${ids.join('\0')}`
+}
+
 export function saveHotelCache(state: HotelCacheState) {
   memory = hydrateState(state)
   initialized = true

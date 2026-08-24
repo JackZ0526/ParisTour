@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   flushHotelCacheToStorage,
+  hotelSelectionFingerprint,
   loadHotelCache,
   resetHotelCacheForTests,
   saveHotelCache,
@@ -65,5 +66,14 @@ describe('hotelCache', () => {
     })
     flushHotelCacheToStorage()
     expect(localStorage.getItem(STORAGE_KEY)).toContain('Padam')
+  })
+
+  it('fingerprints hotel selection without depending on fetch timestamps', () => {
+    expect(hotelSelectionFingerprint([{ id: 'a' }, { id: 'b', bookingHotelId: 'bk' }], 'a')).toBe(
+      hotelSelectionFingerprint([{ id: 'a' }, { id: 'b', bookingHotelId: 'bk' }], 'a'),
+    )
+    expect(hotelSelectionFingerprint([{ id: 'a' }], 'a')).not.toBe(
+      hotelSelectionFingerprint([{ id: 'a' }], 'b'),
+    )
   })
 })

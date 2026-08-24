@@ -106,7 +106,7 @@ export function collectTripSnapshot(): TripSnapshot {
 /** Write snapshot into localStorage (App remount reads from there). */
 export function applyTripSnapshot(
   snapshot: TripSnapshot | null | undefined,
-  opts?: { hydrateArtifacts?: boolean },
+  opts?: { hydrateArtifacts?: boolean; hydrateDays?: boolean },
 ) {
   const snap = snapshot && typeof snapshot === 'object' ? snapshot : emptyTripSnapshot()
 
@@ -141,12 +141,20 @@ export function applyTripSnapshot(
     clearHotelCache()
   }
 
-  clearItineraryState()
+  const keepDays = opts?.hydrateDays === false
+  const previousDays = keepDays ? loadItineraryState().days : []
+  if (!keepDays) {
+    clearItineraryState()
+  }
   if (snap.itinerary) {
-    saveItineraryState(snap.itinerary.days || [], snap.itinerary.customPlaces || {}, {
-      generated: snap.itinerary.generated,
-      fingerprint: snap.itinerary.fingerprint ?? null,
-    })
+    saveItineraryState(
+      keepDays ? previousDays : snap.itinerary.days || [],
+      snap.itinerary.customPlaces || {},
+      {
+        generated: snap.itinerary.generated,
+        fingerprint: snap.itinerary.fingerprint ?? null,
+      },
+    )
   }
 
   clearBaselineItinerary()

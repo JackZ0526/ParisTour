@@ -58,6 +58,7 @@ function localDebugTrip(): AccessibleTrip {
     role: 'owner',
     updatedAt: new Date().toISOString(),
     artifactsRev: 0,
+    daysRev: 0,
     snapshot: emptyTripSnapshot(),
     label: '本地调试行程',
   }
