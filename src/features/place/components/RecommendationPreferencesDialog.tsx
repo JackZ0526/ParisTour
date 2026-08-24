@@ -132,10 +132,10 @@ export function RecommendationPreferencesDialog({
       if (cleanedExtracted.length > 0) {
         setExtractedResult(cleanedExtracted)
       } else {
-        setExtractError('未能提炼出有效标签，请尝试补充更多旅行细节。')
+        setExtractError(t('place.extractTagsNoResult'))
       }
     } catch {
-      setExtractError('提炼偏好标签失败，请重试。')
+      setExtractError(t('place.extractTagsFailed'))
     } finally {
       setIsExtracting(false)
     }
@@ -417,19 +417,19 @@ export function RecommendationPreferencesDialog({
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.94, y: 8 }}
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/80 dark:border-white/15 bg-white/90 dark:bg-[#1c2420]/95 p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.24),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+                  className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/80 dark:border-white/15 bg-white/90 dark:bg-[#1c2420]/95 p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.24),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-2xl"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300/60 bg-amber-500/12 text-amber-700 shadow-2xs backdrop-blur-md">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300/60 dark:border-amber-400/30 bg-amber-500/12 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 shadow-2xs backdrop-blur-md">
                         <Sparkles size={17} strokeWidth={2.2} />
                       </div>
                       <div className="min-w-0 pt-0.5">
                         <h3 id="extracted-dialog-title" className="font-display text-base sm:text-lg font-semibold text-[var(--ink)] tracking-tight">
                           {t('place.extractedSuccessTitle')}
                         </h3>
-                        <p className="mt-0.5 text-xs text-[var(--stone)] leading-relaxed">
+                        <p className="mt-0.5 text-xs text-[var(--stone)] dark:text-zinc-300 leading-relaxed">
                           {t('place.extractedSuccessDesc')}
                         </p>
                       </div>
@@ -438,7 +438,7 @@ export function RecommendationPreferencesDialog({
                   </div>
 
                   {/* Extracted Tags Display Box */}
-                  <div className="my-4 rounded-2xl border border-white/85 bg-white/70 p-3 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-md">
+                  <div className="my-4 rounded-2xl border border-white/85 dark:border-white/10 bg-white/70 dark:bg-black/35 p-3 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)] backdrop-blur-md">
                     <div className="flex flex-wrap gap-1.5">
                       {extractedResult.map((tag) => {
                         const clean = cleanTagText(tag)
@@ -460,7 +460,7 @@ export function RecommendationPreferencesDialog({
                     <button
                       type="button"
                       onClick={handleDiscardExtracted}
-                      className="min-h-[34px] rounded-full border border-black/8 dark:border-white/10 bg-white/70 dark:bg-white/10 px-3.5 py-1 text-xs font-medium text-[var(--stone)] dark:text-zinc-300 shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] active:scale-95 cursor-pointer"
+                      className="min-h-[34px] rounded-full border border-black/8 dark:border-white/10 bg-white/70 dark:bg-white/10 px-3.5 py-1 text-xs font-medium text-[var(--stone)] dark:text-zinc-300 shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/20 hover:text-[var(--ink)] dark:hover:text-white active:scale-95 cursor-pointer"
                     >
                       {t('place.discard')}
                     </button>
@@ -468,7 +468,7 @@ export function RecommendationPreferencesDialog({
                     <button
                       type="button"
                       onClick={handleAddToCandidatePool}
-                      className="min-h-[34px] rounded-full border border-black/10 dark:border-white/10 bg-white/85 dark:bg-white/15 px-4 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/25 active:scale-95 cursor-pointer"
+                      className="min-h-[34px] rounded-full border border-black/10 dark:border-white/10 bg-white/85 dark:bg-white/15 px-4 py-1 text-xs font-medium text-[var(--ink)] dark:text-zinc-100 shadow-2xs backdrop-blur-md transition-all hover:bg-white dark:hover:bg-white/25 active:scale-95 cursor-pointer"
                     >
                       {t('place.addToCandidates')}
                     </button>
@@ -476,7 +476,7 @@ export function RecommendationPreferencesDialog({
                     <button
                       type="button"
                       onClick={handleAddToActivePool}
-                      className="group relative isolate inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[var(--ink)] px-4.5 py-1 text-xs font-semibold text-[var(--paper)] shadow-[0_4px_14px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] transition-all hover:bg-black active:scale-95 cursor-pointer"
+                      className="group relative isolate inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] px-4.5 py-1 text-xs font-semibold text-[var(--paper)] dark:text-white shadow-[0_4px_14px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_14px_rgba(212,131,84,0.35)] transition-all hover:bg-black dark:hover:bg-[var(--copper)]/90 active:scale-95 cursor-pointer"
                     >
                       <Sparkles size={12} className="text-amber-300" />
                       <span>{t('place.addToActive')}</span>

@@ -570,6 +570,8 @@ export interface I18nSchema {
     extractTagsBtn: string
     extractedSuccessTitle: string
     extractedSuccessDesc: string
+    extractTagsNoResult: string
+    extractTagsFailed: string
     discard: string
     addToCandidates: string
     addToActive: string

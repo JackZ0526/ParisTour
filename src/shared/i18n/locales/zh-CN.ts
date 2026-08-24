@@ -515,6 +515,8 @@ export const zhCN: I18nSchema = {
     extractTagsBtn: '智能提炼标签',
     extractedSuccessTitle: 'AI 标签提炼完成',
     extractedSuccessDesc: '已为你提炼以下偏好标签：',
+    extractTagsNoResult: '未能提炼出有效标签，请尝试补充更多旅行细节。',
+    extractTagsFailed: '提炼偏好标签失败，请重试。',
     discard: '放弃',
     addToCandidates: '加入候选池',
     addToActive: '加入已选池',

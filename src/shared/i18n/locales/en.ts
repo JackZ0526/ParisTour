@@ -515,6 +515,8 @@ export const en: I18nSchema = {
     extractTagsBtn: 'Smart Extract Tags',
     extractedSuccessTitle: 'AI Tag Extraction Complete',
     extractedSuccessDesc: 'Extracted the following preference tags for you:',
+    extractTagsNoResult: 'Could not extract valid tags. Please add more travel details.',
+    extractTagsFailed: 'Failed to extract preference tags. Please try again.',
     discard: 'Discard',
     addToCandidates: 'Add to Suggestions',
     addToActive: 'Add to Active Pool',
