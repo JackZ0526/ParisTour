@@ -894,7 +894,17 @@ export async function fetchTripChatWebResearch(input: {
     input.onSearch?.({ source: 'google_places', query: googleQuery.textQuery })
   }
   const googleResearch = await fetchGooglePlaceRecommendationResearch(input)
-  if (googleResearch) return googleResearch
+  if (googleResearch) {
+    const lines = googleResearch.split('\n').filter((l) => /^\d+\./.test(l))
+    if (googleQuery) {
+      input.onSearch?.({
+        source: 'google_places',
+        query: googleQuery.textQuery,
+        sourcesCount: lines.length || 5,
+      })
+    }
+    return googleResearch
+  }
   try {
     // Provisional detail until the stream reveals the real query.
     input.onSearch?.({ source: 'web', query: input.userMessage })
@@ -917,10 +927,12 @@ export async function fetchTripChatWebResearch(input: {
     // Belt-and-suspenders: if the streaming callback somehow didn't fire
     // (older bundle, non-stream fallback, etc.), still promote the first
     // real query to the work-step so the user sees it after completion.
-    const realQuery = result.webSearchQueries[0]
-    if (realQuery) {
-      input.onSearch?.({ source: 'web', query: realQuery })
-    }
+    const realQuery = result.webSearchQueries[0] || input.userMessage
+    input.onSearch?.({
+      source: 'web',
+      query: realQuery,
+      sourcesCount: Math.max(1, result.webSearchQueries.length),
+    })
     const trimmed = result.text.trim()
     return trimmed || null
   } catch {
@@ -1351,6 +1363,7 @@ export type TripChatWebSearchPhase = 'start' | 'done' | 'skip'
 export interface TripChatWebSearchDetail {
   source: 'google_places' | 'web'
   query: string
+  sourcesCount?: number
 }
 
 export type TripChatRequestPlanPhase = 'start' | 'done'

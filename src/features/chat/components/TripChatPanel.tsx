@@ -207,10 +207,13 @@ import {
   chatWorkStepLabel,
   actionsNeedPlaceLookup,
   activateChatWorkStep,
+  applyStepBadges,
   finishChatWorkSteps,
   initialChatWorkSteps,
   requestPlanStepBadges,
   requestPlanStepLabel,
+  resolvePlacesStepBadges,
+  searchStepBadges,
   searchStepLabel,
   type ChatWorkStep,
 } from './ChatWorkStepList'
@@ -220,7 +223,6 @@ import {
 } from './ChatWorkStepPanels'
 import {
   ChatReasoningDisclosure,
-  StoredChatReasoningDisclosure,
 } from './ChatReasoningDisclosure'
 
 interface Props {
@@ -1387,14 +1389,26 @@ export function TripChatPanel({
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'webSearch', {
                 labels: {
-                  webSearch: searchStepLabel(detail, message),
+                  webSearch: searchStepLabel(detail, message, locale),
+                },
+                badges: {
+                  webSearch: searchStepBadges(detail, locale),
                 },
               }),
             )
             return
           }
           if (phase === 'done') {
-            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'generate', {
+                labels: detail?.query
+                  ? { webSearch: searchStepLabel(detail, message, locale) }
+                  : undefined,
+                badges: detail
+                  ? { webSearch: searchStepBadges(detail, locale) }
+                  : undefined,
+              }),
+            )
             return
           }
           if (phase === 'skip') {
@@ -1443,7 +1457,10 @@ export function TripChatPanel({
                   'resolvePlaces',
                   {
                     labels: {
-                      resolvePlaces: detail?.label || chatWorkStepLabel('resolvePlaces'),
+                      resolvePlaces: detail?.label || chatWorkStepLabel('resolvePlaces', locale),
+                    },
+                    badges: {
+                      resolvePlaces: detail?.badges,
                     },
                   },
                 ),
@@ -1456,6 +1473,9 @@ export function TripChatPanel({
                   apply: detail?.pending
                     ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'))
                     : (t('chat.actionNoteApplying') || (locale === 'en' ? 'Applying changes…' : '应用改动…')),
+                },
+                badges: {
+                  apply: detail?.badges,
                 },
               }),
             )
@@ -1546,7 +1566,7 @@ export function TripChatPanel({
       userMessage?: string
       onProgress?: (
         phase: 'resolvePlaces' | 'apply',
-        detail?: { pending?: boolean; label?: string },
+        detail?: { pending?: boolean; label?: string; badges?: string[] },
       ) => void
     },
   ): Promise<{ notes: string[]; pending: PendingPlaceConfirm[] }> {
@@ -1576,9 +1596,10 @@ export function TripChatPanel({
             (locale === 'en'
               ? `Verifying places: ${compactNames}`
               : `正在核对地点：${compactNames}`))
-        : chatWorkStepLabel('resolvePlaces')
+        : chatWorkStepLabel('resolvePlaces', locale)
       options?.onProgress?.('resolvePlaces', {
         label: compactLabel,
+        badges: resolvePlacesStepBadges(names, names.length, locale),
       })
     } else {
       options?.onProgress?.('apply', { pending: false })
@@ -1880,7 +1901,10 @@ export function TripChatPanel({
     }
 
     if (needLookup || pendingBatch.length || notes.length) {
-      options?.onProgress?.('apply', { pending: pendingBatch.length > 0 })
+      options?.onProgress?.('apply', {
+        pending: pendingBatch.length > 0,
+        badges: applyStepBadges(notes),
+      })
     }
 
     return { notes, pending: pendingBatch }
@@ -1957,14 +1981,26 @@ export function TripChatPanel({
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'webSearch', {
                 labels: {
-                  webSearch: searchStepLabel(detail, message),
+                  webSearch: searchStepLabel(detail, message, locale),
+                },
+                badges: {
+                  webSearch: searchStepBadges(detail, locale),
                 },
               }),
             )
             return
           }
           if (phase === 'done') {
-            setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
+            setWorkSteps((prev) =>
+              activateChatWorkStep(prev, 'generate', {
+                labels: detail?.query
+                  ? { webSearch: searchStepLabel(detail, message, locale) }
+                  : undefined,
+                badges: detail
+                  ? { webSearch: searchStepBadges(detail, locale) }
+                  : undefined,
+              }),
+            )
             return
           }
           if (phase === 'skip') {
@@ -2012,7 +2048,10 @@ export function TripChatPanel({
                   'resolvePlaces',
                   {
                     labels: {
-                      resolvePlaces: detail?.label || chatWorkStepLabel('resolvePlaces'),
+                      resolvePlaces: detail?.label || chatWorkStepLabel('resolvePlaces', locale),
+                    },
+                    badges: {
+                      resolvePlaces: detail?.badges,
                     },
                   },
                 ),
@@ -2025,6 +2064,9 @@ export function TripChatPanel({
                   apply: detail?.pending
                     ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'))
                     : (t('chat.actionNoteApplying') || (locale === 'en' ? 'Applying changes…' : '应用改动…')),
+                },
+                badges: {
+                  apply: detail?.badges,
                 },
               }),
             )
@@ -2354,16 +2396,12 @@ export function TripChatPanel({
                       <div className="px-1">
                         <ChatWorkStepsPanel
                           steps={workSteps}
+                          reasoning={showLiveReasoning ? reasoningText : undefined}
                           open={workStepsOpen}
                           onToggle={() => setWorkStepsOpen((v) => !v)}
                         />
                       </div>
-                    ) : showStoredSteps ? (
-                      <div className="px-1">
-                        <StoredChatWorkStepsPanel steps={turn.steps!} />
-                      </div>
-                    ) : null}
-                    {showLiveReasoning ? (
+                    ) : showLiveReasoning ? (
                       <div className="px-1">
                         <ChatReasoningDisclosure
                           text={reasoningText}
@@ -2371,9 +2409,12 @@ export function TripChatPanel({
                           onToggle={() => setReasoningOpen((v) => !v)}
                         />
                       </div>
-                    ) : showStoredReasoning ? (
+                    ) : showStoredSteps || showStoredReasoning ? (
                       <div className="px-1">
-                        <StoredChatReasoningDisclosure text={turn.reasoning!} />
+                        <StoredChatWorkStepsPanel
+                          steps={turn.steps || []}
+                          reasoning={turn.reasoning}
+                        />
                       </div>
                     ) : null}
                     {showAnswerBubble ? (

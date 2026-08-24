@@ -227,16 +227,58 @@ export function parseStepDisplay(step: TripChatWorkStep): { label: string; badge
   return { label: step.label, badges: [] }
 }
 
+export function searchStepBadges(
+  detail?: TripChatWebSearchDetail,
+  locale: Locale = getLocale(),
+): string[] {
+  const badges: string[] = []
+  if (detail?.sourcesCount && detail.sourcesCount > 0) {
+    badges.push(
+      locale === 'en'
+        ? `Ref ${detail.sourcesCount} ${detail.sourcesCount === 1 ? 'source' : 'sources'}`
+        : `参考了 ${detail.sourcesCount} 篇资料`,
+    )
+  } else if (detail?.source === 'google_places') {
+    badges.push(locale === 'en' ? 'Nearby places' : '周边候选')
+  }
+  return badges
+}
+
+export function resolvePlacesStepBadges(
+  placeNames: string[],
+  totalCount?: number,
+  locale: Locale = getLocale(),
+): string[] {
+  if (!placeNames.length) return []
+  const uniqueNames = [...new Set(placeNames.filter(Boolean))]
+  if (!uniqueNames.length) return []
+  const summaryName = uniqueNames.slice(0, 2).join(' · ') + (uniqueNames.length > 2 ? '…' : '')
+  const count = totalCount || uniqueNames.length
+  return [
+    summaryName,
+    `${count}/${count} ${locale === 'en' ? 'verified' : '已核实'}`,
+  ]
+}
+
+export function applyStepBadges(
+  notes: string[],
+): string[] {
+  if (!notes.length) return []
+  return notes.slice(0, 2)
+}
+
 export function activateChatWorkStep(
   steps: ChatWorkStep[],
   id: ChatWorkStepId,
   options?: {
     insert?: ChatWorkStep[]
     labels?: Partial<Record<ChatWorkStepId, string>>
+    badges?: Partial<Record<ChatWorkStepId, string[]>>
   },
 ): ChatWorkStep[] {
   const insert = options?.insert || []
   const labels = options?.labels || {}
+  const badges = options?.badges || {}
   // Preserve the current step's active state when relabeling the same step.
   // This avoids restarting shimmer on repeated callbacks for the same step
   // (e.g. web-search provisional query → real query).
@@ -244,15 +286,16 @@ export function activateChatWorkStep(
     .filter((s) => !insert.find((i) => i.id === s.id))
     .map((s) =>
       s.id === id
-        ? { ...s, status: 'active' as const, label: labels[id] || s.label }
+        ? {
+            ...s,
+            status: 'active' as const,
+            label: labels[id] || s.label,
+            badges: badges[id] || s.badges,
+          }
         : s.status === 'active'
           ? { ...s, status: 'done' as const }
           : s,
     )
-  // Mark done steps in `insert` that match an existing id.
-  for (const item of insert) {
-    if (next.find((s) => s.id === item.id)) continue
-  }
   return [
     ...next,
     ...insert
@@ -260,6 +303,7 @@ export function activateChatWorkStep(
       .map((i) => ({
         id: i.id as ChatWorkStepId,
         label: labels[i.id as ChatWorkStepId] || i.label,
+        badges: badges[i.id as ChatWorkStepId] || i.badges,
         status: i.status,
       })),
   ]
@@ -273,63 +317,37 @@ export function finishChatWorkSteps(steps: ChatWorkStep[]): ChatWorkStep[] {
 
 export function completedWorkSummary(
   steps: TripChatWorkStep[],
+  hasReasoning: boolean = false,
   locale: Locale = getLocale(),
 ): string {
   const visible = steps.filter((s) => s.status !== 'skipped')
-  const doneIds = new Set(visible.filter((s) => s.status === 'done').map((s) => s.id))
+  const doneSteps = visible.filter((s) => s.status === 'done')
+  const doneCount = doneSteps.length || visible.length
+  const doneIds = new Set(doneSteps.map((s) => s.id))
   const hasWebSearch = doneIds.has('webSearch')
-  const hasGenerate = doneIds.has('generate')
-  const hasResolvePlaces = doneIds.has('resolvePlaces')
   const hasApply = doneIds.has('apply')
+  const hasResolvePlaces = doneIds.has('resolvePlaces')
 
-  const t = (key: Parameters<typeof translate>[0], zhFallback: string) =>
-    translate(key, undefined, locale) || (locale === 'en' ? englishFallback(key) : zhFallback)
-
-  // Prefer a natural, user-facing completion hint over the raw internal label.
-  if (hasApply) {
-    return hasWebSearch
-      ? t('chat.workStepCompletedApplyWithWeb' as never, '已联网搜索并完成行程改动')
-      : t('chat.workStepCompletedApply' as never, '已完成行程改动')
-  }
-  if (hasResolvePlaces && !hasApply) {
-    return hasWebSearch
-      ? t('chat.workStepCompletedResolveWithWeb' as never, '已联网搜索并核对地点')
-      : t('chat.workStepCompletedResolve' as never, '已核对地点')
-  }
-  if (hasWebSearch && hasGenerate) {
-    return t('chat.workStepCompletedGenerateWithWeb' as never, '已完成联网搜索并生成回答')
-  }
-  if (hasWebSearch && !hasGenerate) {
-    return t('chat.workStepCompletedWebOnly' as never, '已完成联网搜索')
-  }
-  if (hasGenerate) {
-    return t('chat.workStepCompletedGenerate' as never, '已生成回答')
+  if (locale === 'en') {
+    const parts: string[] = []
+    if (hasReasoning) parts.push('Thought')
+    if (hasWebSearch) parts.push('Web searched')
+    if (hasApply) parts.push('Applied changes')
+    else if (hasResolvePlaces) parts.push('Verified places')
+    else parts.push('Answer ready')
+    parts.push(`${doneCount} ${doneCount === 1 ? 'step' : 'steps'}`)
+    return parts.join(' · ')
   }
 
-  const lastDone = [...visible].reverse().find((s) => s.status === 'done')
-  return lastDone?.label || chatWorkStepLabel('generate', locale)
-}
-
-function englishFallback(key: Parameters<typeof translate>[0]): string {
-  // Last-resort English text when the registry is missing the key.
-  switch (key) {
-    case 'chat.workStepCompletedApplyWithWeb':
-      return 'Searched the web and applied itinerary changes'
-    case 'chat.workStepCompletedApply':
-      return 'Applied itinerary changes'
-    case 'chat.workStepCompletedResolveWithWeb':
-      return 'Searched the web and verified places'
-    case 'chat.workStepCompletedResolve':
-      return 'Verified places'
-    case 'chat.workStepCompletedGenerateWithWeb':
-      return 'Searched the web and generated answer'
-    case 'chat.workStepCompletedWebOnly':
-      return 'Web search complete'
-    case 'chat.workStepCompletedGenerate':
-      return 'Answer generated'
-    default:
-      return ''
-  }
+  // zh-CN
+  const parts: string[] = []
+  if (hasReasoning) parts.push('思考完成')
+  if (hasWebSearch) parts.push('联网搜索')
+  if (hasApply) parts.push('已调整行程')
+  else if (hasResolvePlaces) parts.push('已核实地点')
+  else parts.push('已生成回答')
+  parts.push(`共 ${doneCount} 步`)
+  return parts.join(' · ')
 }
 
 export function actionsNeedPlaceLookup(actions: TripChatAction[]): boolean {

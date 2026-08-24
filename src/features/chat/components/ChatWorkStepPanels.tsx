@@ -53,11 +53,13 @@ function CompletedCheckIcon() {
 
 export function ChatWorkStepsPanel({
   steps,
+  reasoning,
   open,
   onToggle,
   completed = false,
 }: {
   steps: TripChatWorkStep[]
+  reasoning?: string
   open: boolean
   onToggle: () => void
   completed?: boolean
@@ -66,7 +68,8 @@ export function ChatWorkStepsPanel({
   // UI request: don't display skipped steps.
   const { t, locale } = useTranslation()
   const visible = steps.filter((step) => step.status !== 'skipped')
-  if (!visible.length) return null
+  const hasReasoning = Boolean(reasoning?.trim())
+  if (!visible.length && !hasReasoning) return null
   // "Skipped: " prefix used for the inline skipped-step label.
   const skippedPrefix = t('chat.workStepSkippedPrefix' as never) ||
     (locale === 'en' ? 'Skipped: ' : '已跳过：')
@@ -157,9 +160,8 @@ export function ChatWorkStepsPanel({
     )
   }
 
-  // Completed turn: show a compact summary + full timeline list.
-  // (We keep the list expanded so users can always see which step completed.)
-  const collapsedLabel = completedWorkSummary(visible)
+  // Completed turn: show a compact summary + full timeline list with optional reasoning.
+  const collapsedLabel = completedWorkSummary(visible, hasReasoning, locale)
 
   return (
     <div className="mb-1.5 text-xs leading-snug" aria-live="polite">
@@ -187,43 +189,59 @@ export function ChatWorkStepsPanel({
         aria-hidden={!open}
       >
         <div className="min-h-0 overflow-hidden">
-          <ol className="ml-[1.375rem] space-y-0.5 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
-            {visible.map((step) => {
-              const done = step.status === 'done'
-              const { label: cleanLabel, badges } = parseStepDisplay(step)
-              return (
-                <li
-                  key={step.id}
-                  className={`flex items-start gap-1.5 py-0.5 ${
-                    done
-                      ? 'text-[var(--stone)]/62'
-                      : 'text-[var(--stone)]/45'
-                  }`}
-                >
-                  <span className="flex h-5 w-4 shrink-0 items-center justify-center" aria-hidden>
-                    <ChatWorkStepIcon id={step.id} status={step.status} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-h-[1.25rem] items-center gap-1.5 leading-5">
-                      <span className="font-medium">{cleanLabel}</span>
-                    </div>
-                    {badges.length > 0 && (
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        {badges.map((badge, bIdx) => (
-                          <span
-                            key={bIdx}
-                            className="inline-flex items-center rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 dark:border-[var(--sage)]/35 dark:bg-[var(--sage)]/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--sage)] dark:text-[#9fc4b1] select-none"
-                          >
-                            {badge}
-                          </span>
-                        ))}
+          <div className="ml-[1.375rem] mt-1.5 space-y-2 border-l border-[var(--stone)]/25 py-0.5 pl-2.5 pr-1">
+            {hasReasoning && (
+              <div className="rounded-xl border border-[var(--sage)]/20 bg-[var(--sage)]/5 dark:bg-[var(--sage)]/10 p-2.5">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--sage)] dark:text-[#a3c2b1] mb-1">
+                  <Sparkles size={13} strokeWidth={2} />
+                  <span>{locale === 'en' ? 'Reasoning Process' : '深度思考过程'}</span>
+                </div>
+                <div className="max-h-36 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--stone)]/80 dark:text-zinc-300">
+                  {reasoning!.trim()}
+                </div>
+              </div>
+            )}
+
+            {visible.length > 0 && (
+              <ol className="space-y-1">
+                {visible.map((step) => {
+                  const done = step.status === 'done'
+                  const { label: cleanLabel, badges } = parseStepDisplay(step)
+                  return (
+                    <li
+                      key={step.id}
+                      className={`flex items-start gap-1.5 py-0.5 ${
+                        done
+                          ? 'text-[var(--stone)]/62'
+                          : 'text-[var(--stone)]/45'
+                      }`}
+                    >
+                      <span className="flex h-5 w-4 shrink-0 items-center justify-center" aria-hidden>
+                        <ChatWorkStepIcon id={step.id} status={step.status} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-h-[1.25rem] items-center gap-1.5 leading-5">
+                          <span className="font-medium">{cleanLabel}</span>
+                        </div>
+                        {badges.length > 0 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {badges.map((badge, bIdx) => (
+                              <span
+                                key={bIdx}
+                                className="inline-flex items-center rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 dark:border-[var(--sage)]/35 dark:bg-[var(--sage)]/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--sage)] dark:text-[#9fc4b1] select-none"
+                              >
+                                {badge}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -232,13 +250,16 @@ export function ChatWorkStepsPanel({
 
 export function StoredChatWorkStepsPanel({
   steps,
+  reasoning,
 }: {
   steps: TripChatWorkStep[]
+  reasoning?: string
 }) {
   const [open, setOpen] = useState(false)
   return (
     <ChatWorkStepsPanel
       steps={steps}
+      reasoning={reasoning}
       open={open}
       onToggle={() => setOpen((value) => !value)}
       completed

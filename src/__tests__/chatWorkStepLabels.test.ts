@@ -9,6 +9,9 @@ import {
   initialChatWorkSteps,
   requestPlanStepBadges,
   requestPlanStepLabel,
+  resolvePlacesStepBadges,
+  applyStepBadges,
+  searchStepBadges,
   parseStepDisplay,
   searchStepLabel,
   completedWorkSummary,
@@ -84,6 +87,32 @@ describe('chat work-step labels are locale-aware', () => {
     expect(badges).toEqual(['推荐', '联网搜索', '推理: 高'])
   })
 
+  it('searchStepBadges, resolvePlacesStepBadges, and applyStepBadges format properly', () => {
+    // searchStepBadges
+    expect(searchStepBadges({ source: 'web', query: 'Paris', sourcesCount: 5 }, 'en')).toEqual([
+      'Ref 5 sources',
+    ])
+    expect(searchStepBadges({ source: 'web', query: 'Paris', sourcesCount: 3 }, 'zh-CN')).toEqual([
+      '参考了 3 篇资料',
+    ])
+
+    // resolvePlacesStepBadges
+    expect(resolvePlacesStepBadges(['Louvre', 'Eiffel Tower'], 2, 'en')).toEqual([
+      'Louvre · Eiffel Tower',
+      '2/2 verified',
+    ])
+    expect(resolvePlacesStepBadges(['卢浮宫', '埃菲尔铁塔'], 2, 'zh-CN')).toEqual([
+      '卢浮宫 · 埃菲尔铁塔',
+      '2/2 已核实',
+    ])
+
+    // applyStepBadges
+    expect(applyStepBadges(['已将「卢浮宫」加入第 1 天', '已更新住宿'])).toEqual([
+      '已将「卢浮宫」加入第 1 天',
+      '已更新住宿',
+    ])
+  })
+
   it('parseStepDisplay handles badges and legacy string formatting', () => {
     // Native badges
     const native = parseStepDisplay({
@@ -116,18 +145,20 @@ describe('chat work-step labels are locale-aware', () => {
     )
   })
 
-  it('completedWorkSummary uses locale-aware text', () => {
+  it('completedWorkSummary uses unified compact summary with reasoning and steps', () => {
     setLocale('en')
     const enSteps: TripChatWorkStep[] = [
-      { id: 'webSearch', status: 'done' },
-      { id: 'generate', status: 'done' },
+      { id: 'webSearch', status: 'done', label: 'Web search' },
+      { id: 'generate', status: 'done', label: 'Generate' },
     ] as TripChatWorkStep[]
-    expect(completedWorkSummary(enSteps, 'en')).toBe(
-      'Searched the web and generated answer',
+    expect(completedWorkSummary(enSteps, true, 'en')).toBe(
+      'Thought · Web searched · Answer ready · 2 steps',
     )
 
     setLocale('zh-CN')
-    expect(completedWorkSummary(enSteps, 'zh-CN')).toBe('已完成联网搜索并生成回答')
+    expect(completedWorkSummary(enSteps, true, 'zh-CN')).toBe(
+      '思考完成 · 联网搜索 · 已生成回答 · 共 2 步',
+    )
   })
 
   it('locale defaults to the active i18n locale when none is passed', () => {
