@@ -918,6 +918,20 @@ export function useItineraryGeneration(
       currentFingerprint,
     )
     if (usable) return
+    if (isRemoteQuietPeriodActive()) return
+    const restored = restoreFullFromBaseline()
+    if (restored) {
+      setDays(restored.days)
+      setCustomPlaces(restored.customPlaces)
+      setItineraryGenerated(true)
+      const fp = restored.fingerprint || itineraryFingerprint || currentFingerprint
+      if (fp) setItineraryFingerprint(fp)
+      saveItineraryState(restored.days, restored.customPlaces, {
+        generated: true,
+        fingerprint: fp,
+      })
+      return
+    }
 
     void runFullItineraryGeneration()
   }, [

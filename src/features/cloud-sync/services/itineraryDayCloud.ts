@@ -49,6 +49,7 @@ export function hashesForDays(days: DayPlan[] | null | undefined): Record<string
 export function peekDayCloudDiff(
   days: DayPlan[] | null | undefined,
   lastHashes: Record<string, string> | null | undefined,
+  options?: { expectedDayCount?: number },
 ): DayCloudDiff {
   const current = daysToMap(days)
   const last = lastHashes && typeof lastHashes === 'object' ? lastHashes : {}
@@ -62,10 +63,34 @@ export function peekDayCloudDiff(
       hashes[key] = hash
     }
   }
-  for (const key of Object.keys(last)) {
-    if (!(key in current)) deletes.push(key)
+  const currentCount = Object.keys(current).length
+  const lastCount = Object.keys(last).length
+  const expected = options?.expectedDayCount
+  // A partial hydrate (e.g. only D1 after an empty snapshot apply) must not
+  // look like "the user deleted the other days".
+  const canDelete =
+    currentCount > 0 &&
+    (expected == null ? currentCount >= lastCount : currentCount >= expected)
+  if (canDelete) {
+    for (const key of Object.keys(last)) {
+      if (!(key in current)) deletes.push(key)
+    }
   }
   return { upserts, hashes, deletes }
+}
+
+/** Only advertise hashes for days the client still has, so a wiped local plan re-pulls the rest. */
+export function knownHashesForPresentDays(
+  days: DayPlan[] | null | undefined,
+  lastHashes: Record<string, string> | null | undefined,
+): Record<string, string> {
+  const current = daysToMap(days)
+  const last = lastHashes && typeof lastHashes === 'object' ? lastHashes : {}
+  const known: Record<string, string> = {}
+  for (const key of Object.keys(current)) {
+    if (last[key]) known[key] = last[key]
+  }
+  return known
 }
 
 export function dayCloudDiffIsEmpty(diff: DayCloudDiff): boolean {

@@ -806,7 +806,8 @@ begin
 
   for k in select jsonb_object_keys(current_days)
   loop
-    if known ->> k is distinct from current_hashes ->> k then
+    if not (current_hashes ? k)
+       or known ->> k is distinct from current_hashes ->> k then
       upserts := upserts || jsonb_build_object(k, current_days -> k);
     end if;
   end loop;

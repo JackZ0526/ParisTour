@@ -35,9 +35,12 @@ import {
   daysToMap,
   hashDayPlan,
   hashesForDays,
+  knownHashesForPresentDays,
   mergeCloudDays,
   peekDayCloudDiff,
 } from './itineraryDayCloud'
+import { itineraryDayCount } from '../../itinerary/services/tripDates'
+import { loadItineraryState, restoreFullFromBaseline, saveItineraryState } from '../../itinerary/utils/itineraryState'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { sanitizeMapRouteCache } from '../../map/services/mapRouteCache'
 import { getUserNickname } from '../../auth/services/nicknameStore'
@@ -658,12 +661,24 @@ export async function syncTripDaysFromCloud(
   hintRev?: number,
 ): Promise<boolean> {
   if (!tripId || !isCloudSyncEnabled()) return false
+  const localDays = loadItineraryState().days
+  const localEmpty = !localDays.length
   const knownRev = lastAppliedDaysRevByTrip.get(tripId)
-  if (hintRev != null && knownRev != null && hintRev === knownRev) return false
+  if (
+    !localEmpty &&
+    hintRev != null &&
+    knownRev != null &&
+    hintRev === knownRev
+  ) {
+    return false
+  }
 
   const sb = getSupabase()
   const skip = dirtyDayKeys(tripId)
-  const known = lastAppliedDayHashesByTrip.get(tripId) || {}
+  const known = knownHashesForPresentDays(
+    localDays,
+    lastAppliedDayHashesByTrip.get(tripId),
+  )
   let pulled: { rev: number; upserts: ReturnType<typeof asDayPlanMap>; deletes: string[] }
   try {
     const { data, error } = await sb.rpc('pull_trip_days', {
@@ -675,7 +690,7 @@ export async function syncTripDaysFromCloud(
     pulled = {
       rev: parsed.rev,
       upserts: asDayPlanMap(parsed.upserts),
-      deletes: parsed.deletes,
+      deletes: localEmpty ? [] : parsed.deletes,
     }
     logTripCloudRead('pull_trip_days', {
       rev: pulled.rev,
@@ -937,10 +952,7 @@ async function patchTripDaysOrFallback(
   tripId: string,
   snapshot: TripSnapshot,
 ): Promise<{ updatedAt: string | null } | { fallbackPatch: Record<string, unknown> }> {
-  const diff = peekDayCloudDiff(
-    snapshot.itinerary?.days,
-    lastAppliedDayHashesByTrip.get(tripId),
-  )
+  const diff = peekDaysForTrip(tripId, snapshot)
   if (dayCloudDiffIsEmpty(diff)) return { updatedAt: null }
 
   const sb = getSupabase()
@@ -1222,11 +1234,26 @@ function hasGeneratedTrip(snapshot: TripSnapshot): boolean {
   return Boolean(snapshot.itinerary?.generated || snapshot.itinerary?.days?.length)
 }
 
+function expectedDayCountFor(snapshot: TripSnapshot): number {
+  const start =
+    snapshot.itinerary?.fingerprint?.itineraryStartDate || snapshot.dates?.startDate
+  return itineraryDayCount(start, snapshot.dates?.endDate) || snapshot.itinerary?.days?.length || 0
+}
+
+function peekDaysForTrip(tripId: string, snapshot?: TripSnapshot | null) {
+  const current = snapshot ?? collectTripSnapshot()
+  return peekDayCloudDiff(
+    current.itinerary?.days,
+    lastAppliedDayHashesByTrip.get(tripId),
+    { expectedDayCount: expectedDayCountFor(current) },
+  )
+}
+
 function dirtyDayKeys(tripId: string): Set<string> {
   const last = lastAppliedDayHashesByTrip.get(tripId)
   if (!last || !Object.keys(last).length) return new Set()
   try {
-    const diff = peekDayCloudDiff(collectTripSnapshot().itinerary?.days, last)
+    const diff = peekDaysForTrip(tripId)
     return new Set([...Object.keys(diff.upserts), ...diff.deletes])
   } catch {
     return new Set()
@@ -1451,12 +1478,7 @@ export function applyRemoteTripSnapshot(
   // Keep an artifacts-only queue so collaborator itinerary updates don't drop LLM copy.
   const keepArtifactsQueue =
     queuedSaveMode === 'artifacts' || hasArtifactCloudDiff()
-  const keepDaysQueue = !dayCloudDiffIsEmpty(
-    peekDayCloudDiff(
-      collectTripSnapshot().itinerary?.days,
-      lastAppliedDayHashesByTrip.get(tripId),
-    ),
-  )
+  const keepDaysQueue = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId))
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
@@ -1894,9 +1916,7 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
   }
   const coreUnchanged = lastSavedJsonByTrip.get(tripId) === json
   const artifactsChanged = hasArtifactCloudDiff()
-  const daysChanged = !dayCloudDiffIsEmpty(
-    peekDayCloudDiff(snapshot.itinerary?.days, lastAppliedDayHashesByTrip.get(tripId)),
-  )
+  const daysChanged = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId, snapshot))
   if (saveMode === 'artifacts') {
     if (!artifactsChanged && !daysChanged) {
       if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
@@ -1989,7 +2009,11 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
 }
 
 export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
-  applyTripSnapshot(trip.snapshot, { hydrateArtifacts: false })
+  const embeddedDays = Boolean(trip.snapshot.itinerary?.days?.length)
+  applyTripSnapshot(trip.snapshot, {
+    hydrateArtifacts: false,
+    hydrateDays: embeddedDays,
+  })
   rememberSavedSnapshot(trip.id, trip.snapshot, trip.updatedAt)
   try {
     rememberSavedSnapshot(trip.id, collectTripSnapshot(), trip.updatedAt)
@@ -2014,6 +2038,15 @@ export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
     await syncTripDaysFromCloud(trip.id, trip.daysRev)
   } catch (err) {
     console.warn('[tripCloud] day pull failed', err)
+  }
+  if (!loadItineraryState().days.length) {
+    const restored = restoreFullFromBaseline()
+    if (restored) {
+      saveItineraryState(restored.days, restored.customPlaces, {
+        generated: true,
+        fingerprint: restored.fingerprint,
+      })
+    }
   }
 }
 
