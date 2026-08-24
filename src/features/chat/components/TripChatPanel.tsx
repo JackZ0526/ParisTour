@@ -304,7 +304,7 @@ export function TripChatPanel({
     } else if (colorKeepActive) {
       const timer = setTimeout(() => {
         setColorKeepActive(false)
-      }, 380)
+      }, 320)
       return () => clearTimeout(timer)
     }
   }, [busy, colorKeepActive])
@@ -2742,13 +2742,13 @@ export function TripChatPanel({
                 title={busy ? undefined : t('chat.sendButton')}
                 aria-label={busy ? undefined : t('chat.sendButton')}
                 transition={{
-                  layout: { type: 'spring', stiffness: 380, damping: 28, mass: 0.8 },
+                  layout: { type: 'spring', stiffness: 320, damping: 34, mass: 0.6 },
                 }}
                 className={`inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 ${
                   busy
                     ? 'h-8 px-3 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
                     : ((input.trim() || attachedImages.length > 0) && open && convertingCount === 0) || colorKeepActive
-                      ? 'h-8 w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-105 active:scale-95 cursor-pointer'
+                      ? 'h-8 w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
                       : 'h-8 w-8 bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
                 }`}
               >
