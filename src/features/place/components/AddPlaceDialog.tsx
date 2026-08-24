@@ -1127,16 +1127,21 @@ export function AddPlaceDialog({
                 </div>
               </LayoutGroup>
 
-              {loadingRecs && !refreshingRecs ? (
-                <LoadingIndicator
-                  variant="block"
-                  thinkingLabel={t('place.aiThinkingLabel')}
-                  generatingLabel={t('place.aiGeneratingLabel')}
-                  showDots
-                  size="md"
-                  mode="thinking"
-                  task="placeRecommend"
-                />
+              {refreshingRecs || (loadingRecs && !visible.length) ? (
+                <div className="space-y-2" aria-hidden>
+                  {[1, 2, 3].map((n) => (
+                    <div
+                      key={n}
+                      className={`overflow-hidden rounded-2xl border p-3.5 space-y-2.5 ${glassCardSurfaceClass}`}
+                    >
+                      <span className="block h-5 w-[44%] max-w-xs rounded-md day-tab-shimmer" />
+                      <div className="space-y-1.5 pt-0.5">
+                        <span className="block h-3.5 w-full rounded-full day-tab-shimmer" />
+                        <span className="block h-3.5 w-[84%] rounded-full day-tab-shimmer" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <ul className="space-y-2">
                   {visible.map((item) => {
@@ -1321,7 +1326,7 @@ export function AddPlaceDialog({
               {(!loadingRecs || refreshingRecs) && (
                 <button
                   type="button"
-                  disabled={loadingRecs || searching}
+                  disabled={loadingRecs || refreshingRecs || searching}
                   onClick={() => void refreshRecommendations()}
                   aria-busy={refreshingRecs || undefined}
                   className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--sage)]/50 dark:border-[var(--sage)]/40 bg-[var(--sage)]/5 dark:bg-[var(--sage)]/10 px-3 py-2.5 text-sm font-medium text-[var(--sage)] dark:text-emerald-300 hover:bg-[var(--sage)]/10 dark:hover:bg-[var(--sage)]/20 disabled:opacity-50"
