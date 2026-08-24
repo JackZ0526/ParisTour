@@ -459,19 +459,22 @@ export function TripChatPanel({
     await handleDrop(e)
   }
 
+  const MAX_ATTACHED_IMAGES = 9
+
   const enqueueImageFiles = async (files: File[]) => {
     if (!files || files.length === 0) return
-    const remainingSlots = Math.max(0, 4 - attachedImages.length)
-    if (remainingSlots <= 0) return
+    const remainingSlots = Math.max(0, MAX_ATTACHED_IMAGES - attachedImages.length)
+    if (remainingSlots <= 0) {
+      setError(t('chat.imageLimitExceeded', { max: MAX_ATTACHED_IMAGES }))
+      return
+    }
 
-    const validFiles: File[] = []
+    const supportedFiles: File[] = []
     let hasUnsupported = false
 
     for (const f of files) {
       if (isSupportedImageFile(f)) {
-        if (validFiles.length < remainingSlots) {
-          validFiles.push(f)
-        }
+        supportedFiles.push(f)
       } else {
         hasUnsupported = true
       }
@@ -481,6 +484,11 @@ export function TripChatPanel({
       setError(t('chat.imageFormatUnsupported'))
     }
 
+    if (supportedFiles.length > remainingSlots) {
+      setError(t('chat.imageLimitExceeded', { max: MAX_ATTACHED_IMAGES }))
+    }
+
+    const validFiles = supportedFiles.slice(0, remainingSlots)
     if (validFiles.length === 0) return
 
     // Immediately show N skeletons upfront for all incoming valid files
@@ -490,7 +498,7 @@ export function TripChatPanel({
       validFiles.map(async (file) => {
         try {
           const dataUrl = await processImageFile(file)
-          setAttachedImages((prev) => [...prev, dataUrl].slice(0, 4))
+          setAttachedImages((prev) => [...prev, dataUrl].slice(0, MAX_ATTACHED_IMAGES))
         } catch (err) {
           console.warn('[TripChatPanel] Image processing failed:', err)
           if (err instanceof Error && err.message === 'unsupported_format') {
@@ -2656,7 +2664,7 @@ export function TripChatPanel({
             }}
           >
             {(attachedImages.length > 0 || convertingCount > 0) && (
-              <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+              <div className="mb-2 flex flex-wrap items-center gap-2 px-1 max-h-36 overflow-y-auto overscroll-contain">
                 {attachedImages.map((img, idx) => (
                   <div key={idx} className="group relative inline-block">
                     <img

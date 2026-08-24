@@ -644,6 +644,7 @@ export const zhCN: I18nSchema = {
     removeImage: '移除图片',
     imageUploadFailed: '图片读取失败，请重试',
     imageFormatUnsupported: '图片格式不支持，请上传 JPG、PNG、WebP、GIF 或 HEIC 格式的图片',
+    imageLimitExceeded: '单次最多支持上传 {max} 张图片，已为您保留前 {max} 张',
     convertingImage: '正在转换 iPhone HEIC 照片…',
     dropImagePrompt: '松开即可上传图片',
     supportedFormatsHint: '支持 JPG、PNG、WebP、GIF、HEIC',
