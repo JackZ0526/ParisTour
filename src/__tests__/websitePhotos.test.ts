@@ -180,4 +180,30 @@ describe('place website photos', () => {
     expect(photos).not.toContain('https://oats.example/uploads/Oats%20Coffee%20House%20logo%20Favicon%2064x64px.png')
     expect(photos).not.toContain('https://oats.example/uploads/splash_2048x4435_abc.jpg')
   })
+
+  it('filters out EcoJardin certification badge, partner logos, and footer containers', () => {
+    const html = `
+      <meta property="og:image" content="https://paris.fr/parc-monceau-main.jpg" />
+      <div class="content">
+        <img src="https://paris.fr/parc-monceau-rotunda.jpg" alt="Rotonde de Chartres" width="1200" height="800" />
+      </div>
+      <div class="footer-partners">
+        <img src="https://paris.fr/uploads/ecojardin.png" alt="EcoJardin - référence de gestion écologique" />
+        <img src="https://paris.fr/uploads/label-tourisme-handicap.jpg" alt="Label Tourisme" />
+        <img src="https://paris.fr/uploads/partenaire-mairie-paris.png" alt="Partenaire Mairie" />
+        <img src="https://paris.fr/uploads/tripadvisor-certificate-of-excellence.png" alt="Tripadvisor Award" />
+      </div>
+      <footer>
+        <img src="https://paris.fr/uploads/sponsor-banner.jpg" alt="Sponsor" />
+      </footer>
+    `
+    const photos = extractWebsitePhotos(html, 'https://paris.fr/parc-monceau')
+    expect(photos).toEqual([
+      'https://paris.fr/parc-monceau-main.jpg',
+      'https://paris.fr/parc-monceau-rotunda.jpg',
+    ])
+    expect(photos).not.toContain('https://paris.fr/uploads/ecojardin.png')
+    expect(photos).not.toContain('https://paris.fr/uploads/label-tourisme-handicap.jpg')
+    expect(photos).not.toContain('https://paris.fr/uploads/partenaire-mairie-paris.png')
+  })
 })

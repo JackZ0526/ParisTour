@@ -286,7 +286,7 @@ function isLogoPhoto(url: string): boolean {
     if (host === 's0.wp.com' || host === 's1.wp.com' || host === 's2.wp.com') return true
     if (path.includes('/wp-content/plugins/') || path.includes('/wp-includes/')) return true
     if (
-      /(?:^|\/|[_-]|%20|\s)(?:logo|favicon|icon|webclip|site-icon|custom-logo|apple-touch-icon|touch-icon|splash)[^/]*$/i.test(
+      /(?:^|\/|[_-]|%20|\s)(?:logo|favicon|icon|webclip|site-icon|custom-logo|apple-touch-icon|touch-icon|splash|partenaire|partenaires|partner|partners|sponsor|sponsors|certification|certifications|label|labels|norme|normes|charte|adherent|adherents|ecojardin|tripadvisor|michelin|gault|lafourchette|thefork|facebook|instagram|twitter|tiktok|youtube|pinterest)[^/]*$/i.test(
         path,
       )
     ) {
@@ -300,7 +300,7 @@ function isLogoPhoto(url: string): boolean {
 }
 
 const JUNK_NAME =
-  /(?:^|[\/_. -]|%20|\b)(?:logo|favicon|icon|webclip|avatar|headshot|portrait|wordmark|badge|sprite|branding|splash|startup|site-icon|apple-touch|touch-icon)(?:[\/_. -]|%20|\b|$)/i
+  /(?:^|[\/_. -]|%20|\b)(?:logo|favicon|icon|webclip|avatar|headshot|portrait|wordmark|badge|sprite|branding|splash|startup|site-icon|apple-touch|touch-icon|label|labels|partenaire|partenaires|partner|partners|sponsor|sponsors|certification|certifications|certif|norme|normes|charte|adherent|adherents|ecojardin|accreditation|trophy|award|awards|federation|affiliate|recompense|distinction|qualite|tripadvisor|michelin|gaultmillau|gault-millau)(?:[\/_. -]|%20|\b|$)/i
 const PEOPLE_ALT =
   /(?:^|[\/_. -]|%20|\b)(?:team|staff|owner|chef|equipe|équipe|fondateur|founder|portrait|headshot|avatar)(?:[\/_. -]|%20|\b|$)/i
 
@@ -351,7 +351,7 @@ function websitePhotoScore(candidate: WebsitePhotoCandidate): number {
 }
 
 function isLandscapeWebsitePhoto(candidate: WebsitePhotoCandidate): boolean {
-  if (candidate.maxHeight <= 0) return true
+  if (candidate.maxWidth <= 0 || candidate.maxHeight <= 0) return false
   return candidate.maxWidth >= candidate.maxHeight
 }
 
@@ -380,6 +380,16 @@ export function selectBestWebsitePhotos(
     .sort(compareWebsitePhotos)
     .slice(0, limit)
     .map((candidate) => candidate.url)
+}
+
+function cleanContentHtml(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(?:footer|header|nav|aside)\b[^>]*>[\s\S]*?<\/(?:footer|header|nav|aside)>/gi, '')
+    .replace(
+      /<(?:div|section|aside|ul)\b[^>]*\b(?:class|id)=["'][^"']*\b(?:footer|site-footer|footer-widget|footer-bottom|partners?|partenaires?|sponsors?|certifications?|certifs?|labels?|awards?|recompenses?|social-media|social-links|reseaux-sociaux)\b[^"']*["'][^>]*>[\s\S]*?<\/(?:div|section|aside|ul)>/gi,
+      '',
+    )
 }
 
 function metaContents(html: string, key: string): string[] {
@@ -504,7 +514,8 @@ export function extractWebsitePhotos(html: string, baseUrl: string): string[] {
     for (const content of found) pushCandidate(candidates, content, baseUrl)
   }
 
-  const imgTags = html.matchAll(/<img\b[^>]*>/gi)
+  const contentHtml = cleanContentHtml(html)
+  const imgTags = contentHtml.matchAll(/<img\b[^>]*>/gi)
   for (const img of imgTags) {
     const tag = img[0]
     const alt = tagAttr(tag, 'alt')
@@ -527,11 +538,11 @@ export function extractWebsitePhotos(html: string, baseUrl: string): string[] {
   }
 
   // Parse <a> hrefs and data-desktop-bg (explicitly excluding <link> headers)
-  const aTags = html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)
+  const aTags = contentHtml.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)
   for (const a of aTags) {
     if (looksLikeImageUrl(a[1])) pushCandidate(candidates, a[1], baseUrl)
   }
-  const bgAttrs = html.matchAll(/\bdata-desktop-bg=["']([^"']+)["']/gi)
+  const bgAttrs = contentHtml.matchAll(/\bdata-desktop-bg=["']([^"']+)["']/gi)
   for (const bg of bgAttrs) {
     if (looksLikeImageUrl(bg[1])) pushCandidate(candidates, bg[1], baseUrl)
   }
