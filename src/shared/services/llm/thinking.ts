@@ -193,9 +193,9 @@ export function resolveLlmBusyVisual(options?: {
 export function llmBusyDefaultLabel(visual: LlmBusyVisual): string {
   const isEn = getLocale() === 'en'
   if (isEn) {
-    return visual === 'thinking' ? 'Thinking…' : 'Generating…'
+    return visual === 'thinking' ? 'Thinking' : 'Generating'
   }
-  return visual === 'thinking' ? '正在思考…' : '正在生成…'
+  return visual === 'thinking' ? '正在思考' : '正在生成'
 }
 
 export function llmBusyLabel(options: {

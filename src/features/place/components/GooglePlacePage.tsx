@@ -2015,9 +2015,9 @@ export function GooglePlacePage({
                   <>
                 {displayNarrative.loading && !displayNarrative.intro && !displayNarrative.reason && (
                   <LoadingIndicator
-                    thinkingLabel="Thinking…"
+                    thinkingLabel="Thinking"
                     generatingLabel={
-                      displayNarrative.labels?.loadingText || 'Loading…'
+                      displayNarrative.labels?.loadingText || 'Loading'
                     }
                     showDots
                     size="sm"

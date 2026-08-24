@@ -141,6 +141,13 @@ export function ChargeBars({
   )
 }
 
+function stripTrailingEllipsis(val: ReactNode): ReactNode {
+  if (typeof val === 'string') {
+    return val.replace(/[….]+(\s*[….]*)*$/, '').trim()
+  }
+  return val
+}
+
 /**
  * Compact LLM status chip for day-header controls — single-line signal,
  * not a scaled-down CloudSave toast.
@@ -159,6 +166,7 @@ function LlmHudBadge({
 }) {
   const compact = size === 'sm'
   const thinking = visual === 'thinking'
+  const cleanLabel = stripTrailingEllipsis(label)
   return (
     <div
       role="status"
@@ -181,7 +189,7 @@ function LlmHudBadge({
           <SyncOrbitIcon size={compact ? 12 : 14} />
         )}
       </span>
-      <span className={thinking ? 'llm-think-chip-label' : 'llm-gen-chip-label'}>{label}</span>
+      <span className={thinking ? 'llm-think-chip-label' : 'llm-gen-chip-label'}>{cleanLabel}</span>
       <span className={thinking ? 'llm-think-chip-dots' : 'llm-gen-chip-dots'} aria-hidden>
         <i />
         <i />
@@ -242,13 +250,14 @@ export function LoadingIndicator({
   const visual = useResolvedLlmVisual({ mode, task, userText, thinkingEnabled })
   const s = sizeClass[size]
   const llmVisual: LlmBusyVisual | null = visual === 'sync' ? null : visual
-  const text =
+  const rawText =
     children ??
     (llmVisual && thinkingLabel != null && generatingLabel != null
       ? llmVisual === 'thinking'
         ? thinkingLabel
         : generatingLabel
       : label)
+  const text = stripTrailingEllipsis(rawText)
   const active = showSpinner || showDots
   const thinking = visual === 'thinking'
   const generating = visual === 'generating'
@@ -298,8 +307,15 @@ export function LoadingIndicator({
         {active && (
           <Orbit size={s.orbit} className="shrink-0 text-[var(--copper)] dark:text-[var(--gold)]" />
         )}
-        {active && <Bars size={size} className="text-[var(--copper)] dark:text-[var(--gold)]" />}
+        {!llmBusy && active && <Bars size={size} className="text-[var(--copper)] dark:text-[var(--gold)]" />}
         {text != null && text !== '' && <span>{text}</span>}
+        {llmBusy && active && (
+          <span className={thinking ? 'llm-think-chip-dots' : 'llm-gen-chip-dots'} aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
+        )}
       </span>
     )
   }
@@ -315,9 +331,16 @@ export function LoadingIndicator({
         className={`${pulseClass} flex items-center justify-center ${block.gap} py-6 ${toneClass[tone]} ${className}`}
       >
         {active && <Orbit size={block.orbit} className={`shrink-0 ${orbitExtra}`} />}
-        {active && <Bars size={blockSize} className={barsExtra} />}
+        {!llmBusy && active && <Bars size={blockSize} className={barsExtra} />}
         {text != null && text !== '' && (
           <span className={`${block.text} text-[var(--stone)]`}>{text}</span>
+        )}
+        {llmBusy && active && (
+          <span className={thinking ? 'llm-think-chip-dots' : 'llm-gen-chip-dots'} aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
         )}
       </div>
     )
@@ -342,8 +365,15 @@ export function LoadingIndicator({
           className={`shrink-0 ${orbitExtra}`}
         />
       )}
-      {active && <Bars size={size} className={barsExtra} />}
+      {!llmBusy && active && <Bars size={size} className={barsExtra} />}
       {text != null && text !== '' && <span>{text}</span>}
+      {llmBusy && active && (
+        <span className={thinking ? 'llm-think-chip-dots' : 'llm-gen-chip-dots'} aria-hidden>
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
     </span>
   )
 }
