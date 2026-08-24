@@ -22,7 +22,7 @@ function ChatWorkStepIcon({
   status: TripChatWorkStep['status']
 }) {
   if (status === 'done') return <CompletedCheckIcon />
-  const common = `h-4 w-4 ${status === 'active' ? 'animate-pulse' : ''} ${
+  const common = `h-3.5 w-3.5 ${status === 'active' ? 'animate-pulse text-[var(--sage)]' : ''} ${
     status === 'skipped' ? 'opacity-55' : ''
   }`
   if (id === 'preprocessPlan' || id === 'preprocessFallback') {
@@ -48,7 +48,7 @@ function ChatWorkStepIcon({
 }
 
 function CompletedCheckIcon() {
-  return <Check aria-hidden className="h-4 w-4" strokeWidth={2} />
+  return <Check aria-hidden className="h-3.5 w-3.5 text-[var(--sage)] dark:text-[#9fc4b1]" strokeWidth={2.2} />
 }
 
 export function ChatWorkStepsPanel({
@@ -116,7 +116,7 @@ export function ChatWorkStepsPanel({
             return (
               <li
                 key={step.id}
-                className={`flex items-start sm:items-center gap-1.5 py-0.5 ${
+                className={`flex items-start gap-1.5 py-0.5 ${
                   activeStep
                     ? 'text-[var(--stone)]/90'
                     : done
@@ -126,25 +126,27 @@ export function ChatWorkStepsPanel({
                         : 'text-[var(--stone)]/45'
                 }`}
               >
-                <span className="mt-0.5 sm:mt-0 w-4 shrink-0" aria-hidden>
+                <span className="flex h-5 w-4 shrink-0 items-center justify-center" aria-hidden>
                   <ChatWorkStepIcon id={step.id} status={step.status} />
                 </span>
 
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1 leading-snug">
-                  <span className={activeStep ? 'chat-step-shimmer' : ''}>
-                    {label}
-                  </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-h-[1.25rem] items-center gap-1.5 leading-5">
+                    <span className={activeStep ? 'chat-step-shimmer font-medium' : 'font-medium'}>
+                      {label}
+                    </span>
+                  </div>
                   {badges.length > 0 && (
-                    <span className="inline-flex flex-wrap items-center gap-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       {badges.map((badge, bIdx) => (
                         <span
                           key={bIdx}
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium tracking-tight bg-black/[0.04] dark:bg-white/[0.08] text-[var(--stone)]/90 dark:text-zinc-300 border border-black/[0.06] dark:border-white/[0.08] select-none"
+                          className="inline-flex items-center rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 dark:border-[var(--sage)]/35 dark:bg-[var(--sage)]/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--sage)] dark:text-[#9fc4b1] select-none"
                         >
                           {badge}
                         </span>
                       ))}
-                    </span>
+                    </div>
                   )}
                 </div>
               </li>
@@ -192,28 +194,30 @@ export function ChatWorkStepsPanel({
               return (
                 <li
                   key={step.id}
-                  className={`flex items-start sm:items-center gap-1.5 py-0.5 ${
+                  className={`flex items-start gap-1.5 py-0.5 ${
                     done
                       ? 'text-[var(--stone)]/62'
                       : 'text-[var(--stone)]/45'
                   }`}
                 >
-                  <span className="mt-0.5 sm:mt-0 w-4 shrink-0" aria-hidden>
+                  <span className="flex h-5 w-4 shrink-0 items-center justify-center" aria-hidden>
                     <ChatWorkStepIcon id={step.id} status={step.status} />
                   </span>
-                  <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1 leading-snug">
-                    <span>{cleanLabel}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-h-[1.25rem] items-center gap-1.5 leading-5">
+                      <span className="font-medium">{cleanLabel}</span>
+                    </div>
                     {badges.length > 0 && (
-                      <span className="inline-flex flex-wrap items-center gap-1">
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {badges.map((badge, bIdx) => (
                           <span
                             key={bIdx}
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium tracking-tight bg-black/[0.04] dark:bg-white/[0.08] text-[var(--stone)]/90 dark:text-zinc-300 border border-black/[0.06] dark:border-white/[0.08] select-none"
+                            className="inline-flex items-center rounded-full border border-[var(--sage)]/25 bg-[var(--sage)]/10 dark:border-[var(--sage)]/35 dark:bg-[var(--sage)]/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--sage)] dark:text-[#9fc4b1] select-none"
                           >
                             {badge}
                           </span>
                         ))}
-                      </span>
+                      </div>
                     )}
                   </div>
                 </li>
