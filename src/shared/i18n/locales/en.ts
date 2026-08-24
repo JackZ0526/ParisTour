@@ -952,6 +952,11 @@ export const en: I18nSchema = {
     errorTitle: 'The map is temporarily unavailable',
     errorDesc: 'Trip content is still usable — you can reload the map later.',
     errorRetry: 'Reload the map',
+    mapTitleShort: 'Map',
+    routeUnavailable: 'Road routes temporarily unavailable',
+    routeConnectedRealRoads: 'Connecting places along real roads',
+    dayMapAria: 'Day {day} map',
+    twoFingerDragHint: 'Use two fingers to drag the map',
   },
   errors: {
     // Google Places

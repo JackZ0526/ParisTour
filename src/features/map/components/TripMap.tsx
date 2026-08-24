@@ -35,6 +35,7 @@ import {
   getOrFetchMapRouteSegments,
   type MapRouteSegmentsResult,
 } from '../services/openRouteService'
+import { useTranslation } from '../../../shared/i18n'
 
 const OPEN_STREET_MAP_STYLE: StyleSpecification = {
   version: 8,
@@ -139,6 +140,7 @@ export function TripMap({
   const routeSvgRef = useRef<SVGSVGElement | null>(null)
   const pathHandlesRef = useRef<Map<string, SegmentPathHandles>>(new Map())
   const seenSegmentCacheKeysRef = useRef<Map<string, string>>(new Map())
+  const { t } = useTranslation()
   const [mapReady, setMapReady] = useState(false)
   const [segmentEntries, setSegmentEntries] = useState<
     Array<MapRouteSegmentEntry | null>
@@ -250,7 +252,7 @@ export function TripMap({
           return
         }
         setRouteError(
-          error instanceof Error ? error.message : '道路路线暂不可用。',
+          error instanceof Error ? error.message : t('map.routeUnavailable'),
         )
       }
     }
@@ -457,9 +459,9 @@ export function TripMap({
     <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-white/80 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/80 dark:border-white/10 bg-white/70 dark:bg-[#18201c]/90 px-3.5 py-2 text-xs text-[var(--stone)] dark:text-zinc-300 backdrop-blur-md transition-colors">
         <span className="hidden sm:inline font-medium">MapLibre · OpenStreetMap</span>
-        <span className="sm:hidden font-medium">地图</span>
+        <span className="sm:hidden font-medium">{t('map.mapTitleShort')}</span>
         <span title={routeError || undefined}>
-          {routeError ? '道路路线暂不可用' : '按实际道路连接地点'}
+          {routeError ? t('map.routeUnavailable') : t('map.routeConnectedRealRoads')}
         </span>
       </div>
       <div
@@ -470,10 +472,10 @@ export function TripMap({
           ref={containerRef}
           className="h-full w-full bg-[var(--mist)]/35 dark:bg-transparent"
           style={{ position: 'absolute', inset: 0 }}
-          aria-label={`第 ${day.day} 天地图`}
+          aria-label={t('map.dayMapAria', { day: day.day })}
         />
         <div className="pointer-events-none absolute left-1/2 top-3 z-[2] -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-xs text-white sm:hidden">
-          用两根手指拖动地图
+          {t('map.twoFingerDragHint')}
         </div>
         <svg
           ref={routeSvgRef}

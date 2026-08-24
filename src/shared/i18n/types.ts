@@ -979,6 +979,11 @@ export interface I18nSchema {
     errorTitle: string
     errorDesc: string
     errorRetry: string
+    mapTitleShort: string
+    routeUnavailable: string
+    routeConnectedRealRoads: string
+    dayMapAria: string
+    twoFingerDragHint: string
   }
   errors: {
     // Google Places

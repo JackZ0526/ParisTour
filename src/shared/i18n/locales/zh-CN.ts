@@ -952,6 +952,11 @@ export const zhCN: I18nSchema = {
     errorTitle: '地图暂时无法显示',
     errorDesc: '行程内容仍然可用，可以稍后重新加载地图。',
     errorRetry: '重新加载地图',
+    mapTitleShort: '地图',
+    routeUnavailable: '道路路线暂不可用',
+    routeConnectedRealRoads: '按实际道路连接地点',
+    dayMapAria: '第 {day} 天地图',
+    twoFingerDragHint: '用两根手指拖动地图',
   },
   errors: {
     // Google Places
