@@ -518,6 +518,12 @@ ${langRule} 可以介绍地点/酒店、解释节奏、建议改动，并在需�
       : '<image_handling>当用户上传图片时，系统会提供前置多模态视觉模型的解析结果。请将其作为用户展示给你的图片事实依据直接回答，禁止声称自己看不到图片或没有看图功能。</image_handling>',
   )
 
+  contextParts.push(
+    activeLocale === 'en'
+      ? '<general_knowledge_and_chat>If the user asks general questions, public knowledge, science, sports, entertainment, or casual conversation that is not directly about the itinerary, answer the user\'s question directly, accurately, and politely in the "reply" field with "actions": []. Do not give empty acknowledgments or refuse to answer.</general_knowledge_and_chat>'
+      : '<general_knowledge_and_chat>当用户提出与当前行程无关的一般常识、科学事实、体育文娱（如赛事冠军、历史名人）、新闻通识或日常闲聊时，不要困惑，也不要只机械地回复“好的/已收到”；请在 reply 中直接、准确、清晰地回答用户的问题，并将 actions 设为空数组 []。</general_knowledge_and_chat>',
+  )
+
   const context = contextParts.join('\n\n')
 
   // -----------------------------------------------------------------------
@@ -1352,6 +1358,7 @@ function parseTripChatResult(
   maxDay = 30,
 ): TripChatResult {
   const parsed = extractLlmJsonObject(text)
+  const activeLocale = getLocale()
 
   if (!parsed) {
     // Last-ditch: if the model emitted a JSON-looking blob we couldn't parse
@@ -1362,10 +1369,15 @@ function parseTripChatResult(
       const trimmed = salvaged.trim()
       if (trimmed) return { reply: trimmed, actions: [] }
     }
-    return { reply: text.trim() || '我暂时没法解析回复，请再说一次。', actions: [] }
+    const unparsedFallback =
+      activeLocale === 'en'
+        ? "I couldn't parse the response, please try again."
+        : '我暂时没法解析回复，请再说一次。'
+    return { reply: text.trim() || unparsedFallback, actions: [] }
   }
 
-  const reply = String(parsed.reply || parsed.message || '').trim() || '好的。'
+  const defaultAck = activeLocale === 'en' ? 'Got it.' : '好的。'
+  const reply = String(parsed.reply || parsed.message || '').trim() || defaultAck
   // Prefer top-level actions; fall back if the model nestled them oddly.
   const rawActions =
     parsed.actions ??
