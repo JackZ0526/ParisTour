@@ -1277,23 +1277,6 @@ export async function translateItineraryText(
   const langRule = getLlmLanguageInstruction(targetLocale)
   const system = buildTranslateSystemPrompt(targetLocale, sourceLocale, langRule)
 
-  // Send only human-readable fields to keep prompt compact and response fast
-  const compactDays = days.map((d) => ({
-    day: d.day,
-    title: d.title,
-    theme: d.theme,
-    summary: d.summary,
-    metroHintFromArea: d.metroHintFromArea,
-    stops: d.stops.map((s) => ({
-      time: s.time,
-      placeId: s.placeId,
-      note: s.note,
-      duration: s.duration,
-      transport: s.transport,
-    })),
-  }))
-  const user = JSON.stringify({ days: compactDays })
-
   // Emit initial empty template so UI immediately displays graceful skeleton shimmers
   if (onProgress) {
     const initialBlank = days.map((source) =>
@@ -1302,45 +1285,97 @@ export async function translateItineraryText(
     onProgress(initialBlank)
   }
 
-  const onDelta = onProgress
-    ? (_delta: string, fullText: string) => {
-        const parsed = parsePartialJson<{ days?: unknown }>(fullText)
-        const partialDays = Array.isArray(parsed?.days)
-          ? (parsed!.days as Partial<DayPlan>[])
-          : null
-        if (partialDays) {
-          const merged: DayPlan[] = days.map((source, i) => {
-            const translated = partialDays[i] as DayPlan | undefined
-            return mergeTranslatedDay(source, translated, true /* isStreaming */)
-          })
-          onProgress(merged)
+  // Active snapshot of merged days updated progressively by parallel streams
+  const currentMergedDays: DayPlan[] = days.map((source) =>
+    mergeTranslatedDay(source, undefined, true /* isStreaming */),
+  )
+
+  const translateSingleDay = async (sourceDay: DayPlan, dayIndex: number): Promise<DayPlan> => {
+    const compactDay = {
+      day: sourceDay.day,
+      title: sourceDay.title,
+      theme: sourceDay.theme,
+      summary: sourceDay.summary,
+      metroHintFromArea: sourceDay.metroHintFromArea,
+      stops: sourceDay.stops.map((s) => ({
+        time: s.time,
+        placeId: s.placeId,
+        note: s.note,
+        duration: s.duration,
+        transport: s.transport,
+      })),
+    }
+    const user = JSON.stringify({ days: [compactDay] })
+
+    const onDelta = onProgress
+      ? (_delta: string, fullText: string) => {
+          const parsed = parsePartialJson<{ days?: unknown[] } | Partial<DayPlan>>(fullText)
+          let partialDay: Partial<DayPlan> | undefined
+          if (parsed && typeof parsed === 'object') {
+            if ('days' in parsed && Array.isArray(parsed.days) && parsed.days.length > 0) {
+              partialDay = parsed.days[0] as Partial<DayPlan>
+            } else if ('title' in parsed || 'stops' in parsed || 'summary' in parsed) {
+              partialDay = parsed as Partial<DayPlan>
+            }
+          }
+          if (partialDay) {
+            currentMergedDays[dayIndex] = mergeTranslatedDay(
+              sourceDay,
+              partialDay as DayPlan,
+              true /* isStreaming */,
+            )
+            onProgress([...currentMergedDays])
+          }
+        }
+      : undefined
+
+    try {
+      const raw = await generateText(system, user, {
+        strict: false,
+        task: 'itineraryTranslate',
+        json: true,
+        thinking: { enabled: false, effort: 'low' },
+        preflight: false,
+        signal,
+        onDelta,
+      })
+
+      if (!raw) {
+        return sourceDay
+      }
+
+      const parsed = extractJsonObject(raw) as { days?: unknown } | Partial<DayPlan> | null
+      let translatedDay: DayPlan | undefined
+      if (parsed && typeof parsed === 'object') {
+        if ('days' in parsed && Array.isArray(parsed.days) && parsed.days.length > 0) {
+          translatedDay = parsed.days[0] as DayPlan
+        } else if ('title' in parsed || 'stops' in parsed || 'summary' in parsed) {
+          translatedDay = parsed as DayPlan
         }
       }
-    : undefined
 
-  const raw = await generateText(system, user, {
-    strict: true,
-    task: 'itineraryTranslate',
-    json: true,
-    signal,
-    onDelta,
-  })
-  if (!raw) {
-    throw new LlmRequestError('大模型没有返回翻译结果。')
+      const finalDay = mergeTranslatedDay(sourceDay, translatedDay, false /* isStreaming */)
+      currentMergedDays[dayIndex] = finalDay
+      if (onProgress) {
+        onProgress([...currentMergedDays])
+      }
+      return finalDay
+    } catch {
+      // Graceful fallback to source day on individual day failure
+      const fallbackDay = mergeTranslatedDay(sourceDay, undefined, false /* isStreaming */)
+      currentMergedDays[dayIndex] = fallbackDay
+      if (onProgress) {
+        onProgress([...currentMergedDays])
+      }
+      return fallbackDay
+    }
   }
-  const parsed = extractJsonObject(raw) as { days?: unknown } | null
-  const parsedDays = Array.isArray(parsed?.days) ? (parsed!.days as DayPlan[]) : null
-  if (!parsedDays || parsedDays.length !== days.length) {
-    throw new LlmRequestError('无法解析翻译结果。')
-  }
-  // Defensive merge: re-apply the structured fields from the source days
-  // so the LLM can't accidentally mutate day number, pace, transport,
-  // walkLevel, or placeKey values. The LLM is only trusted with strings.
-  const merged: DayPlan[] = days.map((source, i) => {
-    const translated = parsedDays[i]
-    return mergeTranslatedDay(source, translated, false /* isStreaming */)
-  })
-  return { days: merged }
+
+  const translatedDays = await Promise.all(
+    days.map((d, i) => translateSingleDay(d, i)),
+  )
+
+  return { days: translatedDays }
 }
 
 /**

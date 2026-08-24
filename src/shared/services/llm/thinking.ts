@@ -112,7 +112,15 @@ export function thinkingHeuristicDelta(userText?: string): -1 | 0 | 1 {
 function thinkingHeuristicBucket(
   task: LlmTaskKind | undefined,
   userText: string | undefined,
-): 'easy' | 'default' | 'hard' {
+): 'off' | 'easy' | 'default' | 'hard' {
+  // Translation / structured extraction: pure text mapping, CoT reasoning adds 3-8s TTFT before first token.
+  if (
+    task === 'itineraryTranslate' ||
+    task === 'translate' ||
+    task === 'preferenceExtract'
+  ) {
+    return 'off'
+  }
   // Day copy / destination suggest / place name: easy.
   if (task === 'dayCopy' || task === 'destinationSuggest' || task === 'placeName') {
     return 'easy'
@@ -157,6 +165,7 @@ export function resolveThinkingForTask(
   if (mode === 'off') return { enabled: false, effort: 'off', source: 'manual' }
   if (mode === 'auto') {
     const bucket = thinkingHeuristicBucket(task, userText)
+    if (bucket === 'off') return { enabled: false, effort: 'off', source: 'auto' }
     if (bucket === 'easy') return { enabled: true, effort: 'low', source: 'auto' }
     if (bucket === 'hard') return { enabled: true, effort: 'high', source: 'auto' }
     return { enabled: true, effort: 'low', source: 'auto' }

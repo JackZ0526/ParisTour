@@ -89,6 +89,8 @@ export async function generateText(
     json?: boolean
     webSearch?: boolean | 'auto'
     preflightContext?: unknown
+    preflight?: boolean
+    thinking?: ChatCallOptions['thinking']
     signal?: AbortSignal
     onDelta?: (delta: string, fullText: string) => void
   },
@@ -100,6 +102,8 @@ export async function generateText(
     responseFormat: options?.json ? 'json_object' : undefined,
     webSearch: options?.webSearch,
     preflightContext: options?.preflightContext,
+    preflight: options?.preflight,
+    thinking: options?.thinking,
     signal: options?.signal,
     onDelta: options?.onDelta,
   }
