@@ -31,12 +31,8 @@ export function DayTabButton({
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
   const { t } = useTranslation()
 
-  const placeholderTitle = /^第\s*\d+\s*天$/.test(title.trim())
-  /** Streaming preview title while the day is still generating. */
-  const streamingTitle = pending && Boolean(title) && !placeholderTitle
-
   useLayoutEffect(() => {
-    if (!pending && !streamingTitle) {
+    if (!pending) {
       if (box !== null) setBox(null)
       return
     }
@@ -58,7 +54,7 @@ export function DayTabButton({
       if (prev && prev.w === nextW && prev.h === nextH) return prev
       return { w: nextW, h: nextH }
     })
-  }, [pending, title, dateLabel, active, streamingTitle, box])
+  }, [pending, title, dateLabel, active, box])
 
   useLayoutEffect(() => {
     // Delay interaction flag availability to subsequent user actions
@@ -122,17 +118,15 @@ export function DayTabButton({
             active ? 'font-medium text-white/95' : 'text-[var(--stone)]'
           }`}
         >
-          {pending && !streamingTitle ? (
+          {pending ? (
             <span
               aria-hidden
-              className={`block h-[1em] w-full rounded-full ${shimmerClass}`}
+              className={`block h-[1em] w-16 sm:w-20 rounded-full ${shimmerClass}`}
             />
           ) : (
             <span
               title={title}
-              className={`block max-w-[9rem] truncate sm:max-w-[10.5rem] ${
-                streamingTitle ? 'chat-step-shimmer' : ''
-              }`}
+              className="block max-w-[9rem] truncate sm:max-w-[10.5rem]"
             >
               {title}
             </span>
