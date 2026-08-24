@@ -147,11 +147,12 @@ export function applyTripSnapshot(
     clearItineraryState()
   }
   if (snap.itinerary) {
+    const daysToSave = keepDays ? previousDays : snap.itinerary.days || []
     saveItineraryState(
-      keepDays ? previousDays : snap.itinerary.days || [],
+      daysToSave,
       snap.itinerary.customPlaces || {},
       {
-        generated: snap.itinerary.generated,
+        generated: daysToSave.length > 0 ? true : Boolean(snap.itinerary.generated),
         fingerprint: snap.itinerary.fingerprint ?? null,
       },
     )

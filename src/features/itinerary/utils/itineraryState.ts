@@ -573,11 +573,36 @@ export function restoreDayFromBaseline(
   return { days, customPlaces }
 }
 
+export function itineraryStopCount(days: DayPlan[] | null | undefined): number {
+  return (days || []).reduce((n, d) => n + (d.stops?.length || 0), 0)
+}
+
+/**
+ * True when `days` is empty or far thinner than a known full plan.
+ * Used so a half-finished regen cannot persist/upload over the original.
+ */
+export function isThinItineraryAgainstBaseline(
+  days: DayPlan[] | null | undefined,
+  baselineDays: DayPlan[] | null | undefined,
+): boolean {
+  const current = days || []
+  const baseline = baselineDays || []
+  if (!baseline.length) return false
+  if (!current.length) return true
+  const currentStops = itineraryStopCount(current)
+  const baselineStops = itineraryStopCount(baseline)
+  if (current.length < baseline.length) return true
+  return baselineStops > 0 && currentStops < Math.ceil(baselineStops * 0.4)
+}
+
 export function hasUsableGeneratedItinerary(
   state: PersistedItineraryState,
   current?: ItineraryInputFingerprint | null,
 ): boolean {
-  if (!state.generated || !state.days?.length) return false
+  if (!state.days?.length) return false
+  if (isThinItineraryAgainstBaseline(state.days, loadBaselineItinerary()?.days)) {
+    return false
+  }
   if (!current) return true
   if (!state.fingerprint) return true // legacy: keep until inputs change tracking starts
   // Ignore itineraryStartDate drift (async resolve) so refresh does not re-generate.

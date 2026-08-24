@@ -204,7 +204,7 @@ export function useTripSync(
     setItineraryStartLoading(false)
     setDays(nextItinerary.days)
     setCustomPlaces(nextItinerary.customPlaces)
-    setItineraryGenerated(Boolean(nextItinerary.generated && nextItinerary.days.length))
+    setItineraryGenerated(Boolean(nextItinerary.days.length))
     setItineraryFingerprint(nextItinerary.fingerprint || null)
     setRecommendationPreferences(nextRecommendationPreferences)
     setItineraryGenerating(false)

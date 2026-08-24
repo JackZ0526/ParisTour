@@ -63,7 +63,7 @@ import {
   itineraryMissingLabels,
   syncDaysCopyToHotelArea,
 } from '../appHelpers'
-import { isRemoteQuietPeriodActive, holdTripCloudSaves, releaseTripCloudSaves } from '../features/cloud-sync/services/tripCloud'
+import { isRemoteQuietPeriodActive, remainingRemoteQuietMs, holdTripCloudSaves, releaseTripCloudSaves } from '../features/cloud-sync/services/tripCloud'
 import {
   getLlmArtifact,
   removeLlmArtifact,
@@ -85,6 +85,7 @@ import {
   hasMatchingBaseline,
   hasUsableGeneratedItinerary,
   emptyItinerary,
+  isThinItineraryAgainstBaseline,
   loadItineraryState,
   restoreDayFromBaseline,
   restoreFullFromBaseline,
@@ -309,7 +310,7 @@ export function useItineraryGeneration(
     // to return false and force a re-generate of the saved plan.
     const state = loadItineraryState()
     ensureBaselineFromGenerated(state)
-    return Boolean(state.generated && state.days.length)
+    return Boolean(state.days.length)
   })
   const [itineraryFingerprint, setItineraryFingerprint] =
     useState<ItineraryInputFingerprint | null>(() => {
@@ -329,6 +330,7 @@ export function useItineraryGeneration(
   const [itineraryLoadingLineIndex, setItineraryLoadingLineIndex] = useState(
     () => Math.floor(Math.random() * generatingLines.length),
   )
+  const [remoteQuietTick, setRemoteQuietTick] = useState(0)
   // When the locale changes, jump to a random line in the new language so
   // the user isn't left staring at a Chinese sentence after switching to EN.
   useEffect(() => {
@@ -491,11 +493,21 @@ export function useItineraryGeneration(
 
   // Persist current days + customPlaces + fingerprint.
   useEffect(() => {
+    const stored = loadItineraryState()
+    if (!days.length && stored.days.length) return
+    if (isThinItineraryAgainstBaseline(days, stored.days)) return
     saveItineraryState(days, customPlaces, {
-      generated: itineraryGenerated,
+      generated: itineraryGenerated || days.length > 0,
       fingerprint: itineraryFingerprint ?? undefined,
     })
   }, [days, customPlaces, itineraryGenerated, itineraryFingerprint])
+
+  useEffect(() => {
+    const wait = remainingRemoteQuietMs()
+    if (wait <= 0) return
+    const id = window.setTimeout(() => setRemoteQuietTick((n) => n + 1), wait + 30)
+    return () => window.clearTimeout(id)
+  }, [remoteQuietTick, itineraryReady, days.length, itineraryGenerated])
 
   // Fingerprint gate: when hotel / dates / flights change after a plan was
   // generated, wipe so the next expand regenerates.
@@ -540,6 +552,7 @@ export function useItineraryGeneration(
     setCustomPlaces,
     setDayIndex,
     setSelectedPlaceId,
+    remoteQuietTick,
   ])
 
 
@@ -947,6 +960,7 @@ export function useItineraryGeneration(
     itineraryFingerprint,
     currentFingerprint,
     runFullItineraryGeneration,
+    remoteQuietTick,
   ])
 
   const handleResetDay = useCallback(
@@ -1253,7 +1267,7 @@ export function useItineraryGeneration(
   )
 
   // -- Loading line rotation --------------------------------------------------
-  const dayOneReady = itineraryGenerated || itineraryGeneratedUpToDay >= 1
+  const dayOneReady = itineraryGenerated || itineraryGeneratedUpToDay >= 1 || days.length > 0
 
   const isDayGenerationPending = useCallback(
     (dayNumber: number) =>

@@ -133,8 +133,9 @@ export function mergeCloudDays(options: {
     changed = true
   }
   if (!changed) return false
-  saveItineraryState(mapToDays(map), itinerary.customPlaces, {
-    generated: itinerary.generated,
+  const nextDays = mapToDays(map)
+  saveItineraryState(nextDays, itinerary.customPlaces, {
+    generated: nextDays.length > 0 ? true : false,
     fingerprint: itinerary.fingerprint ?? undefined,
   })
   return true

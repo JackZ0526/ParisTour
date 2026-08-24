@@ -40,7 +40,13 @@ import {
   peekDayCloudDiff,
 } from './itineraryDayCloud'
 import { itineraryDayCount } from '../../itinerary/services/tripDates'
-import { loadItineraryState, restoreFullFromBaseline, saveItineraryState } from '../../itinerary/utils/itineraryState'
+import {
+  isThinItineraryAgainstBaseline,
+  loadBaselineItinerary,
+  loadItineraryState,
+  restoreFullFromBaseline,
+  saveItineraryState,
+} from '../../itinerary/utils/itineraryState'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { sanitizeMapRouteCache } from '../../map/services/mapRouteCache'
 import { getUserNickname } from '../../auth/services/nicknameStore'
@@ -1371,6 +1377,11 @@ export function isRemoteQuietPeriodActive(): boolean {
   return Date.now() < quietAutosaveUntil
 }
 
+/** Milliseconds until the remote quiet window ends (0 if already idle). */
+export function remainingRemoteQuietMs(): number {
+  return Math.max(0, quietAutosaveUntil - Date.now())
+}
+
 function queueRemoteUpdate(next: QueuedRemote) {
   if (
     queuedRemote &&
@@ -1916,7 +1927,17 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
   }
   const coreUnchanged = lastSavedJsonByTrip.get(tripId) === json
   const artifactsChanged = hasArtifactCloudDiff()
-  const daysChanged = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId, snapshot))
+  let daysChanged = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId, snapshot))
+  if (
+    daysChanged &&
+    isThinItineraryAgainstBaseline(
+      snapshot.itinerary?.days,
+      snapshot.baseline?.days,
+    )
+  ) {
+    console.warn('[tripCloud] skipped uploading a thin itinerary over the baseline')
+    daysChanged = false
+  }
   if (saveMode === 'artifacts') {
     if (!artifactsChanged && !daysChanged) {
       if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
@@ -2039,7 +2060,12 @@ export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
   } catch (err) {
     console.warn('[tripCloud] day pull failed', err)
   }
-  if (!loadItineraryState().days.length) {
+  const itinerary = loadItineraryState()
+  const baselineDays = loadBaselineItinerary()?.days
+  if (
+    !itinerary.days.length ||
+    isThinItineraryAgainstBaseline(itinerary.days, baselineDays)
+  ) {
     const restored = restoreFullFromBaseline()
     if (restored) {
       saveItineraryState(restored.days, restored.customPlaces, {
@@ -2047,6 +2073,11 @@ export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
         fingerprint: restored.fingerprint,
       })
     }
+  } else if (!itinerary.generated && itinerary.days.length) {
+    saveItineraryState(itinerary.days, itinerary.customPlaces, {
+      generated: true,
+      fingerprint: itinerary.fingerprint,
+    })
   }
 }
 

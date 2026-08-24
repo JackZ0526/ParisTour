@@ -11,6 +11,7 @@ export {
   getCloudSaveStatus,
   getCloudSyncStatus,
   isRemoteQuietPeriodActive,
+  remainingRemoteQuietMs,
   scheduleTripCloudSave,
   holdTripCloudSaves,
   releaseTripCloudSaves,
