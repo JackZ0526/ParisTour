@@ -297,6 +297,17 @@ export function TripChatPanel({
   const { model, thinkingMode } = useLlmSettings()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [colorKeepActive, setColorKeepActive] = useState(false)
+  useEffect(() => {
+    if (busy) {
+      setColorKeepActive(true)
+    } else if (colorKeepActive) {
+      const timer = setTimeout(() => {
+        setColorKeepActive(false)
+      }, 380)
+      return () => clearTimeout(timer)
+    }
+  }, [busy, colorKeepActive])
   const [streamingReply, setStreamingReply] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<TripChatTurn[]>([])
@@ -2736,8 +2747,8 @@ export function TripChatPanel({
                 }}
                 className={`inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 ${
                   busy
-                    ? 'h-8 px-3 border border-white/18 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
-                    : (input.trim() || attachedImages.length > 0) && open && convertingCount === 0
+                    ? 'h-8 px-3 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
+                    : ((input.trim() || attachedImages.length > 0) && open && convertingCount === 0) || colorKeepActive
                       ? 'h-8 w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 hover:scale-105 active:scale-95 cursor-pointer'
                       : 'h-8 w-8 bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
                 }`}
