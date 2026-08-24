@@ -185,11 +185,50 @@ body.is-pwa.orientation-landscape::after {
   );
 }
 
+.dark .day-tab-shimmer {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .day-tab-shimmer::after {
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    rgba(255, 255, 255, 0.16) 50%,
+    transparent 85%
+  );
+}
+
+.dark .day-tab-shimmer-on-ink {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dark .day-tab-shimmer-on-ink::after {
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 85%
+  );
+}
+
 /* Large photo skeleton: higher contrast so the sweep reads on a mist block.
    Do not set position here — the hero overlay must stay `absolute`. */
 .place-hero-shimmer {
   overflow: hidden;
   background-color: color-mix(in srgb, var(--stone) 18%, var(--mist));
+}
+
+.dark .place-hero-shimmer {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .place-hero-shimmer::after {
+  background: linear-gradient(
+    100deg,
+    transparent 8%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 92%
+  );
 }
 
 .place-hero-shimmer::after {

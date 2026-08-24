@@ -515,11 +515,11 @@ function TimelineStopCardSkeleton({ index }: { index: number }) {
     STOP_SKELETON_TITLE_WIDTHS[index % STOP_SKELETON_TITLE_WIDTHS.length]
   return (
     <div
-      className="flex items-start gap-2 rounded-2xl border border-white/80 bg-white/60 p-2.5 sm:gap-3 sm:p-3 shadow-[0_4px_20px_rgba(0,0,0,0.03),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-xl"
+      className={`flex items-start gap-2 p-2.5 sm:gap-3 sm:p-3 ${glassCardSurfaceClass}`}
       aria-hidden
     >
       <span className={`mt-1 inline-flex h-7 w-7 shrink-0 rounded-lg ${glassHandleSurfaceClass} day-tab-shimmer`} />
-      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 rounded-full day-tab-shimmer shadow-sm ring-1 ring-white/60" />
+      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 rounded-full day-tab-shimmer shadow-sm ring-1 ring-white/60 dark:ring-white/10" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="h-5 w-[4.5rem] rounded-full day-tab-shimmer" />
