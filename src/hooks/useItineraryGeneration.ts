@@ -212,6 +212,19 @@ export interface UseItineraryGenerationResult {
   setCopyRefreshing: Dispatch<SetStateAction<boolean>>
 }
 
+/**
+ * Stable structure signature of an itinerary. Changes whenever days,
+ * pace, or stop places/times change, but stays identical across language translations.
+ */
+function computeDaysStructureKey(days: DayPlan[]): string {
+  return days
+    .map(
+      (d) =>
+        `${d.day}:${d.pace}:[${d.stops.map((s) => `${s.placeId}@${s.time}`).join(',')}]`,
+    )
+    .join('|')
+}
+
 export function useItineraryGeneration(
   deps: UseItineraryGenerationDeps,
   setters: UseItineraryGenerationSetters,
@@ -299,6 +312,9 @@ export function useItineraryGeneration(
   const dayGenAbortRef = useRef<AbortController | null>(null)
   const fullGenTimeoutRef = useRef<number | null>(null)
   const dayGenTimeoutRef = useRef<number | null>(null)
+  const localeCopyCacheRef = useRef<
+    Partial<Record<Locale, { structureKey: string; days: DayPlan[] }>>
+  >({})
 
   const cancelInFlightGeneration = useCallback(() => {
     genRequestIdRef.current += 1
@@ -1078,8 +1094,27 @@ export function useItineraryGeneration(
       if (isLlmConfigured() === false) return
       const currentDays = days
       if (currentDays.length === 0) return
+      const structureKey = computeDaysStructureKey(currentDays)
       const sourceLocale = detectLocaleFromDays(currentDays)
+
+      // Ensure source days are saved in the multi-language cache
+      if (
+        !localeCopyCacheRef.current[sourceLocale] ||
+        localeCopyCacheRef.current[sourceLocale]?.structureKey !== structureKey
+      ) {
+        localeCopyCacheRef.current[sourceLocale] = { structureKey, days: currentDays }
+      }
+
       if (sourceLocale === targetLocale) return
+
+      // Instant 0ms cache hit: if target locale copy exists for this exact structure, swap immediately!
+      const cachedTarget = localeCopyCacheRef.current[targetLocale]
+      if (cachedTarget && cachedTarget.structureKey === structureKey) {
+        setDays(cachedTarget.days)
+        setItineraryGenError(null)
+        return
+      }
+
       setItineraryGenError(null)
       setItineraryTranslating(true)
       setAutoRegenOnLocaleChange(true)
@@ -1093,6 +1128,10 @@ export function useItineraryGeneration(
           },
         })
         setDays(translatedDays)
+        localeCopyCacheRef.current[targetLocale] = {
+          structureKey,
+          days: translatedDays,
+        }
       } catch (err) {
         // Rollback to current days on failure
         setDays(currentDays)
@@ -1246,15 +1285,26 @@ export function useItineraryGeneration(
       return
     }
     // Update the ref synchronously so a quick second switch (e.g. en →
-    // zh-CN → en within 1.2s) is still detected by the next effect run.
+    // zh-CN → en) is still detected by the next effect run.
     const targetLocale = locale
     lastAutoRegenLocaleRef.current = targetLocale
+
+    // Fast path: if target locale is already cached for the exact same structure,
+    // swap instantly in 0ms without waiting for debounce or triggering translation!
+    const currentStructureKey = computeDaysStructureKey(days)
+    const cachedTarget = localeCopyCacheRef.current[targetLocale]
+    if (cachedTarget && cachedTarget.structureKey === currentStructureKey) {
+      void handleTranslateItinerary(targetLocale)
+      return
+    }
+
     const id = window.setTimeout(() => {
       void handleTranslateItinerary(targetLocale)
-    }, 1200)
+    }, 400)
     return () => window.clearTimeout(id)
   }, [
     locale,
+    days,
     itineraryGenerated,
     itineraryGenerating,
     itineraryIncrementalGenerating,
