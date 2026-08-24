@@ -805,6 +805,18 @@ export function useItineraryDaysEffects(
       })
 
       setCopyRefreshing(true)
+      const dayIdx = dayIndexForCopyRef.current
+      const prevTitle = day.title
+      const prevTheme = day.theme
+      const prevSummary = day.summary
+
+      // Clear current copy so header immediately enters shimmer loading state
+      setDays((prev) =>
+        prev.map((d, i) =>
+          i === dayIdx ? { ...d, title: '', theme: '', summary: '' } : d,
+        ),
+      )
+
       void generateDayCopy({
         day: dayNum,
         pace,
@@ -814,6 +826,20 @@ export function useItineraryDaysEffects(
         calendarDate,
         totalDays,
         locale,
+        onProgress: (partial) => {
+          if (cancelled || !isCurrentCopyRequest(requestId)) return
+          setDays((prev) =>
+            prev.map((d, i) => {
+              if (i !== dayIdx) return d
+              return {
+                ...d,
+                title: partial.title ?? d.title,
+                theme: partial.theme ?? d.theme,
+                summary: partial.summary ?? d.summary,
+              }
+            }),
+          )
+        },
       })
         .then((copy) => {
           if (
@@ -823,7 +849,6 @@ export function useItineraryDaysEffects(
           )
             return
 
-          const dayIdx = dayIndexForCopyRef.current
           setDays((prev) =>
             prev.map((d, i) => {
               if (i !== dayIdx) return d
@@ -836,6 +861,17 @@ export function useItineraryDaysEffects(
               // Guard against LLM still naming a stale hotel district.
               return syncDaysCopyToHotelArea([next], areaKey)[0] || next
             }),
+          )
+        })
+        .catch(() => {
+          if (cancelled || !isCurrentCopyRequest(requestId)) return
+          // Rollback on failure
+          setDays((prev) =>
+            prev.map((d, i) =>
+              i === dayIdx
+                ? { ...d, title: prevTitle, theme: prevTheme, summary: prevSummary }
+                : d,
+            ),
           )
         })
         .finally(() => {

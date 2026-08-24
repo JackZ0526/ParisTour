@@ -16,7 +16,11 @@ import {
 } from '../prompts'
 import { LlmRequestError } from '../errors'
 import { callOpenAIMessagesStream } from '../transport'
-import { extractPartialJsonStringField, openaiResponsesWithWebSearch } from '../stream'
+import {
+  extractPartialJsonStringField,
+  openaiResponsesWithWebSearch,
+  parsePartialJson,
+} from '../stream'
 import { extractJsonObject } from '../json'
 import {
   recommendationPreferencesPrompt,
@@ -610,6 +614,8 @@ export async function generateDayCopy(input: {
   /** Total daytime days in this itinerary (not a fixed 7) */
   totalDays?: number
   locale?: Locale
+  signal?: AbortSignal
+  onProgress?: (partial: { title?: string; theme?: string; summary?: string }) => void
 }): Promise<{ title: string; theme: string; summary: string } | null> {
   const locale = input.locale ?? getLocale()
   const isEn = locale === 'en'
@@ -685,11 +691,26 @@ export async function generateDayCopy(input: {
         places: input.placeNames,
       })
 
+      const onDelta = input.onProgress
+        ? (_delta: string, fullText: string) => {
+            const partial = parsePartialJson<{ title?: string; theme?: string; summary?: string }>(fullText)
+            if (partial && typeof partial === 'object') {
+              input.onProgress?.({
+                title: typeof partial.title === 'string' ? partial.title : undefined,
+                theme: typeof partial.theme === 'string' ? partial.theme : undefined,
+                summary: typeof partial.summary === 'string' ? partial.summary : undefined,
+              })
+            }
+          }
+        : undefined
+
       const text = await generateText(system, user, {
         task: 'dayCopy',
         json: true,
         thinking: { enabled: false, effort: 'low' },
         preflight: false,
+        signal: input.signal,
+        onDelta,
         userText: input.placeNames.join(isEn ? ', ' : '、'),
       })
       if (!text) return fallbackDayCopy({ ...input, locale })
