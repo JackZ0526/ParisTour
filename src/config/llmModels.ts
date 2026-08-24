@@ -36,7 +36,7 @@ export const DEEPSEEK_MODEL_OPTIONS = [
   {
     id: 'deepseek-v4-flash-vision-exp',
     label: 'DeepSeek V4 Flash Vision',
-    shortLabel: 'V4 Vision',
+    shortLabel: 'V4 Flash Vision',
     descriptionKey: 'llm.deepseekV4FlashVisionDesc' as TranslationKey,
     provider: 'deepseek' as const,
   },
