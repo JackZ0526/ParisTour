@@ -1129,7 +1129,7 @@ export function AddPlaceDialog({
 
               {refreshingRecs || (loadingRecs && !visible.length) ? (
                 <div className="space-y-2" aria-hidden>
-                  {[1, 2, 3].map((n) => (
+                  {[1, 2, 3, 4].map((n) => (
                     <div
                       key={n}
                       className={`overflow-hidden rounded-2xl border p-3.5 space-y-2.5 ${glassCardSurfaceClass}`}
