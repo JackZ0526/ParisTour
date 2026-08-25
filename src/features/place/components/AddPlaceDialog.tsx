@@ -37,6 +37,8 @@ import type { RecommendationPreferences } from '../services/recommendationPrefer
 import { formatPriceLevelLabel } from '../../../shared/utils/priceLevel'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
+import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from '../../../shared/hooks/useLiquidPillInteraction'
 import { GooglePlacePage } from './GooglePlacePage'
 import { ButtonSpinner } from '../../../shared/components/LoadingIndicator'
 import {
@@ -85,6 +87,7 @@ const recommendTabKeys: Record<RecommendPlaceType, string> = {
   cafe: 'place.addCafeOption',
   restaurant: 'place.addRestaurantOption',
 }
+const recommendTabIds = Object.keys(recommendTabKeys) as RecommendPlaceType[]
 
 // Note: We intentionally do NOT pass a `labels` prop to `GooglePlacePage`.
 // The page falls back to the i18n keys `place.advisorNoteTitle`,
@@ -153,22 +156,24 @@ export function AddPlaceDialog({
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined)
   const [heightReady, setHeightReady] = useState(false)
   const [tabsInteractive, setTabsInteractive] = useState(false)
-  const [hasSwitchedMainTab, setHasSwitchedMainTab] = useState(false)
-  const [hasSwitchedCategory, setHasSwitchedCategory] = useState(false)
+  const mainTabInteraction = useLiquidPillInteraction<'ai' | 'google'>()
+  const categoryInteraction = useLiquidPillInteraction<RecommendPlaceType>()
+  const clearMainTabInteraction = mainTabInteraction.clear
+  const clearCategoryInteraction = categoryInteraction.clear
 
   // Reset height and tab animation gate when the sheet closes so reopen doesn't tween from stale size or fly in.
   useLayoutEffect(() => {
     if (!open) {
       setTabsInteractive(false)
-      setHasSwitchedMainTab(false)
-      setHasSwitchedCategory(false)
+      clearMainTabInteraction()
+      clearCategoryInteraction()
       setHeightReady(false)
       setBodyHeight(undefined)
     } else {
       const timer = setTimeout(() => setTabsInteractive(true), 320)
       return () => clearTimeout(timer)
     }
-  }, [open])
+  }, [clearCategoryInteraction, clearMainTabInteraction, open])
 
   // Measure tab content and animate body height on tab / content size changes.
   useLayoutEffect(() => {
@@ -984,7 +989,7 @@ export function AddPlaceDialog({
                   role="tab"
                   aria-selected={mainTab === 'ai'}
                   onClick={() => {
-                    setHasSwitchedMainTab(true)
+                    if (mainTab !== 'ai') mainTabInteraction.activate('ai')
                     setMainTab('ai')
                     closeGoogleDetail()
                   }}
@@ -992,23 +997,14 @@ export function AddPlaceDialog({
                 >
                   {mainTab === 'ai' &&
                     (tabsInteractive ? (
-                      <motion.span
+                      <BoundedLiquidPill
                         layoutId="add-place-main-tab-pill"
                         layoutDependency={mainTab}
-                        className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
-                        animate={
-                          hasSwitchedMainTab
-                            ? {
-                                scaleX: [1, 1.16, 0.95, 1],
-                                scaleY: [1, 0.88, 1.03, 1],
-                              }
-                            : undefined
-                        }
-                        transition={{
-                          layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                          scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                          scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                        }}
+                        className="rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
+                        interactionToken={mainTabInteraction.tokenFor('ai')}
+                        onInteractionSettled={mainTabInteraction.onInteractionSettled}
+                        edge="left"
+                        deformationStrength={1.07}
                       />
                     ) : (
                       <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
@@ -1026,7 +1022,7 @@ export function AddPlaceDialog({
                   role="tab"
                   aria-selected={mainTab === 'google'}
                   onClick={() => {
-                    setHasSwitchedMainTab(true)
+                    if (mainTab !== 'google') mainTabInteraction.activate('google')
                     setMainTab('google')
                     closeGoogleDetail()
                   }}
@@ -1034,23 +1030,14 @@ export function AddPlaceDialog({
                 >
                   {mainTab === 'google' &&
                     (tabsInteractive ? (
-                      <motion.span
+                      <BoundedLiquidPill
                         layoutId="add-place-main-tab-pill"
                         layoutDependency={mainTab}
-                        className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
-                        animate={
-                          hasSwitchedMainTab
-                            ? {
-                                scaleX: [1, 1.16, 0.95, 1],
-                                scaleY: [1, 0.88, 1.03, 1],
-                              }
-                            : undefined
-                        }
-                        transition={{
-                          layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                          scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                          scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                        }}
+                        className="rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]"
+                        interactionToken={mainTabInteraction.tokenFor('google')}
+                        onInteractionSettled={mainTabInteraction.onInteractionSettled}
+                        edge="right"
+                        deformationStrength={1.07}
                       />
                     ) : (
                       <span className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-sm dark:shadow-[0_2px_12px_rgba(212,131,84,0.35)]" />
@@ -1086,14 +1073,14 @@ export function AddPlaceDialog({
 
               <LayoutGroup id="add-place-category-tabs">
                 <div className="flex gap-2 overflow-x-auto pb-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {(Object.keys(recommendTabKeys) as RecommendPlaceType[]).map((tabId) => {
+                  {recommendTabIds.map((tabId, tabIndex) => {
                     const active = category === tabId
                     return (
                       <button
                         key={tabId}
                         type="button"
                         onClick={() => {
-                          setHasSwitchedCategory(true)
+                          if (tabId !== category) categoryInteraction.activate(tabId)
                           setCategory(tabId)
                           setExpandedKey(null)
                           void ensureRecommendationCategory(tabId)
@@ -1102,23 +1089,20 @@ export function AddPlaceDialog({
                       >
                         {active &&
                           (tabsInteractive ? (
-                            <motion.span
+                            <BoundedLiquidPill
                               layoutId="add-place-category-pill"
                               layoutDependency={category}
-                              className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-[0_2px_8px_rgba(99,136,112,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.25)]"
-                              animate={
-                                hasSwitchedCategory
-                                  ? {
-                                      scaleX: [1, 1.14, 0.96, 1],
-                                      scaleY: [1, 0.88, 1.03, 1],
-                                    }
-                                  : undefined
+                              className="rounded-full bg-[var(--sage)] shadow-[0_2px_8px_rgba(99,136,112,0.25),inset_0_1px_1.5px_rgba(255,255,255,0.25)]"
+                              interactionToken={categoryInteraction.tokenFor(tabId)}
+                              onInteractionSettled={categoryInteraction.onInteractionSettled}
+                              edge={
+                                tabIndex === 0
+                                  ? 'left'
+                                  : tabIndex === recommendTabIds.length - 1
+                                    ? 'right'
+                                    : null
                               }
-                              transition={{
-                                layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                              }}
+                              deformationStrength={0.93}
                             />
                           ) : (
                             <span className="absolute inset-0 z-0 rounded-full bg-[var(--sage)] shadow-sm" />

@@ -30,6 +30,8 @@ import {
   Users,
 } from 'lucide-react'
 import { UserAvatarView } from '../../../shared/components/UserAvatarView'
+import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from '../../../shared/hooks/useLiquidPillInteraction'
 import { useUserAvatar } from '../../auth/services/avatarStore'
 import { AvatarPickerDialog } from './AvatarPickerDialog'
 import { useUserNickname, getUserNickname } from '../../auth/services/nicknameStore'
@@ -132,9 +134,9 @@ export function ProfileTab({
   const { nickname } = useUserNickname(email)
   const [nicknamePickerOpen, setNicknamePickerOpen] = useState(false)
   const { themePreference, setThemePreference } = useTheme()
-  const [hasThemeInteracted, setHasThemeInteracted] = useState(false)
+  const themeInteraction = useLiquidPillInteraction<typeof themePreference>()
   const { t, locale, setLocale } = useTranslation()
-  const [hasLanguageInteracted, setHasLanguageInteracted] = useState(false)
+  const languageInteraction = useLiquidPillInteraction<Locale>()
 
   const roleLabel =
     role === 'owner'
@@ -611,36 +613,28 @@ export function ProfileTab({
                   key={id}
                   type="button"
                   onClick={() => {
-                    setHasThemeInteracted(true)
+                    if (id === themePreference) return
+                    themeInteraction.activate(id)
                     setThemePreference(id)
                   }}
                   className="relative isolate flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
                 >
                   {isActive && (
-                    <motion.div
+                    <BoundedLiquidPill
                       layoutId="theme-preference-pill"
                       layoutDependency={themePreference}
-                      className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
-                      animate={
-                        hasThemeInteracted
-                          ? {
-                              scaleX: [1, 1.12, 0.96, 1],
-                              scaleY: [1, 0.9, 1.03, 1],
-                            }
-                          : undefined
-                      }
-                      transition={{
-                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                        scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                        scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                      }}
+                      className="overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
+                      interactionToken={themeInteraction.tokenFor(id)}
+                      onInteractionSettled={themeInteraction.onInteractionSettled}
+                      edge={id === 'light' ? 'left' : id === 'system' ? 'right' : null}
+                      deformationStrength={0.8}
                     >
                       {/* Top specular light reflection highlight */}
                       <span
                         aria-hidden
                         className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
                       />
-                    </motion.div>
+                    </BoundedLiquidPill>
                   )}
                   <Icon
                     size={15}
@@ -695,36 +689,28 @@ export function ProfileTab({
                   key={id}
                   type="button"
                   onClick={() => {
-                    setHasLanguageInteracted(true)
+                    if (id === locale) return
+                    languageInteraction.activate(id)
                     setLocale(id as Locale)
                   }}
                   className="relative isolate flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors outline-none cursor-pointer"
                 >
                   {isActive && (
-                    <motion.div
+                    <BoundedLiquidPill
                       layoutId="language-preference-pill"
                       layoutDependency={locale}
-                      className="absolute inset-0 overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
-                      animate={
-                        hasLanguageInteracted
-                          ? {
-                              scaleX: [1, 1.12, 0.96, 1],
-                              scaleY: [1, 0.9, 1.03, 1],
-                            }
-                          : undefined
-                      }
-                      transition={{
-                        layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                        scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                        scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                      }}
+                      className="overflow-hidden rounded-xl bg-white/85 dark:bg-[var(--copper)] shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_4px_16px_rgba(212,131,84,0.35),inset_0_1px_1.5px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.3)] ring-1 ring-black/5 dark:ring-white/15 backdrop-blur-md"
+                      interactionToken={languageInteraction.tokenFor(id)}
+                      onInteractionSettled={languageInteraction.onInteractionSettled}
+                      edge={id === 'zh-CN' ? 'left' : 'right'}
+                      deformationStrength={0.8}
                     >
                       {/* Top specular light reflection highlight */}
                       <span
                         aria-hidden
                         className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/30 to-transparent"
                       />
-                    </motion.div>
+                    </BoundedLiquidPill>
                   )}
                   <span
                     className={`relative z-10 transition-colors ${

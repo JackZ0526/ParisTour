@@ -33,6 +33,8 @@ import { UserAvatarView } from '../../../shared/components/UserAvatarView'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
 import { CloseIconButton } from '../../../shared/components/CloseIconButton'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
+import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from '../../../shared/hooks/useLiquidPillInteraction'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 import { useTranslation } from '../../../shared/i18n'
 
@@ -54,7 +56,7 @@ function RoleToggle({
   name: string
 }) {
   const { t } = useTranslation()
-  const [hasInteracted, setHasInteracted] = useState(false)
+  const roleInteraction = useLiquidPillInteraction<TripShareRole>()
 
   return (
     <LayoutGroup id={`role-toggle-${name}`}>
@@ -79,7 +81,7 @@ function RoleToggle({
               aria-pressed={active}
               onClick={() => {
                 if (active || disabled) return
-                setHasInteracted(true)
+                roleInteraction.activate(opt.id)
                 onChange(opt.id)
               }}
               className={`relative isolate min-w-[3.75rem] sm:min-w-[4rem] rounded-full px-3 py-1 text-xs font-medium transition-colors outline-none cursor-pointer ${
@@ -89,23 +91,14 @@ function RoleToggle({
               } disabled:cursor-default`}
             >
               {active && (
-                <motion.div
+                <BoundedLiquidPill
                   layoutId={`role-toggle-pill-${name}`}
                   layoutDependency={value}
-                  className="absolute inset-0 rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)]"
-                  animate={
-                    hasInteracted
-                      ? {
-                          scaleX: [1, 1.12, 0.96, 1],
-                          scaleY: [1, 0.9, 1.03, 1],
-                        }
-                      : undefined
-                  }
-                  transition={{
-                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                    scaleX: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                    scaleY: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-                  }}
+                  className="rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)]"
+                  interactionToken={roleInteraction.tokenFor(opt.id)}
+                  onInteractionSettled={roleInteraction.onInteractionSettled}
+                  edge={opt.id === 'viewer' ? 'left' : 'right'}
+                  deformationStrength={0.8}
                 />
               )}
               <span className="relative z-10">{opt.label}</span>

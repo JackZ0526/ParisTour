@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
-import { LayoutGroup, motion } from 'framer-motion'
+import { LayoutGroup } from 'framer-motion'
 import { useAuth } from '../authContext'
 import { glassModalSurfaceClass } from '../../../shared/styles/glassCapsule'
 import { useTranslation } from '../../../shared/i18n'
+import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from '../../../shared/hooks/useLiquidPillInteraction'
 
 function readAuthDeepLink(): { mode: 'signin' | 'signup'; email: string } {
   try {
@@ -35,7 +37,7 @@ export function LoginPage() {
   const deepLink = useMemo(() => readAuthDeepLink(), [])
   const { signIn, signUp, status, error: authError } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>(deepLink.mode)
-  const [hasSwitched, setHasSwitched] = useState(false)
+  const modeInteraction = useLiquidPillInteraction<'signin' | 'signup'>()
   const [email, setEmail] = useState(deepLink.email)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -78,7 +80,6 @@ export function LoginPage() {
           setInfo(t('auth.signupSuccess'))
         }
         setMode('signin')
-        setHasSwitched(true)
         clearAuthDeepLink()
       }
     } catch (err) {
@@ -140,29 +141,20 @@ export function LoginPage() {
               aria-selected={mode === 'signin'}
               className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none cursor-pointer"
               onClick={() => {
-                setHasSwitched(true)
+                if (mode !== 'signin') modeInteraction.activate('signin')
                 setMode('signin')
                 setError(null)
               }}
             >
               {mode === 'signin' && (
-                <motion.span
+                <BoundedLiquidPill
                   layoutId="auth-mode-pill"
                   layoutDependency={mode}
-                  className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
-                  animate={
-                    hasSwitched
-                      ? {
-                          scaleX: [1, 1.18, 0.94, 1],
-                          scaleY: [1, 0.86, 1.04, 1],
-                        }
-                      : undefined
-                  }
-                  transition={{
-                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  }}
+                  className="rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
+                  interactionToken={modeInteraction.tokenFor('signin')}
+                  onInteractionSettled={modeInteraction.onInteractionSettled}
+                  edge="left"
+                  deformationStrength={1.2}
                 />
               )}
               <span
@@ -181,30 +173,21 @@ export function LoginPage() {
               aria-selected={mode === 'signup'}
               className="relative isolate rounded-full px-5 py-1.5 font-medium transition-colors outline-none cursor-pointer"
               onClick={() => {
-                setHasSwitched(true)
+                if (mode !== 'signup') modeInteraction.activate('signup')
                 setMode('signup')
                 setError(null)
                 setInfo(null)
               }}
             >
               {mode === 'signup' && (
-                <motion.span
+                <BoundedLiquidPill
                   layoutId="auth-mode-pill"
                   layoutDependency={mode}
-                  className="absolute inset-0 z-0 rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
-                  animate={
-                    hasSwitched
-                      ? {
-                          scaleX: [1, 1.18, 0.94, 1],
-                          scaleY: [1, 0.86, 1.04, 1],
-                        }
-                      : undefined
-                  }
-                  transition={{
-                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  }}
+                  className="rounded-full bg-[var(--ink)] dark:bg-white/16 dark:border dark:border-white/20 shadow-[0_2px_8px_rgba(35,42,38,0.22),inset_0_1px_1.5px_rgba(255,255,255,0.2)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)]"
+                  interactionToken={modeInteraction.tokenFor('signup')}
+                  onInteractionSettled={modeInteraction.onInteractionSettled}
+                  edge="right"
+                  deformationStrength={1.2}
                 />
               )}
               <span

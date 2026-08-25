@@ -1,8 +1,9 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CalendarDays, Luggage, User } from 'lucide-react'
 import type { AppTab } from '../types'
 import { useTranslation } from '../../../shared/i18n'
+import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from '../../../shared/hooks/useLiquidPillInteraction'
 
 export interface BottomNavBarProps {
   activeTab: AppTab
@@ -16,7 +17,7 @@ export function BottomNavBar({
   itineraryReady,
 }: BottomNavBarProps) {
   const { t } = useTranslation()
-  const [hasInteracted, setHasInteracted] = useState(false)
+  const pillInteraction = useLiquidPillInteraction<AppTab>()
 
   const tabs: Array<{
     id: AppTab
@@ -27,6 +28,7 @@ export function BottomNavBar({
     { id: 'itinerary', label: t('nav.itinerary'), Icon: CalendarDays },
     { id: 'profile', label: t('nav.profile'), Icon: User },
   ]
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
   return (
     <aside
       aria-label={t('app.floatingNavAria')}
@@ -67,7 +69,8 @@ export function BottomNavBar({
               key={id}
               type="button"
               onClick={() => {
-                setHasInteracted(true)
+                if (id === activeTab) return
+                pillInteraction.activate(id)
                 onSelectTab(id)
               }}
               whileTap={{ scale: 0.92 }}
@@ -75,28 +78,18 @@ export function BottomNavBar({
             >
               {/* Semi-transparent Active Frosted Pill with Specular Reflection */}
               {isActive && (
-                <motion.div
+                <BoundedLiquidPill
                   layoutId="semi-translucent-active-pill"
                   layoutDependency={activeTab}
-                  className="absolute inset-0 overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
-                  animate={
-                    hasInteracted
-                      ? {
-                          scaleX: [1, 1.15, 0.95, 1],
-                          scaleY: [1, 0.88, 1.04, 1],
-                        }
-                      : undefined
-                  }
-                  transition={{
-                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  }}
+                  className="overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
+                  interactionToken={pillInteraction.tokenFor(id)}
+                  onInteractionSettled={pillInteraction.onInteractionSettled}
+                  edge={activeIndex === 0 ? 'left' : activeIndex === tabs.length - 1 ? 'right' : null}
                 >
                   {/* Dynamic Pill Gradient Border (活动滑块流光描边) */}
-                  <div
+                  <span
                     aria-hidden
-                    className="pointer-events-none absolute inset-0 rounded-full p-[1px]"
+                    className="pointer-events-none absolute inset-0 block rounded-full p-[1px]"
                     style={{
                       background: 'var(--nav-pill-border-gradient)',
                       WebkitMask:
@@ -109,7 +102,7 @@ export function BottomNavBar({
                     aria-hidden
                     className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent"
                   />
-                </motion.div>
+                </BoundedLiquidPill>
               )}
 
               {/* Tab Icon & Label */}

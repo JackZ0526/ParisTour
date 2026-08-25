@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
 import { CalendarDays, Luggage, User } from 'lucide-react'
 import type { AppTab } from '../types'
 import { useTranslation } from '../../../shared/i18n'
+import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from '../../../shared/hooks/useLiquidPillInteraction'
 
 export interface TopNavSegmentProps {
   activeTab: AppTab
@@ -18,7 +18,7 @@ export function TopNavSegment({
   className = '',
 }: TopNavSegmentProps) {
   const { t } = useTranslation()
-  const [hasInteracted, setHasInteracted] = useState(false)
+  const pillInteraction = useLiquidPillInteraction<AppTab>()
 
   const tabs: Array<{
     id: AppTab
@@ -29,6 +29,7 @@ export function TopNavSegment({
     { id: 'itinerary', label: t('nav.itineraryDaily'), Icon: CalendarDays },
     { id: 'profile', label: t('nav.profile'), Icon: User },
   ]
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
   return (
     <div
       role="tablist"
@@ -67,34 +68,25 @@ export function TopNavSegment({
             role="tab"
             aria-selected={isActive}
             onClick={() => {
-              setHasInteracted(true)
+              if (id === activeTab) return
+              pillInteraction.activate(id)
               onSelectTab(id)
             }}
             className="relative isolate flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-medium transition-colors outline-none cursor-pointer"
           >
             {isActive && (
-              <motion.span
+              <BoundedLiquidPill
                 layoutId="light-top-nav-active-pill"
                 layoutDependency={activeTab}
-                className="absolute inset-0 overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
-                animate={
-                  hasInteracted
-                    ? {
-                        scaleX: [1, 1.15, 0.95, 1],
-                        scaleY: [1, 0.88, 1.04, 1],
-                      }
-                    : undefined
-                }
-                transition={{
-                  layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                  scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                  scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                }}
+                className="overflow-hidden rounded-full bg-white/70 dark:bg-white/10 shadow-[0_3px_12px_rgba(0,0,0,0.06),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.7)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.3),inset_0_1px_1.5px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.4)] backdrop-blur-md"
+                interactionToken={pillInteraction.tokenFor(id)}
+                onInteractionSettled={pillInteraction.onInteractionSettled}
+                edge={activeIndex === 0 ? 'left' : activeIndex === tabs.length - 1 ? 'right' : null}
               >
                 {/* Dynamic Pill Gradient Border (活动滑块流光描边) */}
-                <div
+                <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-full p-[1px]"
+                  className="pointer-events-none absolute inset-0 block rounded-full p-[1px]"
                   style={{
                     background: 'var(--nav-pill-border-gradient)',
                     WebkitMask:
@@ -107,7 +99,7 @@ export function TopNavSegment({
                   aria-hidden
                   className="pointer-events-none absolute inset-x-2 top-0 h-[1px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent"
                 />
-              </motion.span>
+              </BoundedLiquidPill>
             )}
 
             <Icon

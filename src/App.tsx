@@ -41,6 +41,8 @@ import { BottomNavBar } from './features/navigation/components/BottomNavBar'
 import { TopNavSegment } from './features/navigation/components/TopNavSegment'
 import { ProfileTab } from './features/navigation/components/ProfileTab'
 import { UserAvatarView } from './shared/components/UserAvatarView'
+import { BoundedLiquidPill } from './shared/components/BoundedLiquidPill'
+import { useLiquidPillInteraction } from './shared/hooks/useLiquidPillInteraction'
 import { useUserAvatar } from './features/auth/services/avatarStore'
 import { useUserNickname } from './features/auth/services/nicknameStore'
 import type { AppTab } from './features/navigation/types'
@@ -163,8 +165,10 @@ export default function App() {
     setRecommendationPreferences,
   } = useTripDialogs()
   const { mobileItineraryPane, setMobileItineraryPane } = useMobilePane()
-  const [hasInteractedPane, setHasInteractedPane] = useState(false)
-  const [hasInteractedDay, setHasInteractedDay] = useState(false)
+  const paneInteraction = useLiquidPillInteraction<'timeline' | 'map'>()
+  const dayInteraction = useLiquidPillInteraction<number>()
+  const clearPaneInteraction = paneInteraction.clear
+  const clearDayInteraction = dayInteraction.clear
   const [summaryHasLeftOverflow, setSummaryHasLeftOverflow] = useState(false)
   const [dayRailHasLeftOverflow, setDayRailHasLeftOverflow] = useState(false)
   const initialItinerary = useMemo(() => {
@@ -233,11 +237,11 @@ export default function App() {
       if (nextTab === activeTab) return
 
       tabScrollPositionsRef.current[activeTab] = window.scrollY
-      setHasInteractedDay(false)
-      setHasInteractedPane(false)
+      clearDayInteraction()
+      clearPaneInteraction()
       setActiveTab(nextTab)
     },
-    [activeTab],
+    [activeTab, clearDayInteraction, clearPaneInteraction],
   )
   const restoreTabScroll = useCallback(
     (tab: AppTab) => {
@@ -988,9 +992,14 @@ export default function App() {
                                     (copyRefreshing && i === dayIndex && !d.title)
                                   }
                                   active={i === dayIndex}
-                                  hasInteracted={hasInteractedDay}
+                                  interactionToken={dayInteraction.tokenFor(d.day)}
+                                  onInteractionSettled={dayInteraction.onInteractionSettled}
+                                  liquidEdge={
+                                    i === 0 ? 'left' : i === days.length - 1 ? 'right' : null
+                                  }
                                   onSelect={() => {
-                                    setHasInteractedDay(true)
+                                    if (i === dayIndex) return
+                                    dayInteraction.activate(d.day)
                                     handleSelectDay(i)
                                   }}
                                 />
@@ -1010,29 +1019,22 @@ export default function App() {
                               role="tab"
                               aria-selected={mobileItineraryPane === 'timeline'}
                               onClick={() => {
-                                setHasInteractedPane(true)
+                                if (mobileItineraryPane !== 'timeline') {
+                                  paneInteraction.activate('timeline')
+                                }
                                 setMobileItineraryPane('timeline')
                               }}
                               className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
                             >
                               {mobileItineraryPane === 'timeline' && (
-                                <motion.span
+                                <BoundedLiquidPill
                                   layoutId="itinerary-pane-pill"
                                   layoutDependency={mobileItineraryPane}
-                                  className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                                  animate={
-                                    hasInteractedPane
-                                      ? {
-                                          scaleX: [1, 1.16, 0.95, 1],
-                                          scaleY: [1, 0.88, 1.03, 1],
-                                        }
-                                      : undefined
-                                  }
-                                  transition={{
-                                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                  }}
+                                  className="rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                                  interactionToken={paneInteraction.tokenFor('timeline')}
+                                  onInteractionSettled={paneInteraction.onInteractionSettled}
+                                  edge="left"
+                                  deformationStrength={1.07}
                                 />
                               )}
                               <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'timeline' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
@@ -1044,29 +1046,22 @@ export default function App() {
                               role="tab"
                               aria-selected={mobileItineraryPane === 'map'}
                               onClick={() => {
-                                setHasInteractedPane(true)
+                                if (mobileItineraryPane !== 'map') {
+                                  paneInteraction.activate('map')
+                                }
                                 setMobileItineraryPane('map')
                               }}
                               className="relative isolate flex-1 rounded-full px-3 py-2 text-sm transition-colors outline-none cursor-pointer"
                             >
                               {mobileItineraryPane === 'map' && (
-                                <motion.span
+                                <BoundedLiquidPill
                                   layoutId="itinerary-pane-pill"
                                   layoutDependency={mobileItineraryPane}
-                                  className="absolute inset-0 z-0 rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                                  animate={
-                                    hasInteractedPane
-                                      ? {
-                                          scaleX: [1, 1.16, 0.95, 1],
-                                          scaleY: [1, 0.88, 1.03, 1],
-                                        }
-                                      : undefined
-                                  }
-                                  transition={{
-                                    layout: { type: 'spring', stiffness: 420, damping: 28, mass: 0.8 },
-                                    scaleX: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                    scaleY: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
-                                  }}
+                                  className="rounded-full border border-black/[0.04] dark:border-white/10 bg-white dark:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                                  interactionToken={paneInteraction.tokenFor('map')}
+                                  onInteractionSettled={paneInteraction.onInteractionSettled}
+                                  edge="right"
+                                  deformationStrength={1.07}
                                 />
                               )}
                               <span className={`relative z-10 font-medium transition-colors duration-200 ${mobileItineraryPane === 'map' ? 'font-semibold text-[var(--copper)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
