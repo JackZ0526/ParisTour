@@ -6,9 +6,12 @@ import {
   resolveBookingHotelIdentity,
   type BookingHotelRecord,
 } from './bookingHotels'
+import { loadTripDates } from '../../itinerary/services/tripDates'
 
 const FALLBACK_HOTEL_IMAGE =
   'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'
+
+export const BOOKING_IDENTITY_VERSION = 3
 
 export function candidateToSelected(card: HotelCandidate): SelectedHotel {
   return {
@@ -28,6 +31,61 @@ export function candidateToSelected(card: HotelCandidate): SelectedHotel {
   }
 }
 
+/** Replace every provider-owned identity field with Booking's canonical record. */
+export function applyBookingHotelIdentity(
+  card: HotelCandidate,
+  identity: BookingHotelRecord,
+): HotelCandidate {
+  const name = identity.name
+  const address = identity.address || card.address
+  const lat = identity.location.lat
+  const lng = identity.location.lng
+  return {
+    ...card,
+    bookingHotelId: identity.id,
+    bookingIdentityVersion: BOOKING_IDENTITY_VERSION,
+    googlePlaceId: undefined,
+    name,
+    address,
+    lat,
+    lng,
+    area: normalizeHotelAreaLabel({
+      area: identity.area,
+      address,
+      name,
+      lat,
+      lng,
+    }),
+    image: identity.image || card.image,
+    photos: identity.photos.length ? identity.photos : card.photos,
+    description: identity.description || '',
+    reason: undefined,
+    tripFit: undefined,
+    hotelAdvisorVersion: undefined,
+    rating: identity.rating,
+    reviewCount: identity.reviewCount,
+    starRating: identity.stars,
+    propertyType: identity.propertyType,
+    facilities: [],
+    reviewScores: undefined,
+    languages: undefined,
+    policies: undefined,
+    paymentMethods: undefined,
+    sustainability: undefined,
+    districtLabel: undefined,
+    distanceToCityCenterKm: undefined,
+    locationDescription: undefined,
+    reviews: [],
+    checkIn: undefined,
+    checkOut: undefined,
+    bookingUrl: undefined,
+    bookingDetailsLoaded: false,
+    bookingDetailsVersion: undefined,
+    bookingPhotosLoaded: false,
+    bookingReviewsLoaded: false,
+  }
+}
+
 function ratingHint(details: Pick<BookingHotelRecord, 'rating' | 'reviewCount'> | null) {
   if (details?.rating == null) return undefined
   const count = details.reviewCount != null ? `（${details.reviewCount}）` : ''
@@ -41,7 +99,7 @@ async function resolveRecord(input: {
   const cached = peekBookingHotel(input.bookingHotelId)
   if (cached) return cached
   if (!input.bookingHotelId) {
-    return resolveBookingHotelIdentity(input.name).catch(() => null)
+    return resolveBookingHotelIdentity(input.name, loadTripDates()).catch(() => null)
   }
   return null
 }
@@ -96,6 +154,7 @@ export async function resolveHotelCandidate(input: {
   return {
     id: `hotel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     bookingHotelId: details?.id || input.bookingHotelId,
+    bookingIdentityVersion: details?.id ? BOOKING_IDENTITY_VERSION : undefined,
     googlePlaceId: input.googlePlaceId,
     name,
     area,

@@ -6,6 +6,7 @@ import {
   resetHotelCacheForTests,
   saveHotelCache,
 } from '../features/hotel/services/hotelCache'
+import { applyBookingHotelIdentity } from '../features/hotel/services/hotelResolve'
 import type { HotelCandidate } from '../types'
 
 const STORAGE_KEY = 'paris-tour-hotel-cache-v1'
@@ -75,5 +76,48 @@ describe('hotelCache', () => {
     expect(hotelSelectionFingerprint([{ id: 'a' }], 'a')).not.toBe(
       hotelSelectionFingerprint([{ id: 'a' }], 'b'),
     )
+  })
+
+  it('replaces legacy Google identity fields with Booking canonical data', () => {
+    const migrated = applyBookingHotelIdentity(
+      {
+        ...candidate,
+        name: 'Padam hôtel 4*',
+        area: '7区 (Tour Eiffel / 埃菲尔)',
+        googlePlaceId: 'google-legacy',
+        rating: 4.8,
+        reviewCount: 900,
+        description: '4-star boutique hotel in the 16th arrondissement.',
+        reason: 'Near Trocadéro.',
+        tripFit: 'Matches the old Google record.',
+        hotelAdvisorVersion: 2,
+      },
+      {
+        id: 'booking-padam',
+        name: 'Padam Hôtel',
+        address: '9 Rue Jean Giraudoux, 75116 Paris',
+        location: { lat: 48.868, lng: 2.296 },
+        photos: [],
+        facilities: [],
+        reviews: [],
+      },
+    )
+
+    expect(migrated).toMatchObject({
+      bookingHotelId: 'booking-padam',
+      bookingIdentityVersion: 3,
+      name: 'Padam Hôtel',
+      address: '9 Rue Jean Giraudoux, 75116 Paris',
+      lat: 48.868,
+      lng: 2.296,
+    })
+    expect(migrated.googlePlaceId).toBeUndefined()
+    expect(migrated.rating).toBeUndefined()
+    expect(migrated.reviewCount).toBeUndefined()
+    expect(migrated.description).toBe('')
+    expect(migrated.reason).toBeUndefined()
+    expect(migrated.tripFit).toBeUndefined()
+    expect(migrated.hotelAdvisorVersion).toBeUndefined()
+    expect(migrated.area).toContain('16区')
   })
 })

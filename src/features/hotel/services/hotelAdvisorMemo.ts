@@ -8,16 +8,19 @@ import { getLocale, type Locale } from '../../../shared/i18n'
 import { looksChinese } from '../../chat/services/translate'
 import type { HotelCandidate } from '../../../types'
 
+export const HOTEL_ADVISOR_VERSION = 4
+const HOTEL_ADVISOR_KEY_VERSION = 'v5'
+
 export function hotelAdvisorCardKey(cardId: string, locale: Locale = getLocale()) {
-  return `hotel-detail:v3:${locale}:${cardId}`
+  return `hotel-detail:${HOTEL_ADVISOR_KEY_VERSION}:${locale}:${cardId}`
 }
 
 export function hotelAdvisorBookingKey(bookingHotelId: string, locale: Locale = getLocale()) {
-  return `hotel-detail:v3:${locale}:booking:${bookingHotelId.trim()}`
+  return `hotel-detail:${HOTEL_ADVISOR_KEY_VERSION}:${locale}:booking:${bookingHotelId.trim()}`
 }
 
 export function hotelAdvisorNameKey(name: string, locale: Locale = getLocale()) {
-  return `hotel-detail:v3:${locale}:name:${name.toLowerCase().trim()}`
+  return `hotel-detail:${HOTEL_ADVISOR_KEY_VERSION}:${locale}:name:${name.toLowerCase().trim()}`
 }
 
 /** Stable first, then name, then ephemeral card id. */
@@ -49,6 +52,16 @@ export function isValidMemoForLocale(reason: string, locale: Locale = getLocale(
   return true
 }
 
+/** Booking-backed cards must never reuse prose containing Google-owned hotel facts. */
+export function isHotelAdvisorCopyCompatible(
+  hotel: { bookingHotelId?: string },
+  reason: string,
+  locale: Locale = getLocale(),
+): boolean {
+  if (!isValidMemoForLocale(reason, locale)) return false
+  return !hotel.bookingHotelId || !/\bgoogle(?:\s+(?:rating|score|reviews?))?\b/i.test(reason)
+}
+
 export function peekHotelAdvisorCopy(
   ...keys: Array<string | undefined | null>
 ): HotelDetailCopy | undefined {
@@ -72,7 +85,7 @@ export function rememberHotelAdvisorCopy(
   locale: Locale = getLocale(),
 ) {
   const trimmed = reason.trim()
-  if (!trimmed || !isValidMemoForLocale(trimmed, locale)) return
+  if (!trimmed || !isHotelAdvisorCopyCompatible(hotel, trimmed, locale)) return
   const keys = hotelAdvisorKeys(hotel, locale)
   if (!keys.length) return
   const value: HotelDetailCopy = { intro: '', reason: trimmed, tripFit: '' }
@@ -85,18 +98,18 @@ export function hydrateHotelAdvisorFromCache(
   hotel: HotelCandidate,
   locale: Locale = getLocale(),
 ): HotelCandidate {
-  if (hotel.tripFit?.trim() && isValidMemoForLocale(hotel.tripFit, locale)) {
+  if (hotel.tripFit?.trim() && isHotelAdvisorCopyCompatible(hotel, hotel.tripFit, locale)) {
     rememberHotelAdvisorCopy(hotel, hotel.tripFit, locale)
     return hotel
   }
   const cached = peekHotelAdvisorCopy(...hotelAdvisorKeys(hotel, locale))
   const reason = cached?.reason?.trim()
-  if (!reason || !isValidMemoForLocale(reason, locale)) return hotel
+  if (!reason || !isHotelAdvisorCopyCompatible(hotel, reason, locale)) return hotel
   rememberHotelAdvisorCopy(hotel, reason, locale)
   return {
     ...hotel,
     tripFit: reason,
-    hotelAdvisorVersion: 2,
+    hotelAdvisorVersion: HOTEL_ADVISOR_VERSION,
   }
 }
 
@@ -109,7 +122,7 @@ export async function memoizeHotelAdvisorCopy(
   const keys = hotelAdvisorKeys(hotel, locale)
   if (!options?.bypass) {
     const existing = peekHotelAdvisorCopy(...keys)
-    if (existing && isValidMemoForLocale(existing.reason, locale)) {
+    if (existing && isHotelAdvisorCopyCompatible(hotel, existing.reason, locale)) {
       for (const key of keys) seedLlmMemo(key, existing)
       return existing
     }

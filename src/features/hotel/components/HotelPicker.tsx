@@ -15,9 +15,16 @@ import {
   persistHotelState,
   refreshHotelCandidates,
 } from '../services/hotelRecommend'
-import { candidateToSelected, resolveHotelCandidate } from '../services/hotelResolve'
 import {
+  BOOKING_IDENTITY_VERSION,
+  applyBookingHotelIdentity,
+  candidateToSelected,
+  resolveHotelCandidate,
+} from '../services/hotelResolve'
+import {
+  HOTEL_ADVISOR_VERSION,
   hydrateHotelAdvisorFromCache,
+  isHotelAdvisorCopyCompatible,
   memoizeHotelAdvisorCopy,
   rememberHotelAdvisorCopy,
 } from '../services/hotelAdvisorMemo'
@@ -288,6 +295,14 @@ function hasValidParisBookingIdentity(hotel: HotelCandidate): boolean {
       hotel.lat <= 49.05 &&
       hotel.lng >= 1.95 &&
       hotel.lng <= 2.7,
+  )
+}
+
+function needsBookingIdentityMigration(hotel: HotelCandidate): boolean {
+  return (
+    !hasValidParisBookingIdentity(hotel) ||
+    (hotel.bookingIdentityVersion || 0) < BOOKING_IDENTITY_VERSION ||
+    Boolean(hotel.googlePlaceId)
   )
 }
 
@@ -1075,6 +1090,7 @@ export function HotelPicker({
   } | null>(null)
   const cardBlurbInflightRef = useRef(new Set<string>())
   const cardBlurbFailedRef = useRef(new Set<string>())
+  const selectedIdentityMigrationRef = useRef(new Set<string>())
   candidatesRef.current = candidates
   daysRef.current = days
   selectedRef.current = selected
@@ -1138,7 +1154,7 @@ export function HotelPicker({
         : candidatesRef.current.find((hotel) => hotel.id === popupId)
     if (
       !card ||
-      hasValidParisBookingIdentity(card) ||
+      !needsBookingIdentityMigration(card) ||
       !isBookingApiEnabled()
     ) {
       setIdentityLoadingId(null)
@@ -1148,35 +1164,15 @@ export function HotelPicker({
     let cancelled = false
     setIdentityLoadingId(card.id)
     setIdentityError(null)
-    void resolveBookingHotelIdentity(card.name)
+    void resolveBookingHotelIdentity(card.name, loadTripDates())
       .then((identity) => {
         if (cancelled) return
         if (!identity) {
-          setIdentityError('没有找到对应的 Booking.com 酒店，请使用其原文名称重试。')
+          setIdentityError(t('hotel.bookingIdentityNotFound'))
           return
         }
         const enrich = (hotel: HotelCandidate): HotelCandidate =>
-          hotel.id !== card.id
-            ? hotel
-            : {
-                ...hotel,
-                bookingHotelId: identity.id,
-                name: identity.name,
-                address: identity.address || hotel.address,
-                lat: identity.location.lat,
-                lng: identity.location.lng,
-                image: identity.image || hotel.image,
-                photos: identity.photos.length ? identity.photos : hotel.photos,
-                area: hotel.area || identity.area || '巴黎',
-                facilities: [],
-                reviews: [],
-                checkIn: undefined,
-                checkOut: undefined,
-                bookingUrl: undefined,
-                bookingDetailsLoaded: false,
-                bookingPhotosLoaded: false,
-                bookingReviewsLoaded: false,
-              }
+          hotel.id === card.id ? applyBookingHotelIdentity(hotel, identity) : hotel
         if (pendingCustomRef.current?.id === card.id) {
           setPendingCustom((current) => (current ? enrich(current) : current))
           return
@@ -1194,7 +1190,7 @@ export function HotelPicker({
       .catch((cause) => {
         if (cancelled) return
         setIdentityError(
-          cause instanceof Error ? cause.message : 'Booking.com 酒店身份匹配失败。',
+          cause instanceof Error ? cause.message : t('hotel.bookingIdentityFailed'),
         )
       })
       .finally(() => {
@@ -1205,7 +1201,7 @@ export function HotelPicker({
     return () => {
       cancelled = true
     }
-  }, [popupId, identityRetryToken, onCandidatesChange, onSelect])
+  }, [popupId, identityRetryToken, onCandidatesChange, onSelect, t])
 
   useEffect(() => {
     if (!popupId) {
@@ -1365,6 +1361,59 @@ export function HotelPicker({
     () => candidates.find((h) => h.id === selected.id) || null,
     [candidates, selected.id],
   )
+  const selectedIdentityKey = selectedCandidate
+    ? `${selectedCandidate.id}:${selectedCandidate.bookingHotelId || ''}:${selectedCandidate.name}:${selectedCandidate.lat}:${selectedCandidate.lng}`
+    : ''
+
+  // Old local/cloud snapshots can still contain a Google-era hotel name and
+  // coordinates without a Booking identity. Migrate the confirmed stay in
+  // the background; opened cards are handled by the visible retry flow above.
+  useEffect(() => {
+    const card = candidatesRef.current.find(
+      (hotel) => hotel.id === selectedRef.current.id,
+    )
+    if (
+      readOnly ||
+      !card ||
+      popupId === card.id ||
+      !needsBookingIdentityMigration(card) ||
+      !isBookingApiEnabled()
+    ) {
+      return
+    }
+
+    const migrationKey = `${card.id}:${card.name}`
+    if (selectedIdentityMigrationRef.current.has(migrationKey)) return
+    selectedIdentityMigrationRef.current.add(migrationKey)
+
+    let cancelled = false
+    void resolveBookingHotelIdentity(card.name, loadTripDates())
+      .then((identity) => {
+        if (cancelled || !identity) return
+        const current = candidatesRef.current.find((hotel) => hotel.id === card.id)
+        if (!current || !needsBookingIdentityMigration(current)) return
+        const migrated = applyBookingHotelIdentity(current, identity)
+        const next = candidatesRef.current.map((hotel) =>
+          hotel.id === current.id ? migrated : hotel,
+        )
+        onCandidatesChange(next)
+        const nextSelected =
+          selectedRef.current.id === current.id
+            ? candidateToSelected(migrated)
+            : selectedRef.current
+        if (nextSelected !== selectedRef.current) onSelect(nextSelected)
+        persistHotelState(next, nextSelected)
+      })
+      .catch(() => {
+        // Keep the confirmed stay intact. Opening its detail provides a
+        // localized retry surface with the provider error.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [onCandidatesChange, onSelect, popupId, readOnly, selectedIdentityKey])
+
   const otherCandidates = useMemo(
     () =>
       selectedCandidate
@@ -1429,21 +1478,14 @@ export function HotelPicker({
     const card = popupCandidate
     const bypass = hotelStoryRegenToken > 0
 
-    const isValidForLocale = (text?: string) => {
-      if (!text?.trim()) return false
-      if (locale === 'en' && looksChinese(text)) return false
-      if (locale === 'zh-CN' && !looksChinese(text)) return false
-      return true
-    }
-
-    if (!bypass && card.tripFit?.trim() && isValidForLocale(card.tripFit) && card.hotelAdvisorVersion === 2) {
+    if (!bypass && card.tripFit?.trim() && isHotelAdvisorCopyCompatible(card, card.tripFit, locale) && card.hotelAdvisorVersion === HOTEL_ADVISOR_VERSION) {
       rememberHotelAdvisorCopy(card, card.tripFit, locale)
       return
     }
 
     if (!bypass) {
       const hydrated = hydrateHotelAdvisorFromCache(card, locale)
-      if (hydrated.tripFit?.trim() && isValidForLocale(hydrated.tripFit) && hydrated.hotelAdvisorVersion === 2) {
+      if (hydrated.tripFit?.trim() && isHotelAdvisorCopyCompatible(hydrated, hydrated.tripFit, locale) && hydrated.hotelAdvisorVersion === HOTEL_ADVISOR_VERSION) {
         if (hydrated.tripFit !== card.tripFit) {
           const enrich = (h: HotelCandidate): HotelCandidate =>
             h.id === card.id ? hydrated : h
@@ -1530,14 +1572,14 @@ export function HotelPicker({
         { bypass },
       )
 
-      if (cancelled || !copy?.reason) return
+      if (cancelled || !copy?.reason || !isHotelAdvisorCopyCompatible(latest, copy.reason, locale)) return
 
       const enrich = (h: HotelCandidate): HotelCandidate =>
         h.id === card.id
           ? {
               ...h,
               tripFit: copy.reason || h.tripFit,
-              hotelAdvisorVersion: 2,
+              hotelAdvisorVersion: HOTEL_ADVISOR_VERSION,
             }
           : h
 
@@ -1547,7 +1589,7 @@ export function HotelPicker({
       }
 
       const current = candidatesRef.current.find((h) => h.id === card.id)
-      if (!bypass && current?.tripFit?.trim() && current.hotelAdvisorVersion === 2) return
+      if (!bypass && current?.tripFit?.trim() && current.hotelAdvisorVersion === HOTEL_ADVISOR_VERSION) return
 
       const next = candidatesRef.current.map(enrich)
       onCandidatesChange(next)
@@ -1579,6 +1621,7 @@ export function HotelPicker({
     popupCandidate?.name,
     popupCandidate?.bookingDetailsLoaded,
     popupCandidate?.bookingDetailsVersion,
+    popupCandidate?.hotelAdvisorVersion,
     detailsLoadingId,
     hotelStoryRegenToken,
   ])
@@ -2743,10 +2786,14 @@ export function HotelPicker({
                     ? streamingAdvisorReason ||
                       (hotelStoryRegenToken > 0
                         ? undefined
-                        : (locale === 'en' && looksChinese(popupCandidate.tripFit || '')
+                        : (popupCandidate.hotelAdvisorVersion !== HOTEL_ADVISOR_VERSION ||
+                            !isHotelAdvisorCopyCompatible(popupCandidate, popupCandidate.tripFit || '', locale) ||
+                            (locale === 'en' && looksChinese(popupCandidate.tripFit || ''))
                             ? undefined
                             : popupCandidate.tripFit))
-                    : (locale === 'en' && looksChinese(popupCandidate.tripFit || '')
+                    : (popupCandidate.hotelAdvisorVersion !== HOTEL_ADVISOR_VERSION ||
+                        !isHotelAdvisorCopyCompatible(popupCandidate, popupCandidate.tripFit || '', locale) ||
+                        (locale === 'en' && looksChinese(popupCandidate.tripFit || ''))
                         ? undefined
                         : popupCandidate.tripFit),
                 loading: storyLoadingId === popupCandidate.id,

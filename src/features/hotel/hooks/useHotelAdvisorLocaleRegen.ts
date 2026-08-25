@@ -29,6 +29,7 @@ import {
 } from '../../../shared/services/llm/llm'
 import { isLlmConfigured } from '../../../shared/services/llm/llm'
 import {
+  HOTEL_ADVISOR_VERSION,
   hotelAdvisorKeys,
   isValidMemoForLocale,
   rememberHotelAdvisorCopy,
@@ -155,7 +156,7 @@ export function useHotelAdvisorLocaleRegen({
                 author: r.author,
               }))
               const copy = await memoizeLlmCall(
-                hotelAdvisorKeys(hotel, newLocale)[0] || `hotel-detail:v3:${newLocale}:${hotel.id}`,
+                hotelAdvisorKeys(hotel, newLocale)[0] || `hotel-detail:v5:${newLocale}:${hotel.id}`,
                 () =>
                   generateHotelDetailCopy({
                     name: hotel.name,
@@ -184,7 +185,7 @@ export function useHotelAdvisorLocaleRegen({
               rememberHotelAdvisorCopy(hotel, copy.reason, newLocale)
               applyToCandidate(hotel.id, {
                 tripFit: copy.reason,
-                hotelAdvisorVersion: 2,
+                hotelAdvisorVersion: HOTEL_ADVISOR_VERSION,
               })
             } catch {
               // Silent.

@@ -4,7 +4,7 @@ import { isCloudSyncedArtifactKey } from '../shared/services/llm/artifactCloudPo
 describe('artifactCloudPolicy', () => {
   it('allowlists LLM copy that should roam across devices', () => {
     expect(isCloudSyncedArtifactKey('place-detail:v3:zh-CN:louvre')).toBe(true)
-    expect(isCloudSyncedArtifactKey('hotel-detail:v3:zh-CN:booking:1')).toBe(true)
+    expect(isCloudSyncedArtifactKey('hotel-detail:v5:zh-CN:booking:1')).toBe(true)
     expect(isCloudSyncedArtifactKey('recommend:v2:zh-CN:day:1')).toBe(true)
     expect(isCloudSyncedArtifactKey('translations:zh')).toBe(true)
     expect(isCloudSyncedArtifactKey('place-names:zh')).toBe(true)

@@ -52,9 +52,9 @@ describe('hotelAdvisorMemo', () => {
         bookingHotelId: '12345',
       }),
     ).toEqual([
-      'hotel-detail:v3:zh-CN:booking:12345',
-      'hotel-detail:v3:zh-CN:name:padam hôtel',
-      'hotel-detail:v3:zh-CN:hotel-111-abc',
+      'hotel-detail:v5:zh-CN:booking:12345',
+      'hotel-detail:v5:zh-CN:name:padam hôtel',
+      'hotel-detail:v5:zh-CN:hotel-111-abc',
     ])
   })
 
@@ -69,7 +69,7 @@ describe('hotelAdvisorMemo', () => {
     )
 
     expect(restored.tripFit).toBe('坐落于16区安静街道，步行约20分钟可达埃菲尔铁塔。')
-    expect(restored.hotelAdvisorVersion).toBe(2)
+    expect(restored.hotelAdvisorVersion).toBe(4)
   })
 
   it('restores advisor copy by hotel name when booking id is not yet known', () => {
@@ -80,5 +80,17 @@ describe('hotelAdvisorMemo', () => {
 
     const restored = hydrateHotelAdvisorFromCache(hotel({ id: 'hotel-new', name: 'Padam Hôtel' }))
     expect(restored.tripFit).toContain('位置评分高达9.6')
+  })
+
+  it('does not restore Google provider facts onto a Booking-backed hotel', () => {
+    const legacy = hotel({
+      id: 'hotel-padam',
+      name: 'Padam Hôtel',
+      bookingHotelId: '12345',
+      tripFit: 'Its exceptional Google score of 4.7 comes from 175 reviews.',
+      hotelAdvisorVersion: 3,
+    })
+
+    expect(hydrateHotelAdvisorFromCache(legacy)).toBe(legacy)
   })
 })

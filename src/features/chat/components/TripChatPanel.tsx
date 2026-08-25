@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
+import { useReducedMotion } from '../../../shared/hooks/useReducedMotion'
 import { useTranslation } from '../../../shared/i18n'
 import { createPortal } from 'react-dom'
 import {
@@ -100,6 +101,7 @@ import {
 // Locale-aware chat action notes. These are helpers (not module constants)
 // because the registry needs to be live and we want the active locale.
 import { getLocale, translate, type Locale } from '../../../shared/i18n'
+import { buildTripChatSuggestions } from '../services/tripChatSuggestions'
 
 function noActionAppliedNote(locale: Locale = getLocale()): string {
   return (
@@ -249,20 +251,6 @@ interface Props {
   onClose?: () => void
 }
 
-interface ChatSuggestion {
-  /** i18n key (TranslationKey) used to render the chip text via t() at render time. */
-  text: import('../../../shared/i18n').TranslationKey
-  tone: keyof typeof glassCapsuleToneClass
-}
-
-const SUGGESTIONS: ChatSuggestion[] = [
-  { text: 'chat.suggestHotelCurrent', tone: 'gold' },
-  { text: 'chat.suggestHotelsLeftBank', tone: 'gold' },
-  { text: 'chat.suggestFirstPlace', tone: 'sage' },
-  { text: 'chat.suggestAddCafe', tone: 'copper' },
-  { text: 'chat.suggestRemoveArc', tone: 'neutral' },
-]
-
 export function TripChatPanel({
   hotel,
   hotelCandidates,
@@ -294,7 +282,20 @@ export function TripChatPanel({
   useBodyScrollLock(open && !isDesktop)
   const { isDark } = useTheme()
   const { t, locale } = useTranslation()
+  const reduceMotion = useReducedMotion()
   const { model, thinkingMode } = useLlmSettings()
+  const suggestions = useMemo(
+    () =>
+      buildTripChatSuggestions({
+        hotel,
+        days,
+        currentDay,
+        customPlaces,
+        viewing,
+        locale,
+      }),
+    [currentDay, customPlaces, days, hotel, locale, viewing],
+  )
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [colorKeepActive, setColorKeepActive] = useState(false)
@@ -2434,8 +2435,54 @@ export function TripChatPanel({
           {/* Full-panel Drag & Drop Overlay */}
           {isDraggingOver && (
             <div className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[var(--sage)] bg-white/92 dark:bg-black/92 backdrop-blur-lg shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--sage)]/15 text-[var(--sage)] border border-[var(--sage)]/30 shadow-inner">
-                <ImageIcon className="h-8 w-8 animate-bounce" strokeWidth={1.8} />
+              <div className="relative flex h-16 w-16 items-center justify-center text-[var(--sage)]">
+                <motion.div
+                  initial={{ y: 0, rotate: 0, scale: 1 }}
+                  animate={
+                    reduceMotion
+                      ? { y: 0, rotate: 0, scale: 1 }
+                      : {
+                          y: [0, -9, 0, -20, -24, -10, 0, -7, 0, 0],
+                          rotate: [0, -6, 0, 0, 145, 295, 360, 360, 360, 360],
+                          scale: [1, 1.05, 0.98, 1.03, 1.08, 1.04, 0.96, 1.02, 1, 1],
+                        }
+                  }
+                  transition={
+                    reduceMotion
+                      ? { duration: 0.12 }
+                      : {
+                          duration: 1.45,
+                          times: [0, 0.12, 0.22, 0.32, 0.42, 0.52, 0.6, 0.72, 0.82, 1],
+                          ease: 'easeInOut',
+                          repeat: Infinity,
+                          repeatDelay: 1,
+                        }
+                  }
+                  className="relative z-10 will-change-transform"
+                >
+                  <ImageIcon
+                    className="h-10 w-10 drop-shadow-[0_5px_10px_color-mix(in_srgb,var(--sage)_35%,transparent)]"
+                    strokeWidth={1.75}
+                  />
+                </motion.div>
+                {!reduceMotion && (
+                  <motion.span
+                    aria-hidden
+                    initial={{ opacity: 0.22, scaleX: 1 }}
+                    animate={{
+                      opacity: [0.22, 0.1, 0.26, 0.12, 0.05, 0.14, 0.28, 0.16, 0.24, 0.22],
+                      scaleX: [1, 0.7, 1.12, 0.76, 0.48, 0.76, 1.18, 0.8, 1.04, 1],
+                    }}
+                    transition={{
+                      duration: 1.45,
+                      times: [0, 0.12, 0.22, 0.32, 0.42, 0.52, 0.6, 0.72, 0.82, 1],
+                      ease: 'easeInOut',
+                      repeat: Infinity,
+                      repeatDelay: 1,
+                    }}
+                    className="absolute bottom-1 h-1.5 w-8 rounded-full bg-[var(--sage)] blur-[3px] will-change-transform"
+                  />
+                )}
               </div>
               <div className="text-center px-6">
                 <p className="text-sm font-semibold text-[var(--ink)]">
@@ -2518,15 +2565,15 @@ export function TripChatPanel({
                   {t('chat.tryAskingIntro')}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {SUGGESTIONS.map(({ text, tone }) => (
+                  {suggestions.map(({ id, label, tone }) => (
                     <button
-                      key={text}
+                      key={id}
                       type="button"
                       disabled={busy}
-                      onClick={() => void submit(t(text))}
+                      onClick={() => void submit(label)}
                       className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass[tone]} inline-flex items-center px-3 py-1.5 text-left text-xs font-medium text-[var(--ink)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer`}
                     >
-                      {t(text)}
+                      {label}
                     </button>
                   ))}
                 </div>

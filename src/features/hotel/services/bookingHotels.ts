@@ -506,45 +506,72 @@ export function normalizeBookingSearchResponse(payload: unknown): BookingHotelRe
   return out
 }
 
-export function normalizeBookingHotelIdentityResponse(
-  payload: unknown,
-  query: string,
-): BookingHotelRecord | null {
+type BookingHotelIdentityHit = Omit<
+  BookingHotelRecord,
+  'location' | 'facilities' | 'reviews'
+> & {
+  location?: Coordinates
+}
+
+function normalizeBookingHotelIdentityHits(payload: unknown): BookingHotelIdentityHit[] {
   const root = asRecord(payload)
   const rows = Array.isArray(root?.data) ? root.data : []
-  const hotels = rows.flatMap((value) => {
+  return rows.flatMap((value) => {
     const row = asRecord(value)
     if (!row || (text(row.dest_type) !== 'hotel' && text(row.type) !== 'ho')) return []
+    const location = asRecord(row.location)
+    const coordinates = asRecord(row.coordinates)
     const id = String(row.dest_id ?? '').trim()
     const name = text(row.name)
-    const lat = number(row.latitude)
-    const lng = number(row.longitude)
-    if (!id || !name || lat == null || lng == null) return []
+    const lat = number(row.latitude ?? row.lat ?? location?.latitude ?? location?.lat ?? coordinates?.latitude ?? coordinates?.lat)
+    const lng = number(row.longitude ?? row.lng ?? location?.longitude ?? location?.lng ?? coordinates?.longitude ?? coordinates?.lng)
+    if (!id || !name) return []
     return [{
       id,
       name,
       address: text(row.label) || joinedAddress(name, row.city_name, row.country),
-      location: { lat, lng },
+      location: lat != null && lng != null ? { lat, lng } : undefined,
       area: text(row.city_name),
       image: bookingPhotoUrl(row.image_url) || undefined,
       photos: uniqueStrings([bookingPhotoUrl(row.image_url)]),
-      facilities: [],
-      reviews: [],
-    } satisfies BookingHotelRecord]
-  }).filter((hotel) => distanceMeters(PARIS, hotel.location) <= 30_000)
-  return (
-    hotels
-      .map((hotel) => ({
-        hotel,
-        score: placeIdentitySimilarity(query, hotel.name),
-      }))
-      .filter(
-        (item) =>
-          item.score >= PLACE_NAME_MATCH_MIN &&
-          hasMeaningfulHotelNameOverlap(query, item.hotel.name),
-      )
-      .sort((a, b) => b.score - a.score)[0]?.hotel || null
+    } satisfies BookingHotelIdentityHit]
+  })
+}
+
+function bestBookingHotelIdentityHit(
+  hotels: BookingHotelIdentityHit[],
+  query: string,
+): BookingHotelIdentityHit | null {
+  return hotels
+    .map((hotel) => ({
+      hotel,
+      score: placeIdentitySimilarity(query, hotel.name),
+    }))
+    .filter(
+      (item) =>
+        item.score >= PLACE_NAME_MATCH_MIN &&
+        hasMeaningfulHotelNameOverlap(query, item.hotel.name),
+    )
+    .sort((a, b) => b.score - a.score)[0]?.hotel || null
+}
+
+export function normalizeBookingHotelIdentityResponse(
+  payload: unknown,
+  query: string,
+): BookingHotelRecord | null {
+  const hit = bestBookingHotelIdentityHit(
+    normalizeBookingHotelIdentityHits(payload).filter(
+      (hotel) => hotel.location && distanceMeters(PARIS, hotel.location) <= 30_000,
+    ),
+    query,
   )
+  if (!hit?.location) return null
+  return {
+    ...hit,
+    location: hit.location,
+    facilities: [],
+    reviews: [],
+  }
 }
 
 export function normalizeBookingDestinationResponse(
@@ -964,8 +991,9 @@ export async function searchBookingHotelCandidates(input: {
 
 export async function resolveBookingHotelIdentity(
   rawQuery: string,
+  dates?: { startDate: string; endDate: string } | null,
 ): Promise<BookingHotelRecord | null> {
-  const name = rawQuery.split(',')[0].trim()
+  const name = normalizeBookingHotelIdentityQuery(rawQuery)
   if (!name) return null
   const query = /\bparis\b/i.test(name) ? name : `${name} Paris`
   const key = `${IDENTITY_PREFIX}${query.toLowerCase()}`
@@ -978,10 +1006,75 @@ export async function resolveBookingHotelIdentity(
     query,
     languageCode: 'en-us',
   })
-  const identity = normalizeBookingHotelIdentityResponse(payload, query)
+  let identity = normalizeBookingHotelIdentityResponse(payload, query)
+  if (!identity) {
+    const hit = bestBookingHotelIdentityHit(
+      normalizeBookingHotelIdentityHits(payload).filter(
+        (hotel) =>
+          !hotel.location || distanceMeters(PARIS, hotel.location) <= 30_000,
+      ),
+      query,
+    )
+    if (hit && !hit.location) {
+      const lookupDates = bookingIdentityLookupDates(dates)
+      const detailPayload = await request<unknown>('stays/detail', {
+        hotelId: hit.id,
+        checkinDate: lookupDates.startDate,
+        checkoutDate: lookupDates.endDate,
+        rooms: '1',
+        adults: '2',
+        units: 'metric',
+        languageCode: 'en-us',
+        currencyCode: 'EUR',
+      })
+      const details = normalizeBookingDetailResponse(detailPayload)
+      if (
+        details &&
+        distanceMeters(PARIS, details.location) <= 30_000 &&
+        placeIdentitySimilarity(query, details.name) >= PLACE_NAME_MATCH_MIN &&
+        hasMeaningfulHotelNameOverlap(query, details.name)
+      ) {
+        identity = details
+      }
+    }
+  }
   if (identity) remember(identity, true)
   setLlmArtifact(key, { value: identity, fetchedAt: Date.now() })
   return identity
+}
+
+/** Remove legacy Google/LLM display decorations before Booking autocomplete. */
+export function normalizeBookingHotelIdentityQuery(rawQuery: string): string {
+  return rawQuery
+    .split(',')[0]
+    .replace(/(?:^|\s)[1-5]\s*(?:\*|★|stars?|étoiles?)(?=\s|$)/giu, ' ')
+    .replace(/[★☆]{1,5}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function bookingIdentityLookupDates(
+  dates?: { startDate: string; endDate: string } | null,
+): { startDate: string; endDate: string } {
+  const today = new Date()
+  const todayKey = today.toISOString().slice(0, 10)
+  if (
+    dates?.startDate &&
+    dates.endDate &&
+    dates.startDate > todayKey &&
+    dates.endDate > dates.startDate
+  ) {
+    return dates
+  }
+
+  const start = new Date(today)
+  start.setUTCDate(start.getUTCDate() + 2)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 2)
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  }
 }
 
 async function fetchBookingReviewScores(

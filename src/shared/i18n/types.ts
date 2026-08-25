@@ -342,6 +342,8 @@ export interface I18nSchema {
     advisorReviewLoading: string
     regenerateAdvisor: string
     retryMatching: string
+    bookingIdentityNotFound: string
+    bookingIdentityFailed: string
     loadingHotels: string
     viewDetails: string
     bookingReviews: string
@@ -684,11 +686,18 @@ export interface I18nSchema {
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: string
     // Suggested prompts
-    suggestHotelCurrent: string
-    suggestHotelsLeftBank: string
-    suggestFirstPlace: string
+    suggestChooseHotel: string
+    suggestHotelNamed: string
+    suggestHotelAlternativesNamed: string
+    suggestPlaceNamed: string
+    suggestAfterPlace: string
     suggestAddCafe: string
-    suggestRemoveArc: string
+    suggestAddRestaurant: string
+    suggestAddAttraction: string
+    suggestAddAnotherPlace: string
+    suggestOptimizeDay: string
+    suggestPlanDay: string
+    suggestRemovePlace: string
     // Work-step pipeline labels (ChatWorkStepList.tsx)
     workStepPreprocessPlan: string
     workStepPreprocessFallback: string

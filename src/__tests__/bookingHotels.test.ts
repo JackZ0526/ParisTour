@@ -9,10 +9,12 @@ import {
   normalizeBookingDescriptionResponse,
   normalizeBookingFeaturedReviews,
   normalizeBookingHotelIdentityResponse,
+  normalizeBookingHotelIdentityQuery,
   normalizeBookingPhotosResponse,
   normalizeBookingReviewScoresResponse,
   normalizeBookingSearchResponse,
   resetBookingHotelCacheForTests,
+  resolveBookingHotelIdentity,
   searchBookingHotelCandidates,
 } from '../features/hotel/services/bookingHotels'
 
@@ -475,6 +477,82 @@ describe('Booking hotel adapter', () => {
       name: 'Georgette Hôtel & Restaurant',
       image: 'https://cf.bstatic.com/georgette.jpg',
     })
+  })
+
+  it('removes legacy star decorations before Booking identity lookup', () => {
+    expect(normalizeBookingHotelIdentityQuery('Padam hôtel 4*')).toBe('Padam hôtel')
+    expect(normalizeBookingHotelIdentityQuery('Padam Hôtel 4 stars, Paris')).toBe(
+      'Padam Hôtel',
+    )
+  })
+
+  it('accepts nested coordinates returned by Booking autocomplete', () => {
+    const hotel = normalizeBookingHotelIdentityResponse(
+      {
+        data: [
+          {
+            dest_type: 'hotel',
+            dest_id: 'padam-1',
+            name: 'Padam Hôtel',
+            location: { latitude: 48.867, longitude: 2.292 },
+          },
+        ],
+      },
+      'Padam hôtel',
+    )
+
+    expect(hotel).toMatchObject({
+      id: 'padam-1',
+      name: 'Padam Hôtel',
+      location: { lat: 48.867, lng: 2.292 },
+    })
+  })
+
+  it('hydrates an autocomplete identity through Booking details when coordinates are absent', async () => {
+    vi.stubEnv('VITE_BOOKING_API_ENABLED', 'true')
+    const storage = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) || null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    })
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.includes('auto-complete')) {
+        return Response.json({
+          data: [
+            {
+              dest_type: 'hotel',
+              dest_id: 'padam-identity',
+              name: 'Padam Hôtel',
+              label: 'Padam Hôtel, Paris, France',
+            },
+          ],
+        })
+      }
+      return Response.json({
+        data: {
+          hotel_id: 'padam-identity',
+          hotel_name: 'Padam Hôtel',
+          latitude: 48.868,
+          longitude: 2.296,
+          address: '9 Rue Jean Giraudoux, Paris',
+        },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const hotel = await resolveBookingHotelIdentity('Padam hôtel 4*', {
+      startDate: '2098-04-01',
+      endDate: '2098-04-05',
+    })
+
+    expect(hotel).toMatchObject({
+      id: 'padam-identity',
+      name: 'Padam Hôtel',
+      location: { lat: 48.868, lng: 2.296 },
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('caches candidate, detail, and featured-review requests independently', async () => {

@@ -12,6 +12,8 @@ export interface Coordinates {
 export interface HotelCandidate {
   id: string
   bookingHotelId?: string
+  /** Canonical Booking identity schema; used to migrate legacy provider snapshots once. */
+  bookingIdentityVersion?: number
   /** Legacy identity retained for older saved trips. */
   googlePlaceId?: string
   name: string
@@ -69,7 +71,7 @@ export interface HotelCandidate {
   reason?: string
   /** How this stay fits the trip + user preferences */
   tripFit?: string
-  /** LLM advisor reason schema version; v2 = single combined reason. */
+  /** LLM advisor reason schema version; v4 = validated Booking-only provider facts. */
   hotelAdvisorVersion?: number
   isBest?: boolean
   source: 'llm' | 'custom'
