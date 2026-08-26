@@ -21,6 +21,13 @@ import { loadRecommendationPreferences } from '../features/place/services/recomm
 import { SELECTED_HOTEL_PLACE_ID } from '../features/itinerary/utils/dayOrigin'
 import { resolveItineraryStartSync } from '../shared/services/llm/business/itinerary'
 
+function daysStructureKey(daysList?: DayPlan[]): string {
+  if (!daysList?.length) return ''
+  return daysList
+    .map((d) => `${d.day}:${d.stops.map((s) => s.placeId).join(',')}`)
+    .join(';')
+}
+
 export interface UseTripSyncDeps {
   tripSyncEpoch: number
   canEdit: boolean
@@ -160,6 +167,8 @@ export function useTripSync(
   daysRef.current = days
   selectedPlaceIdRef.current = selectedPlaceId
 
+  const lastNotifiedDaysStructureRef = useRef<string>(daysStructureKey(days))
+
   const cloudSaveSkipRunsRef = useRef(2)
   const cloudHydratedAtRef = useRef(Date.now())
 
@@ -184,6 +193,7 @@ export function useTripSync(
 
     tripInputsHydratedRef.current = true
     suppressCloudSaveRef.current = false
+    lastNotifiedDaysStructureRef.current = daysStructureKey(nextItinerary.days)
 
     setHotel(nextHotels.hotel)
     setHotelCandidates(nextHotels.candidates)
@@ -203,9 +213,9 @@ export function useTripSync(
     setItineraryStart(resolvedStart)
     setItineraryStartLoading(false)
     setDays(nextItinerary.days)
-    setCustomPlaces(nextItinerary.customPlaces)
-    setItineraryGenerated(Boolean(nextItinerary.days.length))
-    setItineraryFingerprint(nextItinerary.fingerprint || null)
+    setCustomPlaces(nextItinerary.customPlaces || {})
+    setItineraryGenerated(Boolean(nextItinerary.generated))
+    setItineraryFingerprint(nextItinerary.fingerprint ?? null)
     setRecommendationPreferences(nextRecommendationPreferences)
     setItineraryGenerating(false)
     setItineraryGenError(null)
@@ -249,10 +259,17 @@ export function useTripSync(
       return
     }
     if (Date.now() - cloudHydratedAtRef.current < 2000) return
-    if (suppressCloudSaveRef.current) {
+
+    const currentStructure = daysStructureKey(days)
+    const isStructuralChange =
+      currentStructure !== lastNotifiedDaysStructureRef.current
+    lastNotifiedDaysStructureRef.current = currentStructure
+
+    if (suppressCloudSaveRef.current && !isStructuralChange) {
       suppressCloudSaveRef.current = false
       return
     }
+    suppressCloudSaveRef.current = false
     if (!canEdit) return
     notifyTripChanged()
   }, [
