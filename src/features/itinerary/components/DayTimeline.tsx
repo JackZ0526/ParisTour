@@ -2238,7 +2238,7 @@ export function DayTimeline({
             width: drag.width,
           }}
         >
-          <div className="timeline-drag-float-card relative overflow-hidden rounded-2xl border border-white/90 bg-white/85 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
+          <div className="timeline-drag-float-card relative overflow-hidden rounded-2xl border border-white/90 dark:border-white/10 bg-white/85 dark:bg-[#161d19]/90 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.08)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
             <div className="timeline-drag-float-content">
             {(() => {
               const stop = day.stops[drag.from]
@@ -2254,8 +2254,8 @@ export function DayTimeline({
               const travelChip =
                 travelChipFromLeg(legInbound) || stop.walkLevel || null
               return (
-                <div className={`flex items-start gap-3 rounded-2xl ${glassCardSurfaceClass} p-3`}>
-                  <span className={`mt-1 inline-flex h-7 cursor-grabbing items-center justify-center rounded-lg ${glassHandleSurfaceClass} px-2 text-xs text-[var(--stone)]`}>
+                <div className="flex w-full min-w-0 max-w-full items-start gap-2 p-2.5 sm:gap-3 sm:p-3">
+                  <span className={`mt-1 inline-flex h-7 w-7 cursor-grabbing select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-xs text-[var(--stone)] dark:text-zinc-300`}>
                     <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                   </span>
                   {isHotelStop ? (

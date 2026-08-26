@@ -1204,7 +1204,7 @@ export default function App() {
                     }}
                   />
 
-                  <div className="relative mx-auto max-w-lg space-y-5">
+                  <div className="relative mx-auto max-w-3xl space-y-5">
                     {/* Top Editorial Category Badge */}
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--copper)]/25 bg-[var(--copper)]/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--copper)]">
                       <Sparkles size={12} strokeWidth={2.2} />
@@ -1212,7 +1212,7 @@ export default function App() {
                     </div>
 
                     {/* Central 3D Frosted Icon Badge */}
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/90 bg-gradient-to-br from-white/95 to-[#fcf6f0] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] backdrop-blur-md">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/90 dark:border-white/10 bg-gradient-to-br from-white/95 to-[#fcf6f0] dark:from-[#1f2824] dark:to-[#171e1b] text-[var(--copper)] shadow-[0_8px_24px_rgba(181,106,60,0.18),inset_0_1px_1.5px_rgba(255,255,255,1)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.08)] backdrop-blur-md">
                       <Luggage size={30} strokeWidth={1.9} />
                     </div>
 
@@ -1227,32 +1227,42 @@ export default function App() {
                     </div>
 
                     {/* Interactive 3-Step Readiness Matrix */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-2 text-left">
                       {/* Step 1: Dates */}
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                        className={`group relative isolate flex items-center justify-between gap-2 overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-xs transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
                           datesReady
-                            ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
-                            : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
+                            ? 'border-emerald-400/60 dark:border-emerald-500/35 bg-gradient-to-b from-emerald-50/90 to-emerald-100/50 dark:from-[#13281d]/90 dark:to-[#0e1d15]/90 text-emerald-950 dark:text-emerald-100 shadow-[0_4px_16px_rgba(16,185,129,0.08),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.4)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.12)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.15)] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-emerald-400/40 before:to-transparent'
+                            : 'border-white/90 dark:border-white/10 bg-gradient-to-b from-white/90 to-white/60 dark:from-white/10 dark:to-white/5 text-[var(--ink)] shadow-[0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.5)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.08)] hover:border-[var(--copper)]/50 dark:hover:border-[var(--copper)]/40 hover:shadow-[0_8px_24px_rgba(181,106,60,0.12)] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/30 before:to-transparent'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <CalendarDays size={16} className="text-[var(--copper)] shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{t('itinerary.tripDates')}</p>
-                            <p className="text-[10.5px] text-[var(--stone)] truncate">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span
+                            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border shadow-xs transition-transform duration-200 group-hover:scale-105 ${
+                              datesReady
+                                ? 'border-emerald-300/80 dark:border-emerald-500/40 bg-white/90 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]'
+                                : 'border-white/80 dark:border-white/10 bg-white/80 dark:bg-white/10 text-[var(--copper)] shadow-[inset_0_1px_1px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
+                            }`}
+                          >
+                            <CalendarDays size={16} strokeWidth={2} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-semibold truncate ${datesReady ? 'text-emerald-950 dark:text-emerald-100' : 'text-[var(--ink)]'}`}>
+                              {t('itinerary.tripDates')}
+                            </p>
+                            <p className={`text-[10.5px] font-medium truncate mt-0.5 ${datesReady ? 'text-emerald-700 dark:text-emerald-300/85' : 'text-[var(--stone)] dark:text-zinc-400'}`}>
                               {datesReady ? `${tripDates?.startDate?.slice(5)} → ${tripDates?.endDate?.slice(5)}` : t('app.datesPendingShort')}
                             </p>
                           </div>
                         </div>
                         {datesReady ? (
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.7)] ring-1 ring-white/60 dark:ring-white/20">
                             <Check size={11} strokeWidth={3} />
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
+                          <span className="shrink-0 whitespace-nowrap inline-flex items-center justify-center rounded-full border border-amber-300/80 dark:border-amber-500/40 bg-gradient-to-b from-amber-50 to-amber-100/90 dark:from-amber-950/70 dark:to-amber-900/50 px-2 py-0.5 text-[9.5px] font-semibold leading-normal text-amber-900 dark:text-amber-200 shadow-[0_1px_3px_rgba(245,158,11,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
                             {t('app.todoBadge')}
                           </span>
                         )}
@@ -1262,17 +1272,27 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                        className={`group relative isolate flex items-center justify-between gap-2 overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-xs transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
                           flights.outbound && flights.returnFlight
-                            ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
-                            : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
+                            ? 'border-emerald-400/60 dark:border-emerald-500/35 bg-gradient-to-b from-emerald-50/90 to-emerald-100/50 dark:from-[#13281d]/90 dark:to-[#0e1d15]/90 text-emerald-950 dark:text-emerald-100 shadow-[0_4px_16px_rgba(16,185,129,0.08),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.4)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.12)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.15)] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-emerald-400/40 before:to-transparent'
+                            : 'border-white/90 dark:border-white/10 bg-gradient-to-b from-white/90 to-white/60 dark:from-white/10 dark:to-white/5 text-[var(--ink)] shadow-[0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.5)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.08)] hover:border-[var(--copper)]/50 dark:hover:border-[var(--copper)]/40 hover:shadow-[0_8px_24px_rgba(181,106,60,0.12)] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/30 before:to-transparent'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Plane size={16} className="text-[var(--copper)] shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{t('flight.title')}</p>
-                            <p className="text-[10.5px] text-[var(--stone)] truncate">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span
+                            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border shadow-xs transition-transform duration-200 group-hover:scale-105 ${
+                              flights.outbound && flights.returnFlight
+                                ? 'border-emerald-300/80 dark:border-emerald-500/40 bg-white/90 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]'
+                                : 'border-white/80 dark:border-white/10 bg-white/80 dark:bg-white/10 text-[var(--copper)] shadow-[inset_0_1px_1px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
+                            }`}
+                          >
+                            <Plane size={16} strokeWidth={2} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-semibold truncate ${flights.outbound && flights.returnFlight ? 'text-emerald-950 dark:text-emerald-100' : 'text-[var(--ink)]'}`}>
+                              {t('flight.title')}
+                            </p>
+                            <p className={`text-[10.5px] font-medium truncate mt-0.5 ${flights.outbound && flights.returnFlight ? 'text-emerald-700 dark:text-emerald-300/85' : 'text-[var(--stone)] dark:text-zinc-400'}`}>
                               {flights.outbound && flights.returnFlight
                                 ? `${flights.outbound.flightNumber} / ${flights.returnFlight.flightNumber}`
                                 : flights.outbound
@@ -1282,11 +1302,11 @@ export default function App() {
                           </div>
                         </div>
                         {flights.outbound && flights.returnFlight ? (
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.7)] ring-1 ring-white/60 dark:ring-white/20">
                             <Check size={11} strokeWidth={3} />
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
+                          <span className="shrink-0 whitespace-nowrap inline-flex items-center justify-center rounded-full border border-amber-300/80 dark:border-amber-500/40 bg-gradient-to-b from-amber-50 to-amber-100/90 dark:from-amber-950/70 dark:to-amber-900/50 px-2 py-0.5 text-[9.5px] font-semibold leading-normal text-amber-900 dark:text-amber-200 shadow-[0_1px_3px_rgba(245,158,11,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
                             {t('app.todoBadge')}
                           </span>
                         )}
@@ -1296,27 +1316,37 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleSelectTab('logistics')}
-                        className={`group relative flex items-center justify-between gap-2 rounded-2xl border p-3 text-xs transition-all duration-200 hover:shadow-sm active:scale-[0.98] ${
+                        className={`group relative isolate flex items-center justify-between gap-2 overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-xs transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
                           isHotelSelected(hotel)
-                            ? 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
-                            : 'border-[var(--copper)]/20 bg-white/70 text-[var(--ink)] hover:border-[var(--copper)]/40 hover:bg-white/95'
+                            ? 'border-emerald-400/60 dark:border-emerald-500/35 bg-gradient-to-b from-emerald-50/90 to-emerald-100/50 dark:from-[#13281d]/90 dark:to-[#0e1d15]/90 text-emerald-950 dark:text-emerald-100 shadow-[0_4px_16px_rgba(16,185,129,0.08),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.4)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.12)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.15)] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-emerald-400/40 before:to-transparent'
+                            : 'border-white/90 dark:border-white/10 bg-gradient-to-b from-white/90 to-white/60 dark:from-white/10 dark:to-white/5 text-[var(--ink)] shadow-[0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,255,255,0.5)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4),inset_0_1px_1.5px_rgba(255,255,255,0.08)] hover:border-[var(--copper)]/50 dark:hover:border-[var(--copper)]/40 hover:shadow-[0_8px_24px_rgba(181,106,60,0.12)] before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white dark:before:via-white/30 before:to-transparent'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <HotelIcon size={16} className="text-[var(--copper)] shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{t('hotel.title')}</p>
-                            <p className="text-[10.5px] text-[var(--stone)] truncate">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span
+                            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border shadow-xs transition-transform duration-200 group-hover:scale-105 ${
+                              isHotelSelected(hotel)
+                                ? 'border-emerald-300/80 dark:border-emerald-500/40 bg-white/90 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 shadow-[inset_0_1px_1px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]'
+                                : 'border-white/80 dark:border-white/10 bg-white/80 dark:bg-white/10 text-[var(--copper)] shadow-[inset_0_1px_1px_rgba(255,255,255,1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
+                            }`}
+                          >
+                            <HotelIcon size={16} strokeWidth={2} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-semibold truncate ${isHotelSelected(hotel) ? 'text-emerald-950 dark:text-emerald-100' : 'text-[var(--ink)]'}`}>
+                              {t('hotel.title')}
+                            </p>
+                            <p className={`text-[10.5px] font-medium truncate mt-0.5 ${isHotelSelected(hotel) ? 'text-emerald-700 dark:text-emerald-300/85' : 'text-[var(--stone)] dark:text-zinc-400'}`}>
                               {isHotelSelected(hotel) ? hotel.name : t('app.chooseStay')}
                             </p>
                           </div>
                         </div>
                         {isHotelSelected(hotel) ? (
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.7)] ring-1 ring-white/60 dark:ring-white/20">
                             <Check size={11} strokeWidth={3} />
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-700">
+                          <span className="shrink-0 whitespace-nowrap inline-flex items-center justify-center rounded-full border border-amber-300/80 dark:border-amber-500/40 bg-gradient-to-b from-amber-50 to-amber-100/90 dark:from-amber-950/70 dark:to-amber-900/50 px-2 py-0.5 text-[9.5px] font-semibold leading-normal text-amber-900 dark:text-amber-200 shadow-[0_1px_3px_rgba(245,158,11,0.12),inset_0_1px_1px_rgba(255,255,255,0.9)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
                             {t('app.todoBadge')}
                           </span>
                         )}
