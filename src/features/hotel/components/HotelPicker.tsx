@@ -2392,10 +2392,10 @@ export function HotelPicker({
                     ref={currentSlotRef}
                     className={`flex flex-1 flex-col justify-center rounded-2xl border border-dashed p-6 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 [transition-timing-function:var(--timeline-ease)] sm:p-8 ${
                       currentSlotDropReady
-                        ? 'border-[var(--sage)] bg-[var(--sage)]/15 ring-2 ring-[var(--sage)]/35'
+                        ? 'border-[var(--sage)] dark:border-[var(--sage)] bg-[var(--sage)]/15 dark:bg-[var(--sage)]/25 ring-2 ring-[var(--sage)]/35'
                         : currentSlotHighlight
-                          ? 'border-[var(--copper)] bg-[var(--copper)]/10 ring-2 ring-[var(--copper)]/30'
-                          : 'border-[var(--copper)]/35 bg-white/60'
+                          ? 'border-[var(--copper)] dark:border-[var(--copper)] bg-[var(--copper)]/10 dark:bg-[var(--copper)]/20 ring-2 ring-[var(--copper)]/30'
+                          : 'border-[var(--copper)]/35 dark:border-white/15 bg-white/60 dark:bg-white/5 dark:shadow-none'
                     }`}
                   >
                     <p className="font-medium text-base text-[var(--ink)]">
@@ -2466,7 +2466,7 @@ export function HotelPicker({
         </div>
 
         {(canToggleOthers || (!selectedCandidate && candidates.length > 0)) && (
-          <div className="space-y-3 border-t border-black/5 pt-4">
+          <div className="space-y-3 border-t border-black/5 dark:border-white/10 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <Sparkles size={14} className="text-[var(--gold)]" />
@@ -2691,7 +2691,7 @@ export function HotelPicker({
       {showEmpty && !error && (
         <p className="text-sm text-[var(--stone)]">{t('hotel.emptyCandidates')}</p>
       )}
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         </div>
       </article>
 

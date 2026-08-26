@@ -1698,21 +1698,6 @@ body.timeline-dragging {
   transform: translateZ(0);
 }
 
-/*
- * Outer float rotates for the tilted-card look; content counter-rotates so
- * glyphs stay axis-aligned (subpixel AA stays sharp). Border/shadow still tilt.
- */
-.timeline-drag-float-lifted .timeline-drag-float-content {
-  transform: rotate(-1.15deg);
-  backface-visibility: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-
-.timeline-drag-float-settle .timeline-drag-float-content {
-  transform: rotate(0deg);
-  transition: transform var(--dur-base) ease;
-}
-
 .timeline-sortable-item {
   will-change: transform;
 }
