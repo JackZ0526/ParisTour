@@ -496,26 +496,19 @@ export function useItineraryDays(
         return keepFixedHotelPositions(d.day, next, lastDayNum)
       }
 
-      const insertion: {
-        afterStopId: string | null
-        beforeStopId: string | null
-        didInsert: boolean
-      } = { afterStopId: null, beforeStopId: null, didInsert: false }
+      const targetDay = days.find((entry) => entry.day === dayNum)
+      if (!targetDay) return
+      const nextStops = insertIntoDay(targetDay)
+      const insertedAt = nextStops.findIndex((stop) => stop.id === newStop.id)
+      if (insertedAt < 0) return
+      const anchors = stopAnchors(dayNum, nextStops, insertedAt)
 
-      setDays((prev) => {
-        const targetDayPlan = prev.find((entry) => entry.day === dayNum)
-        if (!targetDayPlan) return prev
-        const nextStops = insertIntoDay(targetDayPlan)
-        const insertedAt = nextStops.findIndex((stop) => stop.id === newStop.id)
-        if (insertedAt < 0) return prev
-        const anchors = stopAnchors(dayNum, nextStops, insertedAt)
-        insertion.afterStopId = anchors.afterStopId
-        insertion.beforeStopId = anchors.beforeStopId
-        insertion.didInsert = true
-        return prev.map((d) => (d.day === dayNum ? { ...d, stops: nextStops } : d))
-      })
-
-      if (!insertion.didInsert) return
+      setDays((prev) =>
+        prev.map((d) => {
+          if (d.day !== dayNum) return d
+          return { ...d, stops: insertIntoDay(d) }
+        }),
+      )
 
       onMutation?.({
         type: 'stop.add',
@@ -523,8 +516,8 @@ export function useItineraryDays(
           dayNumber: dayNum,
           stop: newStop as ItineraryStop & { id: string },
           place,
-          afterStopId: insertion.afterStopId,
-          beforeStopId: insertion.beforeStopId,
+          afterStopId: anchors.afterStopId,
+          beforeStopId: anchors.beforeStopId,
         },
       })
       // Belt-and-suspenders: keep custom place metadata even if a peer applies
