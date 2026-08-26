@@ -854,6 +854,9 @@ export interface I18nSchema {
     saveLabelErrorWithReason: string
     syncLabelSyncing: string
     syncLabelSynced: string
+    syncLabelConflict: string
+    syncLabelOffline: string
+    syncLabelError: string
     saveKicker: string
     syncKicker: string
     saveTargetDaysSingle: string

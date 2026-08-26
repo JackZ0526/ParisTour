@@ -45,6 +45,7 @@ import {
   holdTripCloudSaves,
   releaseTripCloudSaves,
 } from '../features/cloud-sync/services/tripCloud'
+import type { TripMutationDraft } from '../features/cloud-sync/v2/mutationTypes'
 
 const REORDER_SAVE_SETTLE_MS = 1000
 const REORDER_SAVE_FALLBACK_MS = 30_000
@@ -70,6 +71,7 @@ export interface UseItineraryDaysRefsForHandlers {
   /** Needed for “pinned overnight hotel” rules; provided via ref because it’s
    * only known after `useItineraryGeneration` runs in App. */
   numberOfDaysRef: MutableRefObject<number>
+  onMutation?: (mutation: TripMutationDraft) => void
 }
 
 export interface UseItineraryDaysResult {
@@ -124,9 +126,17 @@ export interface UseItineraryDaysResult {
 export function useItineraryDays(
   hotel: SelectedHotel,
   initial: ItineraryDaysInitialState,
-  { numberOfDaysRef }: UseItineraryDaysRefsForHandlers,
+  { numberOfDaysRef, onMutation }: UseItineraryDaysRefsForHandlers,
 ): UseItineraryDaysResult {
-  const [days, setDays] = useState<DayPlan[]>(() => initial.days)
+  const [days, setDays] = useState<DayPlan[]>(() =>
+    initial.days.map((day) => ({
+      ...day,
+      stops: day.stops.map((stop, index) => ({
+        ...stop,
+        id: ensureStopId(day.day, stop, index, day.stops),
+      })),
+    })),
+  )
   const [customPlaces, setCustomPlaces] = useState<
     Record<string, Place>
   >(() => initial.customPlaces)
@@ -207,6 +217,15 @@ export function useItineraryDays(
   const lastDayNum =
     numberOfDaysRef.current > 0 ? numberOfDaysRef.current : days.length
 
+  const stopAnchors = useCallback((dayNumber: number, stops: ItineraryStop[], index: number) => ({
+    afterStopId: index > 0
+      ? ensureStopId(dayNumber, stops[index - 1], index - 1, stops)
+      : null,
+    beforeStopId: index < stops.length - 1
+      ? ensureStopId(dayNumber, stops[index + 1], index + 1, stops)
+      : null,
+  }), [])
+
   const updateDayStops = useCallback(
     (updater: (stops: ItineraryStop[]) => ItineraryStop[]) => {
       setDays((prev) =>
@@ -227,16 +246,53 @@ export function useItineraryDays(
       )
       const changed = reordered.some((stop, index) => stop !== day.stops[index])
       if (!changed) return
+      const moving = day.stops[from]
+      if (!moving) return
+      const movingId = ensureStopId(day.day, moving, from, day.stops)
+      const nextIndex = reordered.findIndex(
+        (stop, index) => ensureStopId(day.day, stop, index, reordered) === movingId,
+      )
       beginReorderSaveTransaction()
       updateDayStops((stops) =>
         keepFixedHotelPositions(day.day, reorderStops(stops, from, to), lastDayNum),
       )
+      onMutation?.({
+        type: 'stop.move',
+        payload: {
+          stopId: movingId,
+          targetDayNumber: day.day,
+          ...stopAnchors(day.day, reordered, nextIndex),
+        },
+      })
     },
-    [beginReorderSaveTransaction, day.day, day.stops, lastDayNum, updateDayStops],
+    [
+      beginReorderSaveTransaction,
+      day.day,
+      day.stops,
+      lastDayNum,
+      onMutation,
+      stopAnchors,
+      updateDayStops,
+    ],
   )
 
   const handleReorderOnDay = useCallback(
     (dayNum: number, from: number, to: number) => {
+      const currentDay = days.find((entry) => entry.day === dayNum)
+      if (!currentDay) return
+      const moving = currentDay.stops[from]
+      if (!moving) return
+      const reordered = keepFixedHotelPositions(
+        dayNum,
+        reorderStops(currentDay.stops, from, to),
+        lastDayNum,
+      )
+      const changed = reordered.some((stop, index) => stop !== currentDay.stops[index])
+      if (!changed) return
+      const movingId = ensureStopId(dayNum, moving, from, currentDay.stops)
+      const nextIndex = reordered.findIndex(
+        (stop, index) => ensureStopId(dayNum, stop, index, reordered) === movingId,
+      )
       setDays((prev) =>
         prev.map((d) =>
           d.day === dayNum
@@ -251,15 +307,31 @@ export function useItineraryDays(
             : d,
         ),
       )
+      onMutation?.({
+        type: 'stop.move',
+        payload: {
+          stopId: movingId,
+          targetDayNumber: dayNum,
+          ...stopAnchors(dayNum, reordered, nextIndex),
+        },
+      })
     },
-    [lastDayNum, setDays],
+    [days, lastDayNum, onMutation, setDays, stopAnchors],
   )
 
   const handleDelete = useCallback(
     (stopId: string) => {
+      const removedIdx = day.stops.findIndex(
+        (stop, index) => ensureStopId(day.day, stop, index, day.stops) === stopId,
+      )
+      if (
+        removedIdx < 0 ||
+        isPinnedHotelStop(day.day, day.stops, removedIdx, lastDayNum)
+      ) return
+      const removedPlaceId = day.stops[removedIdx]?.placeId
       updateDayStops((stops) => {
         const removedIdx = stops.findIndex(
-          (s, i) => ensureStopId(day.day, s, i) === stopId,
+          (s, i) => ensureStopId(day.day, s, i, stops) === stopId,
         )
         if (removedIdx < 0) return stops
         if (isPinnedHotelStop(day.day, stops, removedIdx, lastDayNum)) {
@@ -272,17 +344,36 @@ export function useItineraryDays(
         }
         return next
       })
+      onMutation?.({
+        type: 'stop.delete',
+        payload: {
+          stopId,
+          dayNumber: day.day,
+          placeId: removedPlaceId,
+        },
+      })
     },
-    [day.day, lastDayNum, selectedPlaceId, updateDayStops],
+    [day.day, day.stops, lastDayNum, onMutation, selectedPlaceId, updateDayStops],
   )
 
   const handleDeleteOnDay = useCallback(
     (dayNum: number, stopId: string) => {
+      const currentDay = days.find((entry) => entry.day === dayNum)
+      const removedIdx = currentDay?.stops.findIndex(
+        (stop, index) =>
+          ensureStopId(dayNum, stop, index, currentDay.stops) === stopId,
+      ) ?? -1
+      if (
+        !currentDay ||
+        removedIdx < 0 ||
+        isPinnedHotelStop(dayNum, currentDay.stops, removedIdx, lastDayNum)
+      ) return
+      const removedPlaceId = currentDay.stops[removedIdx]?.placeId
       setDays((prev) =>
         prev.map((d) => {
           if (d.day !== dayNum) return d
           const removedIdx = d.stops.findIndex(
-            (s, i) => ensureStopId(d.day, s, i) === stopId,
+            (s, i) => ensureStopId(d.day, s, i, d.stops) === stopId,
           )
           if (removedIdx < 0) return d
           if (isPinnedHotelStop(d.day, d.stops, removedIdx, lastDayNum)) {
@@ -296,8 +387,16 @@ export function useItineraryDays(
           return { ...d, stops: next }
         }),
       )
+      onMutation?.({
+        type: 'stop.delete',
+        payload: {
+          stopId,
+          dayNumber: dayNum,
+          placeId: removedPlaceId,
+        },
+      })
     },
-    [lastDayNum, selectedPlaceId, setDays],
+    [days, lastDayNum, onMutation, selectedPlaceId, setDays],
   )
 
   const handleGoogleIdentityResolved = useCallback(
@@ -307,34 +406,29 @@ export function useItineraryDays(
       nameOriginal?: string,
       googleAddress?: string,
     ) => {
-      setCustomPlaces((prev) => {
-        const current = prev[placeId]
-        if (!current) return prev
-        const nextNameLocal = nameOriginal || current.nameLocal
-        const nextGoogleAddress = googleAddress || current.googleAddress
-        if (
-          current.googlePlaceId === googlePlaceId &&
-          current.nameLocal === nextNameLocal &&
-          current.googleAddress === nextGoogleAddress
-        ) {
-          return prev
-        }
-        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          nextNameLocal || current.name,
-        )}&query_place_id=${encodeURIComponent(googlePlaceId)}`
-        return {
-          ...prev,
-          [placeId]: {
-            ...current,
-            googlePlaceId,
-            nameLocal: nextNameLocal,
-            googleAddress: nextGoogleAddress,
-            googleMapsUrl,
-          },
-        }
-      })
+      const current = customPlaces[placeId]
+      if (!current) return
+      const nextNameLocal = nameOriginal || current.nameLocal
+      const nextGoogleAddress = googleAddress || current.googleAddress
+      if (
+        current.googlePlaceId === googlePlaceId &&
+        current.nameLocal === nextNameLocal &&
+        current.googleAddress === nextGoogleAddress
+      ) return
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        nextNameLocal || current.name,
+      )}&query_place_id=${encodeURIComponent(googlePlaceId)}`
+      const nextPlace = {
+        ...current,
+        googlePlaceId,
+        nameLocal: nextNameLocal,
+        googleAddress: nextGoogleAddress,
+        googleMapsUrl,
+      }
+      setCustomPlaces((prev) => ({ ...prev, [placeId]: nextPlace }))
+      onMutation?.({ type: 'custom_place.upsert', payload: { place: nextPlace } })
     },
-    [setCustomPlaces],
+    [customPlaces, onMutation, setCustomPlaces],
   )
 
   const handleAddOnDay = useCallback(
@@ -351,85 +445,74 @@ export function useItineraryDays(
         duration: place.durationHint || '60 分钟',
       }
 
+      const insertIntoDay = (d: DayPlan): ItineraryStop[] => {
+        const next = [...d.stops]
+        const endsWithOvernight =
+          d.day !== lastDayNum &&
+          d.stops[d.stops.length - 1]?.placeId === SELECTED_HOTEL_PLACE_ID
+
+        if (typeof options?.insertAt === 'number') {
+          let at = Math.max(0, Math.min(options.insertAt, next.length))
+          if (d.day === 1 && d.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID) {
+            at = Math.max(1, at)
+          }
+          if (endsWithOvernight) at = Math.min(at, d.stops.length - 1)
+          next.splice(at, 0, newStop)
+          return keepFixedHotelPositions(d.day, next, lastDayNum)
+        }
+
+        if (mode === 'end') {
+          if (endsWithOvernight) {
+            next.splice(Math.max(0, d.stops.length - 1), 0, newStop)
+            return next
+          }
+          return [...d.stops, newStop]
+        }
+
+        if (!d.stops.length) return [newStop]
+        const origin = getDayOrigin(d.day, hotel)
+        const placesLookup = { ...placesWithHotel, [place.id]: place }
+        const stopLocations = d.stops.map((stop) => {
+          try {
+            return getPlace(stop.placeId, placesLookup).location
+          } catch {
+            return { lat: origin.lat, lng: origin.lng }
+          }
+        })
+        let insertAt = findBestInsertIndex(
+          { lat: origin.lat, lng: origin.lng },
+          stopLocations,
+          place.location,
+        )
+        if (d.day === 1 && d.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID) {
+          insertAt = Math.max(1, insertAt)
+        }
+        if (endsWithOvernight) insertAt = Math.min(insertAt, d.stops.length - 1)
+        next.splice(insertAt, 0, newStop)
+        return keepFixedHotelPositions(d.day, next, lastDayNum)
+      }
+
+      const targetDay = days.find((entry) => entry.day === dayNum)
+      if (!targetDay) return
+      const nextStops = insertIntoDay(targetDay)
+      const insertedAt = nextStops.findIndex((stop) => stop.id === newStop.id)
+
       setDays((prev) =>
         prev.map((d) => {
           if (d.day !== dayNum) return d
-
-          const next = [...d.stops]
-          const endsWithOvernight =
-            d.day !== lastDayNum &&
-            d.stops[d.stops.length - 1]?.placeId ===
-              SELECTED_HOTEL_PLACE_ID
-
-          if (typeof options?.insertAt === 'number') {
-            let at = Math.max(0, Math.min(options.insertAt, next.length))
-            if (
-              d.day === 1 &&
-              d.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID
-            ) {
-              at = Math.max(1, at)
-            }
-            if (endsWithOvernight) {
-              at = Math.min(at, d.stops.length - 1)
-            }
-            next.splice(at, 0, newStop)
-            return {
-              ...d,
-              stops: keepFixedHotelPositions(d.day, next, lastDayNum),
-            }
-          }
-
-          if (mode === 'end') {
-            // Insert before pinned overnight hotel when present.
-            if (endsWithOvernight) {
-              const at = Math.max(0, d.stops.length - 1)
-              next.splice(at, 0, newStop)
-              return { ...d, stops: next }
-            }
-            return { ...d, stops: [...d.stops, newStop] }
-          }
-
-          // Default / best: insert where day-origin → stops path is shortest.
-          if (!d.stops.length) {
-            return { ...d, stops: [newStop] }
-          }
-
-          const origin = getDayOrigin(d.day, hotel)
-          const placesLookup = {
-            ...placesWithHotel,
-            [place.id]: place,
-          }
-          const stopLocations = d.stops.map((s) => {
-            try {
-              return getPlace(s.placeId, placesLookup).location
-            } catch {
-              return { lat: origin.lat, lng: origin.lng }
-            }
-          })
-          let insertAt = findBestInsertIndex(
-            { lat: origin.lat, lng: origin.lng },
-            stopLocations,
-            place.location,
-          )
-
-          // Keep day-1 hotel check-in as the first stop.
-          if (
-            d.day === 1 &&
-            d.stops[0]?.placeId === SELECTED_HOTEL_PLACE_ID
-          ) {
-            insertAt = Math.max(1, insertAt)
-          }
-          // Keep overnight hotel as the last stop on non-last days.
-          if (endsWithOvernight) {
-            insertAt = Math.min(insertAt, d.stops.length - 1)
-          }
-          next.splice(insertAt, 0, newStop)
-          return {
-            ...d,
-            stops: keepFixedHotelPositions(d.day, next, lastDayNum),
-          }
+          return { ...d, stops: insertIntoDay(d) }
         }),
       )
+
+      onMutation?.({
+        type: 'stop.add',
+        payload: {
+          dayNumber: dayNum,
+          stop: newStop as ItineraryStop & { id: string },
+          place,
+          ...stopAnchors(dayNum, nextStops, insertedAt),
+        },
+      })
 
       const targetIndex = days.findIndex((d) => d.day === dayNum)
       if (targetIndex >= 0) setDayIndex(targetIndex)
@@ -439,11 +522,13 @@ export function useItineraryDays(
       days,
       hotel,
       lastDayNum,
+      onMutation,
       placesWithHotel,
       setCustomPlaces,
       setDays,
       setDayIndex,
       setSelectedPlaceId,
+      stopAnchors,
     ],
   )
 
@@ -473,12 +558,10 @@ export function useItineraryDays(
       place: Place,
       options?: { select?: boolean },
     ) => {
-      setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
-
       const dayPlan = days.find((d) => d.day === dayNum)
       const oldIdx =
         dayPlan?.stops.findIndex(
-          (s, i) => ensureStopId(dayNum, s, i) === stopId,
+          (s, i) => ensureStopId(dayNum, s, i, dayPlan.stops) === stopId,
         ) ?? -1
 
       const replacedPlaceId =
@@ -486,11 +569,14 @@ export function useItineraryDays(
           ? dayPlan.stops[oldIdx]?.placeId ?? null
           : null
 
+      if (!dayPlan || oldIdx < 0 || !replacedPlaceId) return
+      setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
+
       setDays((prev) =>
         prev.map((d) => {
           if (d.day !== dayNum) return d
           const idx = d.stops.findIndex(
-            (s, i) => ensureStopId(d.day, s, i) === stopId,
+            (s, i) => ensureStopId(d.day, s, i, d.stops) === stopId,
           )
           if (idx < 0) return d
 
@@ -498,7 +584,7 @@ export function useItineraryDays(
           if (isPinnedHotelStop(d.day, d.stops, idx, lastDayNum)) return d
 
           const newStop: ItineraryStop = {
-            id: makeStopId(dayNum, place.id),
+            id: stopId,
             time: old.time || '12:00',
             placeId: place.id,
             note: place.description,
@@ -512,6 +598,21 @@ export function useItineraryDays(
         }),
       )
 
+      onMutation?.({
+        type: 'stop.replace',
+        payload: {
+          stopId,
+          place,
+          patch: {
+            time: dayPlan.stops[oldIdx].time || '12:00',
+            note: place.description,
+            walkLevel: dayPlan.stops[oldIdx].walkLevel || 'short',
+            duration: place.durationHint || dayPlan.stops[oldIdx].duration || '60 分钟',
+            transport: dayPlan.stops[oldIdx].transport,
+          },
+        },
+      })
+
       const targetIndex = days.findIndex((d) => d.day === dayNum)
       if (targetIndex >= 0) setDayIndex(targetIndex)
 
@@ -521,7 +622,7 @@ export function useItineraryDays(
         setSelectedPlaceId(null)
       }
     },
-    [days, lastDayNum, selectedPlaceId, setDays, setSelectedPlaceId],
+    [days, lastDayNum, onMutation, selectedPlaceId, setCustomPlaces, setDays, setSelectedPlaceId],
   )
 
   return {
@@ -580,6 +681,7 @@ export function useItineraryDaysEffects(
     setCopyRefreshing: Dispatch<SetStateAction<boolean>>
     completeReorderSaveTransaction: () => void
     syncRenderKey: number
+    onMutation?: (mutation: TripMutationDraft) => void
   },
   refs: UseItineraryDaysEffectsRefs,
 ) {
@@ -601,10 +703,13 @@ export function useItineraryDaysEffects(
     setCopyRefreshing,
     completeReorderSaveTransaction,
     syncRenderKey,
+    onMutation,
   } = params
 
   const isRemoteHydrationRender =
     refs.remoteHydrationRenderKeyRef.current === syncRenderKey
+  const onMutationRef = useRef(onMutation)
+  onMutationRef.current = onMutation
 
   const dayPlacesKey = useMemo(
     () => day.stops.map((s) => s.placeId).join(','),
@@ -656,41 +761,69 @@ export function useItineraryDaysEffects(
     const applyKey = `${navPlan.stopsKey}::${day1HotelHm || ''}`
     if (refs.navTimesAppliedKeyRef.current === applyKey) return
 
+    const placesKey = day.stops.map((s) => s.placeId).join(',')
+    if (navPlan.stopsKey !== `${day.day}|${placesKey}`) return
+
+    const betweenStops = navPlan.betweenStops
+    const placeTypeAt = (placeId: string) => {
+      try {
+        return getPlace(placeId, placesWithHotel).type
+      } catch {
+        return null
+      }
+    }
+
+    // Recompute from `prev` inside the updater. A remote delete can commit between
+    // this effect and setState; writing a closed-over day would resurrect stops.
+    const timePatches: { stopId: string; time: string }[] = []
+    let wrote = false
     setDays((prev) => {
-      const idx = prev.findIndex((d) => d.day === day.day)
-      if (idx < 0) return prev
-      let nextDay = prev[idx]
+      const currentIndex = prev.findIndex((entry) => entry.day === day.day)
+      if (currentIndex < 0) return prev
+      let nextDay = prev[currentIndex]
+      const livePlaces = nextDay.stops.map((s) => s.placeId).join(',')
+      if (livePlaces !== placesKey) return prev
 
       if (day.day === 1 && day1HotelHm) {
         nextDay = applyDay1HotelArrivalTimes(nextDay, day1HotelHm)
       }
-
       const recomputed = recomputeDayStopTimes(nextDay, {
-        betweenStops: navPlan.betweenStops,
+        betweenStops,
         firstStopHm: day.day === 1 && day1HotelHm ? day1HotelHm : null,
         defaultFirstHm: '10:00',
-        placeTypeAt: (placeId) => {
-          try {
-            return getPlace(placeId, placesWithHotel).type
-          } catch {
-            return null
-          }
-        },
+        placeTypeAt,
       })
-
-      refs.navTimesAppliedKeyRef.current = applyKey
-
       if (
-        recomputed.stops.length === prev[idx].stops.length &&
-        recomputed.stops.every((s, i) => s.time === prev[idx].stops[i]?.time)
+        recomputed.stops.length === nextDay.stops.length &&
+        recomputed.stops.every((stop, index) => stop.time === nextDay.stops[index]?.time)
       ) {
+        refs.navTimesAppliedKeyRef.current = applyKey
         return prev
       }
 
+      timePatches.length = 0
+      for (let index = 0; index < recomputed.stops.length; index += 1) {
+        const stop = recomputed.stops[index]
+        const previous = nextDay.stops[index]
+        if (stop.id && previous && stop.time !== previous.time) {
+          timePatches.push({ stopId: stop.id, time: stop.time })
+        }
+      }
+      wrote = true
+      refs.navTimesAppliedKeyRef.current = applyKey
       const next = [...prev]
-      next[idx] = recomputed
+      next[currentIndex] = recomputed
       return next
     })
+
+    if (wrote) {
+      for (const patch of timePatches) {
+        onMutationRef.current?.({
+          type: 'stop.patch',
+          payload: { stopId: patch.stopId, fields: { time: patch.time } },
+        })
+      }
+    }
   }, [
     itineraryReady,
     itineraryGenerated,
@@ -702,6 +835,7 @@ export function useItineraryDaysEffects(
     navPlan.hotelToFirst?.durationSeconds,
     day.day,
     day.stops.length,
+    days,
     flights.outbound,
     placesWithHotel,
     refs.day1TransitSecondsRef,
@@ -874,6 +1008,17 @@ export function useItineraryDaysEffects(
               return syncDaysCopyToHotelArea([next], areaKey)[0] || next
             }),
           )
+          onMutationRef.current?.({
+            type: 'day.patch',
+            payload: {
+              dayNumber: dayNum,
+              fields: {
+                title: copy.title,
+                theme: copy.theme,
+                summary: copy.summary,
+              },
+            },
+          })
         })
         .catch(() => {
           if (cancelled || !isCurrentCopyRequest(requestId)) return

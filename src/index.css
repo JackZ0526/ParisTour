@@ -943,6 +943,11 @@ select {
   pointer-events: none;
 }
 
+.cloud-save-toast.is-dismissible {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 @media (min-width: 640px) {
   .cloud-save-toast {
     bottom: max(1rem, env(safe-area-inset-bottom));

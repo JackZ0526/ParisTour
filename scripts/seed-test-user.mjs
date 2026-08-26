@@ -18,7 +18,13 @@ function loadEnvFile() {
       const eq = trimmed.indexOf('=')
       if (eq <= 0) continue
       const key = trimmed.slice(0, eq).trim()
-      const value = trimmed.slice(eq + 1).trim()
+      let value = trimmed.slice(eq + 1).trim()
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1)
+      }
       if (!(key in process.env)) process.env[key] = value
     }
   } catch {
@@ -68,10 +74,12 @@ async function main() {
       email_confirm: true,
     })
     if (error) {
-      console.error('Update test user failed:', error.message)
-      process.exit(1)
+      // Auth password policy may reject short passwords; existing account is still usable.
+      console.warn(`Could not reset password (${error.message}). Existing account kept.`)
+      console.log(`Existing test user (${existing.id})`)
+    } else {
+      console.log(`Updated existing test user (${existing.id})`)
     }
-    console.log(`Updated existing test user (${existing.id})`)
   } else {
     const { data, error } = await sb.auth.admin.createUser({
       email: DEV_TEST_EMAIL,

@@ -106,6 +106,11 @@ import type { DayPlan, Place, SelectedHotel } from '../types'
 import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
 import type { RecommendationPreferences } from '../features/place/services/recommendationPreferences'
+import type { TripMutationDraft } from '../features/cloud-sync/v2/mutationTypes'
+import {
+  dayReplaceDraft,
+  itineraryReplaceDraft,
+} from '../features/cloud-sync/v2/itineraryIds'
 
 /** User-facing Chinese summary plus concrete debug detail for itinerary failures. */
 function formatItineraryFailure(err: unknown, fallback: string): string {
@@ -140,6 +145,7 @@ export interface UseItineraryGenerationDeps {
   /** placesWithHotel (customPlaces + hotel-as-place) for occupiedPlaces derivation in handleResetDay. */
   placesWithHotel: Record<string, Place>
   recommendationPreferences: RecommendationPreferences
+  onMutation?: (mutation: TripMutationDraft) => void
 }
 
 export interface UseItineraryGenerationSetters {
@@ -278,8 +284,27 @@ export function useItineraryGeneration(
     customPlaces,
     placesWithHotel,
     recommendationPreferences,
+    onMutation,
   } = deps
   const { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId } = setters
+  const onMutationRef = useRef(onMutation)
+  onMutationRef.current = onMutation
+
+  const emitItineraryReplace = (
+    nextDays: DayPlan[],
+    nextPlaces: Record<string, Place>,
+  ) => {
+    onMutationRef.current?.(itineraryReplaceDraft(nextDays, nextPlaces))
+  }
+
+  const emitDayReplace = (
+    dayNumber: number,
+    nextDays: DayPlan[],
+    nextPlaces: Record<string, Place>,
+  ) => {
+    const draft = dayReplaceDraft(dayNumber, nextDays, nextPlaces)
+    if (draft) onMutationRef.current?.(draft)
+  }
 
   // -- State -----------------------------------------------------------------
   const [itineraryStart, setItineraryStart] = useState<ItineraryStartResult | null>(() => {
@@ -520,6 +545,7 @@ export function useItineraryGeneration(
       clearDayNavCache()
       setDays([])
       setCustomPlaces({})
+      emitItineraryReplace([], {})
       setItineraryGenerated(false)
       setItineraryFingerprint(null)
       setItineraryGenError(null)
@@ -682,11 +708,13 @@ export function useItineraryGeneration(
           setDays(currentDays)
           setCustomPlaces(currentCustomPlaces)
           setItineraryGeneratedUpToDay((prev) => Math.max(prev, dayNumber))
+          emitDayReplace(dayNumber, currentDays, currentCustomPlaces)
         }
 
         if (!canResume) {
           setDays(currentDays)
           setCustomPlaces(currentCustomPlaces)
+          emitItineraryReplace(currentDays, currentCustomPlaces)
           setSelectedPlaceId(null)
           setDayIndex(0)
         }
@@ -934,6 +962,7 @@ export function useItineraryGeneration(
     if (restored) {
       setDays(restored.days)
       setCustomPlaces(restored.customPlaces)
+      emitItineraryReplace(restored.days, restored.customPlaces)
       setItineraryGenerated(true)
       const fp = restored.fingerprint || itineraryFingerprint || currentFingerprint
       if (fp) setItineraryFingerprint(fp)
@@ -1043,6 +1072,7 @@ export function useItineraryGeneration(
         const synced = syncDaysCopyToHotelArea(result.days, hotel.areaKey)
         setDays(synced)
         setCustomPlaces(result.customPlaces)
+        emitDayReplace(active.day, synced, result.customPlaces)
         setItineraryGenerated(true)
         saveItineraryState(synced, result.customPlaces, {
           generated: true,
@@ -1097,6 +1127,7 @@ export function useItineraryGeneration(
     clearDayNavCache()
     setDays([])
     setCustomPlaces({})
+    emitItineraryReplace([], {})
     setItineraryGenerated(false)
     setItineraryFingerprint(null)
     setItineraryGenError(null)
@@ -1162,6 +1193,7 @@ export function useItineraryGeneration(
             days: cachedTarget,
           }
           setDays(cachedTarget)
+          emitItineraryReplace(cachedTarget, customPlaces)
           setItineraryGenError(null)
           return
         }
@@ -1186,6 +1218,7 @@ export function useItineraryGeneration(
           )
         }
         setDays(translatedDays)
+        emitItineraryReplace(translatedDays, customPlaces)
         localeCopyCacheRef.current[targetLocale] = {
           structureKey,
           days: translatedDays,
@@ -1202,7 +1235,7 @@ export function useItineraryGeneration(
         releaseTripCloudSaves()
       }
     },
-    [itineraryGenerated, days, isLlmConfigured, setDays],
+    [itineraryGenerated, days, customPlaces, isLlmConfigured, setDays],
   )
 
   const handleRestoreDefault = useCallback(() => {
@@ -1210,6 +1243,7 @@ export function useItineraryGeneration(
     if (!restored) return
     setDays(restored.days)
     setCustomPlaces(restored.customPlaces)
+    emitItineraryReplace(restored.days, restored.customPlaces)
     setItineraryGenerated(true)
     const fp = restored.fingerprint || itineraryFingerprint || currentFingerprint
     if (fp) setItineraryFingerprint(fp)
@@ -1241,6 +1275,7 @@ export function useItineraryGeneration(
       setDayRestoring(true)
       setDays(restored.days)
       setCustomPlaces(restored.customPlaces)
+      emitDayReplace(dayNum, restored.days, restored.customPlaces)
       saveItineraryState(restored.days, restored.customPlaces, {
         generated: true,
         fingerprint: itineraryFingerprint,

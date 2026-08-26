@@ -168,99 +168,147 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const activeBootstrapUserIdRef = useRef<string | null | undefined>(undefined)
   const bootstrapSequenceRef = useRef(0)
+  const bootstrapInFlightRef = useRef<Promise<void> | null>(null)
 
   const bootstrapSession = useCallback(async (next: Session | null) => {
     const nextUserId = next?.user?.id ?? null
-    if (activeBootstrapUserIdRef.current === nextUserId) {
-      return
+    // Reuse the in-flight bootstrap for the same user instead of no-op returning
+    // (which previously could leave status stuck on "loading" when a newer
+    // caller skipped work that an older superseded run later abandoned).
+    if (
+      activeBootstrapUserIdRef.current === nextUserId &&
+      bootstrapInFlightRef.current
+    ) {
+      return bootstrapInFlightRef.current
     }
     const sequence = ++bootstrapSequenceRef.current
     activeBootstrapUserIdRef.current = nextUserId
     const isCurrentBootstrap = () => bootstrapSequenceRef.current === sequence
 
-    try {
-      setTripReady(false)
-      setSession(next)
-
-      if (!next?.user) {
-        setAllowlisted(false)
-        setTrips([])
-        setActiveTripId(null)
-        setStatus((prev) => (prev === 'not_allowlisted' ? 'not_allowlisted' : 'signed_out'))
-        return
-      }
-
-      setError(null)
-
-      const userEmail = (next.user.email || '').toLowerCase()
-      let listed = false
+    const run = (async () => {
       try {
-        listed =
-          (await getProfileAllowlisted(next.user.id)) ||
-          (await isEmailAllowlisted(userEmail))
-      } catch (err) {
-        console.warn(err)
-        listed = false
-      }
-      if (!isCurrentBootstrap()) return
+        setTripReady(false)
+        setSession(next)
 
-      if (!listed) {
-        setAllowlisted(false)
-        setTrips([])
-        setActiveTripId(null)
-        setError(t('auth.inviteOnlyMessage'))
-        setStatus('not_allowlisted')
+        if (!next?.user) {
+          setAllowlisted(false)
+          setTrips([])
+          setActiveTripId(null)
+          setStatus((prev) => (prev === 'not_allowlisted' ? 'not_allowlisted' : 'signed_out'))
+          return
+        }
+
+        setError(null)
+
+        const userEmail = (next.user.email || '').toLowerCase()
+        let listed = false
         try {
-          await getSupabase().auth.signOut({ scope: 'local' })
-        } catch {
-          /* ignore */
+          listed = await Promise.race([
+            (async () =>
+              (await getProfileAllowlisted(next.user.id)) ||
+              (await isEmailAllowlisted(userEmail)))(),
+            new Promise<boolean>((_, reject) => {
+              window.setTimeout(
+                () => reject(new Error('allowlist check timeout')),
+                8_000,
+              )
+            }),
+          ])
+        } catch (err) {
+          console.warn(err)
+          if (!isCurrentBootstrap()) return
+          // Network/SW hangs must not be treated as "not invited".
+          setError(t('auth.errorTripLoadFailed'))
+          setStatus('signed_out')
+          return
         }
-        return
-      }
-
-      setAllowlisted(true)
-      try {
-        // Load trips before any preference write that may refresh the auth token.
-        const accessible = await listAccessibleTrips(next.user.id, userEmail)
         if (!isCurrentBootstrap()) return
-        setTrips(accessible)
-        const preferred = pickPreferredTrip(accessible, next.user.id)
-        if (preferred) {
-          await applyAccessibleTripLocally(preferred)
-          setActiveTripId(preferred.id)
-          rememberLastTripId(next.user.id, preferred.id)
+
+        if (!listed) {
+          setAllowlisted(false)
+          setTrips([])
+          setActiveTripId(null)
+          setError(t('auth.inviteOnlyMessage'))
+          setStatus('not_allowlisted')
+          try {
+            await getSupabase().auth.signOut({ scope: 'local' })
+          } catch {
+            /* ignore */
+          }
+          return
         }
-        setStatus('ready')
-        setTripReady(true)
-        setBootKey((k) => k + 1)
 
-        // Safe, non-blocking background hydration. Avatar metadata cleanup may
-        // refresh the token, so it deliberately runs after RLS-protected trips.
-        void Promise.allSettled([
-          hydrateAccountThemePreference(next.user.id),
-          hydrateAccountLanguagePreference(next.user.id),
-          hydrateAccountAvatar(next.user.id, userEmail),
-          hydrateAccountNickname(next.user.id, userEmail),
-        ])
-      } catch (err) {
-        if (!isCurrentBootstrap()) return
-        console.error(err)
-        const defaultMsg = t('auth.errorTripLoadFailed')
-        const msg =
-          err && typeof err === 'object' && 'message' in err
-            ? String((err as { message: unknown }).message)
-            : err instanceof Error
-              ? err.message
-              : defaultMsg
-        setError(msg || defaultMsg)
-        setStatus('ready')
-        setTripReady(true)
+        setAllowlisted(true)
+        try {
+          // Load trips before any preference write that may refresh the auth token.
+          const accessible = await Promise.race([
+            listAccessibleTrips(next.user.id, userEmail),
+            new Promise<never>((_, reject) => {
+              window.setTimeout(
+                () => reject(new Error('list trips timeout')),
+                10_000,
+              )
+            }),
+          ])
+          if (!isCurrentBootstrap()) return
+          setTrips(accessible)
+          const preferred = pickPreferredTrip(accessible, next.user.id)
+          // Leave the auth verifying screen as soon as we know the session is
+          // valid. Heavy snapshot/RPC hydrate can continue under the trip loader.
+          setStatus('ready')
+          if (preferred) {
+            setActiveTripId(preferred.id)
+            rememberLastTripId(next.user.id, preferred.id)
+            try {
+              await Promise.race([
+                applyAccessibleTripLocally(preferred),
+                new Promise<never>((_, reject) => {
+                  window.setTimeout(
+                    () => reject(new Error('trip hydrate timeout')),
+                    15_000,
+                  )
+                }),
+              ])
+            } catch (hydrateErr) {
+              console.warn('[auth] trip hydrate failed', hydrateErr)
+            }
+            if (!isCurrentBootstrap()) return
+          }
+          setTripReady(true)
+          setBootKey((k) => k + 1)
+
+          // Safe, non-blocking background hydration. Avatar metadata cleanup may
+          // refresh the token, so it deliberately runs after RLS-protected trips.
+          void Promise.allSettled([
+            hydrateAccountThemePreference(next.user.id),
+            hydrateAccountLanguagePreference(next.user.id),
+            hydrateAccountAvatar(next.user.id, userEmail),
+            hydrateAccountNickname(next.user.id, userEmail),
+          ])
+        } catch (err) {
+          if (!isCurrentBootstrap()) return
+          console.error(err)
+          const defaultMsg = t('auth.errorTripLoadFailed')
+          const msg =
+            err && typeof err === 'object' && 'message' in err
+              ? String((err as { message: unknown }).message)
+              : err instanceof Error
+                ? err.message
+                : defaultMsg
+          setError(msg || defaultMsg)
+          setStatus('ready')
+          setTripReady(true)
+        }
+      } finally {
+        if (isCurrentBootstrap()) {
+          activeBootstrapUserIdRef.current = undefined
+          bootstrapInFlightRef.current = null
+        }
       }
-    } finally {
-      if (isCurrentBootstrap()) {
-        activeBootstrapUserIdRef.current = undefined
-      }
-    }
+    })()
+
+    bootstrapInFlightRef.current = run
+    return run
   }, [])
 
   useEffect(() => {
@@ -279,16 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
     const sb = getSupabase()
-
-    sb.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!cancelled) void bootstrapSession(data.session)
-      })
-      .catch((err) => {
-        console.error(err)
-        if (!cancelled) setStatus('signed_out')
-      })
+    let sawInitialSession = false
 
     let bootstrapTimer: number | null = null
     const scheduleBootstrap = (nextSession: Session | null) => {
@@ -299,8 +338,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, 0)
     }
 
+    // Prefer onAuthStateChange(INITIAL_SESSION) over a parallel getSession():
+    // awaiting getSession while also subscribing can stall under the auth lock
+    // (especially with a dev service worker in front of Supabase).
     const { data: sub } = sb.auth.onAuthStateChange((event, nextSession) => {
-      if (event === 'INITIAL_SESSION') return
+      if (event === 'INITIAL_SESSION') {
+        sawInitialSession = true
+        scheduleBootstrap(nextSession)
+        return
+      }
       const isSameUserReady =
         Boolean(nextSession?.user?.id) &&
         statusRef.current === 'ready' &&
@@ -318,8 +364,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       scheduleBootstrap(nextSession)
     })
 
+    // Safety net for older clients / rare cases where INITIAL_SESSION is skipped.
+    const fallbackTimer = window.setTimeout(() => {
+      if (cancelled || sawInitialSession) return
+      void sb.auth
+        .getSession()
+        .then(({ data }) => {
+          if (!cancelled && !sawInitialSession) void bootstrapSession(data.session)
+        })
+        .catch((err) => {
+          console.error(err)
+          if (!cancelled && statusRef.current === 'loading') setStatus('signed_out')
+        })
+    }, 1500)
+
+    const stuckTimer = window.setTimeout(() => {
+      if (cancelled) return
+      if (statusRef.current === 'loading') {
+        console.warn('[auth] bootstrap timed out; falling back to signed_out')
+        setStatus('signed_out')
+        return
+      }
+      if (statusRef.current === 'ready' && !tripReadyRef.current) {
+        console.warn('[auth] trip hydrate timed out; opening with local state')
+        setTripReady(true)
+      }
+    }, 20_000)
+
     return () => {
       cancelled = true
+      window.clearTimeout(fallbackTimer)
+      window.clearTimeout(stuckTimer)
       if (bootstrapTimer !== null) window.clearTimeout(bootstrapTimer)
       sub.subscription.unsubscribe()
     }

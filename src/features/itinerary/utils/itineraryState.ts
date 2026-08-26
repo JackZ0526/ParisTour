@@ -168,7 +168,9 @@ function cloneDay(day: DayPlan, dayNumber = day.day): DayPlan {
     metroHintFromArea: { ...day.metroHintFromArea },
     stops: day.stops.map((stop, index) => ({
       ...stop,
-      id: stop.id || `d${dayNumber}-${stop.placeId}-${index}`,
+      id: stop.id || `d${dayNumber}-${stop.placeId}-occ${
+        day.stops.slice(0, index).filter((s) => s.placeId === stop.placeId).length
+      }`,
     })),
   }
 }
@@ -320,7 +322,11 @@ function normalizeLoadedDays(days: DayPlan[]): DayPlan[] {
       ...day,
       stops: day.stops.map((stop, index) => ({
         ...stop,
-        id: stop.id || `d${day.day}-${stop.placeId}-${index}`,
+        id:
+          stop.id ||
+          `d${day.day}-${stop.placeId}-occ${
+            day.stops.slice(0, index).filter((s) => s.placeId === stop.placeId).length
+          }`,
       })),
     })),
   )

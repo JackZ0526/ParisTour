@@ -15,6 +15,13 @@ describe('key-path helpers', () => {
   it('ensureStopId generates stable fallback when id missing', () => {
     const stop = { placeId: 'place-a', time: '12:00' } as any
     expect(ensureStopId(2, stop, 4)).toBe('d2-place-a-4')
+    const dayStops = [
+      { placeId: 'x', time: '09:00' },
+      { placeId: 'place-a', time: '12:00' },
+      { placeId: 'place-a', time: '13:00' },
+    ] as any
+    expect(ensureStopId(2, dayStops[1], 1, dayStops)).toBe('d2-place-a-occ0')
+    expect(ensureStopId(2, dayStops[2], 2, dayStops)).toBe('d2-place-a-occ1')
   })
 
   it('syncDaysCopyToHotelArea rewrites wrong district mentions', () => {

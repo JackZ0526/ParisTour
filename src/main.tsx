@@ -28,30 +28,58 @@ subscribeLocale(syncDocumentTitle)
 // vite-plugin-pwa: register the service worker. With `autoUpdate` in
 // vite.config.ts, the new SW activates in the background; we just log
 // state transitions so the user can see what's happening in DevTools.
+// When local cloud sync is enabled, skip registration and actively clear any
+// leftover SW — Workbox NetworkFirst soft-timeouts hang Supabase bootstrap.
 if ('serviceWorker' in navigator) {
-  import('virtual:pwa-register')
-    .then(({ registerSW }) => {
-      registerSW({
-        immediate: true,
-        onRegisteredSW(swUrl) {
-          console.info('[pwa] service worker registered:', swUrl)
-        },
-        onOfflineReady() {
-          console.info('[pwa] offline-ready; cached assets available.')
-        },
-        onNeedRefresh() {
-          // autoUpdate activates the new SW without a reload prompt. We log
-          // so a future UI can surface a "new version available" toast.
-          console.info('[pwa] new version available; will activate on next load.')
-        },
-        onRegisterError(error) {
-          console.warn('[pwa] SW registration failed:', error)
-        },
+  const cloudSyncOnLocal =
+    import.meta.env.DEV && import.meta.env.VITE_ENABLE_CLOUD_SYNC_ON_LOCAL === 'true'
+
+  if (cloudSyncOnLocal) {
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+      .then((results) => {
+        if (results.some(Boolean)) {
+          console.info('[pwa] unregistered service workers for local cloud sync')
+        }
       })
-    })
-    .catch(() => {
-      /* dev mode without plugin or unsupported env: silent no-op */
-    })
+      .catch(() => {
+        /* ignore */
+      })
+    if ('caches' in window) {
+      void caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => /workbox|supabase|precache|google-fonts/i.test(key))
+            .map((key) => caches.delete(key)),
+        ),
+      )
+    }
+  } else {
+    import('virtual:pwa-register')
+      .then(({ registerSW }) => {
+        registerSW({
+          immediate: true,
+          onRegisteredSW(swUrl) {
+            console.info('[pwa] service worker registered:', swUrl)
+          },
+          onOfflineReady() {
+            console.info('[pwa] offline-ready; cached assets available.')
+          },
+          onNeedRefresh() {
+            // autoUpdate activates the new SW without a reload prompt. We log
+            // so a future UI can surface a "new version available" toast.
+            console.info('[pwa] new version available; will activate on next load.')
+          },
+          onRegisterError(error) {
+            console.warn('[pwa] SW registration failed:', error)
+          },
+        })
+      })
+      .catch(() => {
+        /* dev mode without plugin or unsupported env: silent no-op */
+      })
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

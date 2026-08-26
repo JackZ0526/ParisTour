@@ -19,8 +19,15 @@ import { SyncOrbitIcon } from '../../../shared/components/LoadingIndicator'
 import { Check, CircleAlert, Save } from 'lucide-react'
 import { isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import { useTranslation } from '../../../shared/i18n'
+import {
+  getTripSyncV2UiState,
+  setTripSyncV2UiState,
+  subscribeTripSyncV2UiState,
+} from '../v2/syncV2Status'
 
 type ToastKind = 'save' | 'sync'
+
+const PROBLEM_TOAST_MS = 4200
 
 export function getSaveTargetLabel(
   target: CloudSaveTarget,
@@ -128,6 +135,8 @@ export function CloudSaveIndicator() {
   const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>(() => getCloudSyncStatus())
   const [syncTarget, setSyncTarget] = useState<CloudSaveTarget>(() => getCloudSyncTarget())
   const [syncDays, setSyncDays] = useState<number[] | undefined>(() => getCloudSyncDayNumbers())
+  const [v2State, setV2State] = useState(() => getTripSyncV2UiState())
+  const [dismissedProblemKey, setDismissedProblemKey] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isEnabled) return
@@ -142,40 +151,89 @@ export function CloudSaveIndicator() {
       setSyncTarget(getCloudSyncTarget())
       setSyncDays(getCloudSyncDayNumbers())
     })
+    const unsubV2 = subscribeTripSyncV2UiState(() => {
+      setV2State(getTripSyncV2UiState())
+    })
     return () => {
       unsubSave()
       unsubSync()
+      unsubV2()
     }
   }, [isEnabled])
 
-  // In localhost dev mode, cloud saves are disabled — nothing to show.
-  if (!isEnabled) return null
+  const v2Problem =
+    isEnabled &&
+    v2State.enabled &&
+    (v2State.status === 'conflict' || v2State.status === 'error' || v2State.status === 'offline')
+  const v2ProblemKey = v2Problem
+    ? `${v2State.status}:${v2State.pending}:${v2State.conflicts}`
+    : null
 
-  // Prefer showing local save feedback; otherwise show inbound sync.
-  const kind: ToastKind | null =
-    saveStatus !== 'idle'
+  useEffect(() => {
+    if (!v2ProblemKey || v2ProblemKey === dismissedProblemKey) return
+    // Conflicts stay until click/dismiss or recovery; transient errors auto-hide.
+    if (v2State.status === 'conflict') return
+    const timer = window.setTimeout(() => {
+      setDismissedProblemKey(v2ProblemKey)
+      // Keep pending work visible as "saving" instead of wiping status to idle,
+      // which previously trapped the toast on "即将保存…" forever.
+      if (getTripSyncV2UiState().pending > 0) return
+      setTripSyncV2UiState({ status: 'idle' })
+    }, PROBLEM_TOAST_MS)
+    return () => window.clearTimeout(timer)
+  }, [dismissedProblemKey, v2ProblemKey, v2State.status])
+
+  if (!isEnabled) return null
+  if (typeof document === 'undefined') return null
+
+  const v2ProblemVisible =
+    Boolean(v2ProblemKey) && v2ProblemKey !== dismissedProblemKey
+  const v2Busy =
+    v2State.enabled &&
+    (v2State.pending > 0 || v2State.status === 'connecting' || v2State.status === 'syncing')
+
+  const kind: ToastKind | null = v2ProblemVisible || v2Busy
+    ? 'save'
+    : saveStatus !== 'idle'
       ? 'save'
       : syncStatus !== 'idle'
         ? 'sync'
         : null
 
-  if (typeof document === 'undefined') return null
-
   const isSave = kind === 'save'
-  const label = isSave
-    ? saveLabel(saveStatus, saveError, saveTarget, saveDays, t)
-    : syncLabel(syncStatus, syncTarget, syncDays, t)
+  const v2Label = v2ProblemVisible
+    ? v2State.status === 'conflict'
+      ? t('cloud.syncLabelConflict')
+      : v2State.status === 'offline'
+        ? t('cloud.syncLabelOffline')
+        : t('cloud.syncLabelError')
+    : v2Busy
+      ? t('cloud.saveLabelPending')
+      : null
+  const label = v2Label
+    || (isSave
+      ? saveLabel(saveStatus, saveError, saveTarget, saveDays, t)
+      : syncLabel(syncStatus, syncTarget, syncDays, t))
   const tone =
-    isSave && saveStatus === 'error'
+    v2ProblemVisible || (isSave && saveStatus === 'error')
       ? 'is-error'
       : (isSave && saveStatus === 'saved') || (!isSave && syncStatus === 'synced')
         ? 'is-saved'
         : 'is-busy'
   const busy =
+    v2Busy ||
     (isSave && (saveStatus === 'pending' || saveStatus === 'saving')) ||
     (!isSave && syncStatus === 'syncing')
   const done =
-    (isSave && saveStatus === 'saved') || (!isSave && syncStatus === 'synced')
+    !v2ProblemVisible &&
+    !v2Busy &&
+    ((isSave && saveStatus === 'saved') || (!isSave && syncStatus === 'synced'))
+
+  const dismissProblem = () => {
+    if (!v2ProblemKey) return
+    setDismissedProblemKey(v2ProblemKey)
+    setTripSyncV2UiState({ status: 'idle' })
+  }
 
   return createPortal(
     <AnimatePresence>
@@ -187,69 +245,83 @@ export function CloudSaveIndicator() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.94 }}
           transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className={`cloud-save-toast ${tone}`}
+          className={`cloud-save-toast ${tone}${v2ProblemVisible ? ' is-dismissible' : ''}`}
+          onClick={v2ProblemVisible ? dismissProblem : undefined}
+          onKeyDown={
+            v2ProblemVisible
+              ? (event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    dismissProblem()
+                  }
+                }
+              : undefined
+          }
+          tabIndex={v2ProblemVisible ? 0 : undefined}
         >
-      <div className="cloud-save-toast-glow" aria-hidden />
-      <div className="cloud-save-toast-inner">
-        <div className="cloud-save-icon-wrap">
-          <AnimatePresence mode="wait">
-            {isSave && saveStatus === 'error' ? (
-              <motion.div
-                key="error"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <CircleAlert size={28} strokeWidth={1.8} aria-hidden />
-              </motion.div>
-            ) : done ? (
-              <motion.div
-                key="done"
-                initial={{ scale: 0.85, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.85, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 450, damping: 24 }}
-                className="cloud-save-ok"
-              >
-                {isSave ? <FloppyIcon /> : <SyncOrbitIcon spinning={false} />}
-                <motion.span
-                  initial={{ scale: 0, rotate: -20 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 500,
-                    damping: 20,
-                    delay: 0.05,
-                  }}
-                  className="cloud-save-check-badge"
-                  aria-hidden
-                >
-                  <Check size={11} strokeWidth={3} />
-                </motion.span>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="busy"
-                initial={{ scale: 0.85, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.85, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                {isSave ? (
-                  <FloppyIcon spinning={busy} />
+          <div className="cloud-save-toast-glow" aria-hidden />
+          <div className="cloud-save-toast-inner">
+            <div className="cloud-save-icon-wrap">
+              <AnimatePresence mode="wait">
+                {v2ProblemVisible || (isSave && saveStatus === 'error') ? (
+                  <motion.div
+                    key="error"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <CircleAlert size={28} strokeWidth={1.8} aria-hidden />
+                  </motion.div>
+                ) : done ? (
+                  <motion.div
+                    key="done"
+                    initial={{ scale: 0.85, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.85, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 450, damping: 24 }}
+                    className="cloud-save-ok"
+                  >
+                    {isSave ? <FloppyIcon /> : <SyncOrbitIcon spinning={false} />}
+                    <motion.span
+                      initial={{ scale: 0, rotate: -20 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 500,
+                        damping: 20,
+                        delay: 0.05,
+                      }}
+                      className="cloud-save-check-badge"
+                      aria-hidden
+                    >
+                      <Check size={11} strokeWidth={3} />
+                    </motion.span>
+                  </motion.div>
                 ) : (
-                  <SyncOrbitIcon spinning={busy} />
+                  <motion.div
+                    key="busy"
+                    initial={{ scale: 0.85, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.85, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {isSave ? (
+                      <FloppyIcon spinning={busy} />
+                    ) : (
+                      <SyncOrbitIcon spinning={busy} />
+                    )}
+                  </motion.div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        <div className="cloud-save-copy">
-          <span className="cloud-save-kicker">{isSave ? t('cloud.saveKicker') : t('cloud.syncKicker')}</span>
-          <span className="cloud-save-label">{label}</span>
-        </div>
-      </div>
+              </AnimatePresence>
+            </div>
+            <div className="cloud-save-copy">
+              <span className="cloud-save-kicker">
+                {isSave ? t('cloud.saveKicker') : t('cloud.syncKicker')}
+              </span>
+              <span className="cloud-save-label">{label}</span>
+            </div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>,

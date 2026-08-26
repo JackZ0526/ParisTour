@@ -1235,7 +1235,11 @@ export function DayTimeline({
       exitTimerRef.current = window.setTimeout(() => {
         exitTimerRef.current = null
         skipExternalExitRef.current.add(stopKey)
-        onDelete(stopKey)
+        const actionId =
+          stopIdentities[index]?.actionId ||
+          day.stops[index]?.id ||
+          stopKey
+        onDelete(actionId)
         setExitAnim(null)
       }, GOMMAGE_COLLAPSE_MS)
     }, GOMMAGE_DISSOLVE_MS)

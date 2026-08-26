@@ -68,8 +68,37 @@ export const AREA_LABEL_ALIASES: Record<string, string[]> = {
   trocadero: ['16区特罗卡德罗', '特罗卡德罗', 'Trocadéro', 'Trocadero'],
 }
 
-export function ensureStopId(day: number, stop: ItineraryStop, index: number): string {
-  return stop.id || `d${day}-${stop.placeId}-${index}`
+export function placeOccurrenceAt(
+  stops: readonly ItineraryStop[],
+  index: number,
+): number {
+  const placeId = stops[index]?.placeId
+  if (!placeId) return 0
+  let occurrence = 0
+  for (let i = 0; i < index; i += 1) {
+    if (stops[i]?.placeId === placeId) occurrence += 1
+  }
+  return occurrence
+}
+
+/**
+ * Prefer an existing durable stop.id. When minting, use place-occurrence ids
+ * (`d2-louvre-occ0`) so sibling deletes/reorders do not rename other stops.
+ * Pass `dayStops` whenever minting so duplicates (hotel check-in / overnight)
+ * get distinct occ suffixes. Without `dayStops`, falls back to the legacy
+ * index suffix for backward compatibility.
+ */
+export function ensureStopId(
+  day: number,
+  stop: ItineraryStop,
+  index: number,
+  dayStops?: readonly ItineraryStop[],
+): string {
+  if (stop.id) return stop.id
+  if (dayStops) {
+    return `d${day}-${stop.placeId}-occ${placeOccurrenceAt(dayStops, index)}`
+  }
+  return `d${day}-${stop.placeId}-${index}`
 }
 
 export function areaAliasEntries(): Array<{ key: string; label: string }> {

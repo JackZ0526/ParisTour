@@ -346,6 +346,7 @@ export default defineConfig(({ mode }) => {
   const deepseekBase = (env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/$/, '')
   const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || ''
   const supabaseAnon = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''
+  const cloudSyncOnLocal = env.VITE_ENABLE_CLOUD_SYNC_ON_LOCAL === 'true'
 
   let openaiTarget = 'https://api.openai.com'
   let openaiPrefix = '/v1'
@@ -402,18 +403,11 @@ export default defineConfig(({ mode }) => {
           navigateFallback: '/index.html',
           runtimeCaching: [
             {
-              // Supabase REST: live data when online, last-good when offline
-              urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\//i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'supabase-rest',
-                networkTimeoutSeconds: 3,
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-              },
-            },
-            {
-              // Supabase Realtime handshake + WebSocket upgrades
-              urlPattern: /^https:\/\/.*\.supabase\.co\/(realtime|functions)\//i,
+              // Never let Workbox soft-timeout Supabase. NetworkFirst with
+              // networkTimeoutSeconds falls back to cache, and with a miss it
+              // keeps waiting on the original network promise — that hangs
+              // auth bootstrap on "Verifying sign-in…" forever in dev.
+              urlPattern: /^https:\/\/.*\.supabase\.co\//i,
               handler: 'NetworkOnly',
             },
             {
@@ -437,15 +431,16 @@ export default defineConfig(({ mode }) => {
           ],
         },
         devOptions: {
-          // Enable SW in dev so we can test offline behavior without building.
-          enabled: true,
+          // Dev SW fights live Supabase auth/REST when local cloud sync is on.
+          // Keep offline SW testing for local-only mode; disable otherwise.
+          enabled: !cloudSyncOnLocal,
           type: 'module',
         },
       }),
       paidApiAuthPlugin(
         supabaseUrl,
         supabaseAnon,
-        env.VITE_ENABLE_CLOUD_SYNC_ON_LOCAL === 'true',
+        cloudSyncOnLocal,
       ),
       shareInviteDevPlugin(),
       placeWebsiteDevPlugin(),

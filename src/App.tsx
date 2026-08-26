@@ -21,6 +21,9 @@ import { useItineraryDays, useItineraryDaysEffects } from './hooks/useItineraryD
 import { useMobilePane } from './hooks/useMobilePane'
 import { useTripDialogs } from './hooks/useTripDialogs'
 import { useTripSync } from './hooks/useTripSync'
+import { isTripSyncV2Enabled } from './features/cloud-sync/v2/syncV2Config'
+import { useTripSyncV2 } from './features/cloud-sync/v2/useTripSyncV2'
+import type { TripMutationDraft } from './features/cloud-sync/v2/mutationTypes'
 import { DayTimeline } from './features/itinerary/components/DayTimeline'
 import { DayTabButton } from './features/itinerary/components/DayTabButton'
 import { LogisticsTravelSection } from './features/flight/components/LogisticsTravelSection'
@@ -194,6 +197,7 @@ export default function App() {
   const destination = '巴黎'
   const destinationBrand = destinationBrandFromDestination(destination)
   const numberOfDaysRef = useRef(0)
+  const mutationSinkRef = useRef<(mutation: TripMutationDraft) => void>(() => {})
   const {
     dayIndex,
     setDayIndex,
@@ -221,7 +225,10 @@ export default function App() {
       days: initialItinerary.days,
       customPlaces: initialItinerary.customPlaces,
     },
-    { numberOfDaysRef },
+    {
+      numberOfDaysRef,
+      onMutation: (mutation) => mutationSinkRef.current(mutation),
+    },
   )
   const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
   const [activeTab, setActiveTab] = useState<AppTab>(() =>
@@ -310,6 +317,7 @@ export default function App() {
       customPlaces,
       placesWithHotel,
       recommendationPreferences,
+      onMutation: (mutation) => mutationSinkRef.current(mutation),
     },
     { setDays, setCustomPlaces, setDayIndex, setSelectedPlaceId },
   )
@@ -418,11 +426,26 @@ export default function App() {
   const copyRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
+  const itinerarySyncV2Enabled = isTripSyncV2Enabled()
+  const { recordMutation: recordTripMutationV2 } = useTripSyncV2({
+    enabled: itinerarySyncV2Enabled,
+    tripId: activeTrip?.id ?? null,
+    canEdit,
+    days,
+    customPlaces,
+    setDays,
+    setCustomPlaces,
+    setSyncRenderKey,
+    remoteHydrationRenderKeyRef,
+    suppressCopyRef,
+  })
+  mutationSinkRef.current = recordTripMutationV2
   useTripSync(
     {
       tripSyncEpoch,
       canEdit,
       notifyTripChanged,
+      itinerarySyncV2Enabled,
     },
     {
       syncRenderKey,
@@ -564,6 +587,7 @@ export default function App() {
       setCopyRefreshing,
       completeReorderSaveTransaction,
       syncRenderKey,
+      onMutation: (mutation) => mutationSinkRef.current(mutation),
     },
     {
       prevStopsKeyRef,
@@ -620,6 +644,10 @@ export default function App() {
     setItineraryStartLoading(false)
     setDays([])
     setCustomPlaces({})
+    mutationSinkRef.current({
+      type: 'itinerary.replace',
+      payload: { days: [], customPlaces: {} },
+    })
     setItineraryGenerated(false)
     setItineraryFingerprint(null)
     setItineraryGenError(null)

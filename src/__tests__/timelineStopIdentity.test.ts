@@ -38,22 +38,55 @@ describe('timeline stop identity', () => {
     ).toBe(true)
   })
 
-  it('uses explicit ids for rendering and distinguishes repeated places', () => {
+  it('animates by place occurrence and mutates by durable action ids', () => {
     const identities = timelineStopIdentities(1, [
       stop('hotel', 'check-in'),
       stop('museum', 'museum-stop'),
       stop('hotel', 'overnight'),
     ])
 
+    // renderKey === matchKey so rewriting stop.id (default itinerary) is not a
+    // fake delete + re-add on the peer.
     expect(identities.map((item) => item.renderKey)).toEqual([
-      'check-in',
-      'museum-stop',
-      'overnight',
+      'd1-hotel-occ0',
+      'd1-museum-occ0',
+      'd1-hotel-occ1',
     ])
     expect(identities.map((item) => item.matchKey)).toEqual([
       'd1-hotel-occ0',
       'd1-museum-occ0',
       'd1-hotel-occ1',
+    ])
+    expect(identities.map((item) => item.actionId)).toEqual([
+      'check-in',
+      'museum-stop',
+      'overnight',
+    ])
+  })
+
+  it('keeps render keys stable when index-suffixed default ids rewrite', () => {
+    const before = timelineStopIdentities(2, [
+      stop('louvre', 'd2-louvre-0'),
+      stop('arc', 'd2-arc-1'),
+      stop('seine', 'd2-seine-2'),
+    ])
+    // Peer delete of another stop + restamp looks like index drift on ids.
+    const after = timelineStopIdentities(2, [
+      stop('louvre', 'd2-louvre-0'),
+      stop('seine', 'd2-seine-1'),
+    ])
+
+    expect(before.map((item) => item.renderKey)).toEqual([
+      'd2-louvre-occ0',
+      'd2-arc-occ0',
+      'd2-seine-occ0',
+    ])
+    expect(after.map((item) => item.renderKey)).toEqual([
+      'd2-louvre-occ0',
+      'd2-seine-occ0',
+    ])
+    expect(before.map((item) => item.renderKey).filter((key) => !after.some((item) => item.renderKey === key))).toEqual([
+      'd2-arc-occ0',
     ])
   })
 

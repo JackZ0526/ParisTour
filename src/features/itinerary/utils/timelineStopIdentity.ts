@@ -1,20 +1,29 @@
 import type { ItineraryStop } from '../../../types'
 
 export type TimelineStopIdentity = {
-  /** React/state key. Explicit stop ids remain the source of truth when present. */
+  /**
+   * React / animation key. Always place-occurrence based so rewriting durable
+   * stop.id (common for default itinerary stops after reorder) does not look
+   * like a delete + re-add.
+   */
   renderKey: string
-  /** Position-independent fallback used to match legacy stops across devices. */
+  /** Same as renderKey; kept for callers that distinguish the two. */
   matchKey: string
+  /**
+   * Id passed to itinerary mutations. Prefers the durable stop.id so cloud
+   * sync addresses the same row the server stored.
+   */
+  actionId: string
 }
 
 /**
- * Build identities that survive a reorder.
+ * Build identities that survive a reorder and stop.id rewrites.
  *
- * Older cloud snapshots can contain stops without ids, and some historical
- * clients generated ids from the array index. Matching by place occurrence
- * gives the animation layer a stable semantic identity without changing the
- * persisted itinerary model. The occurrence suffix keeps repeated places
- * (notably Day 1's two hotel cards) distinct.
+ * Default itinerary stops use index-suffixed ids (`d2-attr-arc-1`). After a
+ * peer deletes another stop, local indexes shift; if UI keys followed those
+ * ids, DayTimeline would play a fake gommage while the place remained.
+ * Matching by place occurrence keeps animation identity stable. Mutations
+ * still use `actionId` (explicit id when present).
  */
 export function timelineStopIdentities(
   dayNumber: number,
@@ -22,15 +31,17 @@ export function timelineStopIdentities(
 ): TimelineStopIdentity[] {
   const occurrences = new Map<string, number>()
 
-  return stops.map((stop) => {
+  return stops.map((stop, index) => {
     const occurrence = occurrences.get(stop.placeId) ?? 0
     occurrences.set(stop.placeId, occurrence + 1)
     const matchKey = `d${dayNumber}-${stop.placeId}-occ${occurrence}`
     const explicitId = typeof stop.id === 'string' ? stop.id.trim() : ''
+    const fallbackId = matchKey
 
     return {
-      renderKey: explicitId || matchKey,
+      renderKey: matchKey,
       matchKey,
+      actionId: explicitId || fallbackId,
     }
   })
 }

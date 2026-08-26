@@ -142,7 +142,8 @@ export function applyTripSnapshot(
   }
 
   const keepDays = opts?.hydrateDays === false
-  const previousDays = keepDays ? loadItineraryState().days : []
+  const previousItinerary = keepDays ? loadItineraryState() : null
+  const previousDays = previousItinerary?.days ?? []
   if (!keepDays) {
     clearItineraryState()
   }
@@ -150,7 +151,9 @@ export function applyTripSnapshot(
     const daysToSave = keepDays ? previousDays : snap.itinerary.days || []
     saveItineraryState(
       daysToSave,
-      snap.itinerary.customPlaces || {},
+      keepDays
+        ? previousItinerary?.customPlaces || {}
+        : snap.itinerary.customPlaces || {},
       {
         generated: daysToSave.length > 0 ? true : Boolean(snap.itinerary.generated),
         fingerprint: snap.itinerary.fingerprint ?? null,

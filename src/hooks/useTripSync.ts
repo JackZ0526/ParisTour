@@ -23,6 +23,7 @@ import { resolveItineraryStartSync } from '../shared/services/llm/business/itine
 export interface UseTripSyncDeps {
   tripSyncEpoch: number
   canEdit: boolean
+  itinerarySyncV2Enabled: boolean
   notifyTripChanged: (opts?: {
     artifactsOnly?: boolean
     allowEmptyTrip?: boolean
@@ -102,6 +103,7 @@ export function useTripSync(
   const {
     tripSyncEpoch,
     canEdit,
+    itinerarySyncV2Enabled,
     notifyTripChanged,
   } = deps
 
@@ -155,9 +157,11 @@ export function useTripSync(
   // Snapshot of selection/day while remote sync reads them.
   const dayIndexRef = useRef(dayIndex)
   const daysRef = useRef(days)
+  const customPlacesRef = useRef(customPlaces)
   const selectedPlaceIdRef = useRef(selectedPlaceId)
   dayIndexRef.current = dayIndex
   daysRef.current = days
+  customPlacesRef.current = customPlaces
   selectedPlaceIdRef.current = selectedPlaceId
 
   useEffect(() => {
@@ -198,8 +202,14 @@ export function useTripSync(
         : null
     setItineraryStart(resolvedStart)
     setItineraryStartLoading(false)
-    setDays(nextItinerary.days)
-    setCustomPlaces(nextItinerary.customPlaces || {})
+    const nextDays = itinerarySyncV2Enabled
+      ? daysRef.current
+      : nextItinerary.days
+    const nextCustomPlaces = itinerarySyncV2Enabled
+      ? customPlacesRef.current
+      : nextItinerary.customPlaces || {}
+    setDays(nextDays)
+    setCustomPlaces(nextCustomPlaces)
     setItineraryGenerated(Boolean(nextItinerary.generated))
     setItineraryFingerprint(nextItinerary.fingerprint ?? null)
     setRecommendationPreferences(nextRecommendationPreferences)
@@ -218,7 +228,6 @@ export function useTripSync(
     prevStopsKeyRef.current = null
     suppressCopyRef.current = true
 
-    const nextDays = nextItinerary.days
     let nextIndex = 0
     if (viewingDayNum != null && nextDays.length) {
       const byNum = nextDays.findIndex((d) => d.day === viewingDayNum)
@@ -231,7 +240,7 @@ export function useTripSync(
       ? nextDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
       : false
     const stillInCustom = prevSelected
-      ? Boolean(nextItinerary.customPlaces?.[prevSelected])
+      ? Boolean(nextCustomPlaces[prevSelected])
       : false
     const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
     setSelectedPlaceId(
@@ -242,6 +251,7 @@ export function useTripSync(
   }, [tripSyncEpoch])
 
   useEffect(() => {
+    if (itinerarySyncV2Enabled) return
     if (!canEdit) return
     // This render was produced by applying authoritative remote state. It is
     // not a local edit and must not start a save transaction. The marker is
@@ -263,6 +273,29 @@ export function useTripSync(
     recommendationPreferences,
     syncRenderKey,
     canEdit,
+    notifyTripChanged,
+    remoteHydrationRenderKeyRef,
+    itinerarySyncV2Enabled,
+  ])
+
+  // Under protocol V2, itinerary edits are persisted as operations. Legacy
+  // snapshots remain responsible for the rest of the trip without turning
+  // every stop movement into a second full-document upload.
+  useEffect(() => {
+    if (!itinerarySyncV2Enabled || !canEdit) return
+    if (remoteHydrationRenderKeyRef.current === syncRenderKey) return
+    notifyTripChanged()
+  }, [
+    tripDates,
+    flights,
+    hotel,
+    hotelCandidates,
+    itineraryGenerated,
+    itineraryFingerprint,
+    recommendationPreferences,
+    syncRenderKey,
+    canEdit,
+    itinerarySyncV2Enabled,
     notifyTripChanged,
     remoteHydrationRenderKeyRef,
   ])

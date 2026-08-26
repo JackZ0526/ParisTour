@@ -1,5 +1,6 @@
 import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import { yieldToMain } from '../../../shared/lib/yieldToMain'
+import { isTripSyncV2Enabled } from '../v2/syncV2Config'
 import {
   flushHotelCacheToStorage,
   type HotelCacheState,
@@ -666,6 +667,9 @@ export async function syncTripDaysFromCloud(
   options?: { replaceLocal?: boolean },
 ): Promise<boolean> {
   if (!tripId || !isCloudSyncEnabled()) return false
+  // Protocol V2 owns itinerary days via mutation log + normalized tables.
+  // V1 day sidecars are stale after V2 edits and must not clobber live UI.
+  if (isTripSyncV2Enabled()) return false
   const localDays = loadItineraryState().days
   const localEmpty = !localDays.length
   const replaceLocal = options?.replaceLocal === true
