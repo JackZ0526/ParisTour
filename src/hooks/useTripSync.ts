@@ -206,7 +206,7 @@ export function useTripSync(
       ? daysRef.current
       : nextItinerary.days
     const nextCustomPlaces = itinerarySyncV2Enabled
-      ? customPlacesRef.current
+      ? { ...(nextItinerary.customPlaces || {}), ...customPlacesRef.current }
       : nextItinerary.customPlaces || {}
     setDays(nextDays)
     setCustomPlaces(nextCustomPlaces)

@@ -149,11 +149,15 @@ export function applyTripSnapshot(
   }
   if (snap.itinerary) {
     const daysToSave = keepDays ? previousDays : snap.itinerary.days || []
+    const customPlacesToSave = keepDays
+      ? {
+          ...(previousItinerary?.customPlaces || {}),
+          ...(snap.itinerary.customPlaces || {}),
+        }
+      : snap.itinerary.customPlaces || {}
     saveItineraryState(
       daysToSave,
-      keepDays
-        ? previousItinerary?.customPlaces || {}
-        : snap.itinerary.customPlaces || {},
+      customPlacesToSave,
       {
         generated: daysToSave.length > 0 ? true : Boolean(snap.itinerary.generated),
         fingerprint: snap.itinerary.fingerprint ?? null,

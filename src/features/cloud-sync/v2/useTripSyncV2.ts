@@ -47,6 +47,42 @@ type Document = { days: DayPlan[]; customPlaces: Record<string, Place> }
 const RECENT_ACK_LIMIT = 200
 const GAP_PULL_DEBOUNCE_MS = 40
 
+function missingCustomPlaceIds(document: Document): string[] {
+  const missing = new Set<string>()
+  for (const day of document.days) {
+    for (const stop of day.stops) {
+      if (stop.placeId.startsWith('custom-') && !document.customPlaces[stop.placeId]) {
+        missing.add(stop.placeId)
+      }
+    }
+  }
+  return [...missing]
+}
+
+async function hydrateMissingCustomPlaces(
+  activeTripId: string,
+  document: Document,
+): Promise<Document> {
+  const missing = missingCustomPlaceIds(document)
+  if (!missing.length) return document
+  try {
+    const snapshot = await loadTripSnapshotV2(activeTripId)
+    let customPlaces = document.customPlaces
+    let changed = false
+    for (const id of missing) {
+      const place = snapshot.customPlaces[id]
+      if (place) {
+        customPlaces = { ...customPlaces, [id]: place }
+        changed = true
+      }
+    }
+    return changed ? { ...document, customPlaces } : document
+  } catch (err) {
+    console.warn('[trip-sync-v2] unable to hydrate missing custom places', err)
+    return document
+  }
+}
+
 function normalizeCommittedMutation(value: unknown): CommittedTripMutation | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const candidate = value as Record<string, unknown>
@@ -224,6 +260,9 @@ export function useTripSyncV2(options: {
     // Always push remote documents into React. A false `changed` with an
     // advanced revision leaves the other browser showing "synced" on stale UI.
     if (changed || mode === 'remote') {
+      if (mode === 'remote') {
+        document = await hydrateMissingCustomPlaces(tripId, document)
+      }
       documentRef.current = document
       markRemoteRender()
       setDays(document.days)
