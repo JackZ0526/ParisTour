@@ -217,7 +217,11 @@ export function useItineraryDays(
   const lastDayNum =
     numberOfDaysRef.current > 0 ? numberOfDaysRef.current : days.length
 
-  const stopAnchors = useCallback((dayNumber: number, stops: ItineraryStop[], index: number) => ({
+  const stopAnchors = useCallback((
+    dayNumber: number,
+    stops: ItineraryStop[],
+    index: number,
+  ): { afterStopId: string | null; beforeStopId: string | null } => ({
     afterStopId: index > 0
       ? ensureStopId(dayNumber, stops[index - 1], index - 1, stops)
       : null,
@@ -492,20 +496,26 @@ export function useItineraryDays(
         return keepFixedHotelPositions(d.day, next, lastDayNum)
       }
 
-      let anchorPayload: ReturnType<typeof stopAnchors> | null = null
+      const insertion: {
+        afterStopId: string | null
+        beforeStopId: string | null
+        didInsert: boolean
+      } = { afterStopId: null, beforeStopId: null, didInsert: false }
 
       setDays((prev) => {
         const targetDayPlan = prev.find((entry) => entry.day === dayNum)
         if (!targetDayPlan) return prev
         const nextStops = insertIntoDay(targetDayPlan)
         const insertedAt = nextStops.findIndex((stop) => stop.id === newStop.id)
-        if (insertedAt >= 0) {
-          anchorPayload = stopAnchors(dayNum, nextStops, insertedAt)
-        }
+        if (insertedAt < 0) return prev
+        const anchors = stopAnchors(dayNum, nextStops, insertedAt)
+        insertion.afterStopId = anchors.afterStopId
+        insertion.beforeStopId = anchors.beforeStopId
+        insertion.didInsert = true
         return prev.map((d) => (d.day === dayNum ? { ...d, stops: nextStops } : d))
       })
 
-      if (!anchorPayload) return
+      if (!insertion.didInsert) return
 
       onMutation?.({
         type: 'stop.add',
@@ -513,7 +523,8 @@ export function useItineraryDays(
           dayNumber: dayNum,
           stop: newStop as ItineraryStop & { id: string },
           place,
-          ...anchorPayload,
+          afterStopId: insertion.afterStopId,
+          beforeStopId: insertion.beforeStopId,
         },
       })
       // Belt-and-suspenders: keep custom place metadata even if a peer applies
