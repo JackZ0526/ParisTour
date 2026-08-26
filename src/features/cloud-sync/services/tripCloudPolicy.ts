@@ -53,9 +53,3 @@ export function planRemoteApply(input: {
   if (input.daysRevChanged) return 'days-only'
   return input.artifactsRevChanged ? 'artifacts-only' : 'ignore'
 }
-
-/** True when Realtime omitted snapshot/hotel (TOAST unchanged) so only metadata arrived. */
-export function realtimeRowOmitsCore(row: Record<string, unknown> | null | undefined): boolean {
-  if (!row) return true
-  return !('snapshot' in row) && !('hotel' in row)
-}

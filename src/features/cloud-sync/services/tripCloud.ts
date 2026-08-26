@@ -26,7 +26,6 @@ import {
   hotelCompareJson,
   hotelForCloud,
   planRemoteApply,
-  realtimeRowOmitsCore,
   snapshotCompareJson,
 } from './tripCloudPolicy'
 import {
@@ -40,6 +39,7 @@ import {
   peekDayCloudDiff,
 } from './itineraryDayCloud'
 import { itineraryDayCount } from '../../itinerary/services/tripDates'
+import { createAsyncInvalidationQueue } from './asyncInvalidationQueue'
 import {
   loadItineraryState,
   restoreFullFromBaseline,
@@ -663,12 +663,15 @@ export async function syncTripArtifactsFromCloud(
 export async function syncTripDaysFromCloud(
   tripId: string,
   hintRev?: number,
+  options?: { replaceLocal?: boolean },
 ): Promise<boolean> {
   if (!tripId || !isCloudSyncEnabled()) return false
   const localDays = loadItineraryState().days
   const localEmpty = !localDays.length
+  const replaceLocal = options?.replaceLocal === true
   const knownRev = lastAppliedDaysRevByTrip.get(tripId)
   if (
+    !replaceLocal &&
     !localEmpty &&
     hintRev != null &&
     knownRev != null &&
@@ -678,11 +681,13 @@ export async function syncTripDaysFromCloud(
   }
 
   const sb = getSupabase()
-  const skip = dirtyDayKeys(tripId)
-  const known = knownHashesForPresentDays(
-    localDays,
-    lastAppliedDayHashesByTrip.get(tripId),
-  )
+  const skip = replaceLocal ? new Set<string>() : dirtyDayKeys(tripId)
+  const known = replaceLocal
+    ? {}
+    : knownHashesForPresentDays(
+        localDays,
+        lastAppliedDayHashesByTrip.get(tripId),
+      )
   let pulled: { rev: number; upserts: ReturnType<typeof asDayPlanMap>; deletes: string[] }
   try {
     const { data, error } = await sb.rpc('pull_trip_days', {
@@ -721,17 +726,28 @@ export async function syncTripDaysFromCloud(
     upserts: pulled.upserts,
     deletes: pulled.deletes,
     skipKeys: skip,
+    replace: replaceLocal,
   })
+  if (replaceLocal) {
+    lastAppliedDayHashesByTrip.set(
+      tripId,
+      Object.fromEntries(
+        Object.entries(pulled.upserts).map(([key, plan]) => [key, hashDayPlan(plan)]),
+      ),
+    )
+  }
   const acked: Record<string, string> = {}
   for (const [key, plan] of Object.entries(pulled.upserts)) {
     if (skip.has(key)) continue
     acked[key] = hashDayPlan(plan)
   }
-  ackDayHashes(
-    tripId,
-    acked,
-    pulled.deletes.filter((key) => !skip.has(key)),
-  )
+  if (!replaceLocal) {
+    ackDayHashes(
+      tripId,
+      acked,
+      pulled.deletes.filter((key) => !skip.has(key)),
+    )
+  }
   lastAppliedDaysRevByTrip.set(tripId, pulled.rev)
   return applied
 }
@@ -1048,9 +1064,6 @@ let pendingAfterFlight = false
 let transientSaveRetryCount = 0
 /** Pause uploads during bursty work (itinerary generation); flush once on release. */
 let saveHoldCount = 0
-/** Ignore mirrored realtime events right after our own save. */
-let suppressRemoteUntil = 0
-let suppressFlushTimer: ReturnType<typeof setTimeout> | null = null
 /**
  * Snapshot JSON currently reconciled on this client (last save or last applied remote).
  * Used to skip no-op local uploads — not to reject re-applying historical remote states.
@@ -1466,38 +1479,11 @@ function isNewerUpdatedAt(candidate: string, current: string | undefined): boole
   return candidate > current
 }
 
-function armSuppressRemote(ms: number) {
-  suppressRemoteUntil = Date.now() + ms
-  if (suppressFlushTimer) clearTimeout(suppressFlushTimer)
-  suppressFlushTimer = setTimeout(() => {
-    suppressFlushTimer = null
-    flushQueuedRemote()
-  }, ms + 20)
-}
-
-/** After applying a remote snapshot, ignore remount/effect autosave noise. */
+/** Short guard used only by derived itinerary effects during remote hydration. */
 let quietAutosaveUntil = 0
-let quietSettleTimer: ReturnType<typeof setTimeout> | null = null
 
 function beginRemoteQuietPeriod(ms: number) {
   quietAutosaveUntil = Date.now() + ms
-  if (quietSettleTimer) clearTimeout(quietSettleTimer)
-  // When quiet ends, adopt whatever localStorage settled to (nav/fingerprint
-  // tweaks) as the reconciled baseline — do not upload that drift.
-  quietSettleTimer = setTimeout(() => {
-    quietSettleTimer = null
-    const tripId = saveTripId
-    if (!tripId) return
-    try {
-      const settled = collectTripSnapshot()
-      trackSavedSnapshot(tripId, settled)
-    } catch {
-      /* ignore */
-    }
-    if (queuedSaveMode !== 'none' && saveHoldCount === 0) {
-      armSaveTimer(SAVE_DEBOUNCE_MS)
-    }
-  }, ms + 30)
 }
 
 /** True while App should not wipe a just-applied remote itinerary. */
@@ -1524,10 +1510,6 @@ function queueRemoteUpdate(next: QueuedRemote) {
 function flushQueuedRemote() {
   if (!queuedRemote) return
   if (saveInFlight || cloudSaveStatus === 'saving') return
-  if (Date.now() < suppressRemoteUntil) {
-    armSuppressRemote(Math.max(50, suppressRemoteUntil - Date.now()))
-    return
-  }
   const q = queuedRemote
   queuedRemote = null
   const applied = applyRemoteTripSnapshot(q.tripId, q.snapshot, q.updatedAt, {
@@ -1566,8 +1548,9 @@ export function applyRemoteTripSnapshot(
     typeof updatedAt === 'string' && updatedAt.trim() ? updatedAt.trim() : ''
   const trustSnapshot = Boolean(opts?.trustSnapshot)
 
-  // Defer while we write or swallow our own echo — never drop the event.
-  if (saveInFlight || cloudSaveStatus === 'saving' || Date.now() < suppressRemoteUntil) {
+  // Defer only while a local write is in flight. Own Realtime echoes are
+  // rejected by updated_at/revision comparison before reaching this function.
+  if (saveInFlight || cloudSaveStatus === 'saving') {
     if (stamp) {
       queueRemoteUpdate({
         tripId,
@@ -1639,9 +1622,8 @@ export function applyRemoteTripSnapshot(
   }
   if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
   saveTripId = tripId
-  // Block echo / hydration autosave from bouncing back into realtime.
+  // Let derived itinerary effects settle before they recompute fingerprints.
   beginRemoteQuietPeriod(3500)
-  armSuppressRemote(2000)
   window.setTimeout(() => {
     setCloudSyncStatus('synced')
   }, 450)
@@ -1658,28 +1640,20 @@ let realtimeChannel: RealtimeChannel | null = null
 async function applyRemoteTripFromServer(
   tripId: string,
   hintUpdatedAt?: string | null,
-  payloadRow?: Record<string, unknown> | null,
 ): Promise<boolean> {
+  // Realtime is an invalidation signal only. Its UPDATE record can omit or
+  // truncate unchanged TOAST columns, so all reconciliation decisions use one
+  // authoritative REST row.
+  const full = await loadTripById(tripId)
+  if (!full) return false
+
   const knownRev = lastAppliedArtifactsRevByTrip.get(tripId) ?? 0
   const knownDaysRev = lastAppliedDaysRevByTrip.get(tripId) ?? 0
   const currentStamp = lastAppliedUpdatedAtByTrip.get(tripId)
-  const payloadRev =
-    payloadRow && 'artifacts_rev' in payloadRow
-      ? asArtifactsRev(payloadRow.artifacts_rev)
-      : null
-  const payloadDaysRev =
-    payloadRow && 'days_rev' in payloadRow
-      ? asArtifactsRev(payloadRow.days_rev)
-      : null
-  const payloadStamp =
+  const stamp =
+    (typeof full.updated_at === 'string' && full.updated_at.trim()) ||
     (typeof hintUpdatedAt === 'string' && hintUpdatedAt.trim()) ||
-    (typeof payloadRow?.updated_at === 'string' ? payloadRow.updated_at : '') ||
-    ''
-  const remoteNewer = payloadStamp ? isNewerUpdatedAt(payloadStamp, currentStamp) : true
-  const payloadRevChanged = payloadRev != null && payloadRev !== knownRev
-  const payloadDaysRevChanged =
-    payloadDaysRev != null ? payloadDaysRev !== knownDaysRev : remoteNewer
-  const omitsCore = realtimeRowOmitsCore(payloadRow)
+    null
 
   const pullSidecars = async (
     artifactRev?: number,
@@ -1698,92 +1672,6 @@ async function applyRemoteTripFromServer(
     }
   }
 
-  if (omitsCore) {
-    const decision = planRemoteApply({
-      remoteNewer,
-      artifactsRevChanged: payloadRevChanged,
-      daysRevChanged: payloadDaysRevChanged,
-      coreSame: true,
-      localCoreDirty: isLocalCoreDirty(tripId),
-    })
-    if (decision === 'ignore') return false
-    if (
-      decision === 'artifacts-only' ||
-      decision === 'days-only' ||
-      decision === 'keep-local'
-    ) {
-      const daysApplied = await pullSidecars(
-        payloadRev ?? undefined,
-        payloadDaysRev ?? undefined,
-      )
-      if (decision !== 'keep-local' && payloadStamp) {
-        lastAppliedUpdatedAtByTrip.set(tripId, payloadStamp)
-      }
-      if (decision === 'days-only' || (decision === 'keep-local' && daysApplied)) {
-        if (daysApplied) {
-          setCloudSyncStatus('syncing')
-          window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-        }
-        return daysApplied
-      }
-      if (decision === 'artifacts-only') {
-        setCloudSyncStatus('syncing')
-        window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-      }
-      return false
-    }
-  }
-
-  if (payloadRow && ('snapshot' in payloadRow || 'hotel' in payloadRow)) {
-    const remote = snapshotFromCloudRow(payloadRow)
-    const remoteParts = cloudPartsJson(remote)
-    const localParts = lastSavedPartsByTrip.get(tripId)
-    const payloadCoreSame = Boolean(
-      localParts &&
-        remoteParts.core === localParts.core &&
-        remoteParts.hotel === localParts.hotel,
-    )
-    const payloadDecision = planRemoteApply({
-      remoteNewer,
-      artifactsRevChanged: payloadRevChanged,
-      daysRevChanged: payloadDaysRevChanged,
-      coreSame: payloadCoreSame,
-      localCoreDirty: isLocalCoreDirty(tripId),
-    })
-    if (payloadDecision === 'ignore') return false
-    if (
-      payloadDecision === 'artifacts-only' ||
-      payloadDecision === 'days-only' ||
-      payloadDecision === 'keep-local'
-    ) {
-      const daysApplied = await pullSidecars(
-        payloadRev ?? undefined,
-        payloadDaysRev ?? undefined,
-      )
-      if (payloadDecision !== 'keep-local' && payloadStamp) {
-        lastAppliedUpdatedAtByTrip.set(tripId, payloadStamp)
-      }
-      if (payloadDecision === 'days-only' || (payloadDecision === 'keep-local' && daysApplied)) {
-        if (daysApplied) {
-          setCloudSyncStatus('syncing')
-          window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-        }
-        return daysApplied
-      }
-      if (payloadDecision === 'artifacts-only') {
-        setCloudSyncStatus('syncing')
-        window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-      }
-      return false
-    }
-  }
-
-  const full = await loadTripById(tripId)
-  if (!full) return false
-  const stamp =
-    (typeof full.updated_at === 'string' && full.updated_at.trim()) ||
-    payloadStamp ||
-    null
   const remoteParts = cloudPartsJson(full.snapshot)
   const localParts = lastSavedPartsByTrip.get(tripId)
   const coreSame = Boolean(
@@ -1861,7 +1749,11 @@ export function subscribeTripRealtime(
     if (id === tripId) onRemoteApply()
   }
 
-  let applySeq = 0
+  const reconcileQueue = createAsyncInvalidationQueue({
+    reconcile: () => applyRemoteTripFromServer(tripId),
+    onApplied: onRemoteApply,
+    onError: (err) => console.warn('[tripCloud] realtime sync fetch failed', err),
+  })
 
   const channel = sb
     .channel(`trip-sync:${tripId}`)
@@ -1895,41 +1787,19 @@ export function subscribeTripRealtime(
           return
         }
 
-        const seq = ++applySeq
-        void (async () => {
-          try {
-            const applied = await applyRemoteTripFromServer(
-              tripId,
-              rowUpdatedAt,
-              row,
-            )
-            if (seq !== applySeq) return
-            if (applied) onRemoteApply()
-          } catch (err) {
-            console.warn('[tripCloud] realtime sync fetch failed', err)
-          }
-        })()
+        reconcileQueue.request()
       },
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        const seq = ++applySeq
-        void (async () => {
-          try {
-            const applied = await applyRemoteTripFromServer(tripId)
-            if (seq !== applySeq) return
-            if (applied) onRemoteApply()
-          } catch (err) {
-            console.warn('[tripCloud] realtime subscribe catch-up failed', err)
-          }
-        })()
+        reconcileQueue.request()
       }
     })
 
   realtimeChannel = channel
 
   return () => {
-    applySeq += 1
+    reconcileQueue.dispose()
     if (realtimeApplyHandler) realtimeApplyHandler = null
     if (queuedRemote?.tripId === tripId) queuedRemote = null
     if (realtimeChannel === channel) {
@@ -1943,7 +1813,6 @@ export function scheduleTripCloudSave(
   tripId: string,
   canEdit: boolean,
   opts?: {
-    force?: boolean
     artifactsOnly?: boolean
     allowEmptyTrip?: boolean
   },
@@ -1952,12 +1821,6 @@ export function scheduleTripCloudSave(
   if (!isCloudSyncEnabled()) return // localhost dev: local-only saves
   saveTripId = tripId
   bindCloudFlushListeners()
-
-  // After live sync, remount effects often look like "changes". Swallow those
-  // unless the caller forces (e.g. restore default).
-  if (!opts?.force && Date.now() < quietAutosaveUntil) {
-    return
-  }
 
   if (opts?.artifactsOnly) {
     if (!hasArtifactCloudDiff()) return
@@ -2145,8 +2008,6 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     trackSavedSnapshot(tripId, snapshot, json)
     rememberGeneratedSnapshot(tripId, snapshot)
     if (updatedAt) lastAppliedUpdatedAtByTrip.set(tripId, updatedAt)
-    // Swallow our own realtime echo.
-    armSuppressRemote(3000)
     transientSaveRetryCount = 0
     setCloudSaveStatus('saved', null, detected)
   } catch (err) {
@@ -2202,7 +2063,6 @@ export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
   lastAppliedDaysRevByTrip.delete(trip.id)
   lastAppliedDayHashesByTrip.delete(trip.id)
   beginRemoteQuietPeriod(2500)
-  armSuppressRemote(1500)
   setCloudSaveStatus('idle')
   setCloudSyncStatus('idle')
   try {
@@ -2211,7 +2071,7 @@ export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
     console.warn('[tripCloud] artifact pull failed', err)
   }
   try {
-    await syncTripDaysFromCloud(trip.id, trip.daysRev)
+    await syncTripDaysFromCloud(trip.id, trip.daysRev, { replaceLocal: true })
   } catch (err) {
     console.warn('[tripCloud] day pull failed', err)
   }

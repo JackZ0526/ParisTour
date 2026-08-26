@@ -505,8 +505,9 @@ begin
   end if;
 end $$;
 
--- Use DEFAULT replica identity: Realtime WebSocket only sends primary key & metadata (id, updated_at).
--- This prevents broadcasting massive JSONB snapshots over WebSocket egress.
+-- DEFAULT keeps UPDATE old-record payloads compact. Clients treat every event
+-- only as an invalidation and fetch the authoritative row over REST; they never
+-- trust large/TOASTed JSONB fields from the WebSocket payload.
 alter table public.trips replica identity default;
 
 -- ---------------------------------------------------------------------------

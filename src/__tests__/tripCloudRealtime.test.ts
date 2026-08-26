@@ -6,7 +6,6 @@ import {
 } from '../features/cloud-sync/services/itineraryDayCloud'
 import {
   planRemoteApply,
-  realtimeRowOmitsCore,
 } from '../features/cloud-sync/services/tripCloudPolicy'
 import { loadItineraryState, saveItineraryState } from '../features/itinerary/utils/itineraryState'
 import { SELECTED_HOTEL_PLACE_ID } from '../features/itinerary/utils/dayOrigin'
@@ -135,12 +134,6 @@ describe('tripCloud realtime stop deletion & synchronization', () => {
       localCoreDirty: false,
     })
     expect(decision).toBe('days-only')
-  })
-
-  it('detects when realtime payload omits core jsonb', () => {
-    expect(realtimeRowOmitsCore(null)).toBe(true)
-    expect(realtimeRowOmitsCore({ id: 'trip-1', updated_at: '2026-08-26', days_rev: 2 })).toBe(true)
-    expect(realtimeRowOmitsCore({ id: 'trip-1', snapshot: { version: 1 } })).toBe(false)
   })
 
   it('does not falsely skip merging when remote hash differs from local hash on day 2', () => {

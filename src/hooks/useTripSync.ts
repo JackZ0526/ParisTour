@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { FlightSelection } from '../features/flight/services/flightSelection'
-import type { HotelCandidate, Place, SelectedHotel } from '../types'
-import type { DayPlan } from '../types'
+import type { DayPlan, HotelCandidate, Place, SelectedHotel } from '../types'
 import type { TripDateRange } from '../features/itinerary/services/tripDates'
 import type {
   ItineraryInputFingerprint,
@@ -21,18 +20,10 @@ import { loadRecommendationPreferences } from '../features/place/services/recomm
 import { SELECTED_HOTEL_PLACE_ID } from '../features/itinerary/utils/dayOrigin'
 import { resolveItineraryStartSync } from '../shared/services/llm/business/itinerary'
 
-function daysStructureKey(daysList?: DayPlan[]): string {
-  if (!daysList?.length) return ''
-  return daysList
-    .map((d) => `${d.day}:${d.stops.map((s) => s.placeId).join(',')}`)
-    .join(';')
-}
-
 export interface UseTripSyncDeps {
   tripSyncEpoch: number
   canEdit: boolean
   notifyTripChanged: (opts?: {
-    force?: boolean
     artifactsOnly?: boolean
     allowEmptyTrip?: boolean
   }) => void
@@ -90,7 +81,6 @@ export interface UseTripSyncRefs {
   suppressCopyRef: React.MutableRefObject<boolean>
   copyRequestIdRef: React.MutableRefObject<number>
   tripInputsHydratedRef: React.MutableRefObject<boolean>
-  suppressCloudSaveRef: React.MutableRefObject<boolean>
 }
 
 export interface UseTripSyncHandlers {
@@ -156,7 +146,6 @@ export function useTripSync(
     suppressCopyRef,
     copyRequestIdRef,
     tripInputsHydratedRef,
-    suppressCloudSaveRef,
   } = refs
 
   // Snapshot of selection/day while remote sync reads them.
@@ -166,11 +155,6 @@ export function useTripSync(
   dayIndexRef.current = dayIndex
   daysRef.current = days
   selectedPlaceIdRef.current = selectedPlaceId
-
-  const lastNotifiedDaysStructureRef = useRef<string>(daysStructureKey(days))
-
-  const cloudSaveSkipRunsRef = useRef(2)
-  const cloudHydratedAtRef = useRef(Date.now())
 
   useEffect(() => {
     if (tripSyncEpoch <= 0) return
@@ -192,8 +176,6 @@ export function useTripSync(
     clearDayNavCache()
 
     tripInputsHydratedRef.current = true
-    suppressCloudSaveRef.current = false
-    lastNotifiedDaysStructureRef.current = daysStructureKey(nextItinerary.days)
 
     setHotel(nextHotels.hotel)
     setHotelCandidates(nextHotels.candidates)
@@ -248,29 +230,14 @@ export function useTripSync(
       prevSelected && (stillOnDay || stillInCustom || isHotel) ? prevSelected : null,
     )
 
-    cloudSaveSkipRunsRef.current = 2
-    cloudHydratedAtRef.current = Date.now()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripSyncEpoch])
 
   useEffect(() => {
-    if (cloudSaveSkipRunsRef.current > 0) {
-      cloudSaveSkipRunsRef.current -= 1
-      return
-    }
-    if (Date.now() - cloudHydratedAtRef.current < 2000) return
-
-    const currentStructure = daysStructureKey(days)
-    const isStructuralChange =
-      currentStructure !== lastNotifiedDaysStructureRef.current
-    lastNotifiedDaysStructureRef.current = currentStructure
-
-    if (suppressCloudSaveRef.current && !isStructuralChange) {
-      suppressCloudSaveRef.current = false
-      return
-    }
-    suppressCloudSaveRef.current = false
     if (!canEdit) return
+    // The cloud writer owns no-op detection against the last reconciled snapshot.
+    // Always notify it here: time-based/"skip N renders" guards can swallow a
+    // genuine edit made immediately after a remote update.
     notifyTripChanged()
   }, [
     tripDates,
@@ -284,7 +251,6 @@ export function useTripSync(
     recommendationPreferences,
     canEdit,
     notifyTripChanged,
-    suppressCloudSaveRef,
   ])
 
   useEffect(() => {

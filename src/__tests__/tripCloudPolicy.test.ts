@@ -4,7 +4,6 @@ import {
   hotelCompareJson,
   hotelForCloud,
   planRemoteApply,
-  realtimeRowOmitsCore,
   snapshotCompareJson,
 } from '../features/cloud-sync/services/tripCloudPolicy'
 import { emptyTripSnapshot, type TripSnapshot } from '../features/cloud-sync/services/tripSnapshot'
@@ -118,12 +117,6 @@ describe('tripCloudPolicy', () => {
         localCoreDirty: false,
       }),
     ).toBe('ignore')
-  })
-
-  it('detects Realtime payloads that omitted core jsonb', () => {
-    expect(realtimeRowOmitsCore({ id: 't', updated_at: 'x', artifacts_rev: 3 })).toBe(true)
-    expect(realtimeRowOmitsCore({ id: 't', snapshot: {}, updated_at: 'x' })).toBe(false)
-    expect(realtimeRowOmitsCore({ id: 't', hotel: null, updated_at: 'x' })).toBe(false)
   })
 
 })

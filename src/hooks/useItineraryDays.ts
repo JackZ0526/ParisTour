@@ -558,7 +558,6 @@ export interface UseItineraryDaysEffectsRefs {
   copyRequestIdRef: MutableRefObject<number>
   navTimesAppliedKeyRef: MutableRefObject<string>
   day1TransitSecondsRef: MutableRefObject<number | null>
-  suppressCloudSaveRef: MutableRefObject<boolean>
 }
 
 export function useItineraryDaysEffects(
@@ -649,7 +648,6 @@ export function useItineraryDaysEffects(
     const applyKey = `${navPlan.stopsKey}::${day1HotelHm || ''}`
     if (refs.navTimesAppliedKeyRef.current === applyKey) return
 
-    refs.suppressCloudSaveRef.current = true
     setDays((prev) => {
       const idx = prev.findIndex((d) => d.day === day.day)
       if (idx < 0) return prev
@@ -678,7 +676,6 @@ export function useItineraryDaysEffects(
         recomputed.stops.length === prev[idx].stops.length &&
         recomputed.stops.every((s, i) => s.time === prev[idx].stops[i]?.time)
       ) {
-        refs.suppressCloudSaveRef.current = false
         return prev
       }
 
@@ -700,7 +697,6 @@ export function useItineraryDaysEffects(
     placesWithHotel,
     refs.day1TransitSecondsRef,
     refs.navTimesAppliedKeyRef,
-    refs.suppressCloudSaveRef,
     setDays,
   ])
 
@@ -710,23 +706,20 @@ export function useItineraryDaysEffects(
     const transitSeconds = refs.day1TransitSecondsRef.current
     const hotelHm = computeDay1HotelArrivalHm(flights.outbound, transitSeconds)
     if (!hotelHm) return
-    refs.suppressCloudSaveRef.current = true
     setDays((prev) => {
       const idx = prev.findIndex((d) => d.day === 1)
       if (idx < 0) {
-        refs.suppressCloudSaveRef.current = false
         return prev
       }
       const nextDay = applyDay1HotelArrivalTimes(prev[idx], hotelHm)
       if (nextDay === prev[idx]) {
-        refs.suppressCloudSaveRef.current = false
         return prev
       }
       const next = [...prev]
       next[idx] = nextDay
       return next
     })
-  }, [flights.outbound, day.day, refs.day1TransitSecondsRef, refs.suppressCloudSaveRef, setDays])
+  }, [flights.outbound, day.day, refs.day1TransitSecondsRef, setDays])
 
   // Auto-generate day title / theme / summary after itinerary edits.
   const placesWithHotelRef = useRef(placesWithHotel)

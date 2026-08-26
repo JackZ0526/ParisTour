@@ -34,7 +34,6 @@ export type AuthContextValue = {
   switchTrip: (tripId: string) => Promise<void>
   refreshTrips: () => Promise<void>
   notifyTripChanged: (opts?: {
-    force?: boolean
     artifactsOnly?: boolean
     allowEmptyTrip?: boolean
   }) => void

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DayPlan } from '../types'
 import {
   dayCloudDiffIsEmpty,
@@ -7,7 +7,9 @@ import {
   mapToDays,
   peekDayCloudDiff,
   knownHashesForPresentDays,
+  mergeCloudDays,
 } from '../features/cloud-sync/services/itineraryDayCloud'
+import { loadItineraryState, saveItineraryState } from '../features/itinerary/utils/itineraryState'
 
 const day = (n: number, title: string): DayPlan => ({
   day: n,
@@ -20,6 +22,22 @@ const day = (n: number, title: string): DayPlan => ({
 })
 
 describe('itineraryDayCloud', () => {
+  beforeEach(() => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear(),
+      length: 0,
+      key: () => null,
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('hashes day plans stably and changes when content changes', () => {
     const a = hashDayPlan(day(1, 'Louvre'))
     const b = hashDayPlan(day(1, 'Louvre'))
@@ -92,5 +110,25 @@ describe('itineraryDayCloud', () => {
       '1': last['1'],
     })
     expect(knownHashesForPresentDays([], last)).toEqual({})
+  })
+
+  it('authoritative initial hydrate clears stale local days when cloud is empty', () => {
+    saveItineraryState([day(1, 'Stale local plan')], {}, { generated: true })
+
+    expect(mergeCloudDays({ upserts: {}, replace: true })).toBe(true)
+    expect(loadItineraryState().days).toEqual([])
+    expect(loadItineraryState().generated).toBe(false)
+  })
+
+  it('authoritative initial hydrate replaces rather than merges another trip', () => {
+    saveItineraryState([day(1, 'Old trip'), day(2, 'Old day 2')], {}, { generated: true })
+
+    expect(
+      mergeCloudDays({
+        upserts: daysToMap([day(1, 'Cloud trip')]),
+        replace: true,
+      }),
+    ).toBe(true)
+    expect(loadItineraryState().days.map((plan) => plan.title)).toEqual(['Cloud trip'])
   })
 })

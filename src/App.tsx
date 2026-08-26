@@ -416,8 +416,6 @@ export default function App() {
   const copyRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
-  /** Nav distance/time recomputes mutate stop clocks — not user content edits. */
-  const suppressCloudSaveRef = useRef(false)
   useTripSync(
     {
       tripSyncEpoch,
@@ -465,7 +463,6 @@ export default function App() {
       suppressCopyRef,
       copyRequestIdRef,
       tripInputsHydratedRef,
-      suppressCloudSaveRef,
     },
     {
       cancelInFlightGeneration,
@@ -569,7 +566,6 @@ export default function App() {
       copyRequestIdRef,
       navTimesAppliedKeyRef,
       day1TransitSecondsRef,
-      suppressCloudSaveRef,
     },
   )
 
@@ -629,7 +625,7 @@ export default function App() {
     setCopyRefreshing(false)
     prevStopsKeyRef.current = null
     setPanelResetKey((k) => k + 1)
-    notifyTripChanged({ force: true, allowEmptyTrip: true })
+    notifyTripChanged({ allowEmptyTrip: true })
   }
 
   return (

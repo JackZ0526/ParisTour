@@ -453,7 +453,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const notifyTripChanged = useCallback((opts?: {
-    force?: boolean
     artifactsOnly?: boolean
     allowEmptyTrip?: boolean
   }) => {

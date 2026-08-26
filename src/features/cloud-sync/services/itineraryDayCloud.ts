@@ -117,10 +117,13 @@ export function mergeCloudDays(options: {
   upserts?: DayPlanMap | null
   deletes?: string[] | null
   skipKeys?: Iterable<string>
+  /** Initial hydrate/switch: the supplied map is the complete server state. */
+  replace?: boolean
 }): boolean {
   const skip = new Set(options.skipKeys || [])
   const itinerary = loadItineraryState()
-  const map = daysToMap(itinerary.days)
+  const previous = daysToMap(itinerary.days)
+  const map = options.replace ? {} : { ...previous }
   let changed = false
   for (const key of options.deletes || []) {
     if (!key || skip.has(key) || !(key in map)) continue
@@ -131,6 +134,15 @@ export function mergeCloudDays(options: {
     if (!key || skip.has(key) || !plan) continue
     map[key] = plan
     changed = true
+  }
+  if (options.replace) {
+    const previousKeys = Object.keys(previous)
+    const nextKeys = Object.keys(map)
+    changed =
+      previousKeys.length !== nextKeys.length ||
+      nextKeys.some(
+        (key) => !previous[key] || hashDayPlan(previous[key]) !== hashDayPlan(map[key]),
+      )
   }
   if (!changed) return false
   const nextDays = mapToDays(map)
