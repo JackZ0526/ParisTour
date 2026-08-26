@@ -85,7 +85,6 @@ import {
   hasMatchingBaseline,
   hasUsableGeneratedItinerary,
   emptyItinerary,
-  isThinItineraryAgainstBaseline,
   loadItineraryState,
   restoreDayFromBaseline,
   restoreFullFromBaseline,
@@ -495,7 +494,6 @@ export function useItineraryGeneration(
   useEffect(() => {
     const stored = loadItineraryState()
     if (!days.length && stored.days.length) return
-    if (isThinItineraryAgainstBaseline(days, stored.days)) return
     saveItineraryState(days, customPlaces, {
       generated: itineraryGenerated || days.length > 0,
       fingerprint: itineraryFingerprint ?? undefined,

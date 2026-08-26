@@ -41,8 +41,6 @@ import {
 } from './itineraryDayCloud'
 import { itineraryDayCount } from '../../itinerary/services/tripDates'
 import {
-  isThinItineraryAgainstBaseline,
-  loadBaselineItinerary,
   loadItineraryState,
   restoreFullFromBaseline,
   saveItineraryState,
@@ -1732,9 +1730,11 @@ async function applyRemoteTripFromServer(
         lastAppliedUpdatedAtByTrip.set(tripId, payloadStamp)
       }
       if (decision === 'days-only' || (decision === 'keep-local' && daysApplied)) {
-        setCloudSyncStatus('syncing')
-        window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-        return daysApplied || decision === 'days-only'
+        if (daysApplied) {
+          setCloudSyncStatus('syncing')
+          window.setTimeout(() => setCloudSyncStatus('synced'), 450)
+        }
+        return daysApplied
       }
       if (decision === 'artifacts-only') {
         setCloudSyncStatus('syncing')
@@ -1773,10 +1773,12 @@ async function applyRemoteTripFromServer(
       if (payloadDecision !== 'keep-local' && payloadStamp) {
         lastAppliedUpdatedAtByTrip.set(tripId, payloadStamp)
       }
-      if (payloadDecision === 'days-only' || daysApplied) {
-        setCloudSyncStatus('syncing')
-        window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-        return payloadDecision === 'days-only' || daysApplied
+      if (payloadDecision === 'days-only' || (payloadDecision === 'keep-local' && daysApplied)) {
+        if (daysApplied) {
+          setCloudSyncStatus('syncing')
+          window.setTimeout(() => setCloudSyncStatus('synced'), 450)
+        }
+        return daysApplied
       }
       if (payloadDecision === 'artifacts-only') {
         setCloudSyncStatus('syncing')
@@ -1821,10 +1823,12 @@ async function applyRemoteTripFromServer(
 
   if (decision === 'artifacts-only' || decision === 'days-only') {
     if (stamp) lastAppliedUpdatedAtByTrip.set(tripId, stamp)
-    setCloudSyncStatus('syncing')
     const daysApplied = await pullSidecars(full.artifactsRev, full.daysRev)
-    window.setTimeout(() => setCloudSyncStatus('synced'), 450)
-    return decision === 'days-only' || daysApplied
+    if (daysApplied || decision === 'artifacts-only') {
+      setCloudSyncStatus('syncing')
+      window.setTimeout(() => setCloudSyncStatus('synced'), 450)
+    }
+    return daysApplied
   }
 
   const applied = applyRemoteTripSnapshot(tripId, full.snapshot, stamp, {
@@ -1842,6 +1846,10 @@ async function applyRemoteTripFromServer(
     daysApplied = await syncTripDaysFromCloud(tripId, full.daysRev)
   } catch (err) {
     console.warn('[tripCloud] day pull failed', err)
+  }
+  if (applied || daysApplied) {
+    setCloudSyncStatus('syncing')
+    window.setTimeout(() => setCloudSyncStatus('synced'), 450)
   }
   return applied || daysApplied
 }
@@ -2092,17 +2100,7 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
   }
   const coreUnchanged = lastSavedJsonByTrip.get(tripId) === json
   const artifactsChanged = hasArtifactCloudDiff()
-  let daysChanged = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId, snapshot))
-  if (
-    daysChanged &&
-    isThinItineraryAgainstBaseline(
-      snapshot.itinerary?.days,
-      snapshot.baseline?.days,
-    )
-  ) {
-    console.warn('[tripCloud] skipped uploading a thin itinerary over the baseline')
-    daysChanged = false
-  }
+  const daysChanged = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId, snapshot))
   if (saveMode === 'artifacts') {
     if (!artifactsChanged && !daysChanged) {
       if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
@@ -2228,11 +2226,7 @@ export async function applyAccessibleTripLocally(trip: AccessibleTrip) {
     console.warn('[tripCloud] day pull failed', err)
   }
   const itinerary = loadItineraryState()
-  const baselineDays = loadBaselineItinerary()?.days
-  if (
-    !itinerary.days.length ||
-    isThinItineraryAgainstBaseline(itinerary.days, baselineDays)
-  ) {
+  if (!itinerary.days.length) {
     const restored = restoreFullFromBaseline()
     if (restored) {
       saveItineraryState(restored.days, restored.customPlaces, {

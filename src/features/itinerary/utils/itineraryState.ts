@@ -600,9 +600,6 @@ export function hasUsableGeneratedItinerary(
   current?: ItineraryInputFingerprint | null,
 ): boolean {
   if (!state.days?.length) return false
-  if (isThinItineraryAgainstBaseline(state.days, loadBaselineItinerary()?.days)) {
-    return false
-  }
   if (!current) return true
   if (!state.fingerprint) return true // legacy: keep until inputs change tracking starts
   // Ignore itineraryStartDate drift (async resolve) so refresh does not re-generate.
