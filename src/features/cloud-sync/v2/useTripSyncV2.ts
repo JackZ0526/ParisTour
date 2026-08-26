@@ -249,7 +249,12 @@ export function useTripSyncV2(options: {
         changed ||= result.changed
         // Identity drift (explicit id vs ensureStopId / stale local copy):
         // fall back to durable snapshot instead of advancing past a no-op.
-        if (result.ignoredReason === 'entity_missing') return false
+        if (
+          result.ignoredReason === 'entity_missing' ||
+          result.ignoredReason === 'invalid_anchor'
+        ) {
+          return false
+        }
       }
       nextRevision = mutation.revision
     }

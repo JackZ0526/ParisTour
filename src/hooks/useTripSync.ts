@@ -202,14 +202,18 @@ export function useTripSync(
         : null
     setItineraryStart(resolvedStart)
     setItineraryStartLoading(false)
-    const nextDays = itinerarySyncV2Enabled
-      ? daysRef.current
-      : nextItinerary.days
-    const nextCustomPlaces = itinerarySyncV2Enabled
-      ? { ...(nextItinerary.customPlaces || {}), ...customPlacesRef.current }
-      : nextItinerary.customPlaces || {}
-    setDays(nextDays)
-    setCustomPlaces(nextCustomPlaces)
+    if (itinerarySyncV2Enabled) {
+      // Protocol V2 owns itinerary days via mutation log. V1 trips.updated_at
+      // still fires on hotel/artifact saves; re-applying daysRef here races with
+      // in-flight optimistic adds and replays stale stops (fake gommage on peers).
+      setCustomPlaces((prev) => ({
+        ...(nextItinerary.customPlaces || {}),
+        ...prev,
+      }))
+    } else {
+      setDays(nextItinerary.days)
+      setCustomPlaces(nextItinerary.customPlaces || {})
+    }
     setItineraryGenerated(Boolean(nextItinerary.generated))
     setItineraryFingerprint(nextItinerary.fingerprint ?? null)
     setRecommendationPreferences(nextRecommendationPreferences)
@@ -228,19 +232,25 @@ export function useTripSync(
     prevStopsKeyRef.current = null
     suppressCopyRef.current = true
 
+    const itineraryDays = itinerarySyncV2Enabled ? daysRef.current : nextItinerary.days
     let nextIndex = 0
-    if (viewingDayNum != null && nextDays.length) {
-      const byNum = nextDays.findIndex((d) => d.day === viewingDayNum)
+    if (viewingDayNum != null && itineraryDays.length) {
+      const byNum = itineraryDays.findIndex((d) => d.day === viewingDayNum)
       if (byNum >= 0) nextIndex = byNum
-      else nextIndex = Math.min(dayIndexRef.current, nextDays.length - 1)
+      else nextIndex = Math.min(dayIndexRef.current, itineraryDays.length - 1)
     }
     setDayIndex(nextIndex)
 
     const stillOnDay = prevSelected
-      ? nextDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
+      ? itineraryDays[nextIndex]?.stops.some((s) => s.placeId === prevSelected)
       : false
     const stillInCustom = prevSelected
-      ? Boolean(nextCustomPlaces[prevSelected])
+      ? Boolean(
+          itinerarySyncV2Enabled
+            ? customPlacesRef.current[prevSelected] ??
+              nextItinerary.customPlaces?.[prevSelected]
+            : nextItinerary.customPlaces?.[prevSelected],
+        )
       : false
     const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
     setSelectedPlaceId(
