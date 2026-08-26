@@ -175,12 +175,21 @@ export function useTripSyncV2(options: {
   const tripIdRef = useRef(tripId)
 
   tripIdRef.current = tripId
+  const applyChainRef = useRef(Promise.resolve())
 
-  // Keep documentRef aligned with React state after paint. Avoid assigning during
-  // render — that can clobber a remote apply that already wrote a newer document.
+  const enqueueExclusive = useCallback(<T,>(task: () => Promise<T>) => {
+    const run = applyChainRef.current.then(task, task)
+    applyChainRef.current = run.then(() => undefined, () => undefined)
+    return run
+  }, [])
+
+  // Local edits (copy regen, nav times) write React state without going through
+  // applyCommitted. Skip the echo after a remote apply — that render still has
+  // the pre-add days until setDays flushes, and would clobber documentRef.
   useEffect(() => {
+    if (remoteHydrationRenderKeyRef.current != null) return
     documentRef.current = { days, customPlaces }
-  }, [customPlaces, days])
+  }, [customPlaces, days, remoteHydrationRenderKeyRef])
 
   const rememberAck = useCallback((mutationId: string) => {
     localMutationIdsRef.current.delete(mutationId)
@@ -228,63 +237,77 @@ export function useTripSyncV2(options: {
     suppressCopyRef,
   ])
 
-  const applyCommitted = useCallback(async (
+  const applyCommitted = useCallback((
     mutations: CommittedTripMutation[],
     mode: 'remote' | 'local-ack' = 'remote',
   ): Promise<boolean> => {
-    if (!tripId || !mutations.length) return false
-    const ordered = [...mutations].sort((a, b) => a.revision - b.revision)
-    let document = documentRef.current
-    let changed = false
-    let nextRevision = revisionRef.current
+    if (!tripId || !mutations.length) return Promise.resolve(false)
 
-    for (const mutation of ordered) {
-      if (mutation.tripId !== tripId || mutation.revision <= nextRevision) continue
-      if (mutation.revision !== nextRevision + 1) return false
-      if (mode === 'local-ack' || shouldSkipReplay(mutation.mutationId)) {
-        rememberAck(mutation.mutationId)
-      } else {
-        const result = applyItineraryMutations(document, [mutation], 'remote')
-        document = result.document
-        changed ||= result.changed
-        // Identity drift (explicit id vs ensureStopId / stale local copy):
-        // fall back to durable snapshot instead of advancing past a no-op.
-        if (
-          result.ignoredReason === 'entity_missing' ||
-          result.ignoredReason === 'invalid_anchor'
-        ) {
-          return false
+    return enqueueExclusive(async () => {
+      const ordered = [...mutations].sort((a, b) => a.revision - b.revision)
+      let document = documentRef.current
+      let changed = false
+      let nextRevision = revisionRef.current
+
+      for (const mutation of ordered) {
+        if (mutation.tripId !== tripId || mutation.revision <= nextRevision) continue
+        if (mutation.revision !== nextRevision + 1) return false
+        if (mode === 'local-ack' || shouldSkipReplay(mutation.mutationId)) {
+          rememberAck(mutation.mutationId)
+        } else {
+          const result = applyItineraryMutations(document, [mutation], 'remote')
+          document = result.document
+          changed ||= result.changed
+          // Identity drift (explicit id vs ensureStopId / stale local copy):
+          // fall back to durable snapshot instead of advancing past a no-op.
+          if (
+            result.ignoredReason === 'entity_missing' ||
+            result.ignoredReason === 'invalid_anchor'
+          ) {
+            return false
+          }
+        }
+        nextRevision = mutation.revision
+      }
+
+      if (nextRevision === revisionRef.current) return true
+      revisionRef.current = nextRevision
+      // Publish the in-memory document before any await. stop.add is followed by
+      // custom_place.upsert; awaiting IndexedDB/snapshot first let the upsert
+      // replay the pre-add days and the peer flashed then deleted the card.
+      documentRef.current = document
+
+      await setAppliedTripRevision(tripId, nextRevision)
+      if (changed || mode === 'remote') {
+        if (mode === 'remote') {
+          const hydrated = await hydrateMissingCustomPlaces(tripId, documentRef.current)
+          documentRef.current = {
+            days: documentRef.current.days,
+            customPlaces: {
+              ...hydrated.customPlaces,
+              ...documentRef.current.customPlaces,
+            },
+          }
+        }
+        const latest = documentRef.current
+        markRemoteRender()
+        setDays(latest.days)
+        setCustomPlaces(latest.customPlaces)
+        try {
+          const previous = loadItineraryState()
+          saveItineraryState(latest.days, latest.customPlaces, {
+            generated: previous.generated || latest.days.length > 0,
+            fingerprint: previous.fingerprint ?? null,
+          })
+        } catch (err) {
+          console.warn('[trip-sync-v2] unable to persist applied itinerary', err)
         }
       }
-      nextRevision = mutation.revision
-    }
-
-    if (nextRevision === revisionRef.current) return true
-    revisionRef.current = nextRevision
-    await setAppliedTripRevision(tripId, nextRevision)
-    // Always push remote documents into React. A false `changed` with an
-    // advanced revision leaves the other browser showing "synced" on stale UI.
-    if (changed || mode === 'remote') {
-      if (mode === 'remote') {
-        document = await hydrateMissingCustomPlaces(tripId, document)
-      }
-      documentRef.current = document
-      markRemoteRender()
-      setDays(document.days)
-      setCustomPlaces(document.customPlaces)
-      try {
-        const previous = loadItineraryState()
-        saveItineraryState(document.days, document.customPlaces, {
-          generated: previous.generated || document.days.length > 0,
-          fingerprint: previous.fingerprint ?? null,
-        })
-      } catch (err) {
-        console.warn('[trip-sync-v2] unable to persist applied itinerary', err)
-      }
-    }
-    void publishUiState('synced', tripId)
-    return true
+      void publishUiState('synced', tripId)
+      return true
+    })
   }, [
+    enqueueExclusive,
     markRemoteRender,
     publishUiState,
     rememberAck,
@@ -308,7 +331,7 @@ export function useTripSyncV2(options: {
     let gapTimer: ReturnType<typeof setTimeout> | null = null
     const supabase = getSupabase()
 
-    const applySnapshot = async () => {
+    const applySnapshot = () => enqueueExclusive(async () => {
       let snapshot = await loadTripSnapshotV2(tripId)
       if (disposed) return
       if (!snapshot.initialized && canEdit) {
@@ -351,7 +374,7 @@ export function useTripSyncV2(options: {
       } catch (err) {
         console.warn('[trip-sync-v2] unable to persist snapshot itinerary', err)
       }
-    }
+    })
 
     const catchUp = async () => {
       catchUpRequested = true
@@ -561,6 +584,7 @@ export function useTripSyncV2(options: {
     active,
     applyCommitted,
     canEdit,
+    enqueueExclusive,
     markRemoteRender,
     publishUiState,
     setCustomPlaces,
