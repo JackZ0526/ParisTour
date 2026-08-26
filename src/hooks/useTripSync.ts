@@ -30,6 +30,7 @@ export interface UseTripSyncDeps {
 }
 
 export interface UseTripSyncState {
+  syncRenderKey: number
   tripDates: TripDateRange | null
   flights: FlightSelection
   hotel: SelectedHotel
@@ -81,6 +82,7 @@ export interface UseTripSyncRefs {
   suppressCopyRef: React.MutableRefObject<boolean>
   copyRequestIdRef: React.MutableRefObject<number>
   tripInputsHydratedRef: React.MutableRefObject<boolean>
+  remoteHydrationRenderKeyRef: React.MutableRefObject<number | null>
 }
 
 export interface UseTripSyncHandlers {
@@ -104,6 +106,7 @@ export function useTripSync(
   } = deps
 
   const {
+    syncRenderKey,
     tripDates,
     flights,
     hotel,
@@ -146,6 +149,7 @@ export function useTripSync(
     suppressCopyRef,
     copyRequestIdRef,
     tripInputsHydratedRef,
+    remoteHydrationRenderKeyRef,
   } = refs
 
   // Snapshot of selection/day while remote sync reads them.
@@ -206,7 +210,11 @@ export function useTripSync(
     setDayRestoring(false)
     setCopyRefreshing(false)
     setViewingHotelDetail(null)
-    setSyncRenderKey((key) => key + 1)
+    setSyncRenderKey((key) => {
+      const nextKey = key + 1
+      remoteHydrationRenderKeyRef.current = nextKey
+      return nextKey
+    })
     prevStopsKeyRef.current = null
     suppressCopyRef.current = true
 
@@ -235,6 +243,10 @@ export function useTripSync(
 
   useEffect(() => {
     if (!canEdit) return
+    // This render was produced by applying authoritative remote state. It is
+    // not a local edit and must not start a save transaction. The marker is
+    // cleared after all itinerary-derived effects have also skipped this render.
+    if (remoteHydrationRenderKeyRef.current === syncRenderKey) return
     // The cloud writer owns no-op detection against the last reconciled snapshot.
     // Always notify it here: time-based/"skip N renders" guards can swallow a
     // genuine edit made immediately after a remote update.
@@ -249,8 +261,10 @@ export function useTripSync(
     itineraryGenerated,
     itineraryFingerprint,
     recommendationPreferences,
+    syncRenderKey,
     canEdit,
     notifyTripChanged,
+    remoteHydrationRenderKeyRef,
   ])
 
   useEffect(() => {

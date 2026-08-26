@@ -410,6 +410,8 @@ export default function App() {
    * state; remounting on every soft-sync kills in-flight and future anims.
    */
   const [syncRenderKey, setSyncRenderKey] = useState(0)
+  /** Identifies the single render caused by applying authoritative remote state. */
+  const remoteHydrationRenderKeyRef = useRef<number | null>(null)
   const prevStopsKeyRef = useRef<string | null>(null)
   const suppressCopyRef = useRef(false)
   /** Bumps on each day-copy request so cancelled runs can't leave the HUD stuck. */
@@ -423,6 +425,7 @@ export default function App() {
       notifyTripChanged,
     },
     {
+      syncRenderKey,
       tripDates,
       flights,
       hotel,
@@ -463,6 +466,7 @@ export default function App() {
       suppressCopyRef,
       copyRequestIdRef,
       tripInputsHydratedRef,
+      remoteHydrationRenderKeyRef,
     },
     {
       cancelInFlightGeneration,
@@ -559,6 +563,7 @@ export default function App() {
       numberOfDays,
       setCopyRefreshing,
       completeReorderSaveTransaction,
+      syncRenderKey,
     },
     {
       prevStopsKeyRef,
@@ -566,6 +571,7 @@ export default function App() {
       copyRequestIdRef,
       navTimesAppliedKeyRef,
       day1TransitSecondsRef,
+      remoteHydrationRenderKeyRef,
     },
   )
 

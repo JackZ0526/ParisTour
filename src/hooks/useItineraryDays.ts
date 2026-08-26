@@ -558,6 +558,7 @@ export interface UseItineraryDaysEffectsRefs {
   copyRequestIdRef: MutableRefObject<number>
   navTimesAppliedKeyRef: MutableRefObject<string>
   day1TransitSecondsRef: MutableRefObject<number | null>
+  remoteHydrationRenderKeyRef: MutableRefObject<number | null>
 }
 
 export function useItineraryDaysEffects(
@@ -578,6 +579,7 @@ export function useItineraryDaysEffects(
     numberOfDays: number
     setCopyRefreshing: Dispatch<SetStateAction<boolean>>
     completeReorderSaveTransaction: () => void
+    syncRenderKey: number
   },
   refs: UseItineraryDaysEffectsRefs,
 ) {
@@ -598,7 +600,11 @@ export function useItineraryDaysEffects(
     numberOfDays,
     setCopyRefreshing,
     completeReorderSaveTransaction,
+    syncRenderKey,
   } = params
+
+  const isRemoteHydrationRender =
+    refs.remoteHydrationRenderKeyRef.current === syncRenderKey
 
   const dayPlacesKey = useMemo(
     () => day.stops.map((s) => s.placeId).join(','),
@@ -609,6 +615,7 @@ export function useItineraryDaysEffects(
 
   // Keep stale day title/summary district mentions aligned with hotel-areaKey.
   useEffect(() => {
+    if (isRemoteHydrationRender) return
     const hotelSelectedForCopySync = isHotelSelected(hotel)
     const hotelAreaKeyForCopySync = hotel.areaKey
     if (!hotelSelectedForCopySync) return
@@ -619,7 +626,7 @@ export function useItineraryDaysEffects(
       const next = syncDaysCopyToHotelArea(prev, areaKey)
       return next === prev ? prev : next
     })
-  }, [hotel, days.length, itineraryGenerated, setDays])
+  }, [hotel, days.length, itineraryGenerated, isRemoteHydrationRender, setDays])
 
   // Day 1 transit seed for stop-clock recomputes.
   useEffect(() => {
@@ -630,6 +637,7 @@ export function useItineraryDaysEffects(
 
   // Live stop clocks: cascade from Day-1 hotel arrival using google leg durations.
   useEffect(() => {
+    if (isRemoteHydrationRender) return
     if (!itineraryReady || !itineraryGenerated || itineraryGenerating) return
     if (navLoading) return
     if (!day.stops.length) return
@@ -687,6 +695,7 @@ export function useItineraryDaysEffects(
     itineraryReady,
     itineraryGenerated,
     itineraryGenerating,
+    isRemoteHydrationRender,
     navLoading,
     navPlan.stopsKey,
     navPlan.betweenStops,
@@ -702,6 +711,7 @@ export function useItineraryDaysEffects(
 
   // When viewing another day, still refresh Day 1 hotel check-in if flight/transit changes.
   useEffect(() => {
+    if (isRemoteHydrationRender) return
     if (day.day === 1) return
     const transitSeconds = refs.day1TransitSecondsRef.current
     const hotelHm = computeDay1HotelArrivalHm(flights.outbound, transitSeconds)
@@ -719,7 +729,13 @@ export function useItineraryDaysEffects(
       next[idx] = nextDay
       return next
     })
-  }, [flights.outbound, day.day, refs.day1TransitSecondsRef, setDays])
+  }, [
+    flights.outbound,
+    day.day,
+    isRemoteHydrationRender,
+    refs.day1TransitSecondsRef,
+    setDays,
+  ])
 
   // Auto-generate day title / theme / summary after itinerary edits.
   const placesWithHotelRef = useRef(placesWithHotel)
@@ -748,6 +764,9 @@ export function useItineraryDaysEffects(
 
     if (prevStopsKeyRef.current === null) {
       prevStopsKeyRef.current = key
+      // Initializing the remote baseline already suppresses copy generation;
+      // do not let the marker leak into the user's next real edit.
+      suppressCopyRef.current = false
       completeReorderSaveTransaction()
       return
     }
@@ -900,5 +919,14 @@ export function useItineraryDaysEffects(
     prevStopsKeyRef,
     suppressCopyRef,
   ])
+
+  // All derived effects above have now observed the authoritative remote
+  // render. Clear the one-render marker so the next real user edit behaves
+  // exactly like any other local change.
+  useEffect(() => {
+    if (refs.remoteHydrationRenderKeyRef.current === syncRenderKey) {
+      refs.remoteHydrationRenderKeyRef.current = null
+    }
+  }, [refs.remoteHydrationRenderKeyRef, syncRenderKey])
 }
 
