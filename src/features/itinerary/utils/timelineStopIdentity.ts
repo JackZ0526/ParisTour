@@ -31,7 +31,7 @@ export function timelineStopIdentities(
 ): TimelineStopIdentity[] {
   const occurrences = new Map<string, number>()
 
-  return stops.map((stop, index) => {
+  return stops.map((stop) => {
     const occurrence = occurrences.get(stop.placeId) ?? 0
     occurrences.set(stop.placeId, occurrence + 1)
     const matchKey = `d${dayNumber}-${stop.placeId}-occ${occurrence}`

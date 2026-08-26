@@ -82,20 +82,19 @@ function normalizeCommittedMutation(value: unknown): CommittedTripMutation | nul
   }
 
   return {
-    ...(nested as unknown as CommittedTripMutation),
     protocol: TRIP_SYNC_PROTOCOL_V2,
     tripId,
     mutationId,
     deviceId,
-    type: type as CommittedTripMutation['type'],
+    type,
     revision,
     baseRevision: Number.isFinite(baseRevision) ? baseRevision : 0,
-    payload: payload as CommittedTripMutation['payload'],
+    payload,
     createdAt:
       nested.createdAt == null ? new Date().toISOString() : String(nested.createdAt),
     committedAt:
       nested.committedAt == null ? new Date().toISOString() : String(nested.committedAt),
-  }
+  } as CommittedTripMutation
 }
 
 function toUiStatus(status: TripSyncV2Status): TripSyncV2UiStatus {
