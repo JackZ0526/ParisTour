@@ -65,6 +65,10 @@ import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { useTranslation, getLocale, translate } from '../../../shared/i18n'
 import { localizeDuration, localizePace, localizeTravelChip } from '../../../shared/i18n'
 import { placeOriginalLabel } from '../../../shared/utils/placeTitle'
+import {
+  isKeySetReordered,
+  timelineStopIdentities,
+} from '../utils/timelineStopIdentity'
 
 /** Dissolve + petal flight before slot collapse. */
 const GOMMAGE_DISSOLVE_MS = 560
@@ -610,9 +614,11 @@ export function DayTimeline({
   const swapStageRef = useRef<HTMLDivElement | null>(null)
   const suppressClickRef = useRef(false)
   const prevStopKeysRef = useRef<string[]>([])
+  const prevStopMatchKeysRef = useRef<string[]>([])
   const prevStopsSnapRef = useRef<Array<{ key: string; stop: ItineraryStop }>>([])
   const prevDayRef = useRef(day.day)
   const prevTopsByKeyRef = useRef<Map<string, number>>(new Map())
+  const prevTopsByMatchKeyRef = useRef<Map<string, number>>(new Map())
   /** Drag settle already animated peers — skip one FLIP after commit. */
   const skipNextFlipRef = useRef(false)
   const enterClearTimerRef = useRef<number | null>(null)
@@ -634,8 +640,12 @@ export function DayTimeline({
   exitGhostKeysRef.current = new Set(exitGhosts.map((g) => g.stopKey))
   exitAnimKeyRef.current = exitAnim?.stopKey ?? null
 
-  const stopKeyOf = (stop: ItineraryStop, index: number) =>
-    stop.id || `d${day.day}-${stop.placeId}-${index}`
+  const stopIdentities = useMemo(
+    () => timelineStopIdentities(day.day, day.stops),
+    [day.day, day.stops],
+  )
+  const stopKeyOf = (_stop: ItineraryStop, index: number) =>
+    stopIdentities[index]?.renderKey || `d${day.day}-missing-${index}`
 
   const clearEnterAnim = () => {
     if (enterClearTimerRef.current != null) {
@@ -756,16 +766,20 @@ export function DayTimeline({
   // the same structural animation regardless of where the change originated.
   // Skip only the first mount for a day and explicit day switches.
   useLayoutEffect(() => {
-    const keys = day.stops.map((s, i) => stopKeyOf(s, i))
+    const keys = stopIdentities.map((identity) => identity.renderKey)
+    const matchKeys = stopIdentities.map((identity) => identity.matchKey)
     const snap = day.stops.map((s, i) => ({ key: stopKeyOf(s, i), stop: s }))
     const prev = prevStopKeysRef.current
+    const prevMatchKeys = prevStopMatchKeysRef.current
     const prevDay = prevDayRef.current
 
     if (prevDay !== day.day) {
       prevDayRef.current = day.day
       prevStopKeysRef.current = keys
+      prevStopMatchKeysRef.current = matchKeys
       prevStopsSnapRef.current = snap
       prevTopsByKeyRef.current = new Map()
+      prevTopsByMatchKeyRef.current = new Map()
       clearEnterAnim()
       clearSwapAnim()
       clearReorderFlip()
@@ -782,6 +796,7 @@ export function DayTimeline({
 
     if (prev.length === 0) {
       prevStopKeysRef.current = keys
+      prevStopMatchKeysRef.current = matchKeys
       prevStopsSnapRef.current = snap
       return
     }
@@ -823,6 +838,7 @@ export function DayTimeline({
             phase: 'measure',
           })
           prevStopKeysRef.current = keys
+          prevStopMatchKeysRef.current = matchKeys
           prevStopsSnapRef.current = snap
           return
         }
@@ -830,15 +846,13 @@ export function DayTimeline({
     }
 
     // Pure reorder: same identity set, different order — FLIP cards to new slots.
-    const isPureReorder =
-      added.length === 0 &&
-      removed.length === 0 &&
-      prev.length === keys.length &&
-      prev.length > 0 &&
-      prev.some((k, i) => k !== keys[i]) &&
-      prev.every((k) => keys.includes(k))
+    const isPureReorder = isKeySetReordered(prev, keys)
+    // Legacy clients can omit ids or regenerate index-based ids. In that case,
+    // match by place occurrence so a remote exchange still animates as a move.
+    const isSemanticReorder =
+      !isPureReorder && isKeySetReordered(prevMatchKeys, matchKeys)
 
-    if (isPureReorder) {
+    if (isPureReorder || isSemanticReorder) {
       const skipFlip = skipNextFlipRef.current
       skipNextFlipRef.current = false
       if (
@@ -847,14 +861,16 @@ export function DayTimeline({
         !exitAnimKeyRef.current &&
         exitGhostKeysRef.current.size === 0
       ) {
-        const first = prevTopsByKeyRef.current
+        const first = isPureReorder
+          ? prevTopsByKeyRef.current
+          : prevTopsByMatchKeyRef.current
         const shifts: Record<string, number> = {}
         let any = false
         for (let i = 0; i < keys.length; i++) {
           const k = keys[i]
           const el = itemRefs.current[i]
           if (!el) continue
-          const firstTop = first.get(k)
+          const firstTop = first.get(isPureReorder ? k : matchKeys[i])
           if (firstTop == null) continue
           const lastTop = el.getBoundingClientRect().top
           const dy = firstTop - lastTop
@@ -869,6 +885,7 @@ export function DayTimeline({
         }
       }
       prevStopKeysRef.current = keys
+      prevStopMatchKeysRef.current = matchKeys
       prevStopsSnapRef.current = snap
       return
     }
@@ -939,6 +956,7 @@ export function DayTimeline({
     }
 
     prevStopKeysRef.current = keys
+    prevStopMatchKeysRef.current = matchKeys
     prevStopsSnapRef.current = snap
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day.stops, day.day])
@@ -1005,13 +1023,19 @@ export function DayTimeline({
   // Cache resting tops by stopKey for the next FLIP (skip while motion is active).
   useLayoutEffect(() => {
     if (drag || reorderFlip || swapAnim || exitAnim || exitGhosts.length) return
-    const map = new Map<string, number>()
+    const byRenderKey = new Map<string, number>()
+    const byMatchKey = new Map<string, number>()
     for (let i = 0; i < day.stops.length; i++) {
       const el = itemRefs.current[i]
       if (!el) continue
-      map.set(stopKeyOf(day.stops[i], i), el.getBoundingClientRect().top)
+      const top = el.getBoundingClientRect().top
+      const identity = stopIdentities[i]
+      if (!identity) continue
+      byRenderKey.set(identity.renderKey, top)
+      byMatchKey.set(identity.matchKey, top)
     }
-    prevTopsByKeyRef.current = map
+    prevTopsByKeyRef.current = byRenderKey
+    prevTopsByMatchKeyRef.current = byMatchKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day.stops, day.day, drag, reorderFlip, swapAnim, exitAnim, exitGhosts.length])
 
