@@ -10,7 +10,7 @@ import {
 } from '../features/cloud-sync/services/tripCloudPolicy'
 import { loadItineraryState, saveItineraryState } from '../features/itinerary/utils/itineraryState'
 import { SELECTED_HOTEL_PLACE_ID } from '../features/itinerary/utils/dayOrigin'
-import type { DayPlan, ItineraryStop } from '../types'
+import type { DayPlan, ItineraryStop, Place } from '../types'
 
 const makeStop = (placeId: string, time: string): ItineraryStop => ({
   placeId,
@@ -26,6 +26,17 @@ const makeDay = (n: number, title: string, stops: ItineraryStop[] = []): DayPlan
   summary: '',
   metroHintFromArea: {},
   stops,
+})
+
+const makePlace = (id: string, name: string): Place => ({
+  id,
+  name,
+  type: 'attraction',
+  location: { lat: 48.8584, lng: 2.2945 },
+  description: name,
+  ratingHint: '4.8',
+  image: '',
+  googleMapsUrl: '',
 })
 
 describe('tripCloud realtime stop deletion & synchronization', () => {
@@ -83,6 +94,36 @@ describe('tripCloud realtime stop deletion & synchronization', () => {
       'place-1',
       'place-3',
     ])
+  })
+
+  it('merges remote added place and preserves customPlaces dictionary', () => {
+    const hotelStop = makeStop(SELECTED_HOTEL_PLACE_ID, '08:00')
+    const stop1 = makeStop('place-1', '09:00')
+    const localDay1 = makeDay(1, 'Louvre', [hotelStop, stop1])
+    saveItineraryState([localDay1], { 'place-1': makePlace('place-1', 'Louvre') }, { generated: true })
+
+    // Desktop adds a new place 'place-custom-new'
+    const newPlace = makePlace('place-custom-new', 'Sainte-Chapelle')
+    const stopNew = makeStop('place-custom-new', '11:30')
+    const remoteDay1 = makeDay(1, 'Louvre & Sainte-Chapelle', [hotelStop, stop1, stopNew])
+
+    // Simulate saving customPlaces on core apply
+    saveItineraryState(loadItineraryState().days, {
+      'place-1': makePlace('place-1', 'Louvre'),
+      'place-custom-new': newPlace,
+    })
+
+    const applied = mergeCloudDays({
+      upserts: daysToMap([remoteDay1]),
+      deletes: [],
+      skipKeys: new Set(),
+    })
+
+    expect(applied).toBe(true)
+    const updated = loadItineraryState()
+    expect(updated.days[0].stops).toHaveLength(3)
+    expect(updated.days[0].stops[2].placeId).toBe('place-custom-new')
+    expect(updated.customPlaces['place-custom-new']?.name).toBe('Sainte-Chapelle')
   })
 
   it('correctly decides days-only sync when core is omitted and days_rev changed', () => {

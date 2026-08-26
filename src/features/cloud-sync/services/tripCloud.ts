@@ -1613,22 +1613,12 @@ export function applyRemoteTripSnapshot(
     /* ignore */
   }
 
-  // Remote core wins over a debounced local core save that hasn't uploaded yet.
-  // Keep an artifacts-only queue so collaborator itinerary updates don't drop LLM copy.
-  const keepArtifactsQueue =
-    queuedSaveMode === 'artifacts' || hasArtifactCloudDiff()
-  const keepDaysQueue = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId))
+  // Remote snapshot is being applied: clear any pending local timer and reset queued save mode.
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
   }
-  queuedSaveMode = keepArtifactsQueue
-    ? keepDaysQueue
-      ? 'full'
-      : 'artifacts'
-    : keepDaysQueue
-      ? 'full'
-      : 'none'
+  queuedSaveMode = 'none'
   queuedAllowEmptyTrip = false
   pendingAfterFlight = false
   if (cloudSaveStatus === 'pending') setCloudSaveStatus('idle')
