@@ -1311,6 +1311,10 @@ function peekDaysForTrip(tripId: string, snapshot?: TripSnapshot | null) {
 }
 
 function dirtyDayKeys(tripId: string): Set<string> {
+  // If we have no queued or in-flight save and saves are not held, local state has no uncommitted user edits.
+  if (queuedSaveMode === 'none' && !saveInFlight && saveHoldCount === 0) {
+    return new Set()
+  }
   const last = lastAppliedDayHashesByTrip.get(tripId)
   if (!last || !Object.keys(last).length) return new Set()
   try {
@@ -1833,12 +1837,13 @@ async function applyRemoteTripFromServer(
   } catch (err) {
     console.warn('[tripCloud] artifact pull failed', err)
   }
+  let daysApplied = false
   try {
-    await syncTripDaysFromCloud(tripId, full.daysRev)
+    daysApplied = await syncTripDaysFromCloud(tripId, full.daysRev)
   } catch (err) {
     console.warn('[tripCloud] day pull failed', err)
   }
-  return applied
+  return applied || daysApplied
 }
 
 /** Subscribe to live updates for one trip. Returns unsubscribe. */
@@ -1908,7 +1913,20 @@ export function subscribeTripRealtime(
         })()
       },
     )
-    .subscribe()
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        const seq = ++applySeq
+        void (async () => {
+          try {
+            const applied = await applyRemoteTripFromServer(tripId)
+            if (seq !== applySeq) return
+            if (applied) onRemoteApply()
+          } catch (err) {
+            console.warn('[tripCloud] realtime subscribe catch-up failed', err)
+          }
+        })()
+      }
+    })
 
   realtimeChannel = channel
 
@@ -1972,9 +1990,29 @@ function bindCloudFlushListeners() {
   const flush = () => {
     void flushTripCloudSave({ urgent: true })
   }
+  const checkCatchUp = () => {
+    const tripId = saveTripId
+    if (!tripId || !isCloudSyncEnabled()) return
+    if (saveInFlight || cloudSaveStatus === 'saving') return
+    void (async () => {
+      try {
+        const applied = await applyRemoteTripFromServer(tripId)
+        if (applied) realtimeApplyHandler?.(tripId)
+      } catch (err) {
+        console.warn('[tripCloud] catch-up on visibility/focus failed', err)
+      }
+    })()
+  }
+
   window.addEventListener('pagehide', flush)
+  window.addEventListener('focus', checkCatchUp)
+  window.addEventListener('online', checkCatchUp)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flush()
+    if (document.visibilityState === 'hidden') {
+      flush()
+    } else if (document.visibilityState === 'visible') {
+      checkCatchUp()
+    }
   })
 }
 
