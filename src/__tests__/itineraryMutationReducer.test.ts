@@ -177,6 +177,51 @@ describe('itineraryMutationReducer', () => {
     expect(result.document.days[0].stops.map((stop) => stop.id)).toEqual(['a'])
   })
 
+  it('adds after an occ-based neighbor id when the durable id is index-suffixed', () => {
+    const document = {
+      days: [
+        makeDay(1, [
+          { id: 'd1-hotel-selected-1', placeId: 'hotel-selected', time: '14:00', note: '' },
+          { id: 'd1-gen-cafe-day1-nuxvp-2', placeId: 'gen-cafe-day1-nuxvp', time: '15:00', note: '' },
+        ]),
+      ],
+      customPlaces: {},
+    }
+    const result = applyItineraryMutation(
+      document,
+      mutation('stop.add', {
+        dayNumber: 1,
+        stop: makeStop('d1-custom-new', 'custom-new'),
+        afterStopId: 'd1-hotel-selected-occ0',
+        beforeStopId: 'd1-gen-cafe-day1-nuxvp-occ0',
+      }),
+    )
+    expect(result.changed).toBe(true)
+    expect(result.document.days[0].stops.map((stop) => stop.placeId)).toEqual([
+      'hotel-selected',
+      'custom-new',
+      'gen-cafe-day1-nuxvp',
+    ])
+  })
+
+  it('appends a stop.add when neighbor ids cannot be resolved', () => {
+    const document = {
+      days: [makeDay(1, [makeStop('a'), makeStop('b')])],
+      customPlaces: {},
+    }
+    const result = applyItineraryMutation(
+      document,
+      mutation('stop.add', {
+        dayNumber: 1,
+        stop: makeStop('z'),
+        afterStopId: 'missing-after',
+        beforeStopId: 'missing-before',
+      }),
+    )
+    expect(result.changed).toBe(true)
+    expect(result.document.days[0].stops.map((stop) => stop.id)).toEqual(['a', 'b', 'z'])
+  })
+
   it('rejects a move that anchors a stop to itself', () => {
     const document = {
       days: [makeDay(2, [makeStop('a'), makeStop('b')])],

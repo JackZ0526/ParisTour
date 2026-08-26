@@ -1064,6 +1064,85 @@ $$;
 
 revoke execute on function public.bootstrap_trip_sync_v2(uuid) from public, anon, authenticated;
 
+/* Map a client stop id onto the durable row, including occ / index drift. */
+create or replace function public.resolve_trip_stop_id_v2(
+  p_trip_id uuid,
+  p_day_number integer,
+  p_stop_id text
+)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_exact text;
+  v_place_id text;
+  v_occ integer;
+  v_resolved text;
+  v_match_count integer;
+begin
+  if coalesce(p_stop_id, '') = '' then
+    return null;
+  end if;
+
+  select s.stop_id into v_exact
+  from public.itinerary_stops_v2 s
+  where s.trip_id = p_trip_id
+    and s.day_number = p_day_number
+    and s.deleted_at is null
+    and s.stop_id = p_stop_id
+  limit 1;
+  if v_exact is not null then
+    return v_exact;
+  end if;
+
+  if p_stop_id ~ ('^d' || p_day_number::text || '-.+-occ[0-9]+$') then
+    v_place_id := substring(
+      p_stop_id from ('^d' || p_day_number::text || '-(.+)-occ[0-9]+$')
+    );
+    v_occ := substring(p_stop_id from 'occ([0-9]+)$')::integer;
+    select x.stop_id into v_resolved
+    from (
+      select
+        s.stop_id,
+        (row_number() over (order by s.sort_rank, s.stop_id) - 1) as occ
+      from public.itinerary_stops_v2 s
+      where s.trip_id = p_trip_id
+        and s.day_number = p_day_number
+        and s.deleted_at is null
+        and coalesce(s.stop ->> 'placeId', '') = v_place_id
+    ) x
+    where x.occ = v_occ;
+    if v_resolved is not null then
+      return v_resolved;
+    end if;
+  end if;
+
+  if p_stop_id ~ ('^d' || p_day_number::text || '-.+$') then
+    v_place_id := substring(p_stop_id from ('^d' || p_day_number::text || '-(.+)$'));
+    v_place_id := regexp_replace(v_place_id, '-occ[0-9]+$', '');
+    v_place_id := regexp_replace(v_place_id, '-[0-9]+$', '');
+    select count(*)::integer, min(s.stop_id)
+      into v_match_count, v_resolved
+    from public.itinerary_stops_v2 s
+    where s.trip_id = p_trip_id
+      and s.day_number = p_day_number
+      and s.deleted_at is null
+      and coalesce(s.stop ->> 'placeId', '') = v_place_id;
+    if v_match_count = 1 then
+      return v_resolved;
+    end if;
+  end if;
+
+  return null;
+end;
+$$;
+
+revoke execute on function public.resolve_trip_stop_id_v2(uuid, integer, text)
+  from public, anon, authenticated;
+
 /* Resolve a stable rank between optional neighboring stop ids, rebalancing if needed. */
 create or replace function public.trip_stop_rank_v2(
   p_trip_id uuid,
@@ -1077,25 +1156,34 @@ security definer
 set search_path = public
 as $$
 declare
+  after_id text;
+  before_id text;
   after_rank bigint;
   before_rank bigint;
   next_rank bigint;
   previous_rank bigint;
 begin
-  if p_after_stop_id is not null then
+  after_id := public.resolve_trip_stop_id_v2(p_trip_id, p_day_number, p_after_stop_id);
+  before_id := public.resolve_trip_stop_id_v2(p_trip_id, p_day_number, p_before_stop_id);
+
+  if after_id is not null then
     select sort_rank into after_rank
     from public.itinerary_stops_v2
     where trip_id = p_trip_id and day_number = p_day_number
-      and stop_id = p_after_stop_id and deleted_at is null;
-    if after_rank is null then return null; end if;
+      and stop_id = after_id and deleted_at is null;
   end if;
 
-  if p_before_stop_id is not null then
+  if before_id is not null then
     select sort_rank into before_rank
     from public.itinerary_stops_v2
     where trip_id = p_trip_id and day_number = p_day_number
-      and stop_id = p_before_stop_id and deleted_at is null;
-    if before_rank is null then return null; end if;
+      and stop_id = before_id and deleted_at is null;
+  end if;
+
+  -- Inverted peer order: keep the after-anchor so add still lands.
+  if after_rank is not null and before_rank is not null and before_rank <= after_rank then
+    before_id := null;
+    before_rank := null;
   end if;
 
   if after_rank is null and before_rank is null then
@@ -1134,18 +1222,18 @@ begin
 
   select sort_rank into after_rank
   from public.itinerary_stops_v2
-  where trip_id = p_trip_id and stop_id = p_after_stop_id and deleted_at is null;
+  where trip_id = p_trip_id and stop_id = after_id and deleted_at is null;
   select sort_rank into before_rank
   from public.itinerary_stops_v2
-  where trip_id = p_trip_id and stop_id = p_before_stop_id and deleted_at is null;
-  if p_after_stop_id is null then
+  where trip_id = p_trip_id and stop_id = before_id and deleted_at is null;
+  if after_id is null then
     select max(sort_rank) into previous_rank
     from public.itinerary_stops_v2
     where trip_id = p_trip_id and day_number = p_day_number
       and deleted_at is null and sort_rank < before_rank;
     after_rank := coalesce(previous_rank, before_rank - 2048);
   end if;
-  if p_before_stop_id is null then
+  if before_id is null then
     select min(sort_rank) into next_rank
     from public.itinerary_stops_v2
     where trip_id = p_trip_id and day_number = p_day_number

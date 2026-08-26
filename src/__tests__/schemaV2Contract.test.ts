@@ -41,6 +41,12 @@ describe('sync V2 schema contract', () => {
     expect(v2).toContain('v_match_count = 1')
   })
 
+  it('resolves add/move anchors through occ ids instead of rejecting', () => {
+    expect(v2).toContain('create or replace function public.resolve_trip_stop_id_v2(')
+    expect(v2).toContain("'-.+-occ[0-9]+$'")
+    expect(v2).toContain('Inverted peer order: keep the after-anchor so add still lands.')
+  })
+
   it('bootstraps custom places from trips.snapshot.itinerary.customPlaces', () => {
     expect(v2).toContain("select t.snapshot #> '{itinerary,customPlaces}'")
   })

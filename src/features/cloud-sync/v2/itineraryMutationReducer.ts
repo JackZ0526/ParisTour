@@ -97,31 +97,59 @@ function findStop(
   return null
 }
 
+function resolveAnchorIndex(
+  stops: ItineraryStop[],
+  dayNumber: number,
+  id?: string | null,
+): number {
+  if (!id) return -1
+  const direct = stops.findIndex(
+    (stop, index) =>
+      stopId(stop) === id ||
+      ensureStopId(dayNumber, stop, index, stops) === id,
+  )
+  if (direct >= 0) return direct
+
+  const parsed = parseEnsureStopId(id)
+  if (!parsed || parsed.day !== dayNumber) return -1
+
+  if (parsed.occurrence != null) {
+    let seen = 0
+    for (let index = 0; index < stops.length; index += 1) {
+      if (stops[index]?.placeId !== parsed.placeId) continue
+      if (seen === parsed.occurrence) return index
+      seen += 1
+    }
+  }
+  if (parsed.index != null) {
+    const atIndex = stops[parsed.index]
+    if (atIndex?.placeId === parsed.placeId) return parsed.index
+  }
+
+  const matches: number[] = []
+  stops.forEach((stop, index) => {
+    if (stop.placeId === parsed.placeId) matches.push(index)
+  })
+  return matches.length === 1 ? matches[0] : -1
+}
+
 function insertionIndex(
   stops: ItineraryStop[],
   dayNumber: number,
   afterStopId?: string | null,
   beforeStopId?: string | null,
+  missing: 'reject' | 'append' = 'append',
 ): number | null {
-  if (beforeStopId) {
-    const before = stops.findIndex(
-      (stop, index) =>
-        stopId(stop) === beforeStopId ||
-        ensureStopId(dayNumber, stop, index, stops) === beforeStopId,
-    )
-    if (before < 0) return null
-    return before
-  }
-  if (afterStopId) {
-    const after = stops.findIndex(
-      (stop, index) =>
-        stopId(stop) === afterStopId ||
-        ensureStopId(dayNumber, stop, index, stops) === afterStopId,
-    )
-    if (after < 0) return null
+  const before = resolveAnchorIndex(stops, dayNumber, beforeStopId)
+  const after = resolveAnchorIndex(stops, dayNumber, afterStopId)
+  if (after >= 0 && before >= 0) {
+    // Honor `after` even when the peer's order is inverted vs this device.
     return after + 1
   }
-  return stops.length
+  if (before >= 0) return before
+  if (after >= 0) return after + 1
+  if (!afterStopId && !beforeStopId) return stops.length
+  return missing === 'append' ? stops.length : null
 }
 
 function animationFor(
@@ -247,6 +275,7 @@ export function applyItineraryMutation(
         nextDays[targetDayIndex].day,
         mutation.payload.afterStopId,
         mutation.payload.beforeStopId,
+        'reject',
       )
       if (at == null) {
         return { document: current, changed: false, animation: null, ignoredReason: 'invalid_anchor' }
