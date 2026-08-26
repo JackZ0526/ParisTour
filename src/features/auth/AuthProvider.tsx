@@ -38,6 +38,11 @@ import {
   saveProfileThemePreference,
 } from './services/themePreferenceCloud'
 import {
+  hydrateAccountLanguagePreference,
+  isHydratingLanguagePreference,
+  saveProfileLanguagePreference,
+} from './services/languagePreferenceCloud'
+import {
   hydrateAccountAvatar,
 } from './services/avatarPreferenceCloud'
 import {
@@ -64,7 +69,7 @@ function localDebugTrip(): AccessibleTrip {
   }
 }
 
-import { getLocale, translate, useTranslation } from '../../shared/i18n'
+import { getLocale, subscribeLocale, translate, useTranslation } from '../../shared/i18n'
 
 function mapAuthError(err: { message?: string; code?: string; status?: number }): string {
   const locale = getLocale()
@@ -233,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // refresh the token, so it deliberately runs after RLS-protected trips.
         void Promise.allSettled([
           hydrateAccountThemePreference(next.user.id),
+          hydrateAccountLanguagePreference(next.user.id),
           hydrateAccountAvatar(next.user.id, userEmail),
           hydrateAccountNickname(next.user.id, userEmail),
         ])
@@ -330,11 +336,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    return subscribeTheme(() => {
+    const unsubTheme = subscribeTheme(() => {
       saveProfileThemePreference(userId, getThemePreference()).catch((err) => {
         console.warn('[profile-theme] unable to save account preference', err)
       })
     })
+
+    const unsubLocale = subscribeLocale(() => {
+      if (isHydratingLanguagePreference()) return
+      saveProfileLanguagePreference(userId, getLocale()).catch((err) => {
+        console.warn('[profile-language] unable to save account preference', err)
+      })
+    })
+
+    return () => {
+      unsubTheme()
+      unsubLocale()
+    }
   }, [allowlisted, status, user?.id])
 
   const signIn = useCallback(async (emailInput: string, password: string) => {

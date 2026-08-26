@@ -1037,6 +1037,7 @@ export async function restoreTripSnapshotBackup(
 
 /** Debounced cloud writer — only persists when the snapshot actually changed. */
 const SAVE_DEBOUNCE_MS = 2000
+const SAVE_ARTIFACTS_DEBOUNCE_MS = 3500
 const MAX_TRANSIENT_SAVE_RETRIES = 1
 const TRANSIENT_SAVE_RETRY_MS = 2000
 
@@ -1084,12 +1085,27 @@ let realtimeApplyHandler: ((tripId: string) => void) | null = null
 export type CloudSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 export type CloudSyncStatus = 'idle' | 'syncing' | 'synced'
 
+export type CloudSaveTarget =
+  | 'itinerary_days'
+  | 'place_details'
+  | 'translations'
+  | 'hotel'
+  | 'flights_dates'
+  | 'preferences'
+  | 'custom_places'
+  | 'composite'
+  | 'general'
+
 let cloudSaveStatus: CloudSaveStatus = 'idle'
 let cloudSaveError: string | null = null
+let cloudSaveTarget: CloudSaveTarget = 'general'
+let cloudSaveDayNumbers: number[] | undefined = undefined
 let savedHideTimer: ReturnType<typeof setTimeout> | null = null
 const cloudSaveListeners = new Set<() => void>()
 
 let cloudSyncStatus: CloudSyncStatus = 'idle'
+let cloudSyncTarget: CloudSaveTarget = 'general'
+let cloudSyncDayNumbers: number[] | undefined = undefined
 let syncedHideTimer: ReturnType<typeof setTimeout> | null = null
 const cloudSyncListeners = new Set<() => void>()
 
@@ -1101,6 +1117,14 @@ export function getCloudSaveError(): string | null {
   return cloudSaveError
 }
 
+export function getCloudSaveTarget(): CloudSaveTarget {
+  return cloudSaveTarget
+}
+
+export function getCloudSaveDayNumbers(): number[] | undefined {
+  return cloudSaveDayNumbers
+}
+
 export function subscribeCloudSaveStatus(listener: () => void): () => void {
   cloudSaveListeners.add(listener)
   return () => {
@@ -1110,6 +1134,14 @@ export function subscribeCloudSaveStatus(listener: () => void): () => void {
 
 export function getCloudSyncStatus(): CloudSyncStatus {
   return cloudSyncStatus
+}
+
+export function getCloudSyncTarget(): CloudSaveTarget {
+  return cloudSyncTarget
+}
+
+export function getCloudSyncDayNumbers(): number[] | undefined {
+  return cloudSyncDayNumbers
 }
 
 export function subscribeCloudSyncStatus(listener: () => void): () => void {
@@ -1181,9 +1213,19 @@ function isTransientCloudSaveError(err: unknown): boolean {
   )
 }
 
-function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) {
+function setCloudSaveStatus(
+  next: CloudSaveStatus,
+  error: string | null = null,
+  opts?: { target?: CloudSaveTarget; dayNumbers?: number[] },
+) {
   cloudSaveStatus = next
   cloudSaveError = error
+  if (opts?.target) cloudSaveTarget = opts.target
+  if (opts?.dayNumbers) cloudSaveDayNumbers = opts.dayNumbers
+  else if (next === 'idle') {
+    cloudSaveTarget = 'general'
+    cloudSaveDayNumbers = undefined
+  }
   if (savedHideTimer) {
     clearTimeout(savedHideTimer)
     savedHideTimer = null
@@ -1193,6 +1235,8 @@ function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) 
       if (cloudSaveStatus === 'saved') {
         cloudSaveStatus = 'idle'
         cloudSaveError = null
+        cloudSaveTarget = 'general'
+        cloudSaveDayNumbers = undefined
         cloudSaveListeners.forEach((l) => l())
       }
     }, 2400)
@@ -1200,8 +1244,17 @@ function setCloudSaveStatus(next: CloudSaveStatus, error: string | null = null) 
   cloudSaveListeners.forEach((l) => l())
 }
 
-function setCloudSyncStatus(next: CloudSyncStatus) {
+function setCloudSyncStatus(
+  next: CloudSyncStatus,
+  opts?: { target?: CloudSaveTarget; dayNumbers?: number[] },
+) {
   cloudSyncStatus = next
+  if (opts?.target) cloudSyncTarget = opts.target
+  if (opts?.dayNumbers) cloudSyncDayNumbers = opts.dayNumbers
+  else if (next === 'idle') {
+    cloudSyncTarget = 'general'
+    cloudSyncDayNumbers = undefined
+  }
   if (syncedHideTimer) {
     clearTimeout(syncedHideTimer)
     syncedHideTimer = null
@@ -1210,6 +1263,8 @@ function setCloudSyncStatus(next: CloudSyncStatus) {
     syncedHideTimer = setTimeout(() => {
       if (cloudSyncStatus === 'synced') {
         cloudSyncStatus = 'idle'
+        cloudSyncTarget = 'general'
+        cloudSyncDayNumbers = undefined
         cloudSyncListeners.forEach((l) => l())
       }
     }, 2400)
@@ -1314,6 +1369,77 @@ function rememberGeneratedSnapshot(tripId: string, snapshot: TripSnapshot): void
   if (hasGeneratedTrip(snapshot)) {
     lastGeneratedJsonByTrip.set(tripId, snapshotJson(snapshot))
   }
+}
+
+export function detectSaveTarget(
+  parts: CloudSavePart[],
+  snapshot: TripSnapshot,
+  tripId: string,
+): { target: CloudSaveTarget; dayNumbers?: number[] } {
+  const onlyArtifacts = parts.length === 1 && parts[0] === 'artifacts'
+  const onlyDays = parts.length === 1 && parts[0] === 'days'
+  const onlyHotel = parts.length === 1 && parts[0] === 'hotel'
+
+  if (onlyArtifacts) {
+    const diff = peekArtifactCloudDiff()
+    const keys = Object.keys(diff.upserts)
+    const isTranslations =
+      keys.length > 0 &&
+      keys.every((k) => k.startsWith('translations:') || k.startsWith('place-names:'))
+    return { target: isTranslations ? 'translations' : 'place_details' }
+  }
+
+  if (onlyDays) {
+    const dayDiff = peekDaysForTrip(tripId, snapshot)
+    const dayNums = Object.keys(dayDiff.upserts)
+      .map(Number)
+      .filter((n) => !isNaN(n) && n > 0)
+      .sort((a, b) => a - b)
+    return { target: 'itinerary_days', dayNumbers: dayNums.length ? dayNums : undefined }
+  }
+
+  if (onlyHotel) {
+    return { target: 'hotel' }
+  }
+
+  if (parts.includes('days') && parts.includes('artifacts') && !parts.includes('core')) {
+    return { target: 'composite' }
+  }
+
+  if (parts.includes('core')) {
+    const prev = baselineSnapshot(tripId)
+    if (prev) {
+      const datesChanged = JSON.stringify(prev.dates) !== JSON.stringify(snapshot.dates)
+      const flightsChanged = JSON.stringify(prev.flights) !== JSON.stringify(snapshot.flights)
+      const hotelChanged = JSON.stringify(prev.hotel) !== JSON.stringify(snapshot.hotel)
+      const customPlacesChanged =
+        JSON.stringify(prev.itinerary?.customPlaces) !==
+        JSON.stringify(snapshot.itinerary?.customPlaces)
+      const prefsChanged =
+        JSON.stringify(prev.recommendationPreferences) !==
+        JSON.stringify(snapshot.recommendationPreferences)
+
+      const changedCount = [
+        datesChanged || flightsChanged,
+        hotelChanged,
+        customPlacesChanged,
+        prefsChanged,
+      ].filter(Boolean).length
+
+      if (changedCount === 1 && !parts.includes('days') && !parts.includes('artifacts')) {
+        if (datesChanged || flightsChanged) return { target: 'flights_dates' }
+        if (hotelChanged) return { target: 'hotel' }
+        if (customPlacesChanged) return { target: 'custom_places' }
+        if (prefsChanged) return { target: 'preferences' }
+      }
+    }
+  }
+
+  if (parts.length > 1) {
+    return { target: 'composite' }
+  }
+
+  return { target: 'general' }
 }
 
 function collectSnapshotForMode(
@@ -1827,7 +1953,8 @@ export function scheduleTripCloudSave(
 
   if (saveHoldCount > 0) return
 
-  armSaveTimer(SAVE_DEBOUNCE_MS)
+  const delayMs = opts?.artifactsOnly ? SAVE_ARTIFACTS_DEBOUNCE_MS : SAVE_DEBOUNCE_MS
+  armSaveTimer(delayMs)
 }
 
 function armSaveTimer(delayMs: number) {
@@ -1980,8 +2107,10 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     return
   }
 
+  const detected = detectSaveTarget(parts, snapshot, tripId)
+
   saveInFlight = true
-  setCloudSaveStatus('saving')
+  setCloudSaveStatus('saving', null, detected)
   try {
     const updatedAt = await saveTripSnapshot(tripId, snapshot, {
       archivePrevious: saveMode === 'full' && !coreUnchanged,
@@ -1993,7 +2122,7 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     // Swallow our own realtime echo.
     armSuppressRemote(3000)
     transientSaveRetryCount = 0
-    setCloudSaveStatus('saved')
+    setCloudSaveStatus('saved', null, detected)
   } catch (err) {
     if (err instanceof StaleCloudSaveError) {
       setCloudSaveStatus('idle')
@@ -2006,11 +2135,11 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
         transientSaveRetryCount += 1
         if (saveMode === 'full' || queuedSaveMode === 'none') queuedSaveMode = saveMode
         if (allowEmptyTrip) queuedAllowEmptyTrip = true
-        setCloudSaveStatus('pending')
+        setCloudSaveStatus('pending', null, detected)
         armSaveTimer(TRANSIENT_SAVE_RETRY_MS)
       } else {
         transientSaveRetryCount = 0
-        setCloudSaveStatus('error', describeCloudSaveError(err))
+        setCloudSaveStatus('error', describeCloudSaveError(err), detected)
       }
     }
   } finally {

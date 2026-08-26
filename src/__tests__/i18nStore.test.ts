@@ -3,6 +3,7 @@ import {
   getLocale,
   setLocale,
   initLocale,
+  getSystemPreferredLocale,
   translate,
   subscribeLocale,
   isLocale,
@@ -94,6 +95,54 @@ describe('i18nStore', () => {
     storage['paris_tour_locale_mode'] = 'en'
     expect(initLocale()).toBe('en')
     expect(getLocale()).toBe('en')
+  })
+
+  describe('system preference detection', () => {
+    it('selects zh-CN for Chinese variants', () => {
+      vi.stubGlobal('navigator', { language: 'zh-CN', languages: ['zh-CN'] })
+      expect(getSystemPreferredLocale()).toBe('zh-CN')
+
+      vi.stubGlobal('navigator', { language: 'zh-TW', languages: ['zh-TW'] })
+      expect(getSystemPreferredLocale()).toBe('zh-CN')
+
+      vi.stubGlobal('navigator', { language: 'zh-HK', languages: ['zh-HK'] })
+      expect(getSystemPreferredLocale()).toBe('zh-CN')
+
+      vi.stubGlobal('navigator', { language: 'zh', languages: ['zh'] })
+      expect(getSystemPreferredLocale()).toBe('zh-CN')
+    })
+
+    it('selects en for all non-Chinese languages', () => {
+      vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US', 'en'] })
+      expect(getSystemPreferredLocale()).toBe('en')
+
+      vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR', 'fr'] })
+      expect(getSystemPreferredLocale()).toBe('en')
+
+      vi.stubGlobal('navigator', { language: 'ja-JP', languages: ['ja-JP'] })
+      expect(getSystemPreferredLocale()).toBe('en')
+
+      vi.stubGlobal('navigator', { language: 'es-ES', languages: ['es-ES'] })
+      expect(getSystemPreferredLocale()).toBe('en')
+
+      vi.stubGlobal('navigator', { language: 'de', languages: ['de'] })
+      expect(getSystemPreferredLocale()).toBe('en')
+    })
+
+    it('defaults to en when navigator language is unavailable or SSR', () => {
+      vi.stubGlobal('navigator', { language: '', languages: [] })
+      expect(getSystemPreferredLocale()).toBe('en')
+    })
+
+    it('initLocale uses system language when localStorage is empty', () => {
+      vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR'] })
+      expect(initLocale()).toBe('en')
+      expect(getLocale()).toBe('en')
+
+      vi.stubGlobal('navigator', { language: 'zh-CN', languages: ['zh-CN'] })
+      expect(initLocale()).toBe('zh-CN')
+      expect(getLocale()).toBe('zh-CN')
+    })
   })
 
   describe('dev missing-key warnings', () => {

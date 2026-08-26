@@ -856,6 +856,21 @@ export interface I18nSchema {
     syncLabelSynced: string
     saveKicker: string
     syncKicker: string
+    saveTargetDaysSingle: string
+    saveTargetDaysMultiple: string
+    saveTargetDaysAll: string
+    saveTargetPlaceDetails: string
+    saveTargetTranslations: string
+    saveTargetHotel: string
+    saveTargetFlightsDates: string
+    saveTargetPreferences: string
+    saveTargetCustomPlaces: string
+    saveTargetComposite: string
+    saveTargetGeneral: string
+    saveActionSaving: string
+    saveActionSaved: string
+    syncActionSyncing: string
+    syncActionSynced: string
   }
   apiMeter: {
     ariaLabel: string

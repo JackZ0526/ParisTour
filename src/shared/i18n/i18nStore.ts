@@ -55,13 +55,18 @@ export function isLocale(value: unknown): value is Locale {
  *  System preference detection
  * ------------------------------------------------------------------ */
 
-function getSystemPreferredLocale(): Locale {
-  if (typeof window === 'undefined' || !navigator.language) return DEFAULT_LOCALE
-  const lang = navigator.language.toLowerCase()
-  for (const meta of Object.values(LOCALES)) {
-    if (meta.systemPrefixes.some((p) => lang.startsWith(p))) return meta.id
+export function getSystemPreferredLocale(): Locale {
+  if (typeof navigator === 'undefined') return 'en'
+  const candidate = (
+    navigator.language ||
+    (Array.isArray(navigator.languages) && navigator.languages[0]) ||
+    ''
+  ).toLowerCase()
+
+  if (candidate.startsWith('zh')) {
+    return 'zh-CN'
   }
-  return DEFAULT_LOCALE
+  return 'en'
 }
 
 /* ------------------------------------------------------------------ *

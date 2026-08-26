@@ -41,6 +41,16 @@ alter table public.profiles
   add column if not exists avatar_url text;
 
 alter table public.profiles
+  add column if not exists language_preference text;
+
+alter table public.profiles
+  drop constraint if exists profiles_language_preference_check;
+
+alter table public.profiles
+  add constraint profiles_language_preference_check
+  check (language_preference is null or language_preference in ('zh-CN', 'en'));
+
+alter table public.profiles
   drop constraint if exists profiles_theme_preference_check;
 
 alter table public.profiles

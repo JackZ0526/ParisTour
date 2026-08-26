@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
+  getCloudSaveDayNumbers,
   getCloudSaveError,
   getCloudSaveStatus,
+  getCloudSaveTarget,
+  getCloudSyncDayNumbers,
   getCloudSyncStatus,
+  getCloudSyncTarget,
   subscribeCloudSaveStatus,
   subscribeCloudSyncStatus,
   type CloudSaveStatus,
+  type CloudSaveTarget,
   type CloudSyncStatus,
 } from '../services/tripCloud'
 import { SyncOrbitIcon } from '../../../shared/components/LoadingIndicator'
@@ -17,14 +22,59 @@ import { useTranslation } from '../../../shared/i18n'
 
 type ToastKind = 'save' | 'sync'
 
-function saveLabel(status: CloudSaveStatus, error: string | null, t: ReturnType<typeof useTranslation>['t']): string {
+export function getSaveTargetLabel(
+  target: CloudSaveTarget,
+  dayNumbers: number[] | undefined,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  switch (target) {
+    case 'itinerary_days':
+      if (dayNumbers && dayNumbers.length === 1) {
+        return t('cloud.saveTargetDaysSingle', { day: dayNumbers[0] })
+      }
+      if (dayNumbers && dayNumbers.length > 1) {
+        return t('cloud.saveTargetDaysMultiple', { days: dayNumbers.join(', ') })
+      }
+      return t('cloud.saveTargetDaysAll')
+    case 'place_details':
+      return t('cloud.saveTargetPlaceDetails')
+    case 'translations':
+      return t('cloud.saveTargetTranslations')
+    case 'hotel':
+      return t('cloud.saveTargetHotel')
+    case 'flights_dates':
+      return t('cloud.saveTargetFlightsDates')
+    case 'preferences':
+      return t('cloud.saveTargetPreferences')
+    case 'custom_places':
+      return t('cloud.saveTargetCustomPlaces')
+    case 'composite':
+      return t('cloud.saveTargetComposite')
+    case 'general':
+    default:
+      return t('cloud.saveTargetGeneral')
+  }
+}
+
+export function saveLabel(
+  status: CloudSaveStatus,
+  error: string | null,
+  target: CloudSaveTarget,
+  dayNumbers: number[] | undefined,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  const targetLabel = getSaveTargetLabel(target, dayNumbers, t)
   switch (status) {
     case 'pending':
       return t('cloud.saveLabelPending')
     case 'saving':
-      return t('cloud.saveLabelSaving')
+      return target === 'general'
+        ? t('cloud.saveLabelSaving')
+        : t('cloud.saveActionSaving', { target: targetLabel })
     case 'saved':
-      return t('cloud.saveLabelSaved')
+      return target === 'general'
+        ? t('cloud.saveLabelSaved')
+        : t('cloud.saveActionSaved', { target: targetLabel })
     case 'error': {
       const reason = (error || '').replace(/^(保存失败|Save failed)[:：]?\s*/, '').trim()
       return reason ? t('cloud.saveLabelErrorWithReason', { reason }) : t('cloud.saveLabelError')
@@ -34,12 +84,22 @@ function saveLabel(status: CloudSaveStatus, error: string | null, t: ReturnType<
   }
 }
 
-function syncLabel(status: CloudSyncStatus, t: ReturnType<typeof useTranslation>['t']): string {
+export function syncLabel(
+  status: CloudSyncStatus,
+  target: CloudSaveTarget,
+  dayNumbers: number[] | undefined,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  const targetLabel = getSaveTargetLabel(target, dayNumbers, t)
   switch (status) {
     case 'syncing':
-      return t('cloud.syncLabelSyncing')
+      return target === 'general'
+        ? t('cloud.syncLabelSyncing')
+        : t('cloud.syncActionSyncing', { target: targetLabel })
     case 'synced':
-      return t('cloud.syncLabelSynced')
+      return target === 'general'
+        ? t('cloud.syncLabelSynced')
+        : t('cloud.syncActionSynced', { target: targetLabel })
     default:
       return ''
   }
@@ -62,16 +122,25 @@ export function CloudSaveIndicator() {
 
   const [saveStatus, setSaveStatus] = useState<CloudSaveStatus>(() => getCloudSaveStatus())
   const [saveError, setSaveError] = useState<string | null>(() => getCloudSaveError())
+  const [saveTarget, setSaveTarget] = useState<CloudSaveTarget>(() => getCloudSaveTarget())
+  const [saveDays, setSaveDays] = useState<number[] | undefined>(() => getCloudSaveDayNumbers())
+
   const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>(() => getCloudSyncStatus())
+  const [syncTarget, setSyncTarget] = useState<CloudSaveTarget>(() => getCloudSyncTarget())
+  const [syncDays, setSyncDays] = useState<number[] | undefined>(() => getCloudSyncDayNumbers())
 
   useEffect(() => {
     if (!isEnabled) return
     const unsubSave = subscribeCloudSaveStatus(() => {
       setSaveStatus(getCloudSaveStatus())
       setSaveError(getCloudSaveError())
+      setSaveTarget(getCloudSaveTarget())
+      setSaveDays(getCloudSaveDayNumbers())
     })
     const unsubSync = subscribeCloudSyncStatus(() => {
       setSyncStatus(getCloudSyncStatus())
+      setSyncTarget(getCloudSyncTarget())
+      setSyncDays(getCloudSyncDayNumbers())
     })
     return () => {
       unsubSave()
@@ -93,7 +162,9 @@ export function CloudSaveIndicator() {
   if (typeof document === 'undefined') return null
 
   const isSave = kind === 'save'
-  const label = isSave ? saveLabel(saveStatus, saveError, t) : syncLabel(syncStatus, t)
+  const label = isSave
+    ? saveLabel(saveStatus, saveError, saveTarget, saveDays, t)
+    : syncLabel(syncStatus, syncTarget, syncDays, t)
   const tone =
     isSave && saveStatus === 'error'
       ? 'is-error'
