@@ -124,6 +124,8 @@ describe('dayCopy and place recommendations locale support', () => {
     expect(systemPrompt).toContain('Paris travel advisor')
     expect(systemPrompt).toContain('natural, elegant English')
     expect(systemPrompt).toContain('2–3 sentence introduction in English')
+    expect(systemPrompt).not.toContain('reply first')
+    expect(systemPrompt).not.toContain('then actions')
   })
 
   it('isolates recommend cache by locale', () => {

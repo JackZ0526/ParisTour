@@ -17,27 +17,88 @@ export function isUsableGalleryPhotoUrl(url: string): boolean {
   )
 }
 
+const MIN_NATURAL_EDGE = 64
+const UNIFORM_CHANNEL_RANGE = 22
+
+/** True when a downsampled RGBA buffer is a near-solid color (or empty). */
+export function isNearlyUniformRgba(
+  data: Uint8ClampedArray,
+  maxRange = UNIFORM_CHANNEL_RANGE,
+): boolean {
+  if (data.length < 16) return false
+  let rMin = 255
+  let rMax = 0
+  let gMin = 255
+  let gMax = 0
+  let bMin = 255
+  let bMax = 0
+  let opaque = 0
+  for (let i = 0; i + 3 < data.length; i += 4) {
+    if (data[i + 3] < 16) continue
+    opaque += 1
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    if (r < rMin) rMin = r
+    if (r > rMax) rMax = r
+    if (g < gMin) gMin = g
+    if (g > gMax) gMax = g
+    if (b < bMin) bMin = b
+    if (b > bMax) bMax = b
+  }
+  if (opaque < 8) return true
+  return rMax - rMin <= maxRange && gMax - gMin <= maxRange && bMax - bMin <= maxRange
+}
+
+/** Tiny stretched pixels or CORS-readable solid fills should not stay in the album. */
+export function imageLooksLikeGalleryJunk(img: HTMLImageElement | null): boolean {
+  if (!img) return false
+  if (img.naturalWidth < MIN_NATURAL_EDGE || img.naturalHeight < MIN_NATURAL_EDGE) {
+    return true
+  }
+  if (typeof document === 'undefined') return false
+  try {
+    const size = 16
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return false
+    ctx.drawImage(img, 0, 0, size, size)
+    return isNearlyUniformRgba(ctx.getImageData(0, 0, size, size).data)
+  } catch {
+    return false
+  }
+}
+
 /**
  * Official site first, then Tripadvisor. Google is a last-resort single photo
  * and is ignored whenever either preferred source has a usable image.
+ * `failedUrls` are runtime <img> failures — they must not keep a broken album
+ * from winning over Tripadvisor / Google.
  */
 export function pickPreferredPlacePhotos(input: {
   websitePhotos: string[]
   tripadvisorPhotos: string[]
   googleFallbackUrl?: string | null
+  failedUrls?: Iterable<string>
 }): { photos: string[]; source: PlaceInfoSource | null } {
-  const website = uniquePhotoUrls(
-    input.websitePhotos.filter(isUsableGalleryPhotoUrl),
-  ).slice(0, MAX_PREFERRED_GALLERY_PHOTOS)
+  const failed = new Set(input.failedUrls || [])
+  const stillLoads = (url: string) => isUsableGalleryPhotoUrl(url) && !failed.has(url)
+
+  const website = uniquePhotoUrls(input.websitePhotos.filter(stillLoads)).slice(
+    0,
+    MAX_PREFERRED_GALLERY_PHOTOS,
+  )
   if (website.length) return { photos: website, source: 'website' }
 
   const tripadvisor = uniquePhotoUrls(
-    input.tripadvisorPhotos.filter(isUsableGalleryPhotoUrl),
+    input.tripadvisorPhotos.filter(stillLoads),
   ).slice(0, MAX_PREFERRED_GALLERY_PHOTOS)
   if (tripadvisor.length) return { photos: tripadvisor, source: 'tripadvisor' }
 
   const google = input.googleFallbackUrl?.trim() || ''
-  if (google && isUsableGalleryPhotoUrl(google)) {
+  if (google && stillLoads(google)) {
     return { photos: [google], source: 'google' }
   }
   return { photos: [], source: null }

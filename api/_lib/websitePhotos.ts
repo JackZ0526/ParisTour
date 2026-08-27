@@ -300,7 +300,27 @@ function isLogoPhoto(url: string): boolean {
 }
 
 const JUNK_NAME =
-  /(?:^|[\/_. -]|%20|\b)(?:logo|favicon|icon|webclip|avatar|headshot|portrait|wordmark|badge|sprite|branding|splash|startup|site-icon|apple-touch|touch-icon|label|labels|partenaire|partenaires|partner|partners|sponsor|sponsors|certification|certifications|certif|norme|normes|charte|adherent|adherents|ecojardin|accreditation|trophy|award|awards|federation|affiliate|recompense|distinction|qualite|tripadvisor|michelin|gaultmillau|gault-millau)(?:[\/_. -]|%20|\b|$)/i
+  /(?:^|[\/_. -]|%20|\b)(?:logo|favicon|icon|webclip|avatar|headshot|portrait|wordmark|badge|sprite|branding|splash|startup|site-icon|apple-touch|touch-icon|label|labels|partenaire|partenaires|partner|partners|sponsor|sponsors|certification|certifications|certif|norme|normes|charte|adherent|adherents|ecojardin|accreditation|trophy|award|awards|federation|affiliate|recompense|distinction|qualite|tripadvisor|michelin|gaultmillau|gault-millau|placeholder|blank|spacer|pixel|1x1|swatch|color-block|solid-color)(?:[\/_. -]|%20|\b|$)/i
+
+const COLOR_SWATCH_FILE =
+  /(?:^|\/)(?:aliceblue|antiquewhite|aqua|azure|beige|bisque|black|blue|brown|burgundy|charcoal|coral|cream|crimson|cyan|fuchsia|gold|gray|grey|green|indigo|ivory|khaki|lavender|lilac|lime|magenta|maroon|mauve|mint|navy|nude|olive|orange|peach|pink|plum|purple|red|rose|salmon|silver|tan|teal|turquoise|violet|white|yellow|blush)(?:[-_.](?:bg|background|fill|overlay|color|block|solid|swatch|texture))?\.(?:jpe?g|png|webp|gif)$/i
+
+/** Solid CSS/section fills named `pink.jpg`, `beige-bg.png`, etc. */
+export function isColorSwatchPhoto(url: string): boolean {
+  let pathname = url
+  try {
+    pathname = decodeURIComponent(new URL(url).pathname)
+  } catch {
+    try {
+      pathname = decodeURIComponent(url)
+    } catch {
+      /* keep raw */
+    }
+  }
+  const file = pathname.split('/').pop() || ''
+  return COLOR_SWATCH_FILE.test(file) || COLOR_SWATCH_FILE.test(pathname)
+}
+
 const PEOPLE_ALT =
   /(?:^|[\/_. -]|%20|\b)(?:team|staff|owner|chef|equipe|équipe|fondateur|founder|portrait|headshot|avatar)(?:[\/_. -]|%20|\b|$)/i
 
@@ -310,6 +330,9 @@ export function isJunkWebsitePhoto(
   className = '',
 ): boolean {
   if (isLogoPhoto(url)) return true
+  if (isColorSwatchPhoto(url)) return true
+  const altFile = alt.trim().split(/[/\\]/).pop() || ''
+  if (altFile && isColorSwatchPhoto(`https://swatch.invalid/${altFile}`)) return true
   let decodedUrl = url
   try {
     decodedUrl = decodeURIComponent(url)

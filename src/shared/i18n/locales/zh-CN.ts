@@ -661,6 +661,14 @@ export const zhCN: I18nSchema = {
     closePanelAria: '关闭行程助手',
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: '关闭助手',
+    // Selected-text follow-up (TripChatPanel)
+    askAbout: '问一下',
+    askAboutAria: '就选中的文字问行程助手',
+    askAboutPrompt: '请解释或展开一下这段内容：\n\n「{excerpt}」',
+    askAboutWithQuestion: '关于这段内容：\n\n「{excerpt}」\n\n{question}',
+    askAboutClearQuote: '取消引用',
+    askAboutQuoteAria: '引用选中的文字',
+    askAboutExplainShort: '解释一下',
     // Suggested prompts
     suggestChooseHotel: '帮我选择一家酒店',
     suggestHotelNamed: '介绍一下{name}',

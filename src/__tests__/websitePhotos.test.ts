@@ -6,6 +6,8 @@ import {
   isDirectoryOrSocialUrl,
   isInstagramUrl,
   isPublicHttpsUrl,
+  isJunkWebsitePhoto,
+  isColorSwatchPhoto,
   officialWebsiteFromCandidate,
   toPublicHttpsUrl,
 } from '../../api/_lib/websitePhotos'
@@ -205,5 +207,27 @@ describe('place website photos', () => {
     expect(photos).not.toContain('https://paris.fr/uploads/ecojardin.png')
     expect(photos).not.toContain('https://paris.fr/uploads/label-tourisme-handicap.jpg')
     expect(photos).not.toContain('https://paris.fr/uploads/partenaire-mairie-paris.png')
+  })
+
+  it('drops Squarespace color-block fills and logos, keeps cafe food photos', () => {
+    const html = `
+      <meta property="og:image" content="https://static1.squarespace.com/static/abc/t/def/logo-ocoffee-paris.png?format=1500w" />
+      <img data-src="https://images.squarespace-cdn.com/content/v1/abc/pink.jpg" alt="pink.jpg" width="1000" height="1000" />
+      <img data-src="https://images.squarespace-cdn.com/content/v1/abc/placeholder.png" alt="" />
+      <img data-src="https://images.squarespace-cdn.com/content/v1/abc/O-Coffee-latte.jpg" alt="Latte" width="2200" height="1600" />
+      <img data-src="https://images.squarespace-cdn.com/content/v1/abc/avo-toast.jpg" alt="Avo toast" width="2200" height="1600" />
+      <img data-src="https://images.squarespace-cdn.com/content/v1/abc/red-velvet-cake.jpg" alt="Cake" width="1800" height="1200" />
+    `
+    const photos = extractWebsitePhotos(html, 'https://www.ocoffee.fr/')
+    expect(photos).toEqual([
+      'https://images.squarespace-cdn.com/content/v1/abc/O-Coffee-latte.jpg',
+      'https://images.squarespace-cdn.com/content/v1/abc/avo-toast.jpg',
+      'https://images.squarespace-cdn.com/content/v1/abc/red-velvet-cake.jpg',
+    ])
+    expect(isColorSwatchPhoto('https://images.squarespace-cdn.com/content/v1/abc/pink.jpg')).toBe(
+      true,
+    )
+    expect(isJunkWebsitePhoto('https://cdn.example/beige-bg.png')).toBe(true)
+    expect(isJunkWebsitePhoto('https://cdn.example/red-velvet-cake.jpg')).toBe(false)
   })
 })

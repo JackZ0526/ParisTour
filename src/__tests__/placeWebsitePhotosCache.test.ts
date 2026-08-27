@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { setLlmArtifact, resetLlmArtifactStoreForTests } from '../shared/services/llm/llmArtifactStore'
 import {
+  dropFailedPlaceWebsitePhotos,
   invalidatePlaceWebsitePhotosCache,
   peekCachedPlaceWebsitePhotos,
   resetPlaceWebsitePhotosForTests,
@@ -80,7 +81,7 @@ describe('place website photo cache', () => {
       { silent: true },
     )
     setLlmArtifact(
-      'place-website-photos-by-place:v1:all good + sucré',
+      'place-website-photos-by-place:v3:all good + sucré',
       { photos: [], miss: true },
       { silent: true },
     )
@@ -95,5 +96,54 @@ describe('place website photo cache', () => {
     invalidatePlaceWebsitePhotosCache(input)
 
     expect(peekCachedPlaceWebsitePhotos(input)).toEqual({ photos: [] })
+  })
+
+  it('drops a failed website URL so a junk album can fall through', () => {
+    const input = {
+      website: 'https://www.paris-arc-de-triomphe.fr/',
+      name: 'Arc de Triomphe',
+    }
+    setLlmArtifact(
+      websiteCacheKeys(input.website)[0],
+      {
+        photos: [
+          'https://arc.example/broken-1.jpg',
+          'https://arc.example/ok.jpg',
+          'https://arc.example/broken-2.jpg',
+        ],
+      },
+      { silent: true },
+    )
+
+    expect(
+      dropFailedPlaceWebsitePhotos(input, 'https://arc.example/broken-1.jpg').photos,
+    ).toEqual(['https://arc.example/ok.jpg', 'https://arc.example/broken-2.jpg'])
+    expect(
+      dropFailedPlaceWebsitePhotos(input, 'https://arc.example/ok.jpg').photos,
+    ).toEqual(['https://arc.example/broken-2.jpg'])
+    expect(
+      dropFailedPlaceWebsitePhotos(input, 'https://arc.example/broken-2.jpg'),
+    ).toEqual({ photos: [], miss: true, instagram: null })
+    expect(peekCachedPlaceWebsitePhotos(input)).toEqual({ photos: [], miss: true })
+  })
+
+  it('ignores cached Google Place Photo resource names in a website album', () => {
+    setLlmArtifact(
+      websiteCacheKeys('https://www.paris-arc-de-triomphe.fr/')[0],
+      {
+        photos: [
+          'places/ChIJD3uTd9hx5kcR1IQvGfr8dbk/photos/AUdRd8oAbc',
+          'https://places.googleapis.com/v1/places/ChIJ/photos/abc/media',
+        ],
+      },
+      { silent: true },
+    )
+
+    expect(
+      peekCachedPlaceWebsitePhotos({
+        website: 'https://www.paris-arc-de-triomphe.fr/',
+        name: 'Arc de Triomphe',
+      }),
+    ).toEqual({ photos: [], miss: true })
   })
 })

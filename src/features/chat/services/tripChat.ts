@@ -27,6 +27,7 @@ import { searchNearbyGooglePlaceCandidates } from '../../map/services/googlePlac
 import {
   buildPrompt,
   getCommonRules,
+  getChatOutputRules,
   getNoHallucinationRule,
   getPlaceResearchDiscipline,
   getRouterExamples,
@@ -132,6 +133,8 @@ export interface TripChatTurn {
   role: 'user' | 'assistant'
   content: string
   images?: string[]
+  /** Quoted excerpt shown above the user bubble (Ask about). */
+  quote?: string
   /** When true, kept in API history but not shown as a chat bubble. */
   hidden?: boolean
   /** Pipeline steps persisted after a successful assistant reply. */
@@ -680,6 +683,7 @@ user: "第三天加个咖啡馆" → actions[].day=3
     role,
     context,
     getCommonRules(activeLocale),
+    getChatOutputRules(activeLocale),
     plan.intent === 'answer'
       ? ''
       : [
@@ -1032,9 +1036,10 @@ function buildTripChatMessages(input: {
   const messages: OpenAIChatMessage[] = [
     { role: 'system', content: systemPrompt(input.ctx, input.plan) },
     ...input.history.map((t) => {
+      const text = t.quote ? [t.quote, t.content].filter(Boolean).join('\n') : t.content
       if (t.role === 'user' && t.images && t.images.length > 0 && isVisionModel) {
         const parts: ChatMessageContentPart[] = [
-          { type: 'text', text: t.content },
+          { type: 'text', text },
           ...t.images.map((img) => ({
             type: 'image_url' as const,
             image_url: { url: img },
@@ -1042,7 +1047,7 @@ function buildTripChatMessages(input: {
         ]
         return { role: 'user' as const, content: parts }
       }
-      return { role: t.role, content: t.content }
+      return { role: t.role, content: text }
     }),
   ]
   const contextBlocks: string[] = [
@@ -1347,6 +1352,22 @@ function parseActions(raw: unknown, maxDay = 30): TripChatAction[] {
   return out
 }
 
+function pickChatReplyText(parsed: Record<string, unknown>): string {
+  const keys = ['reply', 'message', 'content', 'answer', 'text', '回复', '介绍']
+  for (const key of keys) {
+    const value = parsed[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  let longest = ''
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key === 'actions' || key === 'action' || key === 'ops') continue
+    if (typeof value !== 'string') continue
+    const trimmed = value.trim()
+    if (trimmed.length > longest.length) longest = trimmed
+  }
+  return longest.length >= 12 ? longest : ''
+}
+
 function parseTripChatResult(
   text: string,
   userMessage: string,
@@ -1377,7 +1398,7 @@ function parseTripChatResult(
     )
   }
 
-  const rawReply = String(parsed.reply || parsed.message || '').trim()
+  const rawReply = pickChatReplyText(parsed)
   // Prefer top-level actions; fall back if the model nestled them oddly.
   const rawActions =
     parsed.actions ??
@@ -1394,6 +1415,8 @@ function parseTripChatResult(
       const reply = activeLocale === 'en' ? 'Updated the itinerary.' : '已为你更新行程。'
       return { reply, actions }
     }
+    const salvaged = extractReplyFromLooseJson(text)?.trim()
+    if (salvaged) return { reply: salvaged, actions }
     throw new LlmRequestError(
       activeLocale === 'en'
         ? 'The model returned an empty reply, please try again.'
@@ -1539,7 +1562,13 @@ function planningContext(input: {
   const viewing = buildViewingSnapshot(input.ctx)
   const recentHistory = input.history
     .slice(-4)
-    .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 500) }))
+    .map((turn) => ({
+      role: turn.role,
+      content: (turn.quote ? [turn.quote, turn.content].filter(Boolean).join('\n') : turn.content).slice(
+        0,
+        500,
+      ),
+    }))
   const attachedImagesCount = input.images ? input.images.length : 0
   return {
     request: input.userMessage,

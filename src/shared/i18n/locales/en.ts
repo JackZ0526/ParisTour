@@ -661,6 +661,14 @@ export const en: I18nSchema = {
     closePanelAria: 'Close trip assistant',
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: 'Close assistant',
+    // Selected-text follow-up (TripChatPanel)
+    askAbout: 'Ask about',
+    askAboutAria: 'Ask the trip assistant about the selected text',
+    askAboutPrompt: 'Please explain or expand on this excerpt:\n\n“{excerpt}”',
+    askAboutWithQuestion: 'About this excerpt:\n\n“{excerpt}”\n\n{question}',
+    askAboutClearQuote: 'Remove quote',
+    askAboutQuoteAria: 'Quoted selection',
+    askAboutExplainShort: 'Explain this',
     // Suggested prompts
     suggestChooseHotel: 'Help me choose a hotel',
     suggestHotelNamed: 'Tell me about {name}',

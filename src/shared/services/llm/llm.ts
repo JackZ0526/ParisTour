@@ -118,7 +118,11 @@ export {
 } from './provider-state'
 
 // ── JSON / streaming helpers ────────────────────────────────────────────
-export { extractLlmJsonObject, extractJsonObject } from './json'
+export {
+  extractLlmJsonObject,
+  extractJsonObject,
+  extractPlaceRecommendationRows,
+} from './json'
 export {
   cleanQueryString,
   consumeResponsesStream,

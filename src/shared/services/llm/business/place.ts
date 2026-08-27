@@ -21,7 +21,7 @@ import {
   openaiResponsesWithWebSearch,
   parsePartialJson,
 } from '../stream'
-import { extractJsonObject } from '../json'
+import { extractJsonObject, extractPlaceRecommendationRows } from '../json'
 import {
   recommendationPreferencesPrompt,
   type RecommendationPreferences,
@@ -744,6 +744,51 @@ function toExcludeSet(names: string[]): Set<string> {
   return new Set(names.map((n) => n.toLowerCase().trim()).filter(Boolean))
 }
 
+function firstRowString(row: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function coerceRecommendType(
+  raw: unknown,
+  requestedTypes: RecommendPlaceType[],
+  fallback: RecommendPlaceType,
+): RecommendPlaceType {
+  const value = String(raw || '').trim().toLowerCase()
+  let resolved: RecommendPlaceType | null = null
+  if (requestedTypes.includes(value as RecommendPlaceType)) {
+    resolved = value as RecommendPlaceType
+  } else if (['咖啡馆', '咖啡', 'coffee', 'bakery', 'brunch'].includes(value)) {
+    resolved = 'cafe'
+  } else if (['景点', '博物馆', 'museum', 'park'].includes(value)) {
+    resolved = 'attraction'
+  } else if (['餐厅', '餐馆', '饭店', 'bistro', 'brasserie'].includes(value)) {
+    resolved = 'restaurant'
+  }
+  if (resolved && requestedTypes.includes(resolved)) return resolved
+  return fallback
+}
+
+function parseRecommendPayload(text: string): {
+  parsed: unknown
+  list: unknown[]
+} {
+  const obj = extractJsonObject(text)
+  if (obj) {
+    const list = extractPlaceRecommendationRows(obj)
+    if (list.length) return { parsed: obj, list }
+  }
+  const partial = parsePartialJson<unknown>(text)
+  if (partial != null) {
+    const list = extractPlaceRecommendationRows(partial)
+    if (list.length) return { parsed: partial, list }
+  }
+  return { parsed: obj ?? partial, list: [] }
+}
+
 /**
  * Recommend places for the current day via LLM only (no local fallback pool).
  */
@@ -898,8 +943,8 @@ export async function recommendPlacesForDay(input: {
     for (const item of rawList) {
       if (!item || typeof item !== 'object') continue
       const row = item as Record<string, unknown>
-      const proposedName = String(row.name || '').trim()
-      const proposedId = String(row.googlePlaceId || '').trim()
+      const proposedName = firstRowString(row, ['name', '名称', '店名', '地名', 'placeName'])
+      const proposedId = firstRowString(row, ['googlePlaceId', 'placeId', 'place_id'])
       const verified =
         (proposedId ? verifiedById.get(proposedId) : undefined) ||
         verifiedByName.get(proposedName.toLowerCase())
@@ -909,24 +954,26 @@ export async function recommendPlacesForDay(input: {
       if (itineraryExclude.has(key) || seen.has(key)) continue
       const type = verified
         ? verified.type
-        : requestedTypes.includes(row.type as RecommendPlaceType)
-          ? (row.type as RecommendPlaceType)
-          : requestedTypes[0]
+        : coerceRecommendType(row.type ?? row.类型 ?? row.category, requestedTypes, requestedTypes[0])
       if (!requestedTypes.includes(type) || typeCounts[type] >= countPerType) continue
-      const reason = String(
-        row.reason || (isEn ? "Fits well into today's rhythm." : '适合补充进今天的行程'),
-      ).trim()
-      const intro = String(row.intro || row.description || reason).trim()
+      const reason = firstRowString(row, ['reason', '理由', '推荐理由']) ||
+        (isEn ? "Fits well into today's rhythm." : '适合补充进今天的行程')
+      const intro =
+        firstRowString(row, ['intro', 'description', '介绍', '简介']) || reason
       seen.add(key)
       typeCounts[type] += 1
       outList.push({
         googlePlaceId: verified?.id || (proposedId || undefined),
         name,
-        nameLocal: String(row.nameLocal || '').trim() || undefined,
+        nameLocal:
+          firstRowString(row, ['nameLocal', 'localName', '中文名']) || undefined,
         type,
         reason,
         intro: intro || reason,
-        area: String(row.area || verified?.address || '').trim() || undefined,
+        area:
+          firstRowString(row, ['area', '区域', '地区']) ||
+          (verified?.address || '').trim() ||
+          undefined,
       })
     }
     return outList
@@ -934,9 +981,9 @@ export async function recommendPlacesForDay(input: {
 
   const onDelta = input.onProgress
     ? (_delta: string, fullText: string) => {
-        const parsed = parsePartialJson<{ recommendations?: unknown[] }>(fullText)
-        if (parsed && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
-          const partialList = sanitizeRecommendations(parsed.recommendations)
+        const { list: rawList } = parseRecommendPayload(fullText)
+        if (rawList.length > 0) {
+          const partialList = sanitizeRecommendations(rawList)
           if (partialList.length > 0) {
             input.onProgress?.(partialList)
           }
@@ -962,11 +1009,10 @@ export async function recommendPlacesForDay(input: {
     throw new LlmRequestError('大模型没有返回内容，请再试一次。')
   }
 
-  const parsed = extractJsonObject(text)
-  const list = (parsed?.recommendations as unknown[]) || []
+  const { parsed, list } = parseRecommendPayload(text)
   if (!Array.isArray(list) || !list.length) {
     const looksTruncated =
-      !parsed && (text.includes('"recommendations"') || /```/.test(text) || text.includes('{'))
+      parsed == null && (text.includes('"recommendations"') || /```/.test(text) || text.includes('{'))
     throw new LlmRequestError(
       looksTruncated
         ? '推荐结果不完整（可能被截断），请再点「换一批」。'

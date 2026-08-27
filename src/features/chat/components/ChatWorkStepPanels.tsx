@@ -214,8 +214,14 @@ export function ChatWorkStepsPanel({
                       </span>
                     </button>
                     {reasoningExpanded && (
-                      <div className="mt-1.5 max-h-48 overflow-y-auto rounded-lg border-l-2 border-[var(--sage)]/40 bg-black/[0.02] dark:bg-white/[0.03] px-2.5 py-2 text-[11px] leading-relaxed text-[var(--stone)]/75 dark:text-zinc-300 select-text [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {reasoning!.trim()}
+                      <div className="relative mt-1.5 overflow-hidden rounded-lg bg-[var(--sage)]/[0.06] dark:bg-[var(--sage)]/[0.12] ring-1 ring-inset ring-[var(--sage)]/12 dark:ring-white/[0.06]">
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute bottom-2 left-[7px] top-2 w-[2.5px] rounded-full bg-[var(--sage)]/45 dark:bg-[#9fc4b1]/40"
+                        />
+                        <div className="max-h-48 overflow-y-auto py-2 pl-4 pr-2.5 text-[11px] leading-relaxed text-[var(--stone)]/75 dark:text-zinc-300 select-text [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          {reasoning!.trim()}
+                        </div>
                       </div>
                     )}
                   </div>

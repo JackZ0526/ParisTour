@@ -12,6 +12,7 @@ import {
   placeSourceLabel,
   type PlaceInfoSource,
 } from '../services/placeSource'
+import { imageLooksLikeGalleryJunk } from '../services/placeGalleryPhotos'
 
 export const photoSlideVariants = {
   enter: (direction: number) => ({
@@ -32,14 +33,15 @@ export const photoSlideVariants = {
 }
 
 export function photoReferrerPolicy(url?: string): HTMLAttributeReferrerPolicy {
-  if (!url) return 'no-referrer-when-downgrade'
+  if (!url) return 'no-referrer'
   if (
     url.includes('places.googleapis.com') ||
     url.includes('maps.googleapis.com/maps/api/place/photo')
   ) {
     return 'origin'
   }
-  return 'no-referrer-when-downgrade'
+  // Official-site CDNs often reject localhost / app referrers.
+  return 'no-referrer'
 }
 
 export function GalleryThumb({
@@ -68,8 +70,14 @@ export function GalleryThumb({
   }
   useLayoutEffect(() => {
     const img = imgRef.current
-    if (img?.complete && img.naturalWidth > 0) setReady(true)
-  }, [url])
+    if (img?.complete && img.naturalWidth > 0) {
+      if (imageLooksLikeGalleryJunk(img)) {
+        onError?.(url || '')
+        return
+      }
+      setReady(true)
+    }
+  }, [onError, url])
 
   return (
     <motion.button
@@ -106,7 +114,13 @@ export function GalleryThumb({
             ready ? 'opacity-100' : 'opacity-0'
           }`}
           referrerPolicy={photoReferrerPolicy(url)}
-          onLoad={() => setReady(true)}
+          onLoad={() => {
+            if (imageLooksLikeGalleryJunk(imgRef.current)) {
+              onError?.(url)
+              return
+            }
+            setReady(true)
+          }}
           onError={() => onError?.(url)}
           draggable={false}
         />
@@ -279,7 +293,13 @@ export function PlacePhotoGallery({
                 draggable={false}
                 fetchPriority="high"
                 decoding="async"
-                onLoad={() => setHeroReady(true)}
+                onLoad={() => {
+                  if (imageLooksLikeGalleryJunk(heroImgRef.current)) {
+                    onFailedPhoto?.(displayPhoto)
+                    return
+                  }
+                  setHeroReady(true)
+                }}
                 onError={() => onFailedPhoto?.(displayPhoto)}
               />
             </motion.div>

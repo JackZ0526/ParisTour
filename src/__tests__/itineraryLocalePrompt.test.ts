@@ -114,6 +114,11 @@ describe('itinerary LLM prompts are locale-aware', () => {
       expect(getCommonRules('en')).toContain('snapshot')
     })
 
+    it('getCommonRules does not force chat reply/actions on structured tasks', () => {
+      expect(getCommonRules('zh-CN')).not.toContain('reply 优先')
+      expect(getCommonRules('en')).not.toContain('reply first')
+    })
+
     it('getPlaceResearchDiscipline switches language by locale', () => {
       expect(getPlaceResearchDiscipline('zh-CN')).toContain('Google Maps 可搜到')
       expect(getPlaceResearchDiscipline('en')).toContain('Google-Maps-discoverable')

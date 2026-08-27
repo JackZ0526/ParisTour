@@ -6,6 +6,7 @@ import {
 } from '../../../shared/services/llm/llmArtifactStore'
 import { isLlmConfigured, resolveOfficialWebsite } from '../../../shared/services/llm/llm'
 import { isDirectoryOrSocialUrl } from '../../../../api/_lib/websitePhotos'
+import { isUsableGalleryPhotoUrl } from './placeGalleryPhotos'
 
 export interface PlaceWebsitePhotos {
   photos: string[]
@@ -14,8 +15,8 @@ export interface PlaceWebsitePhotos {
   miss?: boolean
 }
 
-const ARTIFACT_PREFIX = 'place-website-photos:v8:'
-const PLACE_INDEX_PREFIX = 'place-website-photos-by-place:v1:'
+const ARTIFACT_PREFIX = 'place-website-photos:v10:'
+const PLACE_INDEX_PREFIX = 'place-website-photos-by-place:v3:'
 const memory = new Map<string, PlaceWebsitePhotos>()
 const inflight = new Map<string, Promise<PlaceWebsitePhotos>>()
 
@@ -100,13 +101,35 @@ function peekOfficialWebsiteLookup(
   return { website: null, resolved: false }
 }
 
+function usableWebsitePhotos(photos: unknown): string[] {
+  if (!Array.isArray(photos)) return []
+  return [
+    ...new Set(
+      photos.filter(
+        (item): item is string =>
+          typeof item === 'string' && isUsableGalleryPhotoUrl(item),
+      ),
+    ),
+  ]
+}
+
 function readCached(key: string): PlaceWebsitePhotos | null {
   const memoryHit = memory.get(key)
-  if (memoryHit?.photos?.length || memoryHit?.miss) return memoryHit
+  if (memoryHit) {
+    const photos = usableWebsitePhotos(memoryHit.photos)
+    if (photos.length) return { ...memoryHit, photos }
+    if (memoryHit.miss || memoryHit.photos?.length) {
+      return { photos: [], miss: true, instagram: memoryHit.instagram }
+    }
+  }
   const stored = getLlmArtifact<PlaceWebsitePhotos>(key)
   if (stored?.photos?.length || stored?.miss) {
-    memory.set(key, stored)
-    return stored
+    const photos = usableWebsitePhotos(stored.photos)
+    const next: PlaceWebsitePhotos = photos.length
+      ? { photos, instagram: stored.instagram }
+      : { photos: [], miss: true, instagram: stored.instagram }
+    memory.set(key, next)
+    return next
   }
   return null
 }
@@ -116,8 +139,9 @@ function remember(
   result: PlaceWebsitePhotos,
   aliases?: { name?: string; nameLocal?: string },
 ) {
-  const stored: PlaceWebsitePhotos = result.photos.length
-    ? { photos: result.photos, instagram: result.instagram || null }
+  const photos = usableWebsitePhotos(result.photos)
+  const stored: PlaceWebsitePhotos = photos.length
+    ? { photos, instagram: result.instagram || null }
     : { photos: [], miss: true, instagram: result.instagram || null }
   const keys = [
     ...(website?.trim() ? websiteCacheKeys(website) : []),
@@ -164,6 +188,26 @@ export function peekCachedPlaceWebsitePhotos(input: {
     miss = true
   }
   return miss ? { photos: [], miss: true } : { photos: [] }
+}
+
+/** Drop a URL that failed to load so the next pick can fall through. */
+export function dropFailedPlaceWebsitePhotos(
+  input: {
+    website?: string
+    name?: string
+    nameLocal?: string
+    address?: string
+  },
+  failedUrl: string,
+): PlaceWebsitePhotos {
+  const cached = peekCachedPlaceWebsitePhotos(input)
+  const remaining = cached.photos.filter((url) => url !== failedUrl)
+  if (remaining.length === cached.photos.length) return cached
+  const next: PlaceWebsitePhotos = remaining.length
+    ? { photos: remaining, instagram: cached.instagram }
+    : { photos: [], miss: true, instagram: cached.instagram }
+  remember(input.website, next, { name: input.name, nameLocal: input.nameLocal })
+  return next
 }
 
 /** Clear one place's successful or failed official-site photo lookup. */
@@ -229,9 +273,7 @@ export async function fetchPlaceWebsitePhotos(
     if (!response.ok) return { photos: [] }
     const payload = (await response.json()) as PlaceWebsitePhotos
     const result: PlaceWebsitePhotos = {
-      photos: Array.isArray(payload.photos)
-        ? payload.photos.filter((item) => typeof item === 'string' && item.startsWith('https://'))
-        : [],
+      photos: usableWebsitePhotos(payload.photos),
       instagram: payload.instagram || null,
     }
     remember(url, result, aliases)

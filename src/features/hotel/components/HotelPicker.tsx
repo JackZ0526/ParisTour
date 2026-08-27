@@ -2698,7 +2698,7 @@ export function HotelPicker({
       {drag && (
         <div
           ref={floatElRef}
-          className={`timeline-drag-float pointer-events-none fixed z-[80] ${
+          className={`timeline-drag-float pointer-events-none fixed z-[90] ${
             dropping ? 'timeline-drag-float-settle' : 'timeline-drag-float-lifted'
           }`}
           style={{
@@ -2707,7 +2707,7 @@ export function HotelPicker({
             width: drag.width,
           }}
         >
-          <div className="timeline-drag-float-card relative overflow-hidden rounded-3xl border border-white/90 dark:border-white/10 bg-white/85 dark:bg-[#161d19]/90 shadow-[0_16px_48px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,1)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.08)] ring-1 ring-[var(--ink)]/5 backdrop-blur-2xl">
+          <div className="timeline-drag-float-card relative rounded-3xl border backdrop-blur-2xl">
             <div className="timeline-drag-float-content group">
               {(() => {
                 const hotel =

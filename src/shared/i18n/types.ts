@@ -685,6 +685,14 @@ export interface I18nSchema {
     closePanelAria: string
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: string
+    // Selected-text follow-up (TripChatPanel)
+    askAbout: string
+    askAboutAria: string
+    askAboutPrompt: string
+    askAboutWithQuestion: string
+    askAboutClearQuote: string
+    askAboutQuoteAria: string
+    askAboutExplainShort: string
     // Suggested prompts
     suggestChooseHotel: string
     suggestHotelNamed: string

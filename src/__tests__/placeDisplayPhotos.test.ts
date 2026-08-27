@@ -69,6 +69,9 @@ describe('resolvePlaceDisplayPhotos', () => {
       photos: ['https://arcdetriomphe.example/hero.jpg'],
       source: 'website',
       wikimedia: null,
+      websitePhotos: ['https://arcdetriomphe.example/hero.jpg'],
+      tripadvisorPhotos: ['https://media-cdn.tripadvisor.com/arc.jpg'],
+      googleFallbackUrl: null,
     })
     expect(fetchRapidApiGooglePhotoFallbackById).not.toHaveBeenCalled()
     expect(fetchWikimediaPlacePhoto).not.toHaveBeenCalled()
@@ -89,6 +92,12 @@ describe('resolvePlaceDisplayPhotos', () => {
       ],
       source: 'tripadvisor',
       wikimedia: null,
+      websitePhotos: [],
+      tripadvisorPhotos: [
+        'https://media-cdn.tripadvisor.com/arc-1.jpg',
+        'https://media-cdn.tripadvisor.com/arc-2.jpg',
+      ],
+      googleFallbackUrl: null,
     })
     expect(fetchRapidApiGooglePhotoFallbackById).not.toHaveBeenCalled()
   })
@@ -102,6 +111,9 @@ describe('resolvePlaceDisplayPhotos', () => {
       photos: ['https://lh3.googleusercontent.com/arc-fallback.jpg'],
       source: 'google',
       wikimedia: null,
+      websitePhotos: [],
+      tripadvisorPhotos: [],
+      googleFallbackUrl: 'https://lh3.googleusercontent.com/arc-fallback.jpg',
     })
     expect(fetchRapidApiGooglePhotoFallbackById).toHaveBeenCalledWith(
       ARC.googlePlaceId,
@@ -114,6 +126,9 @@ describe('resolvePlaceDisplayPhotos', () => {
       photos: [],
       source: null,
       wikimedia: null,
+      websitePhotos: [],
+      tripadvisorPhotos: [],
+      googleFallbackUrl: null,
     })
     expect(fetchRapidApiGooglePhotoFallbackById).toHaveBeenCalledTimes(1)
   })
@@ -132,6 +147,9 @@ describe('resolvePlaceDisplayPhotos', () => {
       photos: ['https://lh3.googleusercontent.com/arc-one.jpg'],
       source: 'google',
       wikimedia: null,
+      websitePhotos: [],
+      tripadvisorPhotos: [],
+      googleFallbackUrl: 'https://lh3.googleusercontent.com/arc-one.jpg',
     })
     expect(fetchRapidApiGooglePhotoFallbackById).not.toHaveBeenCalled()
   })

@@ -13,6 +13,18 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Keep Ask-about selection visible after the native highlight drops. */
+[data-chat-ask-selectable]::selection,
+[data-chat-ask-selectable] *::selection {
+  background: rgb(59 130 246 / 0.55);
+  color: inherit;
+}
+
+::highlight(ask-about) {
+  background-color: rgb(59 130 246 / 0.55);
+  color: inherit;
+}
+
 /* 2. Disable long-press system menu on interactive elements */
 button,
 [role='button'],
@@ -365,6 +377,10 @@ body.is-pwa.orientation-landscape::after {
   --timeline-card-depth:
     0 8px 32px rgba(181, 106, 60, 0.14),
     inset 0 1px 2px rgba(255, 255, 255, 1);
+  /* Picked-up drag clone: outer elevation only (no inset / pressed well). */
+  --shadow-drag-float:
+    0 8px 18px rgba(28, 36, 32, 0.12),
+    0 28px 56px rgba(28, 36, 32, 0.22);
   /* === Motion tokens ===
      Easings & durations are project-wide single source of truth.
      Timeline / API-meter / LLM / sheet all read from these so a global
@@ -452,6 +468,10 @@ body.is-pwa.orientation-landscape::after {
     0 12px 36px rgba(0, 0, 0, 0.5),
     inset 0 1px 2px rgba(255, 255, 255, 0.16),
     inset 0 -1px 1px rgba(0, 0, 0, 0.5);
+  --shadow-drag-float:
+    0 10px 24px rgba(0, 0, 0, 0.5),
+    0 28px 64px rgba(0, 0, 0, 0.58),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
   --nav-capsule-border-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 35%, rgba(255, 255, 255, 0.02) 65%, rgba(255, 255, 255, 0.12) 100%);
   --nav-pill-border-gradient: linear-gradient(135deg, rgba(212, 131, 84, 0.42) 0%, rgba(255, 255, 255, 0.1) 35%, rgba(255, 255, 255, 0.03) 65%, rgba(212, 131, 84, 0.22) 100%);
   color-scheme: dark;
@@ -1679,13 +1699,14 @@ body.timeline-dragging {
 }
 
 .timeline-drag-float {
+  z-index: 90;
   will-change: left, top, transform;
   backface-visibility: hidden;
 }
 
 .timeline-drag-float-lifted {
   transition: transform var(--dur-quick) var(--ease-spring);
-  transform: translate3d(0, 0, 0) scale(1.02) rotate(1.15deg);
+  transform: translate3d(0, -6px, 0) scale(1.03) rotate(0.85deg);
 }
 
 .timeline-drag-float-settle {
@@ -1696,11 +1717,26 @@ body.timeline-dragging {
   transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
 }
 
+/* Own the lift surface here (unlayered) so Tailwind inset utilities cannot
+   paint a pressed well, and so dark mode is not stuck with light-ink shadows. */
 .timeline-drag-float-card {
-  box-shadow:
-    0 4px 12px rgba(28, 36, 32, 0.08),
-    0 18px 40px rgba(28, 36, 32, 0.18);
+  overflow: visible;
+  background: rgba(255, 252, 247, 0.94);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-drag-float);
   transform: translateZ(0);
+}
+
+.dark .timeline-drag-float-card {
+  /* Lighter than resting cards — dark elevation is luminance, not inset. */
+  background: var(--surface-raised-dark);
+  border-color: var(--edge-raised-dark);
+  box-shadow: var(--shadow-drag-float);
+}
+
+.timeline-drag-float-content {
+  overflow: hidden;
+  border-radius: inherit;
 }
 
 .timeline-sortable-item {

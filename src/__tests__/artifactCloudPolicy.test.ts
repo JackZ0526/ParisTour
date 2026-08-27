@@ -16,7 +16,7 @@ describe('artifactCloudPolicy', () => {
     expect(isCloudSyncedArtifactKey('tripadvisor-gallery:v18:x')).toBe(false)
     expect(isCloudSyncedArtifactKey('booking-hotel-photos:v3:1')).toBe(false)
     expect(isCloudSyncedArtifactKey('wikimedia-place-photo:v3:x')).toBe(false)
-    expect(isCloudSyncedArtifactKey('place-website-photos:v8:https://x')).toBe(false)
+    expect(isCloudSyncedArtifactKey('place-website-photos:v10:https://x')).toBe(false)
     expect(isCloudSyncedArtifactKey('google-place-photo:abc')).toBe(false)
     expect(isCloudSyncedArtifactKey('destinations:popular')).toBe(false)
   })

@@ -15,6 +15,15 @@ import {
   galleryKindForPlaceType,
 } from './tripadvisorPlacePhotos'
 
+export interface PlaceDisplayPhotoSet {
+  photos: string[]
+  source: PlaceInfoSource | null
+  wikimedia: WikimediaPlacePhoto | null
+  websitePhotos: string[]
+  tripadvisorPhotos: string[]
+  googleFallbackUrl: string | null
+}
+
 export async function resolvePlaceDisplayPhotos(input: {
   name: string
   nameLocal?: string
@@ -24,11 +33,7 @@ export async function resolvePlaceDisplayPhotos(input: {
   googlePlaceId?: string
   location?: Coordinates
   googlePhotoCandidates?: string[]
-}): Promise<{
-  photos: string[]
-  source: PlaceInfoSource | null
-  wikimedia: WikimediaPlacePhoto | null
-}> {
+}): Promise<PlaceDisplayPhotoSet> {
   const [tripadvisorGallery, websiteResult] = await Promise.all([
     galleryKindForPlaceType(input.type)
       ? fetchTripadvisorPlaceGallery({
@@ -46,15 +51,29 @@ export async function resolvePlaceDisplayPhotos(input: {
     }).catch(() => ({ photos: [] as string[] })),
   ])
 
+  const websitePhotos = (websiteResult.photos || []).filter(isUsableGalleryPhotoUrl)
+  const tripadvisorPhotos = (tripadvisorGallery?.photos || []).filter(
+    isUsableGalleryPhotoUrl,
+  )
+  const cachedGoogle =
+    input.googlePhotoCandidates?.find(isUsableGalleryPhotoUrl) || null
+
   const preferred = pickPreferredPlacePhotos({
-    websitePhotos: websiteResult.photos,
-    tripadvisorPhotos: tripadvisorGallery?.photos || [],
+    websitePhotos,
+    tripadvisorPhotos,
+    googleFallbackUrl: cachedGoogle,
   })
   if (preferred.photos.length) {
-    return { photos: preferred.photos, source: preferred.source, wikimedia: null }
+    return {
+      photos: preferred.photos,
+      source: preferred.source,
+      wikimedia: null,
+      websitePhotos,
+      tripadvisorPhotos,
+      googleFallbackUrl: cachedGoogle,
+    }
   }
 
-  const cachedGoogle = input.googlePhotoCandidates?.find(isUsableGalleryPhotoUrl) || null
   const googleFallback =
     cachedGoogle ||
     (input.googlePlaceId
@@ -66,15 +85,36 @@ export async function resolvePlaceDisplayPhotos(input: {
     googleFallbackUrl: googleFallback,
   })
   if (withGoogle.photos.length) {
-    return { photos: withGoogle.photos, source: withGoogle.source, wikimedia: null }
+    return {
+      photos: withGoogle.photos,
+      source: withGoogle.source,
+      wikimedia: null,
+      websitePhotos,
+      tripadvisorPhotos,
+      googleFallbackUrl: googleFallback,
+    }
   }
 
   if (input.type === 'attraction' && input.location) {
     const wikimedia = await fetchWikimediaPlacePhoto(input.name, input.location)
     if (wikimedia?.url) {
-      return { photos: [wikimedia.url], source: 'wikimedia', wikimedia }
+      return {
+        photos: [wikimedia.url],
+        source: 'wikimedia',
+        wikimedia,
+        websitePhotos,
+        tripadvisorPhotos,
+        googleFallbackUrl: null,
+      }
     }
   }
 
-  return { photos: [], source: null, wikimedia: null }
+  return {
+    photos: [],
+    source: null,
+    wikimedia: null,
+    websitePhotos,
+    tripadvisorPhotos,
+    googleFallbackUrl: null,
+  }
 }

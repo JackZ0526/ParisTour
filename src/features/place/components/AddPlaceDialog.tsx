@@ -2,11 +2,17 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
   fetchGooglePlaceDetails,
+  fetchRapidApiGooglePhotoFallbackById,
   placeDetailsQuery,
   searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
-import { resolvePlaceDisplayPhotos } from '../services/placeDisplayPhotos'
+import {
+  resolvePlaceDisplayPhotos,
+  type PlaceDisplayPhotoSet,
+} from '../services/placeDisplayPhotos'
+import { pickPreferredPlacePhotos } from '../services/placeGalleryPhotos'
+import { dropFailedPlaceWebsitePhotos } from '../services/placeWebsitePhotos'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -72,7 +78,7 @@ const FALLBACK_IMAGE =
 
 const typeLabelKey: Record<PlaceType, string> = {
   cafe: 'place.addCafeOption',
-  attraction: 'place.monument',
+  attraction: 'place.typeAttraction',
   restaurant: 'place.addRestaurantOption',
   transport: 'itinerary.transitMode',
   hotel: 'itinerary.hotelStop',
@@ -134,6 +140,12 @@ export function AddPlaceDialog({
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [detailsByKey, setDetailsByKey] = useState<Record<string, GooglePlaceDetails | null>>({})
   const [sourceByKey, setSourceByKey] = useState<Record<string, PlaceInfoSource | null>>({})
+  const [photoSetByKey, setPhotoSetByKey] = useState<
+    Record<string, PlaceDisplayPhotoSet>
+  >({})
+  const [failedPhotosByKey, setFailedPhotosByKey] = useState<
+    Record<string, string[]>
+  >({})
   const [wikimediaByKey, setWikimediaByKey] = useState<
     Record<string, WikimediaPlacePhoto>
   >({})
@@ -607,6 +619,8 @@ export function AddPlaceDialog({
         : details
 
       setDetailsByKey((prev) => ({ ...prev, [key]: resolved }))
+      setPhotoSetByKey((prev) => ({ ...prev, [key]: display }))
+      setFailedPhotosByKey((prev) => ({ ...prev, [key]: [] }))
       if (display.source) {
         setSourceByKey((prev) => ({ ...prev, [key]: display.source }))
       }
@@ -622,6 +636,67 @@ export function AddPlaceDialog({
     } finally {
       setLoadingDetailsKey(null)
     }
+  }
+
+  function galleryForKey(key: string, details: GooglePlaceDetails | null) {
+    const photoSet = photoSetByKey[key]
+    const failed = failedPhotosByKey[key] || []
+    if (!photoSet) {
+      return {
+        photos: details?.photos?.length ? details.photos : [],
+        source: sourceByKey[key] || null,
+      }
+    }
+    return pickPreferredPlacePhotos({
+      websitePhotos: photoSet.websitePhotos,
+      tripadvisorPhotos: photoSet.tripadvisorPhotos,
+      googleFallbackUrl: photoSet.googleFallbackUrl,
+      failedUrls: failed,
+    })
+  }
+
+  function handleFailedPhoto(
+    key: string,
+    item: PlaceRecommendation,
+    details: GooglePlaceDetails | null,
+    failedUrl: string,
+  ) {
+    dropFailedPlaceWebsitePhotos(
+      {
+        website: details?.website,
+        name: details?.name || item.name,
+        nameLocal: details?.nameOriginal || item.nameLocal,
+        address: details?.address,
+      },
+      failedUrl,
+    )
+    const nextFailed = [...new Set([...(failedPhotosByKey[key] || []), failedUrl])]
+    setFailedPhotosByKey((prev) => {
+      const current = prev[key] || []
+      if (current.includes(failedUrl)) return prev
+      return { ...prev, [key]: [...current, failedUrl] }
+    })
+    const photoSet = photoSetByKey[key]
+    const next = pickPreferredPlacePhotos({
+      websitePhotos: photoSet?.websitePhotos || [],
+      tripadvisorPhotos: photoSet?.tripadvisorPhotos || [],
+      googleFallbackUrl: photoSet?.googleFallbackUrl || null,
+      failedUrls: nextFailed,
+    })
+    if (next.photos.length || !details?.id || photoSet?.googleFallbackUrl) return
+    void fetchRapidApiGooglePhotoFallbackById(details.id)
+      .then((url) => {
+        if (!url) return
+        setPhotoSetByKey((prevSet) => {
+          const currentSet = prevSet[key]
+          if (!currentSet || currentSet.googleFallbackUrl) return prevSet
+          return {
+            ...prevSet,
+            [key]: { ...currentSet, googleFallbackUrl: url },
+          }
+        })
+      })
+      .catch(() => {})
   }
 
   async function toggleExpand(item: PlaceRecommendation) {
@@ -1067,8 +1142,13 @@ export function AddPlaceDialog({
                     const loadingDetails = loadingDetailsKey === key
                     const busyBest = addingName === `${item.name}:best`
                     const busyEnd = addingName === `${item.name}:end`
-                    const photos = details?.photos?.length ? details.photos : []
-                    const photoIndex = photoIndexByKey[key] || 0
+                    const gallery = galleryForKey(key, details)
+                    const photos = gallery.photos
+                    const photoSource = gallery.source
+                    const photoIndex = Math.min(
+                      photoIndexByKey[key] || 0,
+                      Math.max(photos.length - 1, 0),
+                    )
                     const priceLevelLabel = formatPriceLevelLabel(details?.priceLevel, locale)
 
                     return (
@@ -1135,7 +1215,7 @@ export function AddPlaceDialog({
                                       </div>
                                       <div className="flex flex-wrap gap-2">
                                         <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-1 text-xs text-[var(--sage)]`}>
-                                          {item.type}
+                                          {t(typeLabelKey[item.type] as never)}
                                         </span>
                                         <span className="h-6 w-20 rounded-full day-tab-shimmer" />
                                         <span className="h-6 w-14 rounded-full day-tab-shimmer" />
@@ -1203,15 +1283,23 @@ export function AddPlaceDialog({
                                             }))
                                           }
                                           alt={item.name}
-                                          photoSource={sourceByKey[key]}
+                                          photoSource={photoSource}
                                           wikimediaPhoto={wikimediaByKey[key]}
                                           heightClass="h-44 sm:h-56"
+                                          onFailedPhoto={(failedUrl) =>
+                                            handleFailedPhoto(
+                                              key,
+                                              item,
+                                              details,
+                                              failedUrl,
+                                            )
+                                          }
                                         />
                                       ) : null}
 
                                       <div className="flex flex-wrap gap-2 text-xs">
                                         <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.sage} inline-flex items-center px-2.5 py-1 text-[var(--sage)]`}>
-                                          {item.type}
+                                          {t(typeLabelKey[item.type] as never)}
                                         </span>
                                         {details?.rating != null && (
                                           <span className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.gold} inline-flex items-center px-2.5 py-1`}>

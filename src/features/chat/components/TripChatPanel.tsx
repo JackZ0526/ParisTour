@@ -24,7 +24,7 @@ import {
   supportsThinkingControls,
   type HotelDetailCopy,
 } from '../../../shared/services/llm/llm'
-import { ArrowUp, Image as ImageIcon, X } from 'lucide-react'
+import { ArrowUp, CornerDownRight, Image as ImageIcon, X } from 'lucide-react'
 import { useLlmSettings } from '../hooks/useOpenAIModel'
 import { ModelBrandIcon } from './LlmModelPicker'
 import {
@@ -79,6 +79,9 @@ import {
 } from '../../../shared/styles/glassCapsule'
 import { useTheme } from '../../../shared/services/themeStore'
 import { InlineMarkdown } from './InlineMarkdown'
+import { ChatSelectionAskToolbar } from './ChatSelectionAskToolbar'
+import { CHAT_ASK_SELECTABLE_ATTR, buildAskAboutSendMessage, previewAskExcerpt } from './chatSelectionAsk'
+import { useChatSelectionAsk } from '../hooks/useChatSelectionAsk'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
 import { LlmModelPicker } from './LlmModelPicker'
@@ -297,6 +300,7 @@ export function TripChatPanel({
     [currentDay, customPlaces, days, hotel, locale, viewing],
   )
   const [input, setInput] = useState('')
+  const [askQuote, setAskQuote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [colorKeepActive, setColorKeepActive] = useState(false)
   useEffect(() => {
@@ -560,6 +564,9 @@ export function TripChatPanel({
   }
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const messagesRef = useRef<HTMLDivElement | null>(null)
+  const askToolbarRef = useRef<HTMLDivElement | null>(null)
+  const composerInputRef = useRef<HTMLInputElement | null>(null)
   const wasOpenRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const backdrop = useEnterExit('fade')
@@ -810,6 +817,21 @@ export function TripChatPanel({
     bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
   }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open, panelEntered])
 
+  const { state: askAboutState, dismiss: dismissAskAbout } = useChatSelectionAsk({
+    enabled: open,
+    containerRef: messagesRef,
+    toolbarRef: askToolbarRef,
+  })
+
+  useEffect(() => {
+    if (!open) setAskQuote(null)
+  }, [open])
+
+  useEffect(() => {
+    if (!askQuote) return
+    composerInputRef.current?.focus()
+  }, [askQuote])
+
   // Mobile keeps modal-style outside-click and Escape dismissal. On desktop,
   // the assistant is non-modal and can only be closed with its X button.
   useEffect(() => {
@@ -817,12 +839,16 @@ export function TripChatPanel({
 
     function onPointerDown(event: PointerEvent) {
       const root = rootRef.current
-      if (root && !root.contains(event.target as Node)) {
+      const toolbar = askToolbarRef.current
+      const target = event.target as Node
+      if (toolbar && toolbar.contains(target)) return
+      if (root && !root.contains(target)) {
         setOpen(false)
       }
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        if (askToolbarRef.current) return
         event.stopPropagation()
         setOpen(false)
       }
@@ -2007,7 +2033,16 @@ export function TripChatPanel({
   }
 
   async function submit(text: string) {
-    const message = text.trim()
+    const quote = askQuote?.trim() || ''
+    const typed = text.trim()
+    const message = quote
+      ? buildAskAboutSendMessage({
+          excerpt: quote,
+          question: typed,
+          explainTemplate: t('chat.askAboutPrompt'),
+          withQuestionTemplate: t('chat.askAboutWithQuestion'),
+        })
+      : typed
     const imagesToSend = [...attachedImages]
     if ((!message && imagesToSend.length === 0) || busy) return
     if (!isLlmConfigured()) {
@@ -2024,10 +2059,16 @@ export function TripChatPanel({
     setBusyUserText(message || (locale === 'en' ? 'Analyzing image…' : '分析图片中…'))
     beginWorkPipeline(message || (locale === 'en' ? 'Image message' : '图片消息'), imagesToSend.length > 0)
     setInput('')
+    setAskQuote(null)
     setAttachedImages([])
     setHistory((prev) => [
       ...prev,
-      { role: 'user', content: message, images: imagesToSend.length > 0 ? imagesToSend : undefined },
+      {
+        role: 'user',
+        content: typed,
+        quote: quote || undefined,
+        images: imagesToSend.length > 0 ? imagesToSend : undefined,
+      },
       { role: 'assistant', content: '' },
     ])
     const ac = beginChatRequest()
@@ -2558,7 +2599,10 @@ export function TripChatPanel({
               show a scrollbar as the panel expands. `panelEntered` flips
               true when the height animation settles, after which we want
               scrolling for long chat histories. */}
-          <div className={`min-h-0 flex-1 space-y-3 ${panelEntered ? 'overflow-y-auto' : 'overflow-y-hidden'} overscroll-contain px-3.5 py-3`}>
+          <div
+            ref={messagesRef}
+            className={`min-h-0 flex-1 space-y-3 ${panelEntered ? 'overflow-y-auto' : 'overflow-y-hidden'} overscroll-contain px-3.5 py-3`}
+          >
             {!history.some((t) => !t.hidden) && (
               <div className="space-y-2.5">
                 <p className="text-xs font-medium text-[var(--stone)]">
@@ -2612,10 +2656,15 @@ export function TripChatPanel({
                   Boolean(turn.content) ||
                   streamingReply ||
                   showThinking
+                const showUserQuote = turn.role === 'user' && Boolean(turn.quote)
+                const userBubbleText =
+                  turn.role === 'user' && !turn.content && turn.quote
+                    ? t('chat.askAboutExplainShort')
+                    : turn.content
                 return (
                   <div
                     key={`${turn.role}-${i}`}
-                    className={`max-w-[92%] ${turn.role === 'user' ? 'ml-auto' : ''}`}
+                    className={`max-w-[92%] ${turn.role === 'user' ? 'ml-auto flex flex-col items-end gap-1' : ''}`}
                   >
                     {showLiveSteps ? (
                       <div className="px-1">
@@ -2642,9 +2691,26 @@ export function TripChatPanel({
                         />
                       </div>
                     ) : null}
+                    {showUserQuote ? (
+                      <div
+                        className="flex max-w-full items-center gap-1.5 px-1 text-xs text-[var(--stone)] dark:text-white/55"
+                        title={turn.quote}
+                        aria-label={t('chat.askAboutQuoteAria')}
+                      >
+                        <CornerDownRight size={13} strokeWidth={2.2} className="shrink-0 opacity-80" aria-hidden />
+                        <span className="min-w-0 truncate">
+                          {locale === 'en'
+                            ? `“${previewAskExcerpt(turn.quote || '')}”`
+                            : `「${previewAskExcerpt(turn.quote || '')}」`}
+                        </span>
+                      </div>
+                    ) : null}
                     {showAnswerBubble ? (
                       <div
-                        className={`px-3.5 py-2 text-sm leading-relaxed ${
+                        {...(showThinking
+                          ? {}
+                          : { [CHAT_ASK_SELECTABLE_ATTR]: '' })}
+                        className={`px-3.5 py-2 text-sm leading-relaxed select-text [&::selection]:bg-[#3b82f6]/55 [&::selection]:text-inherit [&_*::selection]:bg-[#3b82f6]/55 [&_*::selection]:text-inherit ${
                           turn.role === 'user'
                             ? 'rounded-2xl rounded-tr-xs border border-white/12 bg-[var(--ink)]/95 text-[var(--paper)] dark:bg-[var(--copper)] dark:text-white shadow-[0_3px_12px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22),inset_0_-1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm'
                             : 'rounded-2xl rounded-tl-xs border border-[#c6dbcf]/80 dark:border-[#668b7a]/30 bg-[#ebf3ee]/95 dark:bg-[#1a2420]/95 shadow-[0_2px_12px_rgba(74,99,86,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.9)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-md text-[var(--ink)]'
@@ -2674,9 +2740,9 @@ export function TripChatPanel({
                                 ))}
                               </div>
                             )}
-                            {turn.content ? (
+                            {userBubbleText ? (
                               <InlineMarkdown
-                                text={turn.content}
+                                text={userBubbleText}
                                 className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 dark:[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
                               />
                             ) : null}
@@ -2750,7 +2816,38 @@ export function TripChatPanel({
                 ))}
               </div>
             )}
-            <div className="relative flex items-center gap-1.5 rounded-full border border-white/90 dark:border-white/10 bg-white/80 dark:bg-black/35 p-1.5 pl-2 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all focus-within:border-[var(--copper)]/70 focus-within:bg-white dark:focus-within:bg-black/50 focus-within:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)]">
+            <div className={`relative flex flex-col border border-white/90 dark:border-white/10 bg-white/80 dark:bg-black/35 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03),inset_0_-1px_1px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all focus-within:border-[var(--copper)]/70 focus-within:bg-white dark:focus-within:bg-black/50 focus-within:shadow-[0_0_0_2.5px_rgba(181,106,60,0.14)] ${
+              askQuote ? 'rounded-[1.65rem] p-1.5 pt-1' : 'rounded-full p-1.5 pl-2'
+            }`}>
+              {askQuote ? (
+                <div className="flex min-w-0 items-center gap-1.5 px-2 pb-1 pt-0.5">
+                  <CornerDownRight
+                    size={14}
+                    strokeWidth={2.2}
+                    className="shrink-0 text-[var(--stone)]"
+                    aria-hidden
+                  />
+                  <span
+                    className="min-w-0 flex-1 truncate text-xs text-[var(--ink)]/80 dark:text-white/75"
+                    title={askQuote}
+                    aria-label={t('chat.askAboutQuoteAria')}
+                  >
+                    {locale === 'en'
+                      ? `“${previewAskExcerpt(askQuote)}”`
+                      : `「${previewAskExcerpt(askQuote)}」`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAskQuote(null)}
+                    title={t('chat.askAboutClearQuote')}
+                    aria-label={t('chat.askAboutClearQuote')}
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition-colors hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10 dark:hover:text-white"
+                  >
+                    <X size={12} strokeWidth={2.4} />
+                  </button>
+                </div>
+              ) : null}
+              <div className={`flex items-center gap-1.5 ${askQuote ? 'pl-0.5' : ''}`}>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2770,6 +2867,7 @@ export function TripChatPanel({
                 <ImageIcon size={17} />
               </button>
               <input
+                ref={composerInputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={handlePaste}
@@ -2784,7 +2882,7 @@ export function TripChatPanel({
               <motion.button
                 layout
                 type={busy ? 'button' : 'submit'}
-                disabled={!busy && ((!input.trim() && attachedImages.length === 0) || !open || convertingCount > 0)}
+                disabled={!busy && ((!input.trim() && attachedImages.length === 0 && !askQuote) || !open || convertingCount > 0)}
                 tabIndex={open ? undefined : -1}
                 title={busy ? undefined : t('chat.sendButton')}
                 aria-label={busy ? undefined : t('chat.sendButton')}
@@ -2794,7 +2892,7 @@ export function TripChatPanel({
                 className={`h-8 max-h-8 min-h-8 inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden transition-colors duration-500 box-border ${
                   busy
                     ? 'px-3 bg-[var(--ink)]/95 dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.2),inset_0_1px_1px_rgba(255,255,255,0.25)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] backdrop-blur-md select-none cursor-default'
-                    : ((input.trim() || attachedImages.length > 0) && open && convertingCount === 0) || colorKeepActive
+                    : ((input.trim() || attachedImages.length > 0 || Boolean(askQuote)) && open && convertingCount === 0) || colorKeepActive
                       ? 'w-8 bg-[var(--ink)] dark:bg-[var(--copper)] text-white shadow-[0_2px_8px_rgba(35,42,38,0.25),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:shadow-[0_2px_10px_rgba(212,131,84,0.35)] hover:bg-black dark:hover:bg-[var(--copper)]/90 cursor-pointer'
                       : 'w-8 bg-black/[0.06] dark:bg-white/5 text-[var(--stone)]/40 dark:text-zinc-500 cursor-not-allowed pointer-events-none select-none'
                 }`}
@@ -2894,6 +2992,7 @@ export function TripChatPanel({
                   </motion.div>
                 )}
               </motion.button>
+              </div>
             </div>
           </form>
         </motion.div>
@@ -2904,6 +3003,17 @@ export function TripChatPanel({
   return (
     <>
       {createPortal(chatChrome, document.body)}
+      <ChatSelectionAskToolbar
+        state={askAboutState}
+        disabled={busy}
+        label={t('chat.askAbout')}
+        ariaLabel={t('chat.askAboutAria')}
+        toolbarRef={askToolbarRef}
+        onAsk={(excerpt) => {
+          setAskQuote(excerpt)
+          dismissAskAbout(true)
+        }}
+      />
       <GooglePlacePage
         key={`${activePending?.id || 'pending-place'}-${confirmEpoch}`}
         open={Boolean(activePending)}

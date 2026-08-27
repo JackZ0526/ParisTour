@@ -10,8 +10,8 @@
  *  3. **Positive phrasing** wherever possible (use "must equal X" rather
  *     than "don't write Y"); reserved for places where the negative form
  *     is genuinely clearer.
- *  4. **Stream-friendly** — the JSON contract always puts the user-visible
- *     `reply` field first, then `actions`, so tokens land in render order.
+ *  4. **Stream-friendly** — chat JSON puts the user-visible `reply` field
+ *     first, then `actions`. Other tasks follow their own `<json_contract>`.
  *  5. **Locale-aware** — every shared section is a function that takes the
  *     active `Locale`. The default language is Chinese (the app's primary
  *     locale); English is the first-class alternate.
@@ -63,10 +63,8 @@ export function getCommonRules(locale: Locale = promptLocale()): string {
 </type_vocabulary>
 
 <output_format>
-- Output exactly one JSON object. No markdown. No \`\`\`json\`\`\` fence. No explanation.
-- Field order (stream-friendly): reply first (user-visible conversation reply, language must follow the system-set language rule), then actions.
-- reply must contain a complete, informative, and helpful answer to the user's inquiry; never emit an empty reply or generic acknowledgments like "Got it"; answer questions and concepts thoroughly.
-- reply and actions must agree semantically: saying "added/replaced" requires a matching action.
+- Output exactly one JSON object matching <json_contract>. No markdown. No \`\`\`json\`\`\` fence. No explanation.
+- Do not add extra top-level keys (including reply / actions) unless they appear in the schema.
 </output_format>
 
 <fact_discipline>
@@ -90,10 +88,8 @@ export function getCommonRules(locale: Locale = promptLocale()): string {
 </type_vocabulary>
 
 <output_format>
-- 严格只输出一个 JSON 对象；不要 markdown；不要 \`\`\`json\`\`\` fence；不要解释。
-- 字段顺序（流式友好）：先 reply（用户可见的对话回复，语言必须遵循系统设定的语言指令），再 actions。
-- reply 必须包含对用户问题的实质性、有信息量的完整回答；禁止输出空 reply 或敷衍的“好的/已收到”；针对问答与科普必须给出清晰解释。
-- reply 与 actions 的语义必须一致：答应"已加入/已替换"必须有对应 action。
+- 严格只输出一个符合 <json_contract> 的 JSON 对象；不要 markdown；不要 \`\`\`json\`\`\` fence；不要解释。
+- 不要额外添加顶层字段（包括 reply / actions），除非 Schema 里写了这些字段。
 </output_format>
 
 <fact_discipline>
@@ -105,6 +101,26 @@ export function getCommonRules(locale: Locale = promptLocale()): string {
 }
 
 export const COMMON_RULES = getCommonRules(ZH)
+
+/**
+ * Chat-only envelope: stream `reply` before `actions`. Structured tasks
+ * (itinerary / place recommend / hotel) must not see this, or the model
+ * may emit `{ reply, actions }` instead of the schema in `<json_contract>`.
+ */
+export function getChatOutputRules(locale: Locale = promptLocale()): string {
+  if (locale === EN) {
+    return `<chat_output>
+- Field order (stream-friendly): reply first (user-visible conversation reply, language must follow the system-set language rule), then actions.
+- reply must contain a complete, informative, and helpful answer to the user's inquiry; never emit an empty reply or generic acknowledgments like "Got it"; answer questions and concepts thoroughly.
+- reply and actions must agree semantically: saying "added/replaced" requires a matching action.
+</chat_output>`
+  }
+  return `<chat_output>
+- 字段顺序（流式友好）：先 reply（用户可见的对话回复，语言必须遵循系统设定的语言指令），再 actions。
+- reply 必须包含对用户问题的实质性、有信息量的完整回答；禁止输出空 reply 或敷衍的“好的/已收到”；针对问答与科普必须给出清晰解释。
+- reply 与 actions 的语义必须一致：答应"已加入/已替换"必须有对应 action。
+</chat_output>`
+}
 
 /**
  * Anti-hallucination hard rule: actions and reply must agree.
@@ -249,12 +265,19 @@ export function snapshotBlock(label: string, data: unknown): string {
 
 /**
  * JSON schema reminder to keep at the end of prompts that must return a
- * structured response. Stream-friendly order: reply first, actions second.
+ * structured response. Chat schemas that include reply/actions keep the
+ * stream-friendly field order; other tasks only require a matching object.
  */
 export function jsonContract(shape: string, example?: string, locale: Locale = promptLocale()): string {
+  const blob = `${shape}\n${example || ''}`
+  const chatEnvelope = /\breply\b/.test(blob) && /\bactions\b/.test(blob)
   const lead = locale === EN
-    ? 'Output exactly one JSON object. Field order: reply first, then actions.'
-    : '只输出一个 JSON 对象。字段顺序：reply 优先，再 actions。'
+    ? chatEnvelope
+      ? 'Output exactly one JSON object. Field order: reply first, then actions.'
+      : 'Output exactly one JSON object matching the schema. No markdown, no extra keys.'
+    : chatEnvelope
+      ? '只输出一个 JSON 对象。字段顺序：reply 优先，再 actions。'
+      : '只输出一个符合 Schema 的 JSON 对象。不要 markdown，不要额外字段。'
   return [
     '<json_contract>',
     lead,
