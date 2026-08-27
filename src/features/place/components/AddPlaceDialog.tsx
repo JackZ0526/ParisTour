@@ -624,8 +624,9 @@ export function AddPlaceDialog({
       if (display.source) {
         setSourceByKey((prev) => ({ ...prev, [key]: display.source }))
       }
-      if (display.wikimedia) {
-        setWikimediaByKey((prev) => ({ ...prev, [key]: display.wikimedia }))
+      const wikimedia = display.wikimedia
+      if (wikimedia) {
+        setWikimediaByKey((prev) => ({ ...prev, [key]: wikimedia }))
       }
       setPhotoIndexByKey((prev) => ({ ...prev, [key]: 0 }))
       return resolved
