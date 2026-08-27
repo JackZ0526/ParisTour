@@ -28,6 +28,28 @@ export function hotelCompareJson(hotel: HotelCacheState | null | undefined): str
 
 export type RemoteApplyDecision = 'ignore' | 'artifacts-only' | 'days-only' | 'apply-core' | 'keep-local'
 
+/** Minimum gap between automatic `trip_backups` rows for the same trip. */
+export const MIN_TRIP_BACKUP_INTERVAL_MS = 15 * 60 * 1000
+
+/** Skip the artifact pull RPC when the client already has this revision. */
+export function shouldPullTripArtifacts(
+  hintRev: number | undefined,
+  knownRev: number | undefined,
+): boolean {
+  return !(hintRev != null && knownRev != null && hintRev === knownRev)
+}
+
+/** Restore always archives; autosave keeps at most one backup per interval. */
+export function shouldArchiveTripBackup(input: {
+  force?: boolean
+  lastArchiveAtMs: number | null
+  nowMs: number
+}): boolean {
+  if (input.force) return true
+  if (input.lastArchiveAtMs == null) return true
+  return input.nowMs - input.lastArchiveAtMs >= MIN_TRIP_BACKUP_INTERVAL_MS
+}
+
 /**
  * Two-editor policy:
  * - Viewers / clean editors take the newer remote core.

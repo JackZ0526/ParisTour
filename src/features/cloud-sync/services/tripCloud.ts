@@ -1,6 +1,5 @@
 import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import { yieldToMain } from '../../../shared/lib/yieldToMain'
-import { isTripSyncV2Enabled } from '../v2/syncV2Config'
 import {
   flushHotelCacheToStorage,
   type HotelCacheState,
@@ -27,16 +26,14 @@ import {
   hotelCompareJson,
   hotelForCloud,
   planRemoteApply,
+  shouldArchiveTripBackup,
+  shouldPullTripArtifacts,
   snapshotCompareJson,
 } from './tripCloudPolicy'
 import {
-  asDayPlanMap,
   dayCloudDiffIsEmpty,
   daysToMap,
-  hashDayPlan,
   hashesForDays,
-  knownHashesForPresentDays,
-  mergeCloudDays,
   peekDayCloudDiff,
 } from './itineraryDayCloud'
 import { itineraryDayCount } from '../../itinerary/services/tripDates'
@@ -283,6 +280,7 @@ class StaleCloudSaveError extends Error {
 }
 
 const MAX_TRIP_BACKUPS = 5
+const lastBackupAtByTrip = new Map<string, number>()
 
 /** Archive copy without bulky LLM caches / nested history. */
 function snapshotForBackup(snapshot: TripSnapshot): TripSnapshot {
@@ -319,7 +317,17 @@ async function archiveTripSnapshot(
   tripId: string,
   previous: TripSnapshot,
   createdAt?: string | null,
+  options?: { force?: boolean },
 ): Promise<void> {
+  if (
+    !shouldArchiveTripBackup({
+      force: options?.force,
+      lastArchiveAtMs: lastBackupAtByTrip.get(tripId) ?? null,
+      nowMs: Date.now(),
+    })
+  ) {
+    return
+  }
   const sb = getSupabase()
   const row: { trip_id: string; snapshot: TripSnapshot; created_at?: string } = {
     trip_id: tripId,
@@ -330,6 +338,7 @@ async function archiveTripSnapshot(
   }
   const { error: insertError } = await sb.from('trip_backups').insert(row)
   if (insertError) throw insertError
+  lastBackupAtByTrip.set(tripId, Date.now())
 
   const { data: ids, error: listError } = await sb
     .from('trip_backups')
@@ -619,7 +628,7 @@ export async function syncTripArtifactsFromCloud(
 ): Promise<void> {
   if (!tripId || !isCloudSyncEnabled()) return
   const knownRev = lastAppliedArtifactsRevByTrip.get(tripId)
-  if (hintRev != null && knownRev != null && hintRev === knownRev) return
+  if (!shouldPullTripArtifacts(hintRev, knownRev)) return
 
   const sb = getSupabase()
   let pulled: PulledArtifacts
@@ -627,6 +636,7 @@ export async function syncTripArtifactsFromCloud(
     const { data, error } = await sb.rpc('pull_trip_artifacts', {
       p_trip_id: tripId,
       p_known: cloudArtifactKnownMap(),
+      p_known_rev: knownRev ?? null,
     })
     if (error) throw error
     pulled = parsePullResult(data)
@@ -660,100 +670,13 @@ export async function syncTripArtifactsFromCloud(
   lastAppliedArtifactsRevByTrip.set(tripId, pulled.rev)
 }
 
-/** Incremental day hydrate: only days whose hash the client does not already have. */
+/** V1 day sidecars are stale; itinerary lives in the V2 mutation log. */
 export async function syncTripDaysFromCloud(
-  tripId: string,
-  hintRev?: number,
-  options?: { replaceLocal?: boolean },
+  _tripId: string,
+  _hintRev?: number,
+  _options?: { replaceLocal?: boolean },
 ): Promise<boolean> {
-  if (!tripId || !isCloudSyncEnabled()) return false
-  // Protocol V2 owns itinerary days via mutation log + normalized tables.
-  // V1 day sidecars are stale after V2 edits and must not clobber live UI.
-  if (isTripSyncV2Enabled()) return false
-  const localDays = loadItineraryState().days
-  const localEmpty = !localDays.length
-  const replaceLocal = options?.replaceLocal === true
-  const knownRev = lastAppliedDaysRevByTrip.get(tripId)
-  if (
-    !replaceLocal &&
-    !localEmpty &&
-    hintRev != null &&
-    knownRev != null &&
-    hintRev === knownRev
-  ) {
-    return false
-  }
-
-  const sb = getSupabase()
-  const skip = replaceLocal ? new Set<string>() : dirtyDayKeys(tripId)
-  const known = replaceLocal
-    ? {}
-    : knownHashesForPresentDays(
-        localDays,
-        lastAppliedDayHashesByTrip.get(tripId),
-      )
-  let pulled: { rev: number; upserts: ReturnType<typeof asDayPlanMap>; deletes: string[] }
-  try {
-    const { data, error } = await sb.rpc('pull_trip_days', {
-      p_trip_id: tripId,
-      p_known: known,
-    })
-    if (error) throw error
-    const parsed = parsePullResult(data)
-    pulled = {
-      rev: parsed.rev,
-      upserts: asDayPlanMap(parsed.upserts),
-      deletes: localEmpty ? [] : parsed.deletes,
-    }
-    logTripCloudRead('pull_trip_days', {
-      rev: pulled.rev,
-      upsertKeys: Object.keys(pulled.upserts).length,
-      deletes: pulled.deletes.length,
-    })
-  } catch (err) {
-    if (!isMissingRpc(err, 'pull_trip_days')) throw err
-    const { data, error } = await sb
-      .from('trips')
-      .select('itinerary_days, days_rev')
-      .eq('id', tripId)
-      .maybeSingle()
-    if (error) throw error
-    logTripCloudRead('itinerary_days fallback select', data)
-    pulled = {
-      rev: asArtifactsRev(data?.days_rev),
-      upserts: asDayPlanMap(data?.itinerary_days),
-      deletes: [],
-    }
-  }
-
-  const applied = mergeCloudDays({
-    upserts: pulled.upserts,
-    deletes: pulled.deletes,
-    skipKeys: skip,
-    replace: replaceLocal,
-  })
-  if (replaceLocal) {
-    lastAppliedDayHashesByTrip.set(
-      tripId,
-      Object.fromEntries(
-        Object.entries(pulled.upserts).map(([key, plan]) => [key, hashDayPlan(plan)]),
-      ),
-    )
-  }
-  const acked: Record<string, string> = {}
-  for (const [key, plan] of Object.entries(pulled.upserts)) {
-    if (skip.has(key)) continue
-    acked[key] = hashDayPlan(plan)
-  }
-  if (!replaceLocal) {
-    ackDayHashes(
-      tripId,
-      acked,
-      pulled.deletes.filter((key) => !skip.has(key)),
-    )
-  }
-  lastAppliedDaysRevByTrip.set(tripId, pulled.rev)
-  return applied
+  return false
 }
 
 type TripUpdateResult = {
@@ -831,7 +754,7 @@ export async function saveTripSnapshot(
   const sb = getSupabase()
   const parts = options?.parts?.length
     ? options.parts
-    : (['core', 'hotel', 'artifacts', 'days'] as CloudSavePart[])
+    : (['core', 'hotel', 'artifacts'] as CloudSavePart[])
   const nextSnapshot = asSnapshot(snapshot)
   const nextParts = cloudPartsJson(nextSnapshot)
   const prevParts = lastSavedPartsByTrip.get(tripId)
@@ -872,6 +795,7 @@ export async function saveTripSnapshot(
           tripId,
           previous,
           typeof current?.updated_at === 'string' ? current.updated_at : null,
+          { force: options?.replaceArtifacts === true },
         )
       }
     }
@@ -1323,21 +1247,6 @@ function peekDaysForTrip(tripId: string, snapshot?: TripSnapshot | null) {
     lastAppliedDayHashesByTrip.get(tripId),
     { expectedDayCount: expectedDayCountFor(current) },
   )
-}
-
-function dirtyDayKeys(tripId: string): Set<string> {
-  // If we have no queued or in-flight save and saves are not held, local state has no uncommitted user edits.
-  if (queuedSaveMode === 'none' && !saveInFlight && saveHoldCount === 0) {
-    return new Set()
-  }
-  const last = lastAppliedDayHashesByTrip.get(tripId)
-  if (!last || !Object.keys(last).length) return new Set()
-  try {
-    const diff = peekDaysForTrip(tripId)
-    return new Set([...Object.keys(diff.upserts), ...diff.deletes])
-  } catch {
-    return new Set()
-  }
 }
 
 function ackDayHashes(
@@ -1957,16 +1866,15 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
   }
   const coreUnchanged = lastSavedJsonByTrip.get(tripId) === json
   const artifactsChanged = hasArtifactCloudDiff()
-  const daysChanged = !dayCloudDiffIsEmpty(peekDaysForTrip(tripId, snapshot))
   if (saveMode === 'artifacts') {
-    if (!artifactsChanged && !daysChanged) {
+    if (!artifactsChanged) {
       if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
         setCloudSaveStatus('idle')
       }
       flushQueuedRemote()
       return
     }
-  } else if (coreUnchanged && !artifactsChanged && !daysChanged) {
+  } else if (coreUnchanged && !artifactsChanged) {
     if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
       setCloudSaveStatus('idle')
     }
@@ -1991,7 +1899,6 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     parts.push('core', 'hotel')
   }
   if (artifactsChanged) parts.push('artifacts')
-  if (daysChanged) parts.push('days')
   if (!parts.length) {
     if (cloudSaveStatus === 'pending' || cloudSaveStatus === 'saving') {
       setCloudSaveStatus('idle')

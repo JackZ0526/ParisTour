@@ -91,4 +91,9 @@ describe('sync V2 schema contract', () => {
     expect(v2).toContain('p_retain_days integer default 14')
     expect(v2).toContain('p_retain_count integer default 4000')
   })
+
+  it('short-circuits artifact pulls when the client already has the revision', () => {
+    expect(schema).toContain('p_known_rev integer default null')
+    expect(schema).toContain('p_known_rev is not distinct from coalesce(current_rev, 0)')
+  })
 })

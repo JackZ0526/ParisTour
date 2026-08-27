@@ -272,9 +272,8 @@ export function useTripSyncV2(options: {
 
       if (nextRevision === revisionRef.current) return true
       revisionRef.current = nextRevision
-      // Publish the in-memory document before any await. stop.add is followed by
-      // custom_place.upsert; awaiting IndexedDB/snapshot first let the upsert
-      // replay the pre-add days and the peer flashed then deleted the card.
+      // Publish the in-memory document before any await so a follow-up apply
+      // cannot start from pre-add days and wipe the card on the peer.
       documentRef.current = document
 
       await setAppliedTripRevision(tripId, nextRevision)

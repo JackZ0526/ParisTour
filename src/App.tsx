@@ -21,7 +21,6 @@ import { useItineraryDays, useItineraryDaysEffects } from './hooks/useItineraryD
 import { useMobilePane } from './hooks/useMobilePane'
 import { useTripDialogs } from './hooks/useTripDialogs'
 import { useTripSync } from './hooks/useTripSync'
-import { isTripSyncV2Enabled } from './features/cloud-sync/v2/syncV2Config'
 import { useTripSyncV2 } from './features/cloud-sync/v2/useTripSyncV2'
 import type { TripMutationDraft } from './features/cloud-sync/v2/mutationTypes'
 import { DayTimeline } from './features/itinerary/components/DayTimeline'
@@ -426,9 +425,8 @@ export default function App() {
   const copyRequestIdRef = useRef(0)
   /** False until hotel+flights+dates(+start resolve) have produced a stable fingerprint once. */
   const tripInputsHydratedRef = useRef(false)
-  const itinerarySyncV2Enabled = isTripSyncV2Enabled()
   const { recordMutation: recordTripMutationV2 } = useTripSyncV2({
-    enabled: itinerarySyncV2Enabled,
+    enabled: true,
     tripId: activeTrip?.id ?? null,
     canEdit,
     days,
@@ -445,7 +443,6 @@ export default function App() {
       tripSyncEpoch,
       canEdit,
       notifyTripChanged,
-      itinerarySyncV2Enabled,
     },
     {
       syncRenderKey,

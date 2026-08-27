@@ -23,7 +23,6 @@ import { resolveItineraryStartSync } from '../shared/services/llm/business/itine
 export interface UseTripSyncDeps {
   tripSyncEpoch: number
   canEdit: boolean
-  itinerarySyncV2Enabled: boolean
   notifyTripChanged: (opts?: {
     artifactsOnly?: boolean
     allowEmptyTrip?: boolean
@@ -103,7 +102,6 @@ export function useTripSync(
   const {
     tripSyncEpoch,
     canEdit,
-    itinerarySyncV2Enabled,
     notifyTripChanged,
   } = deps
 
@@ -139,8 +137,6 @@ export function useTripSync(
     setDayRestoring,
     setCopyRefreshing,
     setRecommendationPreferences,
-    setDays,
-    setCustomPlaces,
     setDayIndex,
     setSelectedPlaceId,
     setSyncRenderKey,
@@ -202,18 +198,8 @@ export function useTripSync(
         : null
     setItineraryStart(resolvedStart)
     setItineraryStartLoading(false)
-    if (itinerarySyncV2Enabled) {
-      // Protocol V2 owns itinerary days via mutation log. V1 trips.updated_at
-      // still fires on hotel/artifact saves; re-applying daysRef here races with
-      // in-flight optimistic adds and replays stale stops (fake gommage on peers).
-      setCustomPlaces((prev) => ({
-        ...(nextItinerary.customPlaces || {}),
-        ...prev,
-      }))
-    } else {
-      setDays(nextItinerary.days)
-      setCustomPlaces(nextItinerary.customPlaces || {})
-    }
+    // V2 owns days/customPlaces. Reloading them from the V1 snapshot on
+    // hotel/artifact `updated_at` races in-flight optimistic adds.
     setItineraryGenerated(Boolean(nextItinerary.generated))
     setItineraryFingerprint(nextItinerary.fingerprint ?? null)
     setRecommendationPreferences(nextRecommendationPreferences)
@@ -232,7 +218,7 @@ export function useTripSync(
     prevStopsKeyRef.current = null
     suppressCopyRef.current = true
 
-    const itineraryDays = itinerarySyncV2Enabled ? daysRef.current : nextItinerary.days
+    const itineraryDays = daysRef.current
     let nextIndex = 0
     if (viewingDayNum != null && itineraryDays.length) {
       const byNum = itineraryDays.findIndex((d) => d.day === viewingDayNum)
@@ -246,10 +232,8 @@ export function useTripSync(
       : false
     const stillInCustom = prevSelected
       ? Boolean(
-          itinerarySyncV2Enabled
-            ? customPlacesRef.current[prevSelected] ??
-              nextItinerary.customPlaces?.[prevSelected]
-            : nextItinerary.customPlaces?.[prevSelected],
+          customPlacesRef.current[prevSelected] ??
+            nextItinerary.customPlaces?.[prevSelected],
         )
       : false
     const isHotel = prevSelected === SELECTED_HOTEL_PLACE_ID
@@ -260,39 +244,10 @@ export function useTripSync(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripSyncEpoch])
 
+  // Itinerary edits go through the V2 mutation log. This effect only persists
+  // the V1 snapshot fields (hotel, flights, dates, fingerprint, preferences).
   useEffect(() => {
-    if (itinerarySyncV2Enabled) return
     if (!canEdit) return
-    // This render was produced by applying authoritative remote state. It is
-    // not a local edit and must not start a save transaction. The marker is
-    // cleared after all itinerary-derived effects have also skipped this render.
-    if (remoteHydrationRenderKeyRef.current === syncRenderKey) return
-    // The cloud writer owns no-op detection against the last reconciled snapshot.
-    // Always notify it here: time-based/"skip N renders" guards can swallow a
-    // genuine edit made immediately after a remote update.
-    notifyTripChanged()
-  }, [
-    tripDates,
-    flights,
-    hotel,
-    hotelCandidates,
-    days,
-    customPlaces,
-    itineraryGenerated,
-    itineraryFingerprint,
-    recommendationPreferences,
-    syncRenderKey,
-    canEdit,
-    notifyTripChanged,
-    remoteHydrationRenderKeyRef,
-    itinerarySyncV2Enabled,
-  ])
-
-  // Under protocol V2, itinerary edits are persisted as operations. Legacy
-  // snapshots remain responsible for the rest of the trip without turning
-  // every stop movement into a second full-document upload.
-  useEffect(() => {
-    if (!itinerarySyncV2Enabled || !canEdit) return
     if (remoteHydrationRenderKeyRef.current === syncRenderKey) return
     notifyTripChanged()
   }, [
@@ -305,7 +260,6 @@ export function useTripSync(
     recommendationPreferences,
     syncRenderKey,
     canEdit,
-    itinerarySyncV2Enabled,
     notifyTripChanged,
     remoteHydrationRenderKeyRef,
   ])

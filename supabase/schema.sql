@@ -632,9 +632,13 @@ revoke execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) from
 revoke execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) from anon;
 grant execute on function public.patch_trip_artifacts(uuid, jsonb, text[]) to authenticated;
 
+drop function if exists public.pull_trip_artifacts(uuid, jsonb);
+drop function if exists public.pull_trip_artifacts(uuid, jsonb, integer);
+
 create or replace function public.pull_trip_artifacts(
   p_trip_id uuid,
-  p_known jsonb default '{}'::jsonb
+  p_known jsonb default '{}'::jsonb,
+  p_known_rev integer default null
 )
 returns jsonb
 language plpgsql
@@ -675,6 +679,14 @@ begin
 
   current_artifacts := coalesce(current_artifacts, '{}'::jsonb);
 
+  if p_known_rev is not null and p_known_rev is not distinct from coalesce(current_rev, 0) then
+    return jsonb_build_object(
+      'rev', coalesce(current_rev, 0),
+      'upserts', '{}'::jsonb,
+      'deletes', '[]'::jsonb
+    );
+  end if;
+
   for k in select jsonb_object_keys(current_artifacts)
   loop
     if not public.artifact_key_is_cloud(k) then
@@ -708,9 +720,9 @@ begin
 end;
 $$;
 
-revoke execute on function public.pull_trip_artifacts(uuid, jsonb) from public;
-revoke execute on function public.pull_trip_artifacts(uuid, jsonb) from anon;
-grant execute on function public.pull_trip_artifacts(uuid, jsonb) to authenticated;
+revoke execute on function public.pull_trip_artifacts(uuid, jsonb, integer) from public;
+revoke execute on function public.pull_trip_artifacts(uuid, jsonb, integer) from anon;
+grant execute on function public.pull_trip_artifacts(uuid, jsonb, integer) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Incremental itinerary-day patch / pull (one day at a time)

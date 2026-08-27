@@ -3,7 +3,10 @@ import type { HotelCacheState } from '../features/hotel/services/hotelCache'
 import {
   hotelCompareJson,
   hotelForCloud,
+  MIN_TRIP_BACKUP_INTERVAL_MS,
   planRemoteApply,
+  shouldArchiveTripBackup,
+  shouldPullTripArtifacts,
   snapshotCompareJson,
 } from '../features/cloud-sync/services/tripCloudPolicy'
 import { emptyTripSnapshot, type TripSnapshot } from '../features/cloud-sync/services/tripSnapshot'
@@ -117,6 +120,39 @@ describe('tripCloudPolicy', () => {
         localCoreDirty: false,
       }),
     ).toBe('ignore')
+  })
+
+  it('skips artifact pulls when the known revision already matches', () => {
+    expect(shouldPullTripArtifacts(4, 4)).toBe(false)
+    expect(shouldPullTripArtifacts(5, 4)).toBe(true)
+    expect(shouldPullTripArtifacts(undefined, 4)).toBe(true)
+    expect(shouldPullTripArtifacts(4, undefined)).toBe(true)
+  })
+
+  it('throttles automatic backups and always allows restore archives', () => {
+    const now = MIN_TRIP_BACKUP_INTERVAL_MS * 2
+    expect(
+      shouldArchiveTripBackup({ lastArchiveAtMs: null, nowMs: now }),
+    ).toBe(true)
+    expect(
+      shouldArchiveTripBackup({
+        lastArchiveAtMs: now - 60_000,
+        nowMs: now,
+      }),
+    ).toBe(false)
+    expect(
+      shouldArchiveTripBackup({
+        lastArchiveAtMs: now - MIN_TRIP_BACKUP_INTERVAL_MS,
+        nowMs: now,
+      }),
+    ).toBe(true)
+    expect(
+      shouldArchiveTripBackup({
+        force: true,
+        lastArchiveAtMs: now,
+        nowMs: now,
+      }),
+    ).toBe(true)
   })
 
 })

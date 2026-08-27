@@ -520,9 +520,6 @@ export function useItineraryDays(
           beforeStopId: anchors.beforeStopId,
         },
       })
-      // Belt-and-suspenders: keep custom place metadata even if a peer applies
-      // stop.add without the nested place object (V1 snapshot races, etc.).
-      onMutation?.({ type: 'custom_place.upsert', payload: { place } })
 
       const targetIndex = days.findIndex((d) => d.day === dayNum)
       if (targetIndex >= 0) setDayIndex(targetIndex)
