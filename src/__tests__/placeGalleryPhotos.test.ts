@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isUsableGalleryPhotoUrl,
   nextGalleryPhotoIndex,
   pickPlaceGalleryPhotos,
+  pickPreferredPlacePhotos,
 } from '../features/place/services/placeGalleryPhotos'
 
 describe('place gallery photos', () => {
@@ -52,5 +54,72 @@ describe('place gallery photos', () => {
         currentPhoto: 'preview.jpg',
       }),
     ).toBe(0)
+  })
+
+  it('rejects Google Place Photo resource names and media URLs', () => {
+    expect(isUsableGalleryPhotoUrl('https://arc.example/hero.jpg')).toBe(true)
+    expect(
+      isUsableGalleryPhotoUrl(
+        'places/ChIJD3uTd9hx5kcR1IQvGfr8dbk/photos/AUdRd8oAbc',
+      ),
+    ).toBe(false)
+    expect(
+      isUsableGalleryPhotoUrl(
+        'https://places.googleapis.com/v1/places/ChIJ/photos/abc/media',
+      ),
+    ).toBe(false)
+    expect(
+      isUsableGalleryPhotoUrl(
+        'https://maps.googleapis.com/maps/api/place/photo?photoreference=abc',
+      ),
+    ).toBe(false)
+  })
+
+  it('prefers official-site photos, then Tripadvisor, then a single Google fallback', () => {
+    const website = [
+      'https://arcdetriomphe.example/hero.jpg',
+      'https://arcdetriomphe.example/sunset.jpg',
+    ]
+    const tripadvisor = [
+      'https://media-cdn.tripadvisor.com/arc-1.jpg',
+      'https://media-cdn.tripadvisor.com/arc-2.jpg',
+    ]
+    const googleFallback = 'https://lh3.googleusercontent.com/arc-fallback.jpg'
+
+    expect(
+      pickPreferredPlacePhotos({
+        websitePhotos: website,
+        tripadvisorPhotos: tripadvisor,
+        googleFallbackUrl: googleFallback,
+      }),
+    ).toEqual({ photos: website, source: 'website' })
+
+    expect(
+      pickPreferredPlacePhotos({
+        websitePhotos: [],
+        tripadvisorPhotos: tripadvisor,
+        googleFallbackUrl: googleFallback,
+      }),
+    ).toEqual({ photos: tripadvisor, source: 'tripadvisor' })
+
+    expect(
+      pickPreferredPlacePhotos({
+        websitePhotos: [
+          'places/ChIJD3uTd9hx5kcR1IQvGfr8dbk/photos/AUdRd8oAbc',
+          'https://places.googleapis.com/v1/places/ChIJ/photos/abc/media',
+        ],
+        tripadvisorPhotos: [],
+        googleFallbackUrl: googleFallback,
+      }),
+    ).toEqual({ photos: [googleFallback], source: 'google' })
+
+    expect(
+      pickPreferredPlacePhotos({
+        websitePhotos: [],
+        tripadvisorPhotos: [],
+        googleFallbackUrl:
+          'places/ChIJD3uTd9hx5kcR1IQvGfr8dbk/photos/AUdRd8oAbc',
+      }),
+    ).toEqual({ photos: [], source: null })
   })
 })

@@ -6,8 +6,7 @@ import {
   searchNearbyGooglePlaceCandidates,
   type GooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
-import { fetchPlaceWebsitePhotosWithFallback } from '../services/placeWebsitePhotos'
-import { fetchTripadvisorPlaceGallery } from '../services/tripadvisorPlacePhotos'
+import { resolvePlaceDisplayPhotos } from '../services/placeDisplayPhotos'
 import {
   generatePlaceDescription,
   generatePlaceDetailCopy,
@@ -51,10 +50,7 @@ import { PlaceName } from './PlaceName'
 import { PlacePhotoGallery } from './PlacePhotoGallery'
 import type { PlaceInfoSource } from '../services/placeSource'
 import { useTranslation } from '../../../shared/i18n'
-import {
-  fetchWikimediaPlacePhoto,
-  type WikimediaPlacePhoto,
-} from '../../map/services/wikimediaPlacePhotos'
+import type { WikimediaPlacePhoto } from '../../map/services/wikimediaPlacePhotos'
 
 interface Props {
   open: boolean
@@ -595,78 +591,27 @@ export function AddPlaceDialog({
         placeId: item.googlePlaceId,
       })
 
-      const isRestaurantOrCafe = item.type === 'restaurant' || item.type === 'cafe'
-
-      // 1. Tripadvisor photos for restaurant/cafe
-      let tripadvisorPhotos: string[] = []
-      if (isRestaurantOrCafe) {
-        tripadvisorPhotos = (
-          await fetchTripadvisorPlaceGallery({
-            name: details?.name || item.name,
-            nameLocal: details?.nameOriginal || item.nameLocal,
-            type: item.type,
-          }).catch(() => null)
-        )?.photos || []
-      }
-
-      // 2. Official Website photos
-      const websitePhotos = (
-        await fetchPlaceWebsitePhotosWithFallback({
-          website: details?.website,
-          name: details?.name || item.name,
-          nameLocal: details?.nameOriginal || item.nameLocal,
-          address: details?.address,
-        }).catch(() => ({ photos: [] }))
-      ).photos
-
-      // 3. Resolve source and photos using identical priority as GooglePlacePage
-      let displayPhotos: string[] = []
-      let source: PlaceInfoSource | null = null
-
-      if (isRestaurantOrCafe) {
-        if (tripadvisorPhotos.length) {
-          displayPhotos = tripadvisorPhotos
-          source = 'tripadvisor'
-        } else if (websitePhotos.length) {
-          displayPhotos = websitePhotos
-          source = 'website'
-        } else if (details?.photos?.length) {
-          displayPhotos = details.photos
-          source = 'google'
-        }
-      } else {
-        if (details?.photos?.length) {
-          displayPhotos = details.photos
-          source = 'google'
-        } else if (websitePhotos.length) {
-          displayPhotos = websitePhotos
-          source = 'website'
-        }
-      }
-
-      // 4. Wikimedia fallback for attractions
-      let wikimedia: WikimediaPlacePhoto | null = null
-      if (!displayPhotos.length && item.type === 'attraction' && details?.location) {
-        wikimedia = await fetchWikimediaPlacePhoto(
-          details.name || item.name,
-          details.location,
-        )
-        if (wikimedia?.url) {
-          displayPhotos = [wikimedia.url]
-          source = 'wikimedia'
-        }
-      }
+      const display = await resolvePlaceDisplayPhotos({
+        name: details?.name || item.name,
+        nameLocal: details?.nameOriginal || item.nameLocal,
+        type: item.type,
+        website: details?.website,
+        address: details?.address,
+        googlePlaceId: details?.id,
+        location: details?.location,
+        googlePhotoCandidates: details?.photos,
+      })
 
       const resolved = details
-        ? { ...details, photos: displayPhotos }
+        ? { ...details, photos: display.photos }
         : details
 
       setDetailsByKey((prev) => ({ ...prev, [key]: resolved }))
-      if (source) {
-        setSourceByKey((prev) => ({ ...prev, [key]: source }))
+      if (display.source) {
+        setSourceByKey((prev) => ({ ...prev, [key]: display.source }))
       }
-      if (wikimedia) {
-        setWikimediaByKey((prev) => ({ ...prev, [key]: wikimedia }))
+      if (display.wikimedia) {
+        setWikimediaByKey((prev) => ({ ...prev, [key]: display.wikimedia }))
       }
       setPhotoIndexByKey((prev) => ({ ...prev, [key]: 0 }))
       return resolved
@@ -732,38 +677,16 @@ export function AddPlaceDialog({
         }
       }
 
-      const isRestaurantOrCafe = type === 'restaurant' || type === 'cafe'
-      let tripadvisorPhotos: string[] = []
-      if (isRestaurantOrCafe) {
-        tripadvisorPhotos = (
-          await fetchTripadvisorPlaceGallery({
-            name: details.name,
-            nameLocal: details.nameOriginal,
-            type,
-          }).catch(() => null)
-        )?.photos || []
-      }
-
-      const websitePhotos = (
-        await fetchPlaceWebsitePhotosWithFallback({
-          website: details.website,
-          name: details.name,
-          nameLocal: details.nameOriginal,
-          address: details.address,
-        }).catch(() => ({ photos: [] }))
-      ).photos
-
-      let mainPhoto: string | null = null
-      if (isRestaurantOrCafe) {
-        mainPhoto = tripadvisorPhotos[0] || websitePhotos[0] || details.photos?.[0] || null
-      } else {
-        mainPhoto = details.photos?.[0] || websitePhotos[0] || null
-      }
-
-      const wikimediaPhoto =
-        type === 'attraction' && !mainPhoto
-          ? await fetchWikimediaPlacePhoto(details.name, details.location)
-          : null
+      const display = await resolvePlaceDisplayPhotos({
+        name: details.name,
+        nameLocal: details.nameOriginal,
+        type,
+        website: details.website,
+        address: details.address,
+        googlePlaceId: details.id,
+        location: details.location,
+      })
+      const mainPhoto = display.photos[0] || null
 
       const place: Place = {
         id: `custom-${Date.now()}`,
@@ -780,7 +703,7 @@ export function AddPlaceDialog({
             ? `Google ★ ${details.rating.toFixed(1)}`
             : t('place.aiOrGoogle'),
         priceHint: details.priceLevel,
-        image: mainPhoto || wikimediaPhoto?.url || FALLBACK_IMAGE,
+        image: mainPhoto || FALLBACK_IMAGE,
         location: details.location,
         googleMapsUrl: details.id
           ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
