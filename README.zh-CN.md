@@ -71,7 +71,7 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- 浏览器（VITE_）---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-# VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # 默认 DeepSeek 模型（或 deepseek-v4-pro）
+# VITE_DEEPSEEK_MODEL=deepseek-flash  # DeepSeek V4.1 Flash（原生多模态）
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # 覆盖为 OpenAI 模型
 # VITE_LLM_ENABLED=true              # false 可隐藏 LLM 能力
 ```
@@ -81,6 +81,8 @@ VITE_SUPABASE_ANON_KEY=
 本地若出现 Google Places 引荐来源错误，就是缺了上面某一条。道路连线需在 [HeiGIT](https://account.heigit.org/) 创建 openrouteservice 密钥，并仅保存为服务端变量 `OPENROUTESERVICE_API_KEY`。
 
 Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + 白名单。未配置 `RESEND_API_KEY` 时分享仍可用，界面会提示手动复制邀请链接。
+
+聊天意图路由和通用模型预处理通过服务端 `/api/jev` 调用 Vercel AI Gateway 的 `typesafe-ai/jev`（AI SDK 7 evaluation API）。Vercel 部署使用 OIDC，无需 TypeSafe key。本地可用 `vercel env pull` 刷新 `VERCEL_OIDC_TOKEN`，注意保留本地自定义配置；也可设置不带 `VITE_` 前缀的 `AI_GATEWAY_API_KEY`。Jev 不可用或意图／联网判断置信度不足时，保留原 LLM 路由和规则兜底。模型列表只提供 DeepSeek V4.1 Flash 与 GPT-5.6 luna，两者都直接接收图片。
 
 ## 脚本
 

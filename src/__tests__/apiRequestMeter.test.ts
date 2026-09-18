@@ -78,6 +78,7 @@ describe('API request meter', () => {
     expect(classifyApiRequest('/api/booking?rest=stays%2Fget-photos')).toBe(
       'booking-photos',
     )
+    expect(classifyApiRequest('/api/jev')).toBe('llm-jev')
     expect(classifyApiRequest('/api/deepseek/chat/completions')).toBe('llm-deepseek')
     expect(classifyApiRequest('/api/place-website?url=https%3A%2F%2Fx.test')).toBe(
       'place-website',

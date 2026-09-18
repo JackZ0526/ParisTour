@@ -1,9 +1,15 @@
 import { readFile } from 'node:fs/promises'
 
-const llm = await readFile(new URL('../src/services/llm.ts', import.meta.url), 'utf8')
-const chat = await readFile(new URL('../src/services/tripChat.ts', import.meta.url), 'utf8')
+const llmFiles = [
+  '../src/shared/services/llm/transport.ts',
+  '../src/shared/services/llm/business/place.ts',
+  '../src/shared/services/llm/business/hotel.ts',
+  '../src/shared/services/llm/business/itinerary.ts',
+]
+const llm = (await Promise.all(llmFiles.map((file) => readFile(new URL(file, import.meta.url), 'utf8')))).join('\n')
+const chat = await readFile(new URL('../src/features/chat/services/tripChat.ts', import.meta.url), 'utf8')
 const preferences = await readFile(
-  new URL('../src/services/recommendationPreferences.ts', import.meta.url),
+  new URL('../src/features/place/services/recommendationPreferences.ts', import.meta.url),
   'utf8',
 )
 

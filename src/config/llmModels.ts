@@ -26,62 +26,41 @@ export const llmStorageKeys = {
 } as const
 
 /** Hard-coded fallback when no env var or stored value is available. */
-export const DEFAULT_LLM_MODEL_ID = 'deepseek-v4-flash-vision-exp' as const
+export const DEFAULT_LLM_MODEL_ID = 'deepseek-flash' as const
 
 /** Hard-coded fallback model id for the Gemini provider (off by default). */
 export const GEMINI_MODEL = 'gemini-2.0-flash'
 
-/** DeepSeek V4 models shown in the global picker. */
+/** DeepSeek V4.1 Flash is the sole DeepSeek option. */
 export const DEEPSEEK_MODEL_OPTIONS = [
   {
-    id: 'deepseek-v4-flash-vision-exp',
-    label: 'DeepSeek V4 Flash Vision',
-    shortLabel: 'V4 Flash Vision',
+    id: 'deepseek-flash',
+    label: 'DeepSeek V4.1 Flash',
+    shortLabel: 'V4.1 Flash',
     descriptionKey: 'llm.deepseekV4FlashVisionDesc' as TranslationKey,
-    provider: 'deepseek' as const,
-  },
-  {
-    id: 'deepseek-v4-pro',
-    label: 'DeepSeek V4 Pro',
-    shortLabel: 'V4 Pro',
-    descriptionKey: 'llm.deepseekV4ProDesc' as TranslationKey,
     provider: 'deepseek' as const,
   },
 ] as const
 
 /**
  * Returns true if the model supports multimodal image/vision input.
- * DeepSeek V4 Pro is text-only; V4 Flash Vision Exp, OpenAI GPT-5.6, and Gemini support vision.
+ * DeepSeek V4 Pro is text-only; V4.1 Flash, OpenAI GPT-5.6, and Gemini support vision.
  */
 export function isModelVisionCapable(modelId?: string | null): boolean {
   if (!modelId) return true
   if (/deepseek-v4-pro/i.test(modelId)) return false
-  if (/deepseek-v4-flash-vision/i.test(modelId)) return true
+  if (modelId === 'deepseek-flash' || /^deepseek-v4-flash(?:-vision-exp)?$/i.test(modelId)) return true
   if (/deepseek/i.test(modelId)) return false
   return true
 }
 
-/** GPT-5.6 variants kept in the picker (older GPT-5.5/5.4 dropped). */
+/** GPT-5.6 luna is the sole OpenAI option. */
 export const OPENAI_ONLY_MODEL_OPTIONS = [
   {
     id: 'gpt-5.6-luna',
     label: 'GPT-5.6 luna',
     shortLabel: '5.6 luna',
     descriptionKey: 'llm.gpt56LunaDesc' as TranslationKey,
-    provider: 'openai' as const,
-  },
-  {
-    id: 'gpt-5.6-sol',
-    label: 'GPT-5.6 sol',
-    shortLabel: '5.6 sol',
-    descriptionKey: 'llm.gpt56SolDesc' as TranslationKey,
-    provider: 'openai' as const,
-  },
-  {
-    id: 'gpt-5.6-terra',
-    label: 'GPT-5.6 terra',
-    shortLabel: '5.6 terra',
-    descriptionKey: 'llm.gpt56TerraDesc' as TranslationKey,
     provider: 'openai' as const,
   },
 ] as const
@@ -111,9 +90,11 @@ export function defaultOpenAIModelFromEnv(): string {
   const fromDeepseekEnv = (
     import.meta.env.VITE_DEEPSEEK_MODEL as string | undefined
   )?.trim()
+  if (fromDeepseekEnv && /^deepseek/i.test(fromDeepseekEnv)) return DEFAULT_LLM_MODEL_ID
   if (fromDeepseekEnv && OPENAI_MODEL_IDS.has(fromDeepseekEnv)) return fromDeepseekEnv
   const fromOpenAiEnv = (import.meta.env.VITE_OPENAI_MODEL as string | undefined)?.trim()
   if (fromOpenAiEnv && OPENAI_MODEL_IDS.has(fromOpenAiEnv)) return fromOpenAiEnv
+  if (fromOpenAiEnv && /^gpt-/i.test(fromOpenAiEnv)) return 'gpt-5.6-luna'
   return DEFAULT_LLM_MODEL_ID
 }
 

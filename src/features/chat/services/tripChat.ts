@@ -1,3 +1,4 @@
+import { tryJevRoute } from '../../../shared/services/llm/jev-router'
 import type {
   DayPlan,
   FlightInfo,
@@ -33,9 +34,7 @@ import {
   getRouterExamples,
   jsonContract,
 } from '../../../shared/services/llm/prompts'
-import { getLocale, getLlmLanguageInstruction, type Locale } from '../../../shared/i18n'
-import { getOpenAIModel } from '../../../shared/services/llm/model-state'
-import { isModelVisionCapable } from '../../../config/llmModels'
+import { getLocale, getLlmLanguageInstruction } from '../../../shared/i18n'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
   | { type: 'select_place'; placeName: string }
@@ -969,75 +968,19 @@ export async function fetchTripChatWebResearch(input: {
   }
 }
 
-/**
- * Preflight visual analysis proxy for non-vision models (e.g. DeepSeek V4 Pro).
- * Calls V4 Flash Vision in the background to extract factual entities, OCR text,
- * opening hours, dishes, and travel clues from uploaded images.
- */
-export async function fetchTripChatVisualAnalysis(input: {
-  images: string[]
-  userMessage?: string
-  signal?: AbortSignal
-  locale?: Locale
-}): Promise<string | null> {
-  if (!input.images || input.images.length === 0) return null
-  try {
-    const prompt =
-      input.locale === 'en'
-        ? 'You are a visual recognition assistant. Analyze the user\'s uploaded image(s) in detail. Identify buildings, landmarks, scenes, monuments, place names, text/signs, menu dishes, or any visual clues relevant to the user\'s question. Output a concise and clear factual analysis.'
-        : '你是视觉识别助手。请详细分析用户上传的图片，准确识别其中的建筑、地标、景点名称、图案/LOGO、招牌文字、菜单菜品或与用户提问相关的画面特征。输出精炼准确的事实分析与结论。'
-
-    const contentParts: ChatMessageContentPart[] = [
-      {
-        type: 'text',
-        text: input.userMessage
-          ? `用户问题：${input.userMessage}\n请结合用户问题重点提取图片中的相关事实信息。`
-          : '请提取图片中的关键旅行事实信息。',
-      },
-      ...input.images.map((img) => ({
-        type: 'image_url' as const,
-        image_url: { url: img },
-      })),
-    ]
-
-    const messages: OpenAIChatMessage[] = [
-      { role: 'system', content: prompt },
-      { role: 'user', content: contentParts },
-    ]
-
-    const rawText = await openaiChat(messages, {
-      task: 'tripChat',
-      model: 'deepseek-v4-flash-vision-exp',
-      preflight: true,
-      thinking: { enabled: false, effort: 'off', source: 'manual' },
-      signal: input.signal,
-    })
-
-    const trimmed = rawText.trim()
-    return trimmed || null
-  } catch (err) {
-    console.warn('[tripChat] visual analysis failed:', err)
-    return null
-  }
-}
-
 function buildTripChatMessages(input: {
   ctx: TripChatContext
   history: TripChatTurn[]
   userMessage: string
   images?: string[]
   webResearch?: string | null
-  visualAnalysis?: string | null
   plan: TripChatRequestPlan
 }): OpenAIChatMessage[] {
-  const activeModel = getOpenAIModel()
-  const isVisionModel = isModelVisionCapable(activeModel)
-
   const messages: OpenAIChatMessage[] = [
     { role: 'system', content: systemPrompt(input.ctx, input.plan) },
     ...input.history.map((t) => {
       const text = t.quote ? [t.quote, t.content].filter(Boolean).join('\n') : t.content
-      if (t.role === 'user' && t.images && t.images.length > 0 && isVisionModel) {
+      if (t.role === 'user' && t.images && t.images.length > 0) {
         const parts: ChatMessageContentPart[] = [
           { type: 'text', text },
           ...t.images.map((img) => ({
@@ -1065,16 +1008,6 @@ function buildTripChatMessages(input: {
       '\n</app_state_data>',
   ]
 
-  const visual = String(input.visualAnalysis || '').trim()
-  if (visual) {
-    contextBlocks.push(
-      '<visual_observation_data>\n' +
-        '以下是由多模态视觉识别模型从用户上传的图片中提取的事实数据：\n' +
-        visual +
-        '\n</visual_observation_data>',
-    )
-  }
-
   const research = String(input.webResearch || '').trim()
   if (research) {
     const isGooglePlacesShortlist = research.includes('【Google Places 实时附近候选】')
@@ -1095,31 +1028,18 @@ function buildTripChatMessages(input: {
   const contextPrefix = contextBlocks.join('\n\n')
 
   if (input.images && input.images.length > 0) {
-    if (isVisionModel) {
-      const parts: ChatMessageContentPart[] = [
-        { type: 'text', text: `${contextPrefix}\n\n${input.userMessage}` },
-        ...input.images.map((img) => ({
-          type: 'image_url' as const,
-          image_url: { url: img },
-        })),
-      ]
-      messages.push({ role: 'user', content: parts })
-    } else {
-      const visualSummary = visual || '未能从图片中提取到具体文字内容。'
-      const combinedUserMessage = [
-        contextPrefix,
-        '',
-        '【用户上传了图片，以下是前置多模态视觉模型提取的图片画面与事实解析】',
-        visualSummary,
-        '',
-        '【用户提问】',
-        input.userMessage || '请根据上传的图片分析并结合行程给出建议。',
-      ].join('\n')
-      messages.push({ role: 'user', content: combinedUserMessage })
-    }
+    const parts: ChatMessageContentPart[] = [
+      { type: 'text', text: `${contextPrefix}\n\n${input.userMessage}` },
+      ...input.images.map((img) => ({
+        type: 'image_url' as const,
+        image_url: { url: img },
+      })),
+    ]
+    messages.push({ role: 'user', content: parts })
   } else {
     messages.push({ role: 'user', content: `${contextPrefix}\n\n${input.userMessage}` })
   }
+
   return messages
 }
 
@@ -1529,7 +1449,7 @@ export interface TripChatRequestPlan {
   needsWeb: boolean
   recommendedEffort: ResolvedThinkingEffort
   thinking: ResolvedThinking
-  source: 'model' | 'fallback'
+  source: 'jev' | 'model' | 'fallback'
   reason?: string
 }
 
@@ -1537,7 +1457,7 @@ function fallbackTripChatIntent(text: string): TripChatRequestPlan['intent'] {
   if (isLivePlaceRecommendationRequest(text) || /推荐|比较|哪家更好|住哪里/.test(text)) {
     return 'recommend'
   }
-  if (/添加|加上|新增|删除|去掉|移除|替换|换成|重排|调整|修改|选中|切换/.test(text)) {
+  if (/添加|加上|新增|删除|去掉|移除|替换|换成|重排|调整|修改|选中|切换|移到|移动|挪到/.test(text)) {
     return 'mutate'
   }
   return 'answer'
@@ -1606,107 +1526,117 @@ export async function planTripChatRequest(input: {
   let reason = ''
   let source: TripChatRequestPlan['source'] = 'fallback'
 
+  const jev = await tryJevRoute('chat', planningContext(input), input.signal)
+  if (jev) {
+    modelIntent = jev.intent ?? null
+    modelNeedsWeb = jev.needsWeb
+    modelEffort = jev.reasoningEffort
+    source = 'jev'
+  }
+
   const routerLocale = getLocale()
   const routerIsEn = routerLocale === 'en'
-  try {
-    const raw = await openaiChat(
-      [
-        {
-          role: 'system',
-          content: buildPrompt(
-            routerIsEn
-              ? 'You are the request router for a trip assistant. Only analyze the task — do not answer the user and do not modify the itinerary.'
-              : '你是行程助手的请求路由器。只分析任务，不回答用户，也不修改行程。',
-            null,
-            routerIsEn
-              ? `<intent>
-- answer   — only answer / explain / summarise, no app-state change
-- recommend — need to pick places / hotels or compare candidates
-- mutate   — explicit add / remove / replace / reorder / day-switch
-</intent>`
-              : `<intent>
-- answer   — 只回答/解释/概括，不改变应用状态
-- recommend — 需要挑选地点/酒店或比较候选
-- mutate   — 明确要求修改/添加/删除/替换/重排/切换行程
-</intent>`,
-            routerIsEn
-              ? `<needsWeb>
-true when the answer depends on current / third-party public facts:
-opening hours / price / tickets / weather / strikes and transit status / recent events / ratings and reviews / open-ended place or restaurant recommendations / whether a place actually exists / anything that should be verified to be reliable
-
-false when current itinerary alone is enough, OR when attachedImagesCount > 0 and user is asking for image / scene / landmark recognition without explicitly requiring external live pricing/status:
-add / remove / change / reorder / switch days / summarise existing content / write copy / visual landmark identification / general knowledge that does not require fresh facts
-
-Do not only look for the keyword "internet"; understand the reference, context, and the real information needed. When the user uploads images to recognize what/where it is ("这是什么地方", "图中是什么建筑"), needsWeb must be false.
-</needsWeb>`
-              : `<needsWeb>
-true 时（答案依赖当前或第三方公开事实）：
-营业时间/价格/票务/天气/罢工与交通状态/近期活动/评分评论/开放式地点或餐厅推荐/地点是否真实存在/任何应先核实才可靠的信息
-
-false 时（仅根据当前行程或附带图片视觉识别即可完成）：
-增删改排/切换日期/概括现有内容/写作文案/图片建筑识别/一般常识且不要求最新事实
-
-不要只看"联网"关键词，要理解指代、上下文和任务真正需要的信息。当用户上传了图片询问“这是什么地方/图里是什么建筑/帮我看看这张图”等识图问题时，needsWeb 必须为 false（直接由视觉模型识别），除非用户明确要求查询实时票价或最新营业状态。
-</needsWeb>`,
-            routerIsEn
-              ? `<reasoning_effort>
-- off    — simple fact / confirmation / fully clear single-step operation
-- low    — needs a bit of understanding or structured manipulation
-- medium — comparison / suggestion / a few constraints or explanation needed
-- high   — multi-day reorder / multi-objective trade-off / multi-step complex edit / highly ambiguous
-Do not set every simple request to "low" for safety; pick "off" when no reasoning is genuinely needed.
-</reasoning_effort>`
-              : `<reasoning_effort>
-- off   — 简单事实/确认/完全明确的单步操作
-- low   — 需要少量理解或结构化操作
-- medium — 比较/建议/含少量约束或需要解释
-- high  — 多日重排/多目标权衡/多步骤复杂修改/高度歧义
-不要为了保险把所有简单请求都设为 low；确实不需要推理时选 off。
-</reasoning_effort>`,
-            getRouterExamples(routerLocale),
-            jsonContract(
+  if (!jev) {
+    try {
+      const raw = await openaiChat(
+        [
+          {
+            role: 'system',
+            content: buildPrompt(
               routerIsEn
-                ? '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"short reason"}'
-                : '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"简短原因"}',
+                ? 'You are the request router for a trip assistant. Only analyze the task — do not answer the user and do not modify the itinerary.'
+                : '你是行程助手的请求路由器。只分析任务，不回答用户，也不修改行程。',
+              null,
               routerIsEn
-                ? '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"pure itinerary operation"}'
-                : '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"纯行程操作"}',
-              routerLocale,
+                ? `<intent>
+  - answer   — only answer / explain / summarise, no app-state change
+  - recommend — need to pick places / hotels or compare candidates
+  - mutate   — explicit add / remove / replace / reorder / day-switch
+  </intent>`
+                : `<intent>
+  - answer   — 只回答/解释/概括，不改变应用状态
+  - recommend — 需要挑选地点/酒店或比较候选
+  - mutate   — 明确要求修改/添加/删除/替换/重排/切换行程
+  </intent>`,
+              routerIsEn
+                ? `<needsWeb>
+  true when the answer depends on current / third-party public facts:
+  opening hours / price / tickets / weather / strikes and transit status / recent events / ratings and reviews / open-ended place or restaurant recommendations / whether a place actually exists / anything that should be verified to be reliable
+
+  false when current itinerary alone is enough, OR when attachedImagesCount > 0 and user is asking for image / scene / landmark recognition without explicitly requiring external live pricing/status:
+  add / remove / change / reorder / switch days / summarise existing content / write copy / visual landmark identification / general knowledge that does not require fresh facts
+
+  Do not only look for the keyword "internet"; understand the reference, context, and the real information needed. When the user uploads images to recognize what/where it is ("这是什么地方", "图中是什么建筑"), needsWeb must be false.
+  </needsWeb>`
+                : `<needsWeb>
+  true 时（答案依赖当前或第三方公开事实）：
+  营业时间/价格/票务/天气/罢工与交通状态/近期活动/评分评论/开放式地点或餐厅推荐/地点是否真实存在/任何应先核实才可靠的信息
+
+  false 时（仅根据当前行程或附带图片视觉识别即可完成）：
+  增删改排/切换日期/概括现有内容/写作文案/图片建筑识别/一般常识且不要求最新事实
+
+  不要只看"联网"关键词，要理解指代、上下文和任务真正需要的信息。当用户上传了图片询问“这是什么地方/图里是什么建筑/帮我看看这张图”等识图问题时，needsWeb 必须为 false（直接由视觉模型识别），除非用户明确要求查询实时票价或最新营业状态。
+  </needsWeb>`,
+              routerIsEn
+                ? `<reasoning_effort>
+  - off    — simple fact / confirmation / fully clear single-step operation
+  - low    — needs a bit of understanding or structured manipulation
+  - medium — comparison / suggestion / a few constraints or explanation needed
+  - high   — multi-day reorder / multi-objective trade-off / multi-step complex edit / highly ambiguous
+  Do not set every simple request to "low" for safety; pick "off" when no reasoning is genuinely needed.
+  </reasoning_effort>`
+                : `<reasoning_effort>
+  - off   — 简单事实/确认/完全明确的单步操作
+  - low   — 需要少量理解或结构化操作
+  - medium — 比较/建议/含少量约束或需要解释
+  - high  — 多日重排/多目标权衡/多步骤复杂修改/高度歧义
+  不要为了保险把所有简单请求都设为 low；确实不需要推理时选 off。
+  </reasoning_effort>`,
+              getRouterExamples(routerLocale),
+              jsonContract(
+                routerIsEn
+                  ? '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"short reason"}'
+                  : '{"intent":"answer|recommend|mutate","needsWeb":boolean,"reasoningEffort":"off|low|medium|high","reason":"简短原因"}',
+                routerIsEn
+                  ? '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"pure itinerary operation"}'
+                  : '{"intent":"mutate","needsWeb":false,"reasoningEffort":"off","reason":"纯行程操作"}',
+                routerLocale,
+              ),
             ),
-          ),
-        },
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(planningContext(input)),
+          },
+        ],
         {
-          role: 'user',
-          content: JSON.stringify(planningContext(input)),
+          task: 'tripChat',
+          userText: input.userMessage,
+          thinking: { enabled: false, effort: 'low' },
+          preflight: false,
+          webSearch: false,
+          responseFormat: 'json_object',
+          signal: input.signal,
         },
-      ],
-      {
-        task: 'tripChat',
-        userText: input.userMessage,
-        thinking: { enabled: false, effort: 'low' },
-        preflight: false,
-        webSearch: false,
-        responseFormat: 'json_object',
-        signal: input.signal,
-      },
-    )
-    const parsed = extractLlmJsonObject(raw)
-    if (parsed) {
-      if (typeof parsed.needsWeb === 'boolean') modelNeedsWeb = parsed.needsWeb
-      if (
-        parsed.intent === 'answer' ||
-        parsed.intent === 'recommend' ||
-        parsed.intent === 'mutate'
-      ) {
-        modelIntent = parsed.intent
+      )
+      const parsed = extractLlmJsonObject(raw)
+      if (parsed) {
+        if (typeof parsed.needsWeb === 'boolean') modelNeedsWeb = parsed.needsWeb
+        if (
+          parsed.intent === 'answer' ||
+          parsed.intent === 'recommend' ||
+          parsed.intent === 'mutate'
+        ) {
+          modelIntent = parsed.intent
+        }
+        modelEffort = parseThinkingEffort(parsed.reasoningEffort ?? parsed.effort)
+        reason = String(parsed.reason || '').trim().slice(0, 160)
+        if (modelNeedsWeb != null || modelEffort != null) source = 'model'
       }
-      modelEffort = parseThinkingEffort(parsed.reasoningEffort ?? parsed.effort)
-      reason = String(parsed.reason || '').trim().slice(0, 160)
-      if (modelNeedsWeb != null || modelEffort != null) source = 'model'
+    } catch (error) {
+      if (input.signal?.aborted) throw error
+      // The deterministic fallback keeps chat available when planning fails.
     }
-  } catch (error) {
-    if (input.signal?.aborted) throw error
-    // The deterministic fallback keeps chat available when planning fails.
   }
 
   const mode = input.webSearch ?? 'auto'
@@ -1780,41 +1710,11 @@ export async function sendTripChatMessage(input: {
   input.onRequestPlan?.('start')
   const plan = await planTripChatRequest({ ...input, images: input.images })
   input.onRequestPlan?.('done', plan)
-  const activeModel = getOpenAIModel()
-  const isVisionModel = isModelVisionCapable(activeModel)
-  let visualAnalysis: string | null = null
-  if (input.images && input.images.length > 0) {
-    if (!isVisionModel) {
-      input.onVisualAnalysis?.('start', {
-        imageCount: input.images.length,
-        isProxy: true,
-      })
-      visualAnalysis = await fetchTripChatVisualAnalysis({
-        images: input.images,
-        userMessage: input.userMessage,
-        signal: input.signal,
-        locale: getLocale(),
-      })
-      input.onVisualAnalysis?.('done', {
-        imageCount: input.images.length,
-        isProxy: true,
-      })
-    } else {
-      input.onVisualAnalysis?.('start', {
-        imageCount: input.images.length,
-        isProxy: false,
-      })
-      await new Promise((r) => setTimeout(r, 600))
-      input.onVisualAnalysis?.('done', {
-        imageCount: input.images.length,
-        isProxy: false,
-      })
-    }
-  } else {
-    input.onVisualAnalysis?.('skip')
-  }
   const webResearch = await resolveTripChatWebResearch({ ...input, plan })
-  const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
+  const imageCount = input.images?.length ?? 0
+  if (imageCount) input.onVisualAnalysis?.('start', { imageCount, isProxy: false })
+  else input.onVisualAnalysis?.('skip')
+  const messages = buildTripChatMessages({ ...input, webResearch, plan })
   const rawText = await openaiChat(messages, {
     task: 'tripChat',
     userText: input.userMessage,
@@ -1824,6 +1724,7 @@ export async function sendTripChatMessage(input: {
     responseFormat: 'json_object',
     signal: input.signal,
   })
+  if (imageCount) input.onVisualAnalysis?.('done', { imageCount, isProxy: false })
   const text = await repairTripChatJson(rawText, input.signal)
   return parseTripChatResult(
     text,
@@ -1865,43 +1766,11 @@ export async function sendTripChatMessageStream(input: {
   input.onRequestPlan?.('start')
   const plan = await planTripChatRequest({ ...input, images: input.images })
   input.onRequestPlan?.('done', plan)
-  const activeModel = getOpenAIModel()
-  const isVisionModel = isModelVisionCapable(activeModel)
-  let visualAnalysis: string | null = null
-  if (input.images && input.images.length > 0) {
-    if (!isVisionModel) {
-      input.onVisualAnalysis?.('start', {
-        imageCount: input.images.length,
-        isProxy: true,
-      })
-      visualAnalysis = await fetchTripChatVisualAnalysis({
-        images: input.images,
-        userMessage: input.userMessage,
-        signal: input.signal,
-        locale: getLocale(),
-      })
-      input.onVisualAnalysis?.('done', {
-        imageCount: input.images.length,
-        isProxy: true,
-      })
-    } else {
-      input.onVisualAnalysis?.('start', {
-        imageCount: input.images.length,
-        isProxy: false,
-      })
-      // Give the multimodal visual inspection step a brief, smooth visual window (~600ms)
-      // so users can clearly perceive the active image recognition phase rather than an instantaneous flash.
-      await new Promise((r) => setTimeout(r, 600))
-      input.onVisualAnalysis?.('done', {
-        imageCount: input.images.length,
-        isProxy: false,
-      })
-    }
-  } else {
-    input.onVisualAnalysis?.('skip')
-  }
   const webResearch = await resolveTripChatWebResearch({ ...input, plan })
-  const messages = buildTripChatMessages({ ...input, webResearch, visualAnalysis, plan })
+  const imageCount = input.images?.length ?? 0
+  if (imageCount) input.onVisualAnalysis?.('start', { imageCount, isProxy: false })
+  else input.onVisualAnalysis?.('skip')
+  const messages = buildTripChatMessages({ ...input, webResearch, plan })
   let lastEmitted = ''
 
   const rawText = await openaiChatStream(messages, {
@@ -1924,6 +1793,7 @@ export async function sendTripChatMessageStream(input: {
       input.onReasoningDelta?.(delta, fullReasoning)
     },
   })
+  if (imageCount) input.onVisualAnalysis?.('done', { imageCount, isProxy: false })
   const text = await repairTripChatJson(rawText, input.signal)
 
   const result = parseTripChatResult(

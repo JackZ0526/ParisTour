@@ -117,14 +117,14 @@ function paidApiAuthPlugin(
   }
 }
 
-/** Local handler for /api/share-invite (Vercel serves api/share-invite.ts in prod). */
-function shareInviteDevPlugin(): Plugin {
+// Use the same authenticated server handlers locally and on Vercel.
+function localApiDevPlugin(): Plugin {
   return {
-    name: 'paristour-share-invite-dev',
+    name: 'paristour-local-api-dev',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const urlPath = (req.url || '').split('?')[0] || ''
-        if (urlPath !== '/api/share-invite') {
+        if (urlPath !== '/api/share-invite' && urlPath !== '/api/jev') {
           next()
           return
         }
@@ -153,11 +153,13 @@ function shareInviteDevPlugin(): Plugin {
           })
 
           // Resolve from project root (not Vite's .vite-temp copy of this config).
-          const modulePath = path.resolve(server.config.root, 'api/share-invite.ts')
+          const modulePath = path.resolve(server.config.root, urlPath === '/api/jev' ? 'api/jev.ts' : 'api/share-invite.ts')
           const mod = (await server.ssrLoadModule(modulePath)) as {
             handleShareInvite: (req: Request) => Promise<Response>
+            POST: (req: Request) => Promise<Response>
           }
-          const response = await mod.handleShareInvite(request)
+          const handler = urlPath === '/api/jev' ? mod.POST : mod.handleShareInvite
+          const response = await handler(request)
           const outBody = Buffer.from(await response.arrayBuffer())
           res.statusCode = response.status
           response.headers.forEach((value: string, key: string) => {
@@ -165,10 +167,10 @@ function shareInviteDevPlugin(): Plugin {
             res.setHeader(key, value)
           })
           res.end(outBody)
-        } catch (err) {
-          console.error('[share-invite-dev]', err)
+        } catch {
+          console.error('[local-api-dev]', urlPath)
           json(res, 500, {
-            error: err instanceof Error ? err.message : 'share-invite failed',
+            error: 'Local API request failed',
           })
         }
       })
@@ -442,7 +444,7 @@ export default defineConfig(({ mode }) => {
         supabaseAnon,
         cloudSyncOnLocal,
       ),
-      shareInviteDevPlugin(),
+      localApiDevPlugin(),
       placeWebsiteDevPlugin(),
       googlePlacesDevPlugin(),
       openRouteServiceDevPlugin(),

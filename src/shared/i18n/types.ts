@@ -913,6 +913,7 @@ export interface I18nSchema {
       'booking-description': string
       'booking-reviews': string
       'booking-other': string
+      'llm-jev': string
       'llm-deepseek': string
       'llm-openai': string
       'llm-gemini': string

@@ -42,8 +42,8 @@ const DEEPSEEK_RESPONSES_ITINERARY_TASKS = new Set<LlmTaskKind>([
   'itineraryDayGenerate',
 ])
 
-/** Responses API supports deepseek-v4-flash-vision-exp. */
-const DEEPSEEK_RESPONSES_MODEL = 'deepseek-v4-flash-vision-exp'
+/** Responses API supports deepseek-flash. */
+const DEEPSEEK_RESPONSES_MODEL = 'deepseek-flash'
 
 /** Shared completion budget: thinking CoT counts toward the same cap as visible content. */
 function completionTokenBudget(

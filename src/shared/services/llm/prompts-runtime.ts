@@ -11,6 +11,7 @@
  *
  * Both are pure orchestration — no HTTP, no parsing.
  */
+import { tryJevRoute } from './jev-router'
 import { buildPrompt } from './prompts'
 import { getThinkingMode } from './model-state'
 import { resolveThinkingForTask } from './thinking'
@@ -203,46 +204,53 @@ export async function resolveModelCallPreflight(
   let classifiedEffort: ResolvedThinkingEffort | null = null
   let classifiedNeedsWeb: boolean | null = null
 
-  try {
-    const { callOpenAIMessages } = await import('./transport')
-    const { extractLlmJsonObject } = await import('./json')
-    const raw = await callOpenAIMessages(
-      [
+  const jev = await tryJevRoute('preflight', context, options?.signal)
+  if (jev) {
+    classifiedEffort = jev.reasoningEffort
+    classifiedNeedsWeb = jev.needsWeb
+  }
+  if (!jev) {
+    try {
+      const { callOpenAIMessages } = await import('./transport')
+      const { extractLlmJsonObject } = await import('./json')
+      const raw = await callOpenAIMessages(
+        [
+          {
+            role: 'system',
+            content: [
+              '你是大模型调用前的轻量任务路由器。不要执行任务，只判断是否需要联网以及所需思考强度。',
+              '只输出 JSON：{"needsWeb":boolean,"reasoningEffort":"off|low|medium|high"}。',
+              'needsWeb=true：任务依赖当前或外部可变事实，例如最新新闻、营业与票务、价格、天气、赛事结果、近期活动、法规政策、评分评论、库存可用性，或需要核实地点/商品是否真实存在。',
+              'needsWeb=false：翻译、摘要、改写、格式转换、根据输入资料生成文案、纯计算、固定知识，以及上下文已经提供了所需的 Google/网页事实。',
+              '不要只匹配“联网”字样，要理解任务是否会因信息过时或未经核实而不可靠。',
+              'off：无需推理即可直接完成的翻译、摘录、格式转换、简短事实回答、明确单步操作或固定模板生成。',
+              'low：需要少量语义理解、字段提取、简短文案或简单结构化输出。',
+              'medium：需要比较、解释、推荐、多个约束或一般规划。',
+              'high：复杂多步骤规划、多目标权衡、长上下文综合、歧义消解或高风险决策。',
+              '不要因为任务由大模型执行就默认开启思考；确实无需推理时必须选择 off。',
+            ].join('\n'),
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(context),
+          },
+        ],
         {
-          role: 'system',
-          content: [
-            '你是大模型调用前的轻量任务路由器。不要执行任务，只判断是否需要联网以及所需思考强度。',
-            '只输出 JSON：{"needsWeb":boolean,"reasoningEffort":"off|low|medium|high"}。',
-            'needsWeb=true：任务依赖当前或外部可变事实，例如最新新闻、营业与票务、价格、天气、赛事结果、近期活动、法规政策、评分评论、库存可用性，或需要核实地点/商品是否真实存在。',
-            'needsWeb=false：翻译、摘要、改写、格式转换、根据输入资料生成文案、纯计算、固定知识，以及上下文已经提供了所需的 Google/网页事实。',
-            '不要只匹配“联网”字样，要理解任务是否会因信息过时或未经核实而不可靠。',
-            'off：无需推理即可直接完成的翻译、摘录、格式转换、简短事实回答、明确单步操作或固定模板生成。',
-            'low：需要少量语义理解、字段提取、简短文案或简单结构化输出。',
-            'medium：需要比较、解释、推荐、多个约束或一般规划。',
-            'high：复杂多步骤规划、多目标权衡、长上下文综合、歧义消解或高风险决策。',
-            '不要因为任务由大模型执行就默认开启思考；确实无需推理时必须选择 off。',
-          ].join('\n'),
+          task: 'router',
+          userText: 'model-call-preflight',
+          thinking: { enabled: false, effort: 'low', source: 'auto' },
+          preflight: false,
+          webSearch: false,
+          responseFormat: 'json_object',
+          signal: options?.signal,
         },
-        {
-          role: 'user',
-          content: JSON.stringify(context),
-        },
-      ],
-      {
-        task: 'router',
-        userText: 'model-call-preflight',
-        thinking: { enabled: false, effort: 'low', source: 'auto' },
-        preflight: false,
-        webSearch: false,
-        responseFormat: 'json_object',
-        signal: options?.signal,
-      },
-    )
-    const parsed = extractLlmJsonObject(raw)
-    classifiedEffort = preflightEffortFromText(parsed?.reasoningEffort ?? parsed?.effort)
-    if (typeof parsed?.needsWeb === 'boolean') classifiedNeedsWeb = parsed.needsWeb
-  } catch (error) {
-    if (options?.signal?.aborted) throw error
+      )
+      const parsed = extractLlmJsonObject(raw)
+      classifiedEffort = preflightEffortFromText(parsed?.reasoningEffort ?? parsed?.effort)
+      if (typeof parsed?.needsWeb === 'boolean') classifiedNeedsWeb = parsed.needsWeb
+    } catch (error) {
+      if (options?.signal?.aborted) throw error
+    }
   }
 
   const classifiedForTask = classifiedEffort

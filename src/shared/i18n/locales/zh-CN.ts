@@ -761,7 +761,7 @@ export const zhCN: I18nSchema = {
     thinkingModeHigh: '高',
     thinkingModeCurrentSr: '当前模式',
     // Model descriptions
-    deepseekV4FlashVisionDesc: '极速 · 多模态视觉',
+    deepseekV4FlashVisionDesc: '极速 · 原生多模态',
     deepseekV4FlashDesc: '极速 · 日常问答',
     deepseekV4ProDesc: '深度 · 复杂行程',
     gpt56LunaDesc: '轻量 · 快速微调',
@@ -888,6 +888,7 @@ export const zhCN: I18nSchema = {
       'booking-description': '简介',
       'booking-reviews': '评论',
       'booking-other': '其他',
+      'llm-jev': 'Jev',
       'llm-deepseek': 'DeepSeek',
       'llm-openai': 'OpenAI',
       'llm-gemini': 'Gemini',

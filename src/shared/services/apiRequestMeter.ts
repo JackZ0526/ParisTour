@@ -18,6 +18,7 @@ export type ApiRequestKind =
   | 'booking-other'
   | 'llm-openai'
   | 'llm-deepseek'
+  | 'llm-jev'
   | 'llm-gemini'
   | 'flight-timetable'
   | 'flight-aerodatabox'
@@ -79,6 +80,7 @@ export const API_REQUEST_GROUPS: ApiRequestGroup[] = [
     labelKey: 'apiMeter.groups.llm',
     shortLabelKey: 'apiMeter.groups.llm',
     kinds: [
+      { kind: 'llm-jev', labelKey: 'apiMeter.kinds.llm-jev' },
       { kind: 'llm-deepseek', labelKey: 'apiMeter.kinds.llm-deepseek' },
       { kind: 'llm-openai', labelKey: 'apiMeter.kinds.llm-openai' },
       { kind: 'llm-gemini', labelKey: 'apiMeter.kinds.llm-gemini' },
@@ -233,6 +235,7 @@ export function classifyApiRequest(
     return 'booking-other'
   }
   if (path.startsWith('/api/openai')) return 'llm-openai'
+  if (path === '/api/jev') return 'llm-jev'
   if (path.startsWith('/api/deepseek')) return 'llm-deepseek'
   if (path.startsWith('/api/gemini')) return 'llm-gemini'
   if (path.startsWith('/api/timetable-lookup')) return 'flight-timetable'

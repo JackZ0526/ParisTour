@@ -71,7 +71,7 @@ PUBLIC_APP_URL=https://paristour.vercel.app
 # --- Browser (VITE_) ---
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-# VITE_DEEPSEEK_MODEL=deepseek-v4-flash  # Default DeepSeek model (or deepseek-v4-pro)
+# VITE_DEEPSEEK_MODEL=deepseek-flash  # DeepSeek V4.1 Flash (native vision)
 # VITE_OPENAI_MODEL=gpt-5.6-luna     # Override default to an OpenAI model
 # VITE_LLM_ENABLED=true              # false hides LLM features
 ```
@@ -81,6 +81,8 @@ The itinerary map uses MapLibre GL and OpenStreetMap, and road geometry is power
 A local Google Places referrer error usually means one of the above is missing. Create an openrouteservice key at [HeiGIT](https://account.heigit.org/) and store it only as the server-side `OPENROUTESERVICE_API_KEY`.
 
 On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + allowlist. Without `RESEND_API_KEY`, sharing still works—the UI prompts you to copy the invite link manually.
+
+Jev handles chat intent routing and model-call preflight through the server-only `/api/jev` endpoint using Vercel AI Gateway (`typesafe-ai/jev`, AI SDK 7 evaluation API). Vercel deployments use OIDC; no TypeSafe key is needed. For local development, refresh `VERCEL_OIDC_TOKEN` with `vercel env pull`, preserving any local overrides, or set `AI_GATEWAY_API_KEY` without a `VITE_` prefix. Both routers fall back to the existing LLM and then heuristics when Jev is unavailable or uncertain about intent/web research. The model picker offers only DeepSeek V4.1 Flash and GPT-5.6 luna; both receive images natively.
 
 ## Scripts
 

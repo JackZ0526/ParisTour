@@ -761,7 +761,7 @@ export const en: I18nSchema = {
     thinkingModeHigh: 'High',
     thinkingModeCurrentSr: 'Current mode',
     // Model descriptions
-    deepseekV4FlashVisionDesc: 'Fast · Multimodal Vision',
+    deepseekV4FlashVisionDesc: 'Fast · Native multimodal',
     deepseekV4FlashDesc: 'Fast · Daily Q&A',
     deepseekV4ProDesc: 'Deep · Complex trips',
     gpt56LunaDesc: 'Light · Quick edits',
@@ -888,6 +888,7 @@ export const en: I18nSchema = {
       'booking-description': 'Description',
       'booking-reviews': 'Reviews',
       'booking-other': 'Other',
+      'llm-jev': 'Jev',
       'llm-deepseek': 'DeepSeek',
       'llm-openai': 'OpenAI',
       'llm-gemini': 'Gemini',
