@@ -1,220 +1,85 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import {
-  ASK_ABOUT_TOOLBAR_ESTIMATE,
-  getViewportSize,
-  positionToolbarAbove,
   readAskableSelection,
   type ChatSelectionAskState,
 } from '../components/chatSelectionAsk'
 
 export type { ChatSelectionAskState }
 
-function applyCssHighlight(range: Range | null) {
-  if (typeof CSS === 'undefined' || !CSS.highlights) return
-  CSS.highlights.delete('ask-about')
-  if (range && typeof Highlight === 'function') {
-    try {
-      CSS.highlights.set('ask-about', new Highlight(range))
-    } catch {
-      CSS.highlights.delete('ask-about')
-    }
-  }
-}
-
-export function useChatSelectionAsk(opts: {
+export function useChatSelectionAsk({ enabled, containerRef, toolbarRef }: {
   enabled: boolean
   containerRef: RefObject<HTMLElement | null>
   toolbarRef: RefObject<HTMLElement | null>
-}): {
-  state: ChatSelectionAskState | null
-  dismiss: (clearSelection?: boolean) => void
-} {
-  const { enabled, containerRef, toolbarRef } = opts
+}) {
   const [state, setState] = useState<ChatSelectionAskState | null>(null)
-  const stateRef = useRef(state)
-  stateRef.current = state
-  const savedRangeRef = useRef<Range | null>(null)
-  const restoringRef = useRef(false)
-
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dismiss = useCallback((clearSelection = false) => {
-    savedRangeRef.current = null
-    applyCssHighlight(null)
-    if (clearSelection && typeof window !== 'undefined') {
-      window.getSelection()?.removeAllRanges()
-    }
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    if (clearSelection) window.getSelection()?.removeAllRanges()
     setState(null)
   }, [])
 
-  const restoreSavedRange = useCallback(() => {
-    const range = savedRangeRef.current
-    if (!range || typeof window === 'undefined') return
-    const sel = window.getSelection()
-    if (!sel) return
-    if (sel.rangeCount > 0 && sel.toString().trim()) return
-    restoringRef.current = true
-    try {
-      sel.removeAllRanges()
-      sel.addRange(range)
-      applyCssHighlight(range)
-    } catch {
-      savedRangeRef.current = null
-      applyCssHighlight(null)
-    } finally {
-      restoringRef.current = false
-    }
-  }, [])
-
-  useLayoutEffect(() => {
-    if (!state) return
-    restoreSavedRange()
-  }, [restoreSavedRange, state])
-
   useEffect(() => {
-    if (!enabled) {
-      savedRangeRef.current = null
-      applyCssHighlight(null)
-      setState(null)
-      return
+    if (!enabled) { dismiss(); return }
+    let selecting = false
+    const onToolbar = (target: EventTarget | null) => target instanceof Node && toolbarRef.current?.contains(target)
+    const sync = () => {
+      if (timer.current) clearTimeout(timer.current)
+      const next = readAskableSelection(containerRef.current)
+      if (!next) { dismiss(); return }
+      const bounds = containerRef.current?.getBoundingClientRect()
+      if (bounds && (next.rect.top < bounds.top || next.rect.top + next.rect.height > bounds.bottom)) {
+        dismiss(); return
+      }
+      setState({ text: next.text, context: next.context, rect: next.rect })
     }
-
-    let pointerSelecting = false
-    let dismissedByScroll = false
-    let debounceId: number | null = null
-
-    const clearDebounce = () => {
-      if (debounceId != null) {
-        window.clearTimeout(debounceId)
-        debounceId = null
+    const down = (event: PointerEvent) => {
+      if (onToolbar(event.target)) return
+      selecting = true
+      dismiss()
+    }
+    const up = (event: PointerEvent) => {
+      selecting = false
+      if (!onToolbar(event.target)) sync()
+    }
+    const changed = () => {
+      if (selecting) return
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = setTimeout(sync, 100)
+    }
+    const reposition = () => {
+      if (!selecting) sync()
+    }
+    const cancel = () => { selecting = false; dismiss() }
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && toolbarRef.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        dismiss(true)
       }
     }
-
-    const syncFromSelection = (immediate: boolean) => {
-      const apply = () => {
-        const next = readAskableSelection(containerRef.current)
-        if (!next) {
-          // Keep the snapshot toolbar if iOS/Android collapsed the native
-          // highlight after the overlay appeared.
-          if (stateRef.current) {
-            restoreSavedRange()
-            return
-          }
-          savedRangeRef.current = null
-          applyCssHighlight(null)
-          setState(null)
-          return
-        }
-        savedRangeRef.current = next.range
-        applyCssHighlight(next.range)
-        const pos = positionToolbarAbove(
-          next.rect,
-          ASK_ABOUT_TOOLBAR_ESTIMATE,
-          getViewportSize(),
-        )
-        setState((prev) => {
-          if (
-            prev &&
-            prev.text === next.text &&
-            Math.abs(prev.top - pos.top) < 0.5 &&
-            Math.abs(prev.left - pos.left) < 0.5
-          ) {
-            return prev
-          }
-          return { text: next.text, top: pos.top, left: pos.left, highlights: next.highlights }
-        })
-      }
-
-      if (immediate) {
-        clearDebounce()
-        apply()
-        return
-      }
-      clearDebounce()
-      debounceId = window.setTimeout(apply, 80)
-    }
-
-    const isOnToolbar = (target: EventTarget | null) => {
-      const toolbar = toolbarRef.current
-      return Boolean(toolbar && target instanceof Node && toolbar.contains(target))
-    }
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (isOnToolbar(event.target)) return
-      pointerSelecting = true
-      if (stateRef.current) {
-        savedRangeRef.current = null
-        applyCssHighlight(null)
-        setState(null)
-      }
-    }
-
-    const onPointerUp = (event: PointerEvent) => {
-      pointerSelecting = false
-      if (isOnToolbar(event.target)) return
-      if (dismissedByScroll) {
-        dismissedByScroll = false
-        return
-      }
-      syncFromSelection(true)
-    }
-
-    const onSelectionChange = () => {
-      if (restoringRef.current) return
-      const sel = window.getSelection()
-      const empty = !sel || sel.isCollapsed || !sel.toString().trim()
-      if (empty) {
-        dismissedByScroll = false
-        if (stateRef.current) {
-          restoreSavedRange()
-          return
-        }
-        syncFromSelection(true)
-        return
-      }
-      dismissedByScroll = false
-      if (pointerSelecting) return
-      syncFromSelection(false)
-    }
-
-    const onScroll = () => {
-      dismissedByScroll = true
-      savedRangeRef.current = null
-      applyCssHighlight(null)
-      if (stateRef.current) setState(null)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !stateRef.current) return
-      event.preventDefault()
-      event.stopPropagation()
-      savedRangeRef.current = null
-      applyCssHighlight(null)
-      window.getSelection()?.removeAllRanges()
-      setState(null)
-    }
-
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('pointerup', onPointerUp, true)
-    document.addEventListener('selectionchange', onSelectionChange)
-    document.addEventListener('keydown', onKeyDown, true)
-    window.addEventListener('scroll', onScroll, true)
-    window.visualViewport?.addEventListener('resize', onScroll)
-    window.visualViewport?.addEventListener('scroll', onScroll)
-    const container = containerRef.current
-    container?.addEventListener('scroll', onScroll, { passive: true })
-
+    document.addEventListener('pointerdown', down, true)
+    document.addEventListener('pointerup', up, true)
+    document.addEventListener('pointercancel', cancel, true)
+    document.addEventListener('selectionchange', changed)
+    document.addEventListener('keydown', key, true)
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    window.visualViewport?.addEventListener('resize', reposition)
+    window.visualViewport?.addEventListener('scroll', reposition)
     return () => {
-      clearDebounce()
-      applyCssHighlight(null)
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('pointerup', onPointerUp, true)
-      document.removeEventListener('selectionchange', onSelectionChange)
-      document.removeEventListener('keydown', onKeyDown, true)
-      window.removeEventListener('scroll', onScroll, true)
-      window.visualViewport?.removeEventListener('resize', onScroll)
-      window.visualViewport?.removeEventListener('scroll', onScroll)
-      container?.removeEventListener('scroll', onScroll)
+      if (timer.current) clearTimeout(timer.current)
+      document.removeEventListener('pointerdown', down, true)
+      document.removeEventListener('pointerup', up, true)
+      document.removeEventListener('pointercancel', cancel, true)
+      document.removeEventListener('selectionchange', changed)
+      document.removeEventListener('keydown', key, true)
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+      window.visualViewport?.removeEventListener('resize', reposition)
+      window.visualViewport?.removeEventListener('scroll', reposition)
     }
-  }, [containerRef, enabled, restoreSavedRange, toolbarRef])
-
+  }, [enabled, containerRef, toolbarRef, dismiss])
   return { state, dismiss }
 }

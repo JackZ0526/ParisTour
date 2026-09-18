@@ -8,6 +8,7 @@ import {
   normalizeAskExcerpt,
   positionToolbarAbove,
   previewAskExcerpt,
+  quoteContext,
 } from '../features/chat/components/chatSelectionAsk'
 import { setLocale, translate } from '../shared/i18n/i18nStore'
 
@@ -116,5 +117,28 @@ describe('chat selection ask helpers', () => {
     )
     expect(askAboutHistoryContent('Edith 的法式餐厅', '  ')).toBe('Edith 的法式餐厅')
     expect(askAboutHistoryContent(undefined, '随便问问')).toBe('随便问问')
+  })
+})
+
+
+describe('quoted source context', () => {
+  it('retains the source around a phrase late in a long answer', () => {
+    const context = quoteContext('甲'.repeat(5000) + '这是选中的酒店' + '乙'.repeat(5000), '这是选中的酒店')
+    expect(context).toContain('这是选中的酒店')
+    expect(context.length).toBeLessThanOrEqual(3202)
+    expect(context.startsWith('…')).toBe(true)
+  })
+
+  it('includes source as quoted data without replacing the user question', () => {
+    const prompt = buildAskAboutSendMessage({ excerpt: '这家酒店', question: '在哪里？', context: 'Padam 是这家酒店的名字。', explainTemplate: '{excerpt}', withQuestionTemplate: '{excerpt}：{question}' })
+    expect(prompt).toContain('这家酒店：在哪里？')
+    expect(prompt).toContain('"Padam 是这家酒店的名字。"')
+  })
+
+  it('keeps the toolbar within a panned visual viewport', () => {
+    const pos = positionToolbarAbove({ top: 104, left: 51, width: 10, height: 18 }, { width: 100, height: 36 }, { width: 320, height: 400, top: 100, left: 50 })
+    expect(pos.left).toBe(58)
+    expect(pos.top).toBe(130)
+    expect(pos.placed).toBe('below')
   })
 })

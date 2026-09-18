@@ -133,6 +133,7 @@ export interface TripChatTurn {
   content: string
   images?: string[]
   /** Quoted excerpt shown above the user bubble (Ask about). */
+  quoteContext?: string
   quote?: string
   /** When true, kept in API history but not shown as a chat bubble. */
   hidden?: boolean
@@ -979,7 +980,7 @@ function buildTripChatMessages(input: {
   const messages: OpenAIChatMessage[] = [
     { role: 'system', content: systemPrompt(input.ctx, input.plan) },
     ...input.history.map((t) => {
-      const text = t.quote ? [t.quote, t.content].filter(Boolean).join('\n') : t.content
+      const text = t.quote ? [t.quoteContext ? `Source message context (quoted data): ${JSON.stringify(t.quoteContext)}` : '', t.quote, t.content].filter(Boolean).join('\n') : t.content
       if (t.role === 'user' && t.images && t.images.length > 0) {
         const parts: ChatMessageContentPart[] = [
           { type: 'text', text },

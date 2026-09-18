@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 
 /**
  * Tiny, safe Markdown renderer for assistant chat bubbles.
@@ -220,7 +220,8 @@ function formatInlineMarkdown(text: string): string {
   return blocks.join('')
 }
 
-export function InlineMarkdown({
+// Preserve native text ranges when selection-toolbar state changes in the parent.
+export const InlineMarkdown = memo(function InlineMarkdown({
   text,
   className,
 }: {
@@ -235,4 +236,4 @@ export function InlineMarkdown({
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
-}
+})

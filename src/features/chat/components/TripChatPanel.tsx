@@ -300,7 +300,7 @@ export function TripChatPanel({
     [currentDay, customPlaces, days, hotel, locale, viewing],
   )
   const [input, setInput] = useState('')
-  const [askQuote, setAskQuote] = useState<string | null>(null)
+  const [askQuote, setAskQuote] = useState<{ text: string; context: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [colorKeepActive, setColorKeepActive] = useState(false)
   useEffect(() => {
@@ -829,7 +829,7 @@ export function TripChatPanel({
 
   useEffect(() => {
     if (!askQuote) return
-    composerInputRef.current?.focus()
+    composerInputRef.current?.focus({ preventScroll: true })
   }, [askQuote])
 
   // Mobile keeps modal-style outside-click and Escape dismissal. On desktop,
@@ -2033,11 +2033,12 @@ export function TripChatPanel({
   }
 
   async function submit(text: string) {
-    const quote = askQuote?.trim() || ''
+    const quote = askQuote?.text.trim() || ''
     const typed = text.trim()
     const message = quote
       ? buildAskAboutSendMessage({
           excerpt: quote,
+          context: askQuote?.context,
           question: typed,
           explainTemplate: t('chat.askAboutPrompt'),
           withQuestionTemplate: t('chat.askAboutWithQuestion'),
@@ -2067,6 +2068,7 @@ export function TripChatPanel({
         role: 'user',
         content: typed,
         quote: quote || undefined,
+        quoteContext: askQuote?.context,
         images: imagesToSend.length > 0 ? imagesToSend : undefined,
       },
       { role: 'assistant', content: '' },
@@ -2710,7 +2712,7 @@ export function TripChatPanel({
                         {...(showThinking
                           ? {}
                           : { [CHAT_ASK_SELECTABLE_ATTR]: '' })}
-                        className={`px-3.5 py-2 text-sm leading-relaxed select-text [&::selection]:bg-[#3b82f6]/55 [&::selection]:text-inherit [&_*::selection]:bg-[#3b82f6]/55 [&_*::selection]:text-inherit ${
+                        className={`px-3.5 py-2 text-sm leading-relaxed select-text [&::selection]:bg-[#3b82f6]/30 [&::selection]:text-inherit [&_*::selection]:bg-[#3b82f6]/30 [&_*::selection]:text-inherit ${
                           turn.role === 'user'
                             ? 'rounded-2xl rounded-tr-xs border border-white/12 bg-[var(--ink)]/95 text-[var(--paper)] dark:bg-[var(--copper)] dark:text-white shadow-[0_3px_12px_rgba(35,42,38,0.18),inset_0_1px_1.5px_rgba(255,255,255,0.22),inset_0_-1px_1px_rgba(0,0,0,0.3)] backdrop-blur-sm'
                             : 'rounded-2xl rounded-tl-xs border border-[#c6dbcf]/80 dark:border-[#668b7a]/30 bg-[#ebf3ee]/95 dark:bg-[#1a2420]/95 shadow-[0_2px_12px_rgba(74,99,86,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.9)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-md text-[var(--ink)]'
@@ -2820,7 +2822,7 @@ export function TripChatPanel({
               askQuote ? 'rounded-[1.65rem] p-1.5 pt-1' : 'rounded-full p-1.5 pl-2'
             }`}>
               {askQuote ? (
-                <div className="flex min-w-0 items-center gap-1.5 px-2 pb-1 pt-0.5">
+                <div className="mx-2 mb-0.5 mt-1 flex w-fit max-w-[calc(100%-1rem)] min-w-0 self-start items-center gap-1.5 rounded-md bg-black/[0.025] py-0.5 pl-2 pr-0.5 dark:bg-white/[0.035]">
                   <CornerDownRight
                     size={14}
                     strokeWidth={2.2}
@@ -2828,20 +2830,23 @@ export function TripChatPanel({
                     aria-hidden
                   />
                   <span
-                    className="min-w-0 flex-1 truncate text-xs text-[var(--ink)]/80 dark:text-white/75"
-                    title={askQuote}
+                    className="min-w-0 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-[18px] text-[var(--ink)]/80 dark:text-white/75"
+                    title={askQuote.text}
                     aria-label={t('chat.askAboutQuoteAria')}
                   >
                     {locale === 'en'
-                      ? `“${previewAskExcerpt(askQuote)}”`
-                      : `「${previewAskExcerpt(askQuote)}」`}
+                      ? `“${askQuote.text}”`
+                      : `「${askQuote.text}」`}
                   </span>
                   <button
                     type="button"
-                    onClick={() => setAskQuote(null)}
+                    onClick={() => {
+                      setAskQuote(null)
+                      composerInputRef.current?.focus({ preventScroll: true })
+                    }}
                     title={t('chat.askAboutClearQuote')}
                     aria-label={t('chat.askAboutClearQuote')}
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition-colors hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10 dark:hover:text-white"
+                    className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition-colors before:absolute before:-inset-1 hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10 dark:hover:text-white"
                   >
                     <X size={12} strokeWidth={2.4} />
                   </button>
@@ -2871,7 +2876,7 @@ export function TripChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={handlePaste}
-                placeholder={t('chat.sendPromptPlaceholder')}
+                placeholder={t(askQuote ? 'chat.askAboutPlaceholder' : 'chat.sendPromptPlaceholder')}
                 disabled={busy || !open || convertingCount > 0}
                 tabIndex={open ? undefined : -1}
                 aria-busy={busy || undefined}
@@ -3004,14 +3009,15 @@ export function TripChatPanel({
     <>
       {createPortal(chatChrome, document.body)}
       <ChatSelectionAskToolbar
-        state={askAboutState}
+        state={busy ? null : askAboutState}
         disabled={busy}
         label={t('chat.askAbout')}
         ariaLabel={t('chat.askAboutAria')}
         toolbarRef={askToolbarRef}
-        onAsk={(excerpt) => {
-          setAskQuote(excerpt)
+        onAsk={(excerpt, context) => {
+          setAskQuote({ text: excerpt, context })
           dismissAskAbout(true)
+          composerInputRef.current?.focus({ preventScroll: true })
         }}
       />
       <GooglePlacePage

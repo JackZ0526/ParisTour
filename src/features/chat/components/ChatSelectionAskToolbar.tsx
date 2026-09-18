@@ -1,86 +1,38 @@
-import { type PointerEvent, type RefObject } from 'react'
+import { useLayoutEffect, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  ASK_ABOUT_HIGHLIGHT_Z,
-  ASK_ABOUT_TOOLBAR_Z,
-  type ChatSelectionAskState,
-  type SelectionRect,
-} from './chatSelectionAsk'
+import { CornerDownRight } from 'lucide-react'
+import { ASK_ABOUT_TOOLBAR_Z, getViewportSize, positionToolbarAbove, type ChatSelectionAskState } from './chatSelectionAsk'
 
-function keepNativeSelection(event: PointerEvent<HTMLElement>) {
-  event.preventDefault()
-}
-
-function SelectionHighlight({ rects }: { rects: SelectionRect[] }) {
-  if (!rects.length || typeof document === 'undefined') return null
-  return createPortal(
-    <>
-      {rects.map((rect, index) => (
-        <span
-          key={`${rect.left}-${rect.top}-${index}`}
-          aria-hidden
-          className="pointer-events-none fixed rounded-[2px] bg-[#2563eb]/55 dark:bg-[#3b82f6]/60"
-          style={{
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-            zIndex: ASK_ABOUT_HIGHLIGHT_Z,
-          }}
-        />
-      ))}
-    </>,
-    document.body,
-  )
-}
-
-export function ChatSelectionAskToolbar({
-  state,
-  disabled,
-  label,
-  ariaLabel,
-  toolbarRef,
-  onAsk,
-}: {
+export function ChatSelectionAskToolbar({ state, disabled, label, ariaLabel, toolbarRef, onAsk }: {
   state: ChatSelectionAskState | null
   disabled?: boolean
   label: string
   ariaLabel: string
   toolbarRef: RefObject<HTMLDivElement | null>
-  onAsk: (text: string) => void
+  onAsk: (text: string, context: string) => void
 }) {
+  const [position, setPosition] = useState({ top: 0, left: 0 })
+  useLayoutEffect(() => {
+    if (!state || !toolbarRef.current) return
+    const measure = () => {
+      if (!toolbarRef.current) return
+      setPosition(positionToolbarAbove(state.rect, toolbarRef.current.getBoundingClientRect(), getViewportSize()))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(toolbarRef.current)
+    return () => observer.disconnect()
+  }, [state, label, toolbarRef])
   if (!state || typeof document === 'undefined') return null
-
-  return (
-    <>
-      <SelectionHighlight rects={state.highlights} />
-      {createPortal(
-        <div
-          ref={toolbarRef}
-          role="toolbar"
-          aria-label={ariaLabel}
-          style={{
-            position: 'fixed',
-            top: state.top,
-            left: state.left,
-            zIndex: ASK_ABOUT_TOOLBAR_Z,
-          }}
-          className="pointer-events-auto inline-flex items-center rounded-full border border-white/15 bg-[var(--ink)]/94 text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] backdrop-blur-xl dark:border-white/12 dark:bg-zinc-800/94"
-          onPointerDown={keepNativeSelection}
-          onMouseDown={(event) => event.preventDefault()}
-        >
-          <button
-            type="button"
-            disabled={disabled}
-            onPointerDown={keepNativeSelection}
-            onClick={() => onAsk(state.text)}
-            className="rounded-full px-3 py-1.5 text-[13px] font-medium leading-none whitespace-nowrap text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {label}
-          </button>
-        </div>,
-        document.body,
-      )}
-    </>
+  return createPortal(
+    <div ref={toolbarRef} role="toolbar" aria-label={ariaLabel}
+      style={{ position: 'fixed', ...position, zIndex: ASK_ABOUT_TOOLBAR_Z }}
+      className="pointer-events-auto rounded-xl border border-black/10 bg-white text-zinc-800 shadow-lg dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100"
+      onPointerDown={(event) => event.preventDefault()}>
+      <button type="button" disabled={disabled} onClick={() => onAsk(state.text, state.context)}
+        className="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition-colors hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10 disabled:opacity-45">
+        <CornerDownRight size={14} aria-hidden />{label}
+      </button>
+    </div>, document.body,
   )
 }

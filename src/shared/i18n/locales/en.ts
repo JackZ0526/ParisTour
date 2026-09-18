@@ -662,7 +662,8 @@ export const en: I18nSchema = {
     // Close assistant icon button (TripChatPanel)
     closeAssistantAria: 'Close assistant',
     // Selected-text follow-up (TripChatPanel)
-    askAbout: 'Ask about',
+    askAbout: 'Ask about this',
+    askAboutPlaceholder: 'Ask about this passage…',
     askAboutAria: 'Ask the trip assistant about the selected text',
     askAboutPrompt: 'Please explain or expand on this excerpt:\n\n“{excerpt}”',
     askAboutWithQuestion: 'About this excerpt:\n\n“{excerpt}”\n\n{question}',

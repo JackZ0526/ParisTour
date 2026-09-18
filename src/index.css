@@ -13,15 +13,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Keep Ask-about selection visible after the native highlight drops. */
+/* A single native highlight keeps selected chat text readable. */
 [data-chat-ask-selectable]::selection,
 [data-chat-ask-selectable] *::selection {
-  background: rgb(59 130 246 / 0.55);
-  color: inherit;
-}
-
-::highlight(ask-about) {
-  background-color: rgb(59 130 246 / 0.55);
+  background: rgb(59 130 246 / 0.30);
   color: inherit;
 }
 
