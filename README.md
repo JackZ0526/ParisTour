@@ -1,8 +1,36 @@
 # Paris Tour
 
-[中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
+[Case study and screenshots](https://www.jackzhang.ca/paris-tour) · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
-Invite-only Paris trip planner with per-account cloud save and realtime sync. Share by email as read-only or editable. Map, timeline, and LLM recommendations in one place—turn flights, hotels, and daily stops into a walkable itinerary.
+A personal travel-planning app that brings a shared itinerary, map and trip assistant into one workspace. It started from a practical need: organizing a Paris trip with other people while keeping daily plans easy to understand and change.
+
+The hosted app uses invite-only accounts. The [public case study](https://www.jackzhang.ca/paris-tour) can be viewed without an account.
+
+![Paris Tour daily itinerary beside its route map](https://raw.githubusercontent.com/JackZ0526/jackzhang-portfolio/main/public/assets/paris-tour/itinerary.webp)
+
+## My contribution
+
+I independently lead product direction, interaction and visual design, testing and iteration. Cursor and Codex produce the implementation code. My work includes defining the intended experience, reviewing results in the browser, identifying issues and directing revisions.
+
+- Reworked desktop and mobile layouts, navigation and the relationship between the itinerary, map and chat.
+- Refined motion, panel transitions and light/dark presentation through repeated visual review.
+- Tested shared editing and directed fixes for missing updates, stale data and inconsistent interface behaviour.
+- Guided improvements to loading feedback, chat persistence and update handling.
+
+## Selected iterations
+
+The project has progressed beyond its initial layout. Recent work includes preserving chat drafts across reloads, handling stale-tab conflicts, making app updates explicit and splitting optional interfaces into separate loading chunks.
+
+The [optimization notes](docs/optimization-2026-09-18.md) and [verification record](docs/verification-2026-09-18.md) describe the changes and their test boundaries. Recorded build-size changes are not claims of an equivalent improvement in real-world page-load time.
+
+<details>
+<summary>Trip assistant screenshot</summary>
+
+![Trip assistant alongside the current itinerary](https://raw.githubusercontent.com/JackZ0526/jackzhang-portfolio/main/public/assets/paris-tour/assistant.webp)
+
+</details>
+
+Screenshots are captured interface snapshots from the portfolio case study; the current app may have changed since capture.
 
 ## Features
 
@@ -24,7 +52,7 @@ Invite-only Paris trip planner with per-account cloud save and realtime sync. Sh
 | Frontend | Vite · React 19 · TypeScript · Tailwind CSS v4 |
 | Maps | MapLibre GL JS + OpenStreetMap; openrouteservice road geometry |
 | Backend / data | Supabase (Auth · Postgres · Realtime · RLS) |
-| API proxy | Vercel Serverless (`/api/*`): OpenAI, Gemini, RapidAPI, share email |
+| API proxy | Vercel Serverless (`/api/*`): model providers, places, flights, route geometry and sharing |
 | Email | Resend (optional; without it you can copy invite links) |
 
 ## Local setup
@@ -76,9 +104,7 @@ VITE_SUPABASE_ANON_KEY=
 # VITE_LLM_ENABLED=true              # false hides LLM features
 ```
 
-The itinerary map uses MapLibre GL and OpenStreetMap, and road geometry is powered by openrouteservice (`OPENROUTESERVICE_API_KEY`). Google Places queries and photos are securely routed through server-side `/api/google-places` (`GOOGLE_PLACES_API_KEY`).
-
-A local Google Places referrer error usually means one of the above is missing. Create an openrouteservice key at [HeiGIT](https://account.heigit.org/) and store it only as the server-side `OPENROUTESERVICE_API_KEY`.
+The map uses MapLibre GL and OpenStreetMap; road geometry uses the server-side `OPENROUTESERVICE_API_KEY`. Places queries use `/api/google-places`: `.env.example` documents RapidAPI as the default provider and the optional official Google Places provider (`GOOGLE_PLACES_PROVIDER=official`, `GOOGLE_PLACES_API_KEY`). Configure the provider you intend to use; a Places error and a route-geometry error involve different services.
 
 On Vercel, set the same variables; paid `/api/*` routes check Supabase JWT + allowlist. Without `RESEND_API_KEY`, sharing still works—the UI prompts you to copy the invite link manually.
 
@@ -91,70 +117,32 @@ Jev handles chat intent routing and model-call preflight through the server-only
 | `npm run dev` | Local development (Vite) |
 | `npm run build` | Typecheck + production build |
 | `npm run preview` | Preview production build |
-| `npm run lint` | oxlint |
+| `npm run lint` | Oxlint and icon-policy checks |
+| `npm test` | Vitest regression suite |
+| `npm run check:prompts` | Prompt-contract checks |
 | `npm run release:patch` | Bump patch, update changelogs, commit + tag `v*` (no push) |
 | `npm run release:minor` | Same for a minor bump |
 | `npm run release:major` | Same for a major bump |
 
 ## Releases
 
-Version history lives in [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md).
+See the [release workflow](docs/releases.md) and [changelog](CHANGELOG.md).
 
-1. Land your feature commits on `main` (Conventional Commits help: `feat:`, `fix:`, …). Before releasing, add a curated Chinese summary under `## [Unreleased]` in `CHANGELOG.zh-CN.md`; the release command stops if it is missing.
-2. One-time baseline (if no `v*` tags exist yet):
+## Project structure
 
-```bash
-git tag -a v0.2.0 -m v0.2.0 620c6a8
-git push origin v0.2.0
-```
-
-3. Cut the next release locally (writes changelogs + `package.json`, commits, annotated tag — **does not push**):
-
-```bash
-npm run release:patch   # or release:minor / release:major
-# preview only: npm run release -- patch --dry-run
-# files only:   npm run release -- patch --no-git
-git push origin HEAD && git push origin vX.Y.Z
-```
-
-4. Pushing `v*` runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which opens a bilingual GitHub Release from the matching sections in both changelogs.
-
-**What gets auto-generated**
-
-| Artifact | Source |
-|----------|--------|
-| `CHANGELOG.md` section | Commit subjects since previous `v*` tag (`feat`→Added, `fix`→Fixed, else Changed) **plus** any `Unreleased` bullets |
-| `CHANGELOG.zh-CN.md` section | Curated Chinese bullets promoted from its required `Unreleased` section; never falls back to English |
-| `package.json` `version` | Semver bump |
-| git tag `vX.Y.Z` | Annotated tag on the release commit |
-| GitHub Release | Workflow combines that version’s English and Chinese changelog sections |
-
-## Project structure (overview)
-
-```
+```text
 src/
-  components/   # DayTimeline, TripMap, TripChat, CloudSave, hotels/flights, etc.
-  services/     # Cloud save, LLM, Google, flight lookup
-  data/         # Itinerary templates, places, hotel areas, flight templates
-  auth/         # Supabase auth state
-api/            # Vercel proxies (OpenAI / RapidAPI / share invites)
-supabase/       # schema.sql (accounts, saves, sharing & RLS)
+  features/    Itinerary, map, chat, hotels, flights, places and cloud sync
+  shared/      Shared UI, utilities and provider services
+  hooks/       Application-level hooks
+  config/      Shared configuration
+  __tests__/   Regression tests
+api/           Server-side provider and sharing endpoints
+supabase/      Database schema, migrations and database checks
+docs/          Optimization and verification records
 ```
 
-| File | Contents |
-|------|----------|
-| `src/data/itinerary.ts` | Daily timeline & metro tips |
-| `src/data/places.ts` | Place blurbs, coordinates, images |
-| `src/data/hotels.ts` | Hotel area mapping |
-| `src/data/flights.ts` | Suggested flight templates |
-| `supabase/schema.sql` | Accounts, trip saves, sharing & RLS |
-
-Itineraries cache in `localStorage` and debounce-sync to Supabase `trips.snapshot`; collaborators pick up updates via Realtime.
-
-## Screenshots
-
-<!-- Add UI screenshots here, e.g.: -->
-<!-- ![Main UI](docs/screenshot-main.png) -->
+Itinerary edits use the V2 mutation log, local outbox and revision catch-up in `src/features/cloud-sync/v2/`. Other trip data retains the snapshot path. Chat history and drafts are stored on the current device, scoped to the account and trip; this is separate from cloud itinerary sharing.
 
 ## Notes
 
