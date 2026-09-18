@@ -70,6 +70,7 @@ export async function proxyRequest(
     method: req.method,
     headers,
     redirect: 'follow',
+    signal: AbortSignal.any([req.signal, AbortSignal.timeout(45_000)]),
   }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {

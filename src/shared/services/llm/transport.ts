@@ -871,7 +871,23 @@ export async function callOpenAIMessagesStream(
     throw new LlmRequestError('流式响应没有正文。', 'empty')
   }
 
-  return consumeChatStream(res, messages, options)
+  let receivedContent = false
+  try {
+    return await consumeChatStream(res, messages, {
+      ...options,
+      onDelta: (delta, fullText) => {
+        receivedContent = true
+        options?.onDelta?.(delta, fullText)
+      },
+    })
+  } catch (error) {
+    // Only retry an entirely empty completion; never replay partial output.
+    if (!receivedContent && error instanceof LlmRequestError && error.code === 'empty' &&
+        options?.retryEmpty !== false && !options?.signal?.aborted) {
+      return callOpenAIMessagesStream(messages, { ...options, retryEmpty: false, thinking: { enabled: false, effort: 'off', source: 'auto' } })
+    }
+    throw error
+  }
 }
 
 async function consumeChatStream(
@@ -887,9 +903,10 @@ async function consumeChatStream(
   let reasoning = ''
   let dataJson = ''
   let finishReason: string | undefined
+  let finished = false
   const onAbort = () => {
     try {
-      reader.cancel()
+      void reader.cancel().catch(() => {})
     } catch {
       /* ignore */
     }
@@ -901,15 +918,14 @@ async function consumeChatStream(
   try {
     while (true) {
       const { value, done } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      let boundary: number
-      while ((boundary = buffer.indexOf('\n\n')) >= 0) {
-        const block = buffer.slice(0, boundary)
-        buffer = buffer.slice(boundary + 2)
+      buffer += done ? decoder.decode() + '\n\n' : decoder.decode(value, { stream: true })
+      let boundary: RegExpExecArray | null
+      while ((boundary = /\r?\n\r?\n/.exec(buffer)) !== null) {
+        const block = buffer.slice(0, boundary.index)
+        buffer = buffer.slice(boundary.index + boundary[0].length)
         const ev = parseChatStreamBlock(block)
         if (!ev) continue
-        if (ev.type === 'done') break
+        if (ev.type === 'done') { finished = true; break }
         if (ev.type === 'error') {
           const err = ev.error as { message?: string; code?: string; type?: string } | undefined
           throw new LlmRequestError(err?.message || 'stream error', err?.code || err?.type || 'stream')
@@ -940,19 +956,23 @@ async function consumeChatStream(
             }
           }
         }
-        if (ev.raw) {
-          dataJson = (dataJson ? dataJson + '\n' : '') + ev.raw
-        }
+        if (ev.raw) dataJson = ev.raw
+      }
+      if (options?.signal?.aborted) throw new LlmRequestError('请求已取消。', 'aborted')
+      if (done || finished) {
+        if (!done) await reader.cancel()
+        break
       }
     }
   } finally {
+    reader.releaseLock()
     if (options?.signal) options.signal.removeEventListener('abort', onAbort)
   }
 
   if (!text) {
     if (dataJson) {
       try {
-        const data = JSON.parse(dataJson.slice(dataJson.lastIndexOf('{'))) as {
+        const data = JSON.parse(dataJson) as {
           choices?: Array<{
             message?: { content?: string | Array<{ type?: string; text?: string }> }
           }>
@@ -986,7 +1006,7 @@ type ChatStreamEvent = {
 
 function parseChatStreamBlock(block: string): ChatStreamEvent | null {
   const dataLines: string[] = []
-  for (const line of block.split('\n')) {
+  for (const line of block.split(/\r?\n/)) {
     if (!line || line.startsWith(':')) continue
     const colon = line.indexOf(':')
     const field = colon < 0 ? line : line.slice(0, colon)

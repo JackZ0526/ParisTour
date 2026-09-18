@@ -85,43 +85,74 @@ export async function requireAllowlistedUser(
     }
   }
 
-  const userRes = await fetch(`${url.replace(/\/$/, '')}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: anonKey,
-    },
-  })
+  try {
+    const authSignal = AbortSignal.any([req.signal, AbortSignal.timeout(8_000)])
+    const userRes = await fetch(`${url.replace(/\/$/, '')}/auth/v1/user`, {
+      signal: authSignal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: anonKey,
+      },
+    })
 
-  if (!userRes.ok) {
-    return { ok: false, response: unauthorized('Invalid or expired session') }
+    if (!userRes.ok) {
+      return { ok: false, response: unauthorized('Invalid or expired session') }
+    }
+
+    const userJson = (await userRes.json()) as { id?: string; email?: string }
+    const id = userJson.id
+    const email = (userJson.email || '').trim().toLowerCase()
+    if (!id || !email) {
+      return { ok: false, response: unauthorized('Invalid user') }
+    }
+
+    const rpcRes = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/is_allowlisted_email`, {
+      signal: authSignal,
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ check_email: email }),
+    })
+
+    if (!rpcRes.ok) {
+      return { ok: false, response: forbidden('Allowlist check failed') }
+    }
+
+    const listed = await rpcRes.json()
+    if (listed !== true) {
+      return { ok: false, response: forbidden('Email is not invite-allowlisted') }
+    }
+
+    if (/^\/api\/(openai|deepseek|gemini|jev)(?:\/|$)/.test(new URL(req.url).pathname)) {
+      try {
+        const limitRes = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/consume_ai_request`, {
+          method: 'POST',
+          signal: authSignal,
+          headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'Content-Type': 'application/json' },
+          body: '{}',
+        })
+        if (!limitRes.ok) throw new Error('Rate limit unavailable')
+        if (await limitRes.json() !== true) {
+          return { ok: false, response: new Response(JSON.stringify({ error: 'Too many AI requests. Please retry in a minute.' }), {
+            status: 429, headers: { 'content-type': 'application/json', 'retry-after': '60' },
+          }) }
+        }
+      } catch {
+        return { ok: false, response: new Response(JSON.stringify({ error: 'AI request validation temporarily unavailable' }), {
+          status: 503, headers: { 'content-type': 'application/json', 'retry-after': '10' },
+        }) }
+      }
+    }
+
+    return { ok: true, user: { id, email } }
+  } catch {
+    return { ok: false, response: new Response(JSON.stringify({ error: 'Session validation temporarily unavailable' }), {
+      status: 503, headers: { 'content-type': 'application/json', 'retry-after': '10' },
+    }) }
+
   }
-
-  const userJson = (await userRes.json()) as { id?: string; email?: string }
-  const id = userJson.id
-  const email = (userJson.email || '').trim().toLowerCase()
-  if (!id || !email) {
-    return { ok: false, response: unauthorized('Invalid user') }
-  }
-
-  const rpcRes = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/is_allowlisted_email`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: anonKey,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify({ check_email: email }),
-  })
-
-  if (!rpcRes.ok) {
-    return { ok: false, response: forbidden('Allowlist check failed') }
-  }
-
-  const listed = await rpcRes.json()
-  if (listed !== true) {
-    return { ok: false, response: forbidden('Email is not invite-allowlisted') }
-  }
-
-  return { ok: true, user: { id, email } }
 }

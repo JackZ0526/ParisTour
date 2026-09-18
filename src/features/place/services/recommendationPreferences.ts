@@ -221,18 +221,18 @@ export function normalizeRecommendationPreferences(
     if (tags.length === 0) tags = [...DEFAULT_PREFERENCE_TAGS]
   }
 
-  // Derive legacy booleans from tags for backwards-compatible consumers
-  const hasTag = (predicate: (t: string) => boolean) => tags.some(predicate)
+  // Use canonical identities, never translated display text or substring guesses.
+  const selected = new Set(tags.map(preferenceTagKey))
 
   return {
     dayStartTime: normalizeTime(value?.dayStartTime),
     tags,
-    preferCafeStart: hasTag((t) => t.includes('咖啡') || t.includes('早餐')),
-    preferLunchAndDinner: hasTag((t) => t.includes('正餐') || t.includes('午餐') || t.includes('晚餐')),
-    includeDisneyDay: hasTag((t) => t.includes('迪士尼')),
-    includeChampsAndArc: hasTag((t) => t.includes('香街') || t.includes('香榭丽舍') || t.includes('凯旋门')),
-    avoidLouvreAndVersailles: hasTag((t) => t.includes('避开') || t.includes('卢浮宫') || t.includes('凡尔赛') || t.includes('展馆')),
-    preferLowWalking: hasTag((t) => t.includes('少步行') || t.includes('慢节奏') || t.includes('relaxed')),
+    preferCafeStart: selected.has('morningCoffee'),
+    preferLunchAndDinner: selected.has('twoMeals'),
+    includeDisneyDay: selected.has('disney'),
+    includeChampsAndArc: selected.has('champsArc'),
+    avoidLouvreAndVersailles: selected.has('avoidLargeMuseums'),
+    preferLowWalking: selected.has('easyWalking'),
     extraNotes: String(value?.extraNotes || '').trim().slice(0, 800),
   }
 }

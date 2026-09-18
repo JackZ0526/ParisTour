@@ -1,3 +1,5 @@
+import { AppUpdatePrompt } from './shared/components/AppUpdatePrompt'
+import { offerAppUpdate } from './shared/services/appUpdate'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
@@ -25,9 +27,7 @@ function syncDocumentTitle() {
 syncDocumentTitle()
 subscribeLocale(syncDocumentTitle)
 
-// vite-plugin-pwa: register the service worker. With `autoUpdate` in
-// vite.config.ts, the new SW activates in the background; we just log
-// state transitions so the user can see what's happening in DevTools.
+// Updates wait for user confirmation before replacing the active worker.
 // When local cloud sync is enabled, skip registration and actively clear any
 // leftover SW — Workbox NetworkFirst soft-timeouts hang Supabase bootstrap.
 if ('serviceWorker' in navigator) {
@@ -58,7 +58,7 @@ if ('serviceWorker' in navigator) {
   } else {
     import('virtual:pwa-register')
       .then(({ registerSW }) => {
-        registerSW({
+        const updateSW = registerSW({
           immediate: true,
           onRegisteredSW(swUrl) {
             console.info('[pwa] service worker registered:', swUrl)
@@ -67,9 +67,7 @@ if ('serviceWorker' in navigator) {
             console.info('[pwa] offline-ready; cached assets available.')
           },
           onNeedRefresh() {
-            // autoUpdate activates the new SW without a reload prompt. We log
-            // so a future UI can surface a "new version available" toast.
-            console.info('[pwa] new version available; will activate on next load.')
+            offerAppUpdate(() => updateSW(true))
           },
           onRegisterError(error) {
             console.warn('[pwa] SW registration failed:', error)
@@ -87,6 +85,7 @@ createRoot(document.getElementById('root')!).render(
     <AuthProvider>
       <AuthGate>
         <App />
+        <AppUpdatePrompt />
       </AuthGate>
     </AuthProvider>
   </StrictMode>,

@@ -7,7 +7,7 @@ import {
 import { requireAllowlistedUser } from './_lib/auth.js'
 
 export const runtime = 'nodejs'
-export const maxDuration = 120
+export const maxDuration = 60
 
 /** Proxies /api/openai/* → OpenAI-compatible API. */
 export async function GET(req: Request): Promise<Response> {

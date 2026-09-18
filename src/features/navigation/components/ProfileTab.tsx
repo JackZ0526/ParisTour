@@ -1,3 +1,4 @@
+import { version } from '../../../../package.json'
 import { useState, useSyncExternalStore } from 'react'
 import { LayoutGroup, motion } from 'framer-motion'
 import {
@@ -749,7 +750,7 @@ export function ProfileTab({
 
       {/* System Footer Info Note */}
       <div className="text-center pt-1 text-[11px] text-[var(--stone)]/60 space-y-0.5 -mb-2">
-        <p>Paris Tour v0.8.1 · Supabase {t('auth.cloudSyncActive')}</p>
+        <p>Paris Tour v{version}</p>
         <p>{t('app.brandTagline')}</p>
       </div>
 

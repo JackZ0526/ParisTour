@@ -139,3 +139,17 @@ describe('preference pool identity', () => {
     expect(restored).toContain('独立书店')
   })
 })
+
+ it.each([
+   ['morningCoffee', 'twoMeals', 'easyWalking', 'disney', 'champsArc', 'avoidLargeMuseums'],
+   ['晨间咖啡', '两顿正餐', '轻松少步行', '巴黎迪士尼', '凯旋门香街', '避开大展馆'],
+ ])('keeps active flags aligned with selected tags: %s', (...tags) => {
+   const prefs = normalizeRecommendationPreferences({ tags })
+   expect(prefs.tags).toEqual(tags)
+   expect([prefs.preferCafeStart, prefs.preferLunchAndDinner, prefs.preferLowWalking,
+     prefs.includeDisneyDay, prefs.includeChampsAndArc, prefs.avoidLouvreAndVersailles]).toEqual(Array(6).fill(true))
+ })
+ it('does not mistake a custom museum request for museum avoidance', () => {
+   expect(normalizeRecommendationPreferences({ tags: ['想去卢浮宫'] }).avoidLouvreAndVersailles).toBe(false)
+   expect(normalizeRecommendationPreferences({ tags: [] }).preferCafeStart).toBe(false)
+ })

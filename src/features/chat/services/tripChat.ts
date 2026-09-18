@@ -1,3 +1,4 @@
+import { budgetChatHistory } from './chatHistoryBudget'
 import { tryJevRoute } from '../../../shared/services/llm/jev-router'
 import type {
   DayPlan,
@@ -979,7 +980,7 @@ function buildTripChatMessages(input: {
 }): OpenAIChatMessage[] {
   const messages: OpenAIChatMessage[] = [
     { role: 'system', content: systemPrompt(input.ctx, input.plan) },
-    ...input.history.map((t) => {
+    ...budgetChatHistory(input.history).map((t) => {
       const text = t.quote ? [t.quoteContext ? `Source message context (quoted data): ${JSON.stringify(t.quoteContext)}` : '', t.quote, t.content].filter(Boolean).join('\n') : t.content
       if (t.role === 'user' && t.images && t.images.length > 0) {
         const parts: ChatMessageContentPart[] = [

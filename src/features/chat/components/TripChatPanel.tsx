@@ -1,3 +1,5 @@
+import type { TripChatTurn } from '../services/tripChat'
+import { useChatSession } from '../hooks/useChatSession'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
@@ -59,7 +61,6 @@ import {
   type TripChatAction,
   type TripChatContext,
   type TripChatDestination,
-  type TripChatTurn,
   type TripChatViewingTarget,
 } from '../services/tripChat'
 import type {
@@ -232,7 +233,10 @@ import {
   ChatReasoningDisclosure,
 } from './ChatReasoningDisclosure'
 
+type RetryRequest = { text: string; quote: { text: string; context: string } | null; images: string[]; history: TripChatTurn[] }
+
 interface Props {
+  sessionKey: string
   hotel: SelectedHotel
   hotelCandidates: HotelCandidate[]
   days: DayPlan[]
@@ -255,6 +259,7 @@ interface Props {
 }
 
 export function TripChatPanel({
+  sessionKey,
   hotel,
   hotelCandidates,
   days,
@@ -299,8 +304,7 @@ export function TripChatPanel({
       }),
     [currentDay, customPlaces, days, hotel, locale, viewing],
   )
-  const [input, setInput] = useState('')
-  const [askQuote, setAskQuote] = useState<{ text: string; context: string } | null>(null)
+  const { history, setHistory, input, setInput, askQuote, setAskQuote, attachedImages, setAttachedImages, ready: sessionReady, storageFailed, storageConflict } = useChatSession(sessionKey)
   const [busy, setBusy] = useState(false)
   const [colorKeepActive, setColorKeepActive] = useState(false)
   useEffect(() => {
@@ -315,7 +319,7 @@ export function TripChatPanel({
   }, [busy, colorKeepActive])
   const [streamingReply, setStreamingReply] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [history, setHistory] = useState<TripChatTurn[]>([])
+  const [failedRequest, setFailedRequest] = useState<RetryRequest | null>(null)
   const [actionNotes, setActionNotes] = useState<string[]>([])
   const [panelEntered, setPanelEntered] = useState(false)
   const [modelPickerVisible, setModelPickerVisible] = useState(!open)
@@ -352,7 +356,6 @@ export function TripChatPanel({
   const [requestThinkingEnabled, setRequestThinkingEnabled] = useState<boolean | undefined>(
     undefined,
   )
-  const [attachedImages, setAttachedImages] = useState<string[]>([])
   const [convertingCount, setConvertingCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -568,6 +571,7 @@ export function TripChatPanel({
   const askToolbarRef = useRef<HTMLDivElement | null>(null)
   const composerInputRef = useRef<HTMLInputElement | null>(null)
   const wasOpenRef = useRef(false)
+  const followBottomRef = useRef(true)
   const abortRef = useRef<AbortController | null>(null)
   const backdrop = useEnterExit('fade')
   // Spring for the FAB↔panel container transform. stiffness 350 / damping 30
@@ -812,9 +816,9 @@ export function TripChatPanel({
     // runs on a still-transforming, possibly detached panel (reopen case).
     if (!panelEntered) return
     // Jump instantly when opening so we don't animate through the whole history.
-    const behavior: ScrollBehavior = wasOpenRef.current ? 'smooth' : 'auto'
+    if (!wasOpenRef.current) followBottomRef.current = true
     wasOpenRef.current = true
-    bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+    if (followBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
   }, [history, actionNotes, busy, streamingReply, workSteps, reasoningText, open, panelEntered])
 
   const { state: askAboutState, dismiss: dismissAskAbout } = useChatSelectionAsk({
@@ -824,13 +828,9 @@ export function TripChatPanel({
   })
 
   useEffect(() => {
-    if (!open) setAskQuote(null)
-  }, [open])
-
-  useEffect(() => {
-    if (!askQuote) return
+    if (!open || !askQuote) return
     composerInputRef.current?.focus({ preventScroll: true })
-  }, [askQuote])
+  }, [askQuote, open])
 
   // Mobile keeps modal-style outside-click and Escape dismissal. On desktop,
   // the assistant is non-modal and can only be closed with its X button.
@@ -2032,19 +2032,23 @@ export function TripChatPanel({
     return { notes, pending: pendingBatch }
   }
 
-  async function submit(text: string) {
-    const quote = askQuote?.text.trim() || ''
+  async function submit(text: string, retry?: RetryRequest) {
+    if (!sessionReady || storageConflict) return
+    followBottomRef.current = true
+    const selectedQuote = retry ? retry.quote : askQuote
+    const requestHistory = retry?.history ?? history
+    const quote = selectedQuote?.text.trim() || ''
     const typed = text.trim()
     const message = quote
       ? buildAskAboutSendMessage({
           excerpt: quote,
-          context: askQuote?.context,
+          context: selectedQuote?.context,
           question: typed,
           explainTemplate: t('chat.askAboutPrompt'),
           withQuestionTemplate: t('chat.askAboutWithQuestion'),
         })
       : typed
-    const imagesToSend = [...attachedImages]
+    const imagesToSend = [...(retry?.images ?? attachedImages)]
     if ((!message && imagesToSend.length === 0) || busy) return
     if (!isLlmConfigured()) {
       setError(t('chat.chatUnavailable'))
@@ -2054,30 +2058,34 @@ export function TripChatPanel({
     setBusy(true)
     setStreamingReply(false)
     setError(null)
+    setFailedRequest(null)
     setActionNotes([])
     // New user turn supersedes any lingering recommend-confirm sheet.
     setPendingPlaces([])
     setBusyUserText(message || (locale === 'en' ? 'Analyzing image…' : '分析图片中…'))
     beginWorkPipeline(message || (locale === 'en' ? 'Image message' : '图片消息'), imagesToSend.length > 0)
-    setInput('')
-    setAskQuote(null)
-    setAttachedImages([])
-    setHistory((prev) => [
-      ...prev,
+    if (!retry) {
+      setInput('')
+      setAskQuote(null)
+      setAttachedImages([])
+    }
+    setHistory([
+      ...requestHistory,
       {
         role: 'user',
         content: typed,
         quote: quote || undefined,
-        quoteContext: askQuote?.context,
+        quoteContext: selectedQuote?.context,
         images: imagesToSend.length > 0 ? imagesToSend : undefined,
       },
       { role: 'assistant', content: '' },
     ])
     const ac = beginChatRequest()
+    let generationComplete = false
     try {
       const result = await sendTripChatMessageStream({
         ctx: buildChatContext(),
-        history,
+        history: requestHistory,
         userMessage: message,
         images: imagesToSend.length > 0 ? imagesToSend : undefined,
         signal: ac.signal,
@@ -2225,6 +2233,7 @@ export function TripChatPanel({
         },
       })
       if (abortRef.current !== ac) return
+      generationComplete = true
       setStreamingReply(false)
       setWorkSteps((prev) => activateChatWorkStep(prev, 'parse'))
 
@@ -2316,6 +2325,7 @@ export function TripChatPanel({
         // Drop empty assistant placeholder when nothing streamed.
         return prev.filter((t, i) => !(i === prev.length - 1 && t.role === 'assistant' && !t.content))
       })
+      if (!generationComplete) setFailedRequest({ text, quote: selectedQuote, images: imagesToSend, history: requestHistory })
       setError(friendlyChatError(err, locale))
       clearWorkPipeline()
     } finally {
@@ -2603,6 +2613,10 @@ export function TripChatPanel({
               scrolling for long chat histories. */}
           <div
             ref={messagesRef}
+            onScroll={(event) => {
+              const el = event.currentTarget
+              followBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96
+            }}
             className={`min-h-0 flex-1 space-y-3 ${panelEntered ? 'overflow-y-auto' : 'overflow-y-hidden'} overscroll-contain px-3.5 py-3`}
           >
             {!history.some((t) => !t.hidden) && (
@@ -2774,8 +2788,11 @@ export function TripChatPanel({
               <div className="flex items-start gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 dark:border-red-900/50 dark:bg-red-950/40 p-3 text-xs leading-relaxed text-red-900 dark:text-red-300 shadow-2xs backdrop-blur-md">
                 <span className="shrink-0 mt-[5px] h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
                 <p className="min-w-0 flex-1">{error}</p>
+                {failedRequest && <button type="button" disabled={busy} onClick={() => void submit(failedRequest.text, failedRequest)}>{locale === 'en' ? 'Retry' : '重试'}</button>}
               </div>
             )}
+            {storageConflict && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">{locale === 'en' ? 'This chat changed in another tab. Copy your draft, then refresh to continue.' : '另一窗口已更新此聊天。请先复制草稿，再刷新继续。'}</p>}
+            {storageFailed && <p role="status" className="text-xs text-[var(--stone)]">{locale === 'en' ? 'Chat could not be saved on this device.' : '当前设备暂时无法保存聊天记录。'}</p>}
             <div ref={bottomRef} />
           </div>
 
@@ -2864,7 +2881,7 @@ export function TripChatPanel({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={busy || !open || convertingCount > 0}
+                disabled={busy || !sessionReady || !open || convertingCount > 0}
                 title={t('chat.uploadImage')}
                 aria-label={t('chat.uploadImage')}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--stone)] transition-colors hover:bg-black/5 dark:hover:bg-white/10 hover:text-[var(--ink)] dark:hover:text-white disabled:opacity-40 cursor-pointer"
@@ -2877,7 +2894,7 @@ export function TripChatPanel({
                 onChange={(e) => setInput(e.target.value)}
                 onPaste={handlePaste}
                 placeholder={t(askQuote ? 'chat.askAboutPlaceholder' : 'chat.sendPromptPlaceholder')}
-                disabled={busy || !open || convertingCount > 0}
+                disabled={busy || !sessionReady || !open || convertingCount > 0}
                 tabIndex={open ? undefined : -1}
                 aria-busy={busy || undefined}
                 enterKeyHint="send"
@@ -2887,7 +2904,7 @@ export function TripChatPanel({
               <motion.button
                 layout
                 type={busy ? 'button' : 'submit'}
-                disabled={!busy && ((!input.trim() && attachedImages.length === 0 && !askQuote) || !open || convertingCount > 0)}
+                disabled={!busy && (storageConflict || !sessionReady || (!input.trim() && attachedImages.length === 0 && !askQuote) || !open || convertingCount > 0)}
                 tabIndex={open ? undefined : -1}
                 title={busy ? undefined : t('chat.sendButton')}
                 aria-label={busy ? undefined : t('chat.sendButton')}

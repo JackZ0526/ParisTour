@@ -26,7 +26,7 @@ import type { TripMutationDraft } from './features/cloud-sync/v2/mutationTypes'
 import { DayTimeline } from './features/itinerary/components/DayTimeline'
 import { DayTabButton } from './features/itinerary/components/DayTabButton'
 import { LogisticsTravelSection } from './features/flight/components/LogisticsTravelSection'
-import { HotelPicker } from './features/hotel/components/HotelPicker'
+const HotelPicker = React.lazy(() => import('./features/hotel/components/HotelPicker').then(m => ({ default: m.HotelPicker })))
 import { LoadingIndicator } from './shared/components/LoadingIndicator'
 import { CloudSaveIndicator } from './features/cloud-sync/components/CloudSaveIndicator'
 import { ApiRequestMeter } from './shared/components/ApiRequestMeter'
@@ -41,7 +41,7 @@ import { TripChatPanelLazy as TripChatPanel } from './features/chat/components/T
 import type { TripChatViewingTarget } from './features/chat/services/tripChat'
 import { BottomNavBar } from './features/navigation/components/BottomNavBar'
 import { TopNavSegment } from './features/navigation/components/TopNavSegment'
-import { ProfileTab } from './features/navigation/components/ProfileTab'
+const ProfileTab = React.lazy(() => import('./features/navigation/components/ProfileTab').then(m => ({ default: m.ProfileTab })))
 import { UserAvatarView } from './shared/components/UserAvatarView'
 import { BoundedLiquidPill } from './shared/components/BoundedLiquidPill'
 import { useLiquidPillInteraction } from './shared/hooks/useLiquidPillInteraction'
@@ -662,7 +662,7 @@ export default function App() {
   return (
     <div className="mx-auto min-h-screen max-w-7xl px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-[max(4.75rem,calc(env(safe-area-inset-top)+1.25rem))] sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
       <CloudSaveIndicator />
-      <ApiRequestMeter />
+      {import.meta.env.DEV && <ApiRequestMeter />}
       <div className="mb-4 flex items-center justify-between gap-3">
         {/* Left: Brand Title & Trip Selector */}
         <div className="lg:min-w-[260px]">
@@ -1466,6 +1466,7 @@ export default function App() {
                 onFlightsChange={setFlights}
                 readOnly={readOnly}
               />
+              <React.Suspense fallback={<div role="status" className="h-40 animate-pulse rounded-3xl bg-[var(--mist)]" aria-label={locale === 'en' ? 'Loading hotels' : '加载住宿'} />}>
               <HotelPicker
                 key={`hotel-${panelResetKey}-${syncRenderKey}`}
                 selected={hotel}
@@ -1476,6 +1477,7 @@ export default function App() {
                 readOnly={readOnly}
                 onDetailChange={setViewingHotelDetail}
               />
+              </React.Suspense>
 
               {itineraryReady && (
                 <div className={`flex flex-col gap-4 rounded-3xl ${glassCardSurfaceClass} px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6`}>
@@ -1501,6 +1503,7 @@ export default function App() {
           )}
 
           {activeTab === 'profile' && (
+            <React.Suspense fallback={<div role="status" className="h-64 animate-pulse rounded-3xl bg-[var(--mist)]" aria-label={locale === 'en' ? 'Loading profile' : '加载个人中心'} />}>
             <ProfileTab
               onAnimationStart={() => restoreTabScroll('profile')}
               email={email}
@@ -1534,6 +1537,7 @@ export default function App() {
                 datesReady: Boolean(tripDates?.startDate && tripDates?.endDate),
               }}
             />
+            </React.Suspense>
           )}
         </AnimatePresence>
 
@@ -1553,7 +1557,8 @@ export default function App() {
 
       {!readOnly && (
         <TripChatPanel
-          key={`chat-${panelResetKey}-${syncRenderKey}`}
+          sessionKey={JSON.stringify([email || 'local', activeTrip?.id || 'local'])}
+          key={`chat-${email}-${activeTrip?.id}-${panelResetKey}`}
           hotel={hotel}
           hotelCandidates={hotelCandidates}
           days={days}
