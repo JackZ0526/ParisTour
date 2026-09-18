@@ -343,7 +343,7 @@ function BookingSectionHeader({
       </span>
       <div className="min-w-0">
         <h4 className="text-base font-semibold">{title}</h4>
-        {subtitle ? <p className="mt-0.5 text-xs text-[var(--stone)]">{subtitle}</p> : null}
+        {subtitle ? <p className="min-w-0 truncate mt-0.5 text-xs text-[var(--stone)]">{subtitle}</p> : null}
       </div>
     </div>
   )
@@ -2401,7 +2401,7 @@ export function HotelPicker({
                     <p className="font-medium text-base text-[var(--ink)]">
                       {currentSlotHighlight ? t('hotel.dropToSelectTitle') : t('hotel.emptySlotTitle')}
                     </p>
-                    <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
+                    <p className="min-w-0 truncate mt-1.5 text-xs text-[var(--stone)] leading-relaxed">
                       {currentSlotHighlight
                         ? t('hotel.dropToSelectDesc')
                         : t('hotel.emptySlotDesc')}
@@ -2422,9 +2422,6 @@ export function HotelPicker({
                   </div>
                   <p className="mt-2 text-base font-medium text-[var(--ink)]">
                     {t('hotel.alreadyBooked')}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-[var(--stone)]">
-                    {t('hotel.customHotelPrompt')}
                   </p>
                 </div>
               </div>
@@ -2520,9 +2517,6 @@ export function HotelPicker({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="font-medium text-base text-[var(--ink)]">{t('hotel.refreshSelection')}</p>
-                        <p className="mt-1 text-sm text-[var(--stone)]">
-                          {t('hotel.tellPreferencesDesc')}
-                        </p>
                       </div>
                       <button
                         type="button"
@@ -2541,7 +2535,7 @@ export function HotelPicker({
                         className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:hover:bg-[#1f2824] hover:border-white dark:hover:border-white/20 disabled:opacity-50"
                       >
                         <p className="font-medium text-[var(--ink)]">{t('hotel.tellPreferences')}</p>
-                        <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
+                        <p className="min-w-0 truncate mt-1 text-xs text-[var(--stone)] leading-relaxed">
                           {t('hotel.tellPreferencesDesc')}
                         </p>
                       </button>
@@ -2552,7 +2546,7 @@ export function HotelPicker({
                         className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-4 text-left shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:hover:bg-[#1f2824] hover:border-white dark:hover:border-white/20 disabled:opacity-50"
                       >
                         <p className="font-medium text-[var(--ink)]">{t('hotel.refreshDirectly')}</p>
-                        <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
+                        <p className="min-w-0 truncate mt-1 text-xs text-[var(--stone)] leading-relaxed">
                           {t('hotel.refreshDirectlyDesc')}
                         </p>
                       </button>
@@ -2563,7 +2557,7 @@ export function HotelPicker({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="font-medium text-base text-[var(--ink)]">{t('hotel.preferencesPrompt')}</p>
-                        <p className="mt-1 text-sm text-[var(--stone)]">
+                        <p className="min-w-0 truncate mt-1 text-sm text-[var(--stone)]">
                           {t('hotel.preferencesHint')}
                         </p>
                       </div>

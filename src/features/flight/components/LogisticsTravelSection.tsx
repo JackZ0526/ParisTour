@@ -291,7 +291,7 @@ export function LogisticsTravelSection({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-[var(--stone)] leading-relaxed">
+                  <p className="min-w-0 truncate text-xs text-[var(--stone)] leading-relaxed">
                     {t('itinerary.datesDesc')}
                   </p>
                 )}
@@ -527,10 +527,6 @@ export function LogisticsTravelSection({
                         </button>
                       </div>
                     </div>
-
-                    <div className="pt-3 text-[11px] leading-relaxed text-[var(--stone)]">
-                      {t('flight.flightSearchHint')}
-                    </div>
                   </motion.div>
                 </motion.div>
 
@@ -741,10 +737,6 @@ export function LogisticsTravelSection({
                           {busy === 'return' ? t('common.loading') : t('flight.searchLabel')}
                         </button>
                       </div>
-                    </div>
-
-                    <div className="pt-3 text-[11px] leading-relaxed text-[var(--stone)]">
-                      {t('flight.flightSearchHint')}
                     </div>
                   </motion.div>
                 </motion.div>

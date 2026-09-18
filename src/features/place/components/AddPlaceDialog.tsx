@@ -1267,7 +1267,7 @@ export function AddPlaceDialog({
                                           {busyEnd ? t('place.addingBusy') : t('place.addToEnd')}
                                         </button>
                                       </div>
-                                      <p className="text-xs text-[var(--stone)]">
+                                      <p className="min-w-0 truncate text-xs text-[var(--stone)]">
                                         {t('place.fitReasonHint')}
                                       </p>
                                     </div>
@@ -1367,7 +1367,7 @@ export function AddPlaceDialog({
                                           {busyEnd ? t('place.addingBusy') : t('place.addToEnd')}
                                         </button>
                                       </div>
-                                      <p className="text-xs text-[var(--stone)]">
+                                      <p className="min-w-0 truncate text-xs text-[var(--stone)]">
                                         {t('place.fitReasonHint')}
                                       </p>
                                     </>
@@ -1558,7 +1558,7 @@ export function AddPlaceDialog({
                   {googleBusyEnd ? t('place.addingBusy') : t('place.addToEnd')}
                 </button>
               </div>
-              <p className="text-xs text-[var(--stone)]">
+              <p className="min-w-0 truncate text-xs text-[var(--stone)]">
                 {t('place.fitReasonHintShort')}
               </p>
             </div>

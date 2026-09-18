@@ -1670,7 +1670,7 @@ export function DayTimeline({
               task="itineraryDayGenerate"
             />
             {dayPending ? (
-              <p className="mt-1.5 text-xs text-[var(--stone)]">
+              <p className="min-w-0 truncate mt-1.5 text-xs text-[var(--stone)]">
                 {t('itinerary.dayPendingHint')}
               </p>
             ) : null}

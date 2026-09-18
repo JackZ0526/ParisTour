@@ -794,6 +794,8 @@ export interface I18nSchema {
     gpt56TerraDesc: string
   }
   cloud: {
+    noMembers: string
+    noSnapshots: string
     backupTitle: string
     backupSubtitle: string
     exportJson: string

@@ -147,11 +147,11 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
       {/* Header Section */}
       <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0 max-w-full">
             <h2 className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
               {t('cloud.backupTitle')}
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
+            <p className="min-w-0 truncate mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
               {t('cloud.backupSubtitle')}
             </p>
           </div>
@@ -276,9 +276,8 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
                   <Archive size={20} strokeWidth={1.8} />
                 </div>
-                <p className="text-sm font-medium text-[var(--ink)]">{t('cloud.backupTitle')}</p>
-                <p className="text-xs text-[var(--stone)] max-w-xs mx-auto">
-                  {t('cloud.backupSubtitle')}
+                <p className="min-w-0 truncate text-xs text-[var(--stone)] max-w-xs mx-auto">
+                  {t('cloud.noSnapshots')}
                 </p>
               </motion.div>
             )}

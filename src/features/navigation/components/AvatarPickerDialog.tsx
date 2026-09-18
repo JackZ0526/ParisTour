@@ -126,11 +126,11 @@ export function AvatarPickerDialog({
       {/* Header Section */}
       <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0 max-w-full">
             <h2 className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
               {t('auth.avatarTitle')}
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
+            <p className="min-w-0 truncate mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
               {t('auth.avatarSubtitle')}
             </p>
           </div>
@@ -182,7 +182,7 @@ export function AvatarPickerDialog({
               <h3 className="font-display text-base sm:text-lg font-semibold text-[var(--ink)]">
                 {t('auth.cropAvatar')}
               </h3>
-              <p className="mt-1 text-[11px] sm:text-xs text-[var(--stone)] dark:text-zinc-400">
+              <p className="min-w-0 truncate mt-1 text-[11px] sm:text-xs text-[var(--stone)] dark:text-zinc-400">
                 {t('auth.cropHint')}
               </p>
             </div>

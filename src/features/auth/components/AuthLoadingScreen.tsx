@@ -23,13 +23,7 @@ export function AuthLoadingScreen({
         ? t('auth.loadingTripTitle')
         : t('auth.loadingUnconfiguredTitle'))
 
-  const displaySubtitle =
-    subtitle ||
-    (mode === 'auth'
-      ? t('auth.loadingAuthSubtitle')
-      : mode === 'trip'
-        ? t('auth.loadingTripSubtitle')
-        : t('auth.loadingUnconfiguredSubtitle'))
+  const displaySubtitle = subtitle || (mode === 'unconfigured' ? t('auth.loadingUnconfiguredSubtitle') : '')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[var(--paper)] px-4 py-4 select-none">
@@ -89,9 +83,11 @@ export function AuthLoadingScreen({
           </h2>
 
           {/* Subtitle */}
-          <p className="mt-2.5 max-w-xs text-xs sm:text-sm leading-relaxed text-[var(--stone)]">
-            {displaySubtitle}
-          </p>
+          {displaySubtitle ? (
+            <p className="min-w-0 max-w-full truncate mt-2.5 text-xs sm:text-sm text-[var(--stone)]">
+              {displaySubtitle}
+            </p>
+          ) : null}
 
           {/* Optical Fiber Stream Loading Bar */}
           {mode !== 'unconfigured' ? (

@@ -287,11 +287,11 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
       {/* Header Section */}
       <header className="relative shrink-0 border-b border-[var(--mist)]/60 px-5 pb-4 pt-3 sm:pt-5 sm:px-6">
         <div className="relative flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0 max-w-full">
             <h2 id={titleId} className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
               {t('cloud.shareTitle')}
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
+            <p className="min-w-0 truncate mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
               {t('cloud.shareSubtitle')}
             </p>
           </div>
@@ -401,9 +401,8 @@ export function ShareDialog({ tripId, open, onClose }: Props) {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] shadow-inner">
                     <Users size={20} strokeWidth={1.8} />
                   </div>
-                  <p className="text-sm font-medium text-[var(--ink)]">{t('cloud.shareTitle')}</p>
-                  <p className="text-xs text-[var(--stone)] dark:text-zinc-400 max-w-xs mx-auto">
-                    {t('cloud.shareSubtitle')}
+                  <p className="min-w-0 truncate text-xs text-[var(--stone)] dark:text-zinc-400 max-w-xs mx-auto">
+                    {t('cloud.noMembers')}
                   </p>
                 </motion.div>
               ) : (

@@ -78,9 +78,6 @@ export function DestinationPanel({ value, onChange }: Props) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-3xl">{t('destination.panelTitle')}</h2>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--stone)]">
-            {t('destination.panelDesc')}
-          </p>
         </div>
         {trimmed && (
           <button

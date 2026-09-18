@@ -83,9 +83,6 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
               <Edit3 size={22} className="text-[var(--copper)]" />
               <span>{t('auth.editNickname')}</span>
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-              {t('auth.nicknamePlaceholder')}
-            </p>
           </div>
           <CloseIconButton onClick={onClose} className="hidden sm:flex" />
         </div>

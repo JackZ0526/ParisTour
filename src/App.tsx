@@ -937,7 +937,7 @@ export default function App() {
                         showDots
                         size="md"
                       />
-                      <p className="mt-2 text-center text-xs text-[var(--stone)]">
+                      <p className="min-w-0 truncate mt-2 text-center text-xs text-[var(--stone)]">
                         {t('app.emptyHeroSubtitle')}
                       </p>
                     </div>
@@ -1218,9 +1218,6 @@ export default function App() {
                       <h3 className="font-display text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-tight">
                         {t('app.readinessHeadline')}
                       </h3>
-                      <p className="text-xs sm:text-sm text-[var(--stone)] leading-relaxed max-w-md mx-auto">
-                        {t('app.emptySetupSubtitle')}
-                      </p>
                     </div>
 
                     {/* Interactive 3-Step Readiness Matrix */}
@@ -1399,9 +1396,6 @@ export default function App() {
                   <h1 className="font-display mt-1.5 text-2xl leading-tight text-[var(--ink)] sm:text-3xl lg:text-4xl">
                     {destinationLabel(destination, locale)} · {t('app.logisticsBooking')}
                   </h1>
-                  <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">
-                    {t('app.emptyReadinessSubtitle')}
-                  </p>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
                     <span
                       className={`${glassCapsuleSurfaceClass} ${
@@ -1491,9 +1485,6 @@ export default function App() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-[var(--ink)]">{t('itinerary.infoReady')}</p>
-                      <p className="mt-0.5 text-xs text-[var(--stone)]">
-                        {t('itinerary.infoReadySubtitle')}
-                      </p>
                     </div>
                   </div>
                   <button

@@ -188,9 +188,6 @@ export function RecommendationPreferencesDialog({
               <h2 id={titleId} className="font-display text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
                 {t('place.preferencesTitle')}
               </h2>
-              <p className="mt-1 text-xs sm:text-sm text-[var(--stone)] leading-relaxed">
-                {t('place.preferencesSubtitle')}
-              </p>
             </div>
             <CloseIconButton onClick={onClose} className="hidden sm:flex" />
           </div>
@@ -239,7 +236,7 @@ export function RecommendationPreferencesDialog({
 
             {activeTags.length === 0 ? (
               <div className="flex min-h-[64px] flex-col items-center justify-center text-center rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-2.5">
-                <p className="text-xs font-medium text-[var(--stone)]">
+                <p className="min-w-0 truncate text-xs font-medium text-[var(--stone)]">
                   {t('place.preferencesSubtitle')}
                 </p>
               </div>
@@ -429,9 +426,6 @@ export function RecommendationPreferencesDialog({
                         <h3 id="extracted-dialog-title" className="font-display text-base sm:text-lg font-semibold text-[var(--ink)] tracking-tight">
                           {t('place.extractedSuccessTitle')}
                         </h3>
-                        <p className="mt-0.5 text-xs text-[var(--stone)] dark:text-zinc-300 leading-relaxed">
-                          {t('place.extractedSuccessDesc')}
-                        </p>
                       </div>
                     </div>
                     <CloseIconButton onClick={handleDiscardExtracted} />

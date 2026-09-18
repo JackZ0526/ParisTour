@@ -278,10 +278,11 @@ export function ProfileTab({
               <button
                 type="button"
                 onClick={onSignOut}
-                className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.rose} inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-red-600/90 dark:text-red-300 transition-all hover:bg-[#fde8e8]/95 dark:hover:bg-red-500/20 hover:border-red-300/90 dark:hover:border-red-400/40 hover:text-red-700 dark:hover:text-red-200 active:scale-95 cursor-pointer`}
+                aria-label={t('auth.logout')}
+                title={t('auth.logout')}
+                className={`${glassCapsuleSurfaceClass} ${glassCapsuleToneClass.rose} inline-flex h-9 w-9 shrink-0 items-center justify-center text-xs font-semibold text-red-600/90 dark:text-red-300 transition-all hover:bg-[#fde8e8]/95 dark:hover:bg-red-500/20 hover:border-red-300/90 dark:hover:border-red-400/40 hover:text-red-700 dark:hover:text-red-200 active:scale-95 cursor-pointer`}
               >
-                <LogOut size={13} strokeWidth={2.2} />
-                <span>{t('auth.logout')}</span>
+                <LogOut size={16} strokeWidth={2.2} aria-hidden />
               </button>
             </div>
 
@@ -450,13 +451,13 @@ export function ProfileTab({
                 onClick={onOpenShare}
                 className="group flex items-center justify-between rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/95 dark:hover:bg-white/10 hover:shadow-md hover:border-white dark:hover:border-white/20 active:scale-[0.99] cursor-pointer"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] transition-transform group-hover:scale-105">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--copper)]/10 text-[var(--copper)] transition-transform group-hover:scale-105">
                     <Share2 size={17} strokeWidth={2} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-sm font-medium text-[var(--ink)]">{t('cloud.shareTitle')}</div>
-                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">{t('cloud.shareSubtitle')}</div>
+                    <div className="min-w-0 truncate text-xs text-[var(--stone)] dark:text-zinc-400">{t('cloud.shareSubtitle')}</div>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-[var(--stone)] dark:text-zinc-400 transition-transform group-hover:translate-x-0.5" />
@@ -469,13 +470,13 @@ export function ProfileTab({
                 onClick={onOpenBackup}
                 className="group flex items-center justify-between rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3.5 text-left shadow-sm backdrop-blur-md transition-all hover:bg-white/95 dark:hover:bg-white/10 hover:shadow-md hover:border-white dark:hover:border-white/20 active:scale-[0.99] cursor-pointer"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--sage)]/15 text-[var(--sage)] transition-transform group-hover:scale-105">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--sage)]/15 text-[var(--sage)] transition-transform group-hover:scale-105">
                     <Archive size={17} strokeWidth={2} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-sm font-medium text-[var(--ink)]">{t('cloud.backupTitle')}</div>
-                    <div className="text-xs text-[var(--stone)] dark:text-zinc-400">{t('cloud.backupSubtitle')}</div>
+                    <div className="min-w-0 truncate text-xs text-[var(--stone)] dark:text-zinc-400">{t('cloud.backupSubtitle')}</div>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-[var(--stone)] dark:text-zinc-400 transition-transform group-hover:translate-x-0.5" />
@@ -495,11 +496,6 @@ export function ProfileTab({
               <Sparkles size={16} className="text-[var(--copper)] shrink-0" />
               <span>{t('profile.aiPreferences')}</span>
             </div>
-            <p className="mt-0.5 text-xs text-[var(--stone)] dark:text-zinc-400 leading-relaxed">
-              {locale === 'en'
-                ? 'Personalized preferences that guide AI routes and recommendations.'
-                : '个性化行程偏好体系；这些倾向将直接引导 AI 生成专属路线与地点推荐。'}
-            </p>
           </div>
         </div>
 
@@ -556,7 +552,7 @@ export function ProfileTab({
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-3 text-center text-xs text-[var(--stone)] dark:text-zinc-400">
+          <div className="min-w-0 truncate rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-white/40 dark:bg-white/5 p-3 text-center text-xs text-[var(--stone)] dark:text-zinc-400">
             {t('profile.noTagsSet')}
           </div>
         )}
@@ -737,7 +733,7 @@ export function ProfileTab({
             <Trash2 size={16} />
             <span>{t('profile.clearAllTitle')}</span>
           </div>
-          <p className="text-xs text-[var(--stone)] dark:text-zinc-400">
+          <p className="min-w-0 truncate text-xs text-[var(--stone)] dark:text-zinc-400">
             {t('profile.clearAllDesc')}
           </p>
           <button

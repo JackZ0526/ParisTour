@@ -256,9 +256,9 @@ export function FlightPanel({
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0 max-w-full">
           <h2 className="font-display text-2xl sm:text-3xl">{t('flight.title')}</h2>
-          <p className="mt-1 max-w-xl text-sm text-[var(--stone)]">
+          <p className="min-w-0 truncate mt-1 max-w-xl text-xs text-[var(--stone)]">
             {readOnly
               ? t('flight.readOnlyFlights')
               : t('flight.enterFlightsHint')}

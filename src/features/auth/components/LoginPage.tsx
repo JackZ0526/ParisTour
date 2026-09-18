@@ -116,7 +116,7 @@ export function LoginPage() {
         <h1 className="font-display mt-3 text-3xl font-normal tracking-tight text-[var(--ink)] sm:text-4xl">
           {t('auth.inviteOnly')}
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--stone)] dark:text-zinc-400">
+        <p className="min-w-0 truncate mt-2 text-sm leading-relaxed text-[var(--stone)] dark:text-zinc-400">
           {t('auth.inviteRequired')}
         </p>
 
