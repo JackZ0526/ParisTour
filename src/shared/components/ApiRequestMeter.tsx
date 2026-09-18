@@ -319,7 +319,7 @@ export function ApiRequestMeter() {
   return createPortal(
     <aside
       ref={rootRef}
-      className="api-meter"
+      className="api-meter max-sm:!hidden"
       aria-label={t('apiMeter.ariaLabel')}
       style={containerStyle}
       onPointerDown={handlePointerDown}

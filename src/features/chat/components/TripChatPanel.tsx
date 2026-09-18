@@ -85,7 +85,7 @@ import { CHAT_ASK_SELECTABLE_ATTR, buildAskAboutSendMessage, previewAskExcerpt }
 import { useChatSelectionAsk } from '../hooks/useChatSelectionAsk'
 import { GooglePlacePage } from '../../place/components/GooglePlacePage'
 import { ButtonSpinner, LoadingIndicator } from '../../../shared/components/LoadingIndicator'
-import { LlmModelPicker } from './LlmModelPicker'
+import { LlmModelPicker, ChatHeaderModelPicker } from './LlmModelPicker'
 import {
   FALLBACK_IMAGE,
   PENDING_PLACE_LABELS,
@@ -2340,20 +2340,19 @@ export function TripChatPanel({
 
   const chatChrome = (
     <>
-      {/* LlmModelPicker stays anchored at the FAB position; hidden when the
-          chat panel is open so the morphing card can take over the corner.
-          Mobile: stacked above the chat button (column, 8px gap → bottom
-          offset = 48px button + 8px gap = 56px = 3.5rem). */}
-      <div
-        data-trip-chat-fab="1"
-        className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity duration-200 sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
-          modelPickerVisible && !open
-            ? 'visible opacity-100'
-            : 'pointer-events-none invisible opacity-0'
-        }`}
-      >
-        <LlmModelPicker />
-      </div>
+      {/* Desktop model entry; mobile settings live inside the chat header. */}
+      {isDesktop && (
+        <div
+          data-trip-chat-fab="1"
+          className={`fixed bottom-[calc(max(1.15rem,env(safe-area-inset-bottom))+8.35rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-[2050] flex flex-col items-end gap-2 transition-opacity duration-200 sm:bottom-5 sm:right-[calc(max(1.25rem,env(safe-area-inset-right))+3.625rem)] sm:flex-row sm:items-center sm:gap-2.5 ${
+            modelPickerVisible && !open
+              ? 'visible opacity-100'
+              : 'pointer-events-none invisible opacity-0'
+          }`}
+        >
+          <LlmModelPicker />
+        </div>
+      )}
 
       <AnimatePresence>
         {open && (
@@ -2554,13 +2553,14 @@ export function TripChatPanel({
             className="pointer-events-none absolute inset-x-3 top-0 h-[1.5px] rounded-full bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent opacity-95 z-10"
           />
 
-          <div className="border-b border-white/85 dark:border-white/10 px-4 py-3 bg-white/40 dark:bg-black/20 backdrop-blur-md">
+          <div className={`${!isDesktop ? 'relative z-20 shrink-0' : ''} border-b border-white/85 dark:border-white/10 px-4 py-3 bg-white/40 dark:bg-black/20 backdrop-blur-md`}>
             <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-display text-lg leading-tight text-[var(--ink)]">{t('chat.title')}</h3>
-                  {/* Model & Thinking Status Capsule */}
-                  {(() => {
+                  <h3 className="font-display text-lg leading-tight text-[var(--ink)] max-sm:self-start max-sm:pt-3">{t('chat.title')}</h3>
+                  {/* Mobile settings; desktop retains its status capsule. */}
+                  {!isDesktop && open && <ChatHeaderModelPicker disabled={busy} />}
+                  {isDesktop && (() => {
                     const brandTheme = getModelBrandTheme(model)
                     return (
                       <span

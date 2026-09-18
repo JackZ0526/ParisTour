@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { Checkbox } from '../../../shared/components/Checkbox'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
@@ -428,6 +428,88 @@ export function LlmModelPicker({ disabled = false, className = '' }: Props) {
         </motion.div>
       </motion.div>
     </>
+  )
+}
+
+/** Compact mobile entry, with settings contained in the chat header. */
+export function ChatHeaderModelPicker({ disabled = false }: { disabled?: boolean }) {
+  const { t } = useTranslation()
+  const { model, setModel } = useLlmSettings()
+  const [expanded, setExpanded] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelId = useId()
+  const reducedMotion = useReducedMotion()
+
+  useEffect(() => {
+    if (!expanded) return
+    const dismiss = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setExpanded(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      event.preventDefault()
+      setExpanded(false)
+      triggerRef.current?.focus()
+    }
+    document.addEventListener('pointerdown', dismiss)
+    document.addEventListener('keydown', escape, true)
+    return () => {
+      document.removeEventListener('pointerdown', dismiss)
+      document.removeEventListener('keydown', escape, true)
+    }
+  }, [expanded])
+
+  if (!isLlmConfigured()) return null
+
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={t('llm.modelSection')}
+        aria-expanded={expanded}
+        aria-controls={expanded ? panelId : undefined}
+        onClick={() => setExpanded((value) => !value)}
+        className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2 text-xs text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--copper)]"
+      >
+        <ModelBrandIcon deepseek={isDeepSeekModel(model)} className="h-3.5 w-3.5 shrink-0" />
+        <span>{getOpenAIModelShortLabel(model)}</span>
+        <ChevronDown aria-hidden className={`h-3 w-3 transition-transform duration-200 motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            id={panelId}
+            role="group"
+            aria-label={t('llm.modelSection')}
+            initial={{ height: 0, opacity: 0, y: reducedMotion ? 0 : -6 }}
+            animate={{ height: 'auto', opacity: 1, y: 0, transition: { duration: reducedMotion ? 0 : 0.22 } }}
+            exit={{ height: 0, opacity: 0, y: reducedMotion ? 0 : -4, transition: { duration: reducedMotion ? 0 : 0.16 } }}
+            className="absolute inset-x-0 top-full z-30 overflow-hidden text-[var(--ink)]"
+          >
+              {[...DEEPSEEK_MODEL_OPTIONS, ...OPENAI_ONLY_MODEL_OPTIONS].filter((option) => option.id !== model).map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    setModel(option.id)
+                    setExpanded(false)
+                    triggerRef.current?.focus()
+                  }}
+                  className="flex min-h-11 w-full items-center gap-1.5 px-2 text-xs transition-colors hover:text-[var(--copper)] focus-visible:outline-2 focus-visible:outline-[var(--copper)] disabled:opacity-50"
+                >
+                  <ModelBrandIcon deepseek={isDeepSeekModel(option.id)} className="h-3.5 w-3.5 shrink-0" />
+                  <span className="whitespace-nowrap">{getOpenAIModelShortLabel(option.id)}</span>
+                </button>
+              ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
