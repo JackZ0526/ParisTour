@@ -1,8 +1,36 @@
 # Paris Tour
 
-[English](README.md) · [更新日志](CHANGELOG.zh-CN.md)
+[项目案例与截图](https://www.jackzhang.ca/paris-tour) · [English](README.md) · [更新日志](CHANGELOG.zh-CN.md)
 
-巴黎行程可视化规划器：邀请制登录、按账号云端存档与实时同步，支持按邮箱只读/可编辑共享。地图、时间线与 LLM 推荐一体，帮你把航班、酒店和每日去处排成可走的日程。
+将共享行程、地图与旅行助手整合在同一个工作空间的个人旅行规划应用。项目起点是一个实际需求：和同行的人一起安排巴黎旅行，让每天的计划更容易理解、调整和共享。
+
+线上应用采用邀请制；[公开项目案例](https://www.jackzhang.ca/paris-tour)无需登录即可查看。
+
+![Paris Tour 每日行程与路线地图](https://raw.githubusercontent.com/JackZ0526/jackzhang-portfolio/main/public/assets/paris-tour/itinerary.webp)
+
+## 我的贡献
+
+我独立负责产品方向、交互与视觉设计、测试和迭代，使用 Cursor 和 Codex 完成代码实现。我的工作包括明确预期体验、在浏览器中检查结果、发现问题并推动修改。
+
+- 多次调整桌面端与移动端布局、导航，以及行程、地图和聊天之间的关系。
+- 反复检查动效、面板过渡和明暗主题的视觉表现。
+- 测试多人编辑，推动解决更新缺失、旧数据覆盖和界面行为不一致的问题。
+- 推进加载反馈、聊天持久化与应用更新体验的改进。
+
+## 迭代记录
+
+近期工作包括重新加载后恢复聊天草稿、处理旧标签页冲突、明确提示应用更新，以及将部分界面拆分加载。
+
+[优化记录](docs/optimization-2026-09-18.md)与[验证记录](docs/verification-2026-09-18.md)说明了修改内容及测试范围。构建文件大小的变化不等于真实页面加载时间的同比改善。
+
+<details>
+<summary>旅行助手界面</summary>
+
+![行程旁的旅行助手](https://raw.githubusercontent.com/JackZ0526/jackzhang-portfolio/main/public/assets/paris-tour/assistant.webp)
+
+</details>
+
+截图来自作品集中的真实界面记录；当前应用可能已在截图之后继续调整。
 
 ## 功能
 
@@ -24,7 +52,7 @@
 | 前端 | Vite · React 19 · TypeScript · Tailwind CSS v4 |
 | 地图 | MapLibre GL JS + OpenStreetMap；openrouteservice 道路几何 |
 | 后端 / 数据 | Supabase（Auth · Postgres · Realtime · RLS） |
-| API 代理 | Vercel Serverless（`/api/*`）：OpenAI、Gemini、RapidAPI、分享邮件 |
+| API 代理 | Vercel Serverless（`/api/*`）：模型服务、地点、航班、道路路线和共享 |
 | 邮件 | Resend（可选；未配置时可复制邀请链接） |
 
 ## 本地运行
@@ -76,9 +104,7 @@ VITE_SUPABASE_ANON_KEY=
 # VITE_LLM_ENABLED=true              # false 可隐藏 LLM 能力
 ```
 
-行程地图使用 MapLibre GL 与 OpenStreetMap，路线规划由 openrouteservice（`OPENROUTESERVICE_API_KEY`）驱动。Google Places 地点搜索与照片均由服务端 `/api/google-places`（`GOOGLE_PLACES_API_KEY`）安全代理。
-
-本地若出现 Google Places 引荐来源错误，就是缺了上面某一条。道路连线需在 [HeiGIT](https://account.heigit.org/) 创建 openrouteservice 密钥，并仅保存为服务端变量 `OPENROUTESERVICE_API_KEY`。
+地图使用 MapLibre GL 与 OpenStreetMap；道路路线使用服务端变量 `OPENROUTESERVICE_API_KEY`。地点查询经过 `/api/google-places`；`.env.example` 说明了默认的 RapidAPI 方式及可选的官方 Google Places 方式（`GOOGLE_PLACES_PROVIDER=official`、`GOOGLE_PLACES_API_KEY`）。请按实际选择配置；地点服务与道路路线服务的错误需要分别排查。
 
 Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + 白名单。未配置 `RESEND_API_KEY` 时分享仍可用，界面会提示手动复制邀请链接。
 
@@ -91,70 +117,32 @@ Vercel 部署时同步上述变量；付费 `/api/*` 会校验 Supabase JWT + �
 | `npm run dev` | 本地开发（Vite） |
 | `npm run build` | 类型检查 + 生产构建 |
 | `npm run preview` | 预览生产构建 |
-| `npm run lint` | oxlint |
+| `npm run lint` | Oxlint 与图标策略检查 |
+| `npm test` | Vitest 回归测试 |
+| `npm run check:prompts` | 提示词契约检查 |
 | `npm run release:patch` | patch 升版、更新日志、提交并打 `v*` 标签（不推送） |
 | `npm run release:minor` | minor 升版（同上） |
 | `npm run release:major` | major 升版（同上） |
 
 ## 发版
 
-版本历史见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md) / [CHANGELOG.md](CHANGELOG.md)。
+详见[发版流程](docs/releases.zh-CN.md)与[更新日志](CHANGELOG.zh-CN.md)。
 
-1. 功能提交先合入 `main`（推荐 Conventional Commits：`feat:`、`fix:` 等）。发版前必须在 `CHANGELOG.zh-CN.md` 的 `## [Unreleased]` 下整理中文摘要；缺失时发版命令会主动中止。
-2. 若还没有 `v*` 标签，先打一次基线：
+## 项目结构
 
-```bash
-git tag -a v0.2.0 -m v0.2.0 620c6a8
-git push origin v0.2.0
-```
-
-3. 本地切下一版（写更新日志与 `package.json`、提交、附注标签 — **不推送**）：
-
-```bash
-npm run release:patch   # 或 release:minor / release:major
-# 仅预览：npm run release -- patch --dry-run
-# 只改文件：npm run release -- patch --no-git
-git push origin HEAD && git push origin vX.Y.Z
-```
-
-4. 推送 `v*` 后，[`.github/workflows/release.yml`](.github/workflows/release.yml) 会合并两份更新日志的对应版本小节，创建中英双语 GitHub Release。
-
-**自动生成内容**
-
-| 产物 | 来源 |
-|------|------|
-| `CHANGELOG.md` 版本节 | 上一 `v*` 标签以来的提交说明（`feat`→Added，`fix`→Fixed，其余→Changed）**加上** `Unreleased` 条目 |
-| `CHANGELOG.zh-CN.md` 版本节 | 从必填的中文 `Unreleased` 摘要生成，绝不再回退为英文条目 |
-| `package.json` `version` | 语义化版本递增 |
-| git 标签 `vX.Y.Z` | 打在发版提交上的附注标签 |
-| GitHub Release | Workflow 合并该版本的英文与中文更新日志小节 |
-
-## 项目结构（概览）
-
-```
+```text
 src/
-  components/   # DayTimeline、TripMap、TripChat、CloudSave、酒店/航班等
-  services/     # 云存档、LLM、Google、航班查询
-  data/         # 行程模板、地点、酒店区位、航班模板
-  auth/         # Supabase 登录态
-api/            # Vercel 代理（OpenAI / RapidAPI / 分享邀请）
-supabase/       # schema.sql（账号、存档、共享与 RLS）
+  features/    行程、地图、聊天、酒店、航班、地点与云同步
+  shared/      共享界面、工具与模型服务
+  hooks/       应用级 hooks
+  config/      共享配置
+  __tests__/   回归测试
+api/           服务端代理与共享接口
+supabase/      数据库结构、迁移与数据库检查
+docs/          优化与验证记录
 ```
 
-| 文件 | 内容 |
-|------|------|
-| `src/data/itinerary.ts` | 每日时间线与地铁提示 |
-| `src/data/places.ts` | 地点介绍、坐标、图片 |
-| `src/data/hotels.ts` | 酒店区位映射 |
-| `src/data/flights.ts` | 推荐航班模板 |
-| `supabase/schema.sql` | 账号、行程存档、共享与 RLS |
-
-行程会写入 `localStorage` 作缓存，并 debounce 同步到 Supabase `trips.snapshot`；协作者侧通过 Realtime 拉取更新。
-
-## 截图
-
-<!-- 可在此放入界面截图，例如： -->
-<!-- ![主界面](docs/screenshot-main.png) -->
+行程编辑使用 `src/features/cloud-sync/v2/` 中的 V2 操作日志、本地待上传队列与版本补齐机制。其他旅行数据保留 snapshot 路径。聊天历史和草稿按账号与行程保存在当前设备；它与云端行程共享是两套不同的机制。
 
 ## 说明
 
