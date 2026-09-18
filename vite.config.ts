@@ -375,12 +375,12 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         // Use the existing public/manifest.webmanifest; do not inject another one.
         manifest: false,
         // Inject a virtual `/registerSW.js` so the client can opt into a
         // user-facing update prompt (we add the listener in src/main.tsx).
-        injectRegister: 'inline',
+        injectRegister: false,
         includeAssets: [
           'favicon.svg',
           'apple-touch-icon.png',
@@ -391,19 +391,18 @@ export default defineConfig(({ mode }) => {
         workbox: {
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
+          globIgnores: ['**/heic-to-*.js', '**/TripMap-*.js'],
           cleanupOutdatedCaches: true,
-          // Take over the current page as soon as a new SW activates.
-          // Without this, the install on the *next* launch keeps serving
-          // the stale precache — e.g. a Picker layout fix in the latest
-          // bundle wouldn't reach an already-installed PWA until the user
-          // killed every tab. The LLM picker had a "model row blank on
-          // first open" bug that lingered in the installed PWA for this
-          // reason; this claim makes the fix take effect on the next
-          // foreground transition.
+          // Activate only after the user accepts the update prompt.
           clientsClaim: true,
-          skipWaiting: true,
+          skipWaiting: false,
           navigateFallback: '/index.html',
           runtimeCaching: [
+            {
+              urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/assets\/(?:heic-to|TripMap)-[^/]+\.js$/.test(url.pathname),
+              handler: 'CacheFirst',
+              options: { cacheName: 'optional-tools', expiration: { maxEntries: 6, maxAgeSeconds: 30 * 24 * 60 * 60 }, cacheableResponse: { statuses: [200] } },
+            },
             {
               // Never let Workbox soft-timeout Supabase. NetworkFirst with
               // networkTimeoutSeconds falls back to cache, and with a miss it
@@ -451,8 +450,8 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       // Windows often resolves localhost → 127.0.0.1; default Node may bind [::1] only
-      // host: true → listen on 0.0.0.0 so phones on the same LAN can reach the dev server
-      host: true,
+      // Local paid API proxies skip auth; LAN access must be explicitly opted into.
+      host: '127.0.0.1',
       port: 5173,
       strictPort: false,
       proxy: {
