@@ -42,6 +42,32 @@ export const PRESET_PREFERENCE_TAGS: readonly string[] = [
   'affordableFood',
 ]
 
+/** Compare persisted labels and preset codes by identity, independently of UI locale. */
+export function preferenceTagKey(tag: string): string {
+  const cleaned = cleanTagText(tag)
+  if (Object.hasOwn(LEGACY_PREF_TAG_MAP, cleaned)) return LEGACY_PREF_TAG_MAP[cleaned]
+  const key = cleaned.replace(/\s+/g, ' ').toLowerCase()
+  return PRESET_PREFERENCE_TAGS.find((code) =>
+    code.toLowerCase() === key || localizePrefTag(code, 'en').toLowerCase() === key,
+  ) ?? key
+}
+
+/** Preserve custom wording and the first stored label while removing equivalent tags. */
+export function uniquePreferenceTags(tags: readonly string[]): string[] {
+  const seen = new Set<string>()
+  return tags.map(cleanTagText).filter((tag) => {
+    const key = preferenceTagKey(tag)
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+export function availablePreferenceTags(candidates: readonly string[], active: readonly string[]): string[] {
+  const selected = new Set(active.map(preferenceTagKey))
+  return uniquePreferenceTags(candidates).filter((tag) => !selected.has(preferenceTagKey(tag)))
+}
+
 export const DEFAULT_PREFERENCE_TAGS: readonly string[] = [
   'morningCoffee',
   'twoMeals',
@@ -179,13 +205,7 @@ export function normalizeRecommendationPreferences(
   let tags: string[]
 
   if (Array.isArray(value?.tags)) {
-    tags = Array.from(
-      new Set(
-        value.tags
-          .map((t) => cleanTagText(t))
-          .filter(Boolean),
-      ),
-    )
+    tags = uniquePreferenceTags(value.tags)
   } else {
     // Backward compatibility: Derive tags from legacy boolean flags.
     // Output uses the new code-based enum; the UI localizes via

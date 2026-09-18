@@ -5,6 +5,8 @@ import {
   PRESET_PREFERENCE_TAGS,
   normalizeRecommendationPreferences,
   recommendationPreferencesPrompt,
+  availablePreferenceTags,
+  uniquePreferenceTags,
 } from '../features/place/services/recommendationPreferences'
 import { extractPreferenceTags } from '../shared/services/llm/llm'
 
@@ -112,5 +114,28 @@ describe('recommendationPreferences', () => {
     const input = 'I love vintage markets and French pastries'
     const tags = await extractPreferenceTags(input, { locale: 'en' })
     expect(tags.every((t) => !/[\u4e00-\u9fa5]/.test(t))).toBe(true)
+  })
+})
+
+
+describe('preference pool identity', () => {
+  it('excludes all six legacy Chinese selections shown in the reported duplicate pool', () => {
+    const selected = ['晨间咖啡', '两顿正餐', '轻松少步行', '巴黎迪士尼', '凯旋门香街', '避开大展馆']
+    expect(availablePreferenceTags(PRESET_PREFERENCE_TAGS, selected)).toEqual(PRESET_PREFERENCE_TAGS.slice(6))
+  })
+
+  it('deduplicates codes, translated labels and decorated labels while retaining custom tags', () => {
+    expect(uniquePreferenceTags(['☕ 晨间咖啡', 'morningCoffee', 'Morning coffee', '独立书店', '独立书店'])).toEqual(['晨间咖啡', '独立书店'])
+    expect(normalizeRecommendationPreferences({ tags: ['晨间咖啡', 'morningCoffee'] }).tags).toEqual(['晨间咖啡'])
+  })
+
+  it('hides selected AI candidates and makes them available again after removal', () => {
+    const candidates = [...PRESET_PREFERENCE_TAGS, 'Morning coffee', '独立书店']
+    expect(availablePreferenceTags(candidates, ['晨间咖啡', '独立书店'])).not.toContain('morningCoffee')
+    expect(availablePreferenceTags(candidates, ['晨间咖啡', '独立书店'])).not.toContain('独立书店')
+    const restored = availablePreferenceTags(candidates, [])
+    expect(restored.filter(tag => tag === 'morningCoffee')).toHaveLength(1)
+    expect(restored).not.toContain('Morning coffee')
+    expect(restored).toContain('独立书店')
   })
 })

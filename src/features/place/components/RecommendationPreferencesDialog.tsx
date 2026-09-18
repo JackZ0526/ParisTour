@@ -17,6 +17,9 @@ import {
   DEFAULT_RECOMMENDATION_PREFERENCES,
   PRESET_PREFERENCE_TAGS,
   cleanTagText,
+  preferenceTagKey,
+  uniquePreferenceTags,
+  availablePreferenceTags,
   getTagTheme,
   type RecommendationPreferences,
 } from '../services/recommendationPreferences'
@@ -79,7 +82,7 @@ export function RecommendationPreferencesDialog({
     if (open) {
       setDraft({
         ...value,
-        tags: (value.tags || []).map(cleanTagText).filter(Boolean),
+        tags: uniquePreferenceTags(value.tags || []),
       })
       setNaturalInput('')
       setIsExtracting(false)
@@ -88,22 +91,22 @@ export function RecommendationPreferencesDialog({
     }
   }, [open, value])
 
-  const activeTags = (draft.tags || []).map(cleanTagText).filter(Boolean)
+  const activeTags = uniquePreferenceTags(draft.tags || [])
 
   function addTag(tag: string) {
     const cleaned = cleanTagText(tag)
-    if (!cleaned || activeTags.includes(cleaned)) return
+    if (!cleaned) return
     setDraft((prev) => ({
       ...prev,
-      tags: [...prev.tags, cleaned],
+      tags: uniquePreferenceTags([...prev.tags, cleaned]),
     }))
   }
 
   function removeTag(tagToRemove: string) {
-    const cleanedToRemove = cleanTagText(tagToRemove)
+    const keyToRemove = preferenceTagKey(tagToRemove)
     setDraft((prev) => ({
       ...prev,
-      tags: prev.tags.filter((t) => cleanTagText(t) !== cleanedToRemove),
+      tags: prev.tags.filter((t) => preferenceTagKey(t) !== keyToRemove),
     }))
   }
 
@@ -127,7 +130,7 @@ export function RecommendationPreferencesDialog({
         existingTags: activeTags,
       })
 
-      const cleanedExtracted = extracted.map(cleanTagText).filter(Boolean)
+      const cleanedExtracted = availablePreferenceTags(extracted, activeTags)
 
       if (cleanedExtracted.length > 0) {
         setExtractedResult(cleanedExtracted)
@@ -145,7 +148,7 @@ export function RecommendationPreferencesDialog({
     if (!extractedResult || extractedResult.length === 0) return
     setDraft((prev) => ({
       ...prev,
-      tags: Array.from(new Set([...prev.tags, ...extractedResult])),
+      tags: uniquePreferenceTags([...prev.tags, ...extractedResult]),
     }))
     setExtractedResult(null)
     setNaturalInput('')
@@ -154,7 +157,7 @@ export function RecommendationPreferencesDialog({
   function handleAddToCandidatePool() {
     if (!extractedResult || extractedResult.length === 0) return
     setCustomCandidateTags((prev) =>
-      Array.from(new Set([...prev, ...extractedResult])),
+      uniquePreferenceTags([...prev, ...extractedResult]),
     )
     setExtractedResult(null)
     setNaturalInput('')
@@ -164,12 +167,9 @@ export function RecommendationPreferencesDialog({
     setExtractedResult(null)
   }
 
-  const allCandidates = Array.from(
-    new Set([...PRESET_PREFERENCE_TAGS, ...customCandidateTags]),
-  )
-
-  const availablePresets = allCandidates.filter(
-    (preset) => !activeTags.includes(cleanTagText(preset)),
+  const availablePresets = availablePreferenceTags(
+    [...PRESET_PREFERENCE_TAGS, ...customCandidateTags],
+    activeTags,
   )
 
   return (
