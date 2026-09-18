@@ -23,14 +23,6 @@ async function handle(req: Request): Promise<Response> {
     return methodNotAllowed(['GET', 'POST'])
   }
 
-  const auth = await requireAllowlistedUser(req)
-  if (auth.ok === false) return auth.response
-
-  const apiKey = readEnv('OPENAI_API_KEY')
-  if (!apiKey) return missingKey('OPENAI_API_KEY')
-
-  const base = readEnv('OPENAI_BASE_URL') || 'https://api.openai.com/v1'
-
   const url = new URL(req.url)
   let rest = url.searchParams.get('rest') || ''
   url.searchParams.delete('rest')
@@ -40,6 +32,19 @@ async function handle(req: Request): Promise<Response> {
       ? url.pathname.slice(prefix.length).replace(/^\//, '')
       : url.pathname.replace(/^\//, '')
   }
+
+  if (rest === 'jev' || url.pathname === '/api/jev') {
+    const { handleJev } = await import('./_lib/jev-handler.js')
+    return handleJev(req)
+  }
+
+  const auth = await requireAllowlistedUser(req)
+  if (auth.ok === false) return auth.response
+
+  const apiKey = readEnv('OPENAI_API_KEY')
+  if (!apiKey) return missingKey('OPENAI_API_KEY')
+
+  const base = readEnv('OPENAI_BASE_URL') || 'https://api.openai.com/v1'
 
   const target = `${base.replace(/\/$/, '')}/${rest}${url.search}`
 

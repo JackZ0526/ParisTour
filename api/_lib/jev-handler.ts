@@ -1,11 +1,8 @@
-import { requireAllowlistedUser } from './_lib/auth.js'
-import { methodNotAllowed } from './_lib/proxy.js'
-import { evaluateRoute } from './_lib/jev.js'
+import { requireAllowlistedUser } from './auth.js'
+import { methodNotAllowed } from './proxy.js'
+import { evaluateRoute } from './jev.js'
 
-export const runtime = 'nodejs'
-export const maxDuration = 15
-
-export async function POST(req: Request): Promise<Response> {
+export async function handleJev(req: Request): Promise<Response> {
   if (req.method !== 'POST') return methodNotAllowed(['POST'])
   try {
     const auth = await requireAllowlistedUser(req)

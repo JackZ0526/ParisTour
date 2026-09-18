@@ -121,7 +121,7 @@ export async function POST(req: Request): Promise<Response> {
 export async function handleOpenRouteService(req: Request): Promise<Response> {
   if (req.method !== 'POST') return methodNotAllowed(['POST'])
   const auth = await requireAllowlistedUser(req)
-  if (!auth.ok) return auth.response
+  if (auth.ok === false) return auth.response
 
   const apiKey = readEnv('OPENROUTESERVICE_API_KEY')
   if (!apiKey) {

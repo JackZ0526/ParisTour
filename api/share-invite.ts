@@ -266,7 +266,7 @@ async function sendInviteMail(opts: {
     html: opts.html,
     text: opts.text,
   })
-  if (resend.ok) return resend
+  if (resend.ok === true) return resend
 
   if (resend.error !== 'missing_resend_api_key') {
     // Resend configured but failed — still try Supabase before giving up.
@@ -275,7 +275,7 @@ async function sendInviteMail(opts: {
       inviteUrl: opts.inviteUrl,
       registered: opts.registered,
     })
-    if (fallback.ok) return fallback
+    if (fallback.ok === true) return fallback
     return { ok: false, error: `Resend: ${resend.error}; Supabase: ${fallback.error}` }
   }
 
@@ -284,7 +284,7 @@ async function sendInviteMail(opts: {
     inviteUrl: opts.inviteUrl,
     registered: opts.registered,
   })
-  if (viaAuth.ok) return viaAuth
+  if (viaAuth.ok === true) return viaAuth
 
   if (viaAuth.error === 'missing_supabase_service_role_key') {
     return { ok: false, error: 'missing_mail_provider' }
@@ -324,7 +324,7 @@ export async function handleShareInvite(req: Request): Promise<Response> {
     `/rest/v1/trips?id=eq.${encodeURIComponent(tripId)}&owner_id=eq.${encodeURIComponent(auth.user.id)}&select=id,title,owner_id`,
     token,
   )
-  if (!tripRes.ok) {
+  if (tripRes.ok === false) {
     return json(tripRes.status >= 400 ? tripRes.status : 500, {
       error: 'Failed to verify trip ownership',
       detail: tripRes.error,
@@ -339,7 +339,7 @@ export async function handleShareInvite(req: Request): Promise<Response> {
     `/rest/v1/trip_shares?trip_id=eq.${encodeURIComponent(tripId)}&invitee_email=eq.${encodeURIComponent(inviteeEmail)}&select=id`,
     token,
   )
-  if (!shareRes.ok || !shareRes.data?.[0]) {
+  if (shareRes.ok === false || !shareRes.data?.[0]) {
     return json(400, { error: 'Share record not found; add the share first' })
   }
 
@@ -369,7 +369,7 @@ export async function handleShareInvite(req: Request): Promise<Response> {
     registered,
   })
 
-  if (!sent.ok) {
+  if (sent.ok === false) {
     if (sent.error === 'missing_mail_provider') {
       return json(200, {
         sent: false,

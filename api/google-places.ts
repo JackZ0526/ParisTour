@@ -368,7 +368,7 @@ export async function handleGooglePlaces(req: Request): Promise<Response> {
   }
 
   const body =
-    req.method !== 'GET' && req.method !== 'HEAD'
+    req.method === 'POST'
       ? await req.arrayBuffer()
       : null
   if (isPhotoRequest) {

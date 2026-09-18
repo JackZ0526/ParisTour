@@ -153,12 +153,12 @@ function localApiDevPlugin(): Plugin {
           })
 
           // Resolve from project root (not Vite's .vite-temp copy of this config).
-          const modulePath = path.resolve(server.config.root, urlPath === '/api/jev' ? 'api/jev.ts' : 'api/share-invite.ts')
+          const modulePath = path.resolve(server.config.root, urlPath === '/api/jev' ? 'api/_lib/jev-handler.ts' : 'api/share-invite.ts')
           const mod = (await server.ssrLoadModule(modulePath)) as {
             handleShareInvite: (req: Request) => Promise<Response>
-            POST: (req: Request) => Promise<Response>
+            handleJev: (req: Request) => Promise<Response>
           }
-          const handler = urlPath === '/api/jev' ? mod.POST : mod.handleShareInvite
+          const handler = urlPath === '/api/jev' ? mod.handleJev : mod.handleShareInvite
           const response = await handler(request)
           const outBody = Buffer.from(await response.arrayBuffer())
           res.statusCode = response.status

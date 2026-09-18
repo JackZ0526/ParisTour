@@ -10,6 +10,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/jev",
+      "destination": "/api/openai?rest=jev"
+    },
+    {
       "source": "/api/timetable-lookup/(.*)",
       "destination": "/api/timetable-lookup?rest=$1"
     },
