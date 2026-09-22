@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -42,7 +43,7 @@ function formatRelativeTime(isoString?: string, locale: Locale = 'zh-CN'): strin
     if (diffDays < 30) return t('cloud.daysAgo', { count: diffDays })
     return locale === 'en'
       ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      : `${date.getMonth() + 1}月${date.getDate()}日`
+      : uiCopy('mb33f8fa7f5', { p0: (date.getMonth() + 1), p1: (date.getDate()) }, locale)
   } catch {
     return ''
   }

@@ -1,3 +1,5 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/TripChatPanel-2f4379'
 import type { TripChatTurn } from '../services/tripChat'
 import { useChatSession } from '../hooks/useChatSession'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -111,8 +113,8 @@ function noActionAppliedNote(locale: Locale = getLocale()): string {
   return (
     translate('chat.actionNoteNoChange' as never, undefined, locale) ||
     (locale === 'en'
-      ? 'Trip not changed — please tell me what to adjust.'
-      : '行程未改动，请再说一下你想要的调整。')
+      ? localizedCopy('m8c8f1de93c', undefined, 'en')
+      : localizedCopy('m8c8f1de93c', undefined, 'zh-CN'))
   )
 }
 
@@ -120,8 +122,8 @@ function detailConfirmMissingNote(locale: Locale = getLocale()): string {
   return (
     translate('chat.actionNoteConfirmMissing' as never, undefined, locale) ||
     (locale === 'en'
-      ? 'Trip not changed: please confirm on the place detail page.'
-      : '行程未改动：请在详情页确认是否加入。')
+      ? localizedCopy('mc9dd9a10c4', undefined, 'en')
+      : localizedCopy('mc9dd9a10c4', undefined, 'zh-CN'))
   )
 }
 
@@ -680,10 +682,10 @@ export function TripChatPanel({
     const stopNote =
       pending.note ||
       (pending.kind === 'replace'
-        ? translate('chat.actionNoteUsedToReplace' as never, { from: pending.fromPlaceName || translate('chat.actionNoteOriginalPlace' as never, undefined, locale) || (locale === 'en' ? 'the original place' : '原地点') }, locale) ||
+        ? translate('chat.actionNoteUsedToReplace' as never, { from: pending.fromPlaceName || translate('chat.actionNoteOriginalPlace' as never, undefined, locale) || (locale === 'en' ? localizedCopy('mce3ebf5a94', undefined, 'en') : localizedCopy('mce3ebf5a94', undefined, 'zh-CN')) }, locale) ||
           (locale === 'en'
-            ? `Used to replace “${pending.fromPlaceName || 'the original place'}”`
-            : `用于替换「${pending.fromPlaceName || '原地点'}」`)
+            ? localizedCopy('m7da68384ce', { p0: (pending.fromPlaceName || localizedCopy('mce3ebf5a94', undefined, 'en')) }, 'en')
+            : localizedCopy('m7da68384ce', { p0: (pending.fromPlaceName || uiCopy('m450121ee1b', undefined)) }, 'zh-CN'))
         : '')
     const detailKeys = placeDetailKeysFromPlace(place)
     const bypass = pendingStoryRegenToken > 0
@@ -930,20 +932,20 @@ export function TripChatPanel({
           (hasUsefulNote ? travelerNote : undefined) ||
           ta.description ||
           (locale === 'en'
-            ? `${ta.name}, a good fit for day ${input.dayNum} of the trip.`
-            : `${ta.name}，适合安排进第 ${input.dayNum} 天行程。`),
+            ? localizedCopy('mc1f5f88e6d', { p0: (ta.name), p1: (input.dayNum) }, 'en')
+            : localizedCopy('mc1f5f88e6d', { p0: (ta.name), p1: (input.dayNum) }, 'zh-CN')),
         ratingHint:
           ta.rating != null
             ? `Tripadvisor ★ ${ta.rating.toFixed(1)}`
             : locale === 'en'
-              ? 'Tripadvisor attraction'
-              : 'Tripadvisor 景点',
+              ? localizedCopy('ma60834f419', undefined, 'en')
+              : localizedCopy('ma60834f419', undefined, 'zh-CN'),
         image: ta.photos[0] || FALLBACK_IMAGE,
         location: ta.location,
         googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
           `${ta.name} Paris`,
         )}`,
-        durationHint: t('chat.durationMinutes90') || (locale === 'en' ? '90 min' : '90 分钟'),
+        durationHint: t('chat.durationMinutes90') || (locale === 'en' ? localizedCopy('m881dbd17bc', undefined, 'en') : localizedCopy('m881dbd17bc', undefined, 'zh-CN')),
       }
     }
 
@@ -969,7 +971,7 @@ export function TripChatPanel({
     if (!details?.location) {
       if (maxDistanceMeters) {
         throw new Error(
-          `没有在当前住宿附近验证到「${input.placeName}」，已取消操作，避免误选外地同名地点。`,
+          uiCopy('mc4a2cb08ad', { p0: (input.placeName) }),
         )
       }
       throw new Error(t('errors.placeNameNotFoundGeneric', { name: input.placeName }))
@@ -982,7 +984,7 @@ export function TripChatPanel({
     let description =
       (hasUsefulNote ? travelerNote : undefined) ||
       details.summary ||
-      `${details.name}，适合安排进第 ${input.dayNum} 天行程。`
+      uiCopy('m3177b5b19d', { p0: (details.name), p1: (input.dayNum) })
 
     if (isLlmConfigured() && !hasUsefulNote) {
       const blurb = await generatePlaceDescription({
@@ -1015,14 +1017,14 @@ export function TripChatPanel({
       ratingHint: details.rating
         ? `Google ${details.rating}`
         : locale === 'en'
-          ? 'Google place'
-          : 'Google 地点',
+          ? localizedCopy('m31a7b4bf24', undefined, 'en')
+          : localizedCopy('m31a7b4bf24', undefined, 'zh-CN'),
       image: websitePhoto || FALLBACK_IMAGE,
       location: details.location,
       googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.name + ' Paris')}`,
       durationHint: placeType === 'cafe'
-        ? (t('chat.durationMinutes45') || (locale === 'en' ? '45 min' : '45 分钟'))
-        : (t('chat.durationMinutes90') || (locale === 'en' ? '90 min' : '90 分钟')),
+        ? (t('chat.durationMinutes45') || (locale === 'en' ? localizedCopy('m0c4f220b62', undefined, 'en') : localizedCopy('m0c4f220b62', undefined, 'zh-CN')))
+        : (t('chat.durationMinutes90') || (locale === 'en' ? localizedCopy('m881dbd17bc', undefined, 'en') : localizedCopy('m881dbd17bc', undefined, 'zh-CN'))),
     }
   }
 
@@ -1038,13 +1040,13 @@ export function TripChatPanel({
         handlers.setHotel(selectedHotel)
         persistHotelState(workingCandidates, selectedHotel)
         return {
-          note: `候选项里已有「${existing.name}」，已设为当前酒店`,
+          note: uiCopy('m0375936601', { p0: (existing.name) }),
           candidates: workingCandidates,
           hotel: selectedHotel,
         }
       }
       return {
-        note: `候选项里已有「${existing.name}」`,
+        note: uiCopy('mdc01c8aec0', { p0: (existing.name) }),
         candidates: workingCandidates,
         hotel: workingHotel,
       }
@@ -1061,14 +1063,14 @@ export function TripChatPanel({
       handlers.setHotel(selectedHotel)
       persistHotelState(next, selectedHotel)
       return {
-        note: `已添加酒店「${card.name}」并设为当前住宿`,
+        note: uiCopy('mc0508cc09e', { p0: (card.name) }),
         candidates: next,
         hotel: selectedHotel,
       }
     }
     persistHotelState(next, workingHotel)
     return {
-      note: `已添加酒店候选项「${card.name}」`,
+      note: uiCopy('m0e7f0545df', { p0: (card.name) }),
       candidates: next,
       hotel: workingHotel,
     }
@@ -1101,14 +1103,14 @@ export function TripChatPanel({
       return {
         note:
           mode === 'end'
-            ? `已将「${place.name}」加到第 ${dayNum} 天末尾`
-            : `已将「${place.name}」按最顺路插入第 ${dayNum} 天`,
+            ? uiCopy('md119403ddd', { p0: (place.name), p1: (dayNum) })
+            : uiCopy('mfac725e9c7', { p0: (place.name), p1: (dayNum) }),
         appliedPlace: place,
       }
     }
 
     return {
-      note: `已找到「${place.name}」，请在详情页确认是否加入第 ${dayNum} 天`,
+      note: uiCopy('m8cd3ee90a7', { p0: (place.name), p1: (dayNum) }),
       pending: {
         id: `add-${place.id}`,
         kind: 'add',
@@ -1153,7 +1155,7 @@ export function TripChatPanel({
         action.fromPlaceName?.trim() ||
         action.placeType ||
         t('chat.actionNotePlaceFallback') ||
-        (locale === 'en' ? 'Place' : '地点')
+        (locale === 'en' ? localizedCopy('m248dc35bff', undefined, 'en') : localizedCopy('m248dc35bff', undefined, 'zh-CN'))
       throw new Error(t('errors.placeNotReplaceable', { dayNum, label }))
     }
 
@@ -1180,13 +1182,13 @@ export function TripChatPanel({
         return { ...d, stops }
       })
       return {
-        note: `已将第 ${dayNum} 天的「${hit.place.name}」替换为「${place.name}」`,
+        note: uiCopy('mb943ca3c51', { p0: (dayNum), p1: (hit.place.name), p2: (place.name) }),
         nextDays,
       }
     }
 
     return {
-      note: `已找到「${place.name}」，请在详情页确认是否替换「${hit.place.name}」`,
+      note: uiCopy('mee4a48d28f', { p0: (place.name), p1: (hit.place.name) }),
       pending: {
         id: `replace-${hit.stopId}-${place.id}`,
         kind: 'replace',
@@ -1336,11 +1338,11 @@ export function TripChatPanel({
       const confirmNote =
         recovered.kind === 'replace'
           ? locale === 'en'
-            ? `Found “${recovered.place.name}”. Please confirm on the detail page whether to replace “${recovered.fromPlaceName || 'the original place'}”.`
-            : `已找到「${recovered.place.name}」，请在详情页确认是否替换「${recovered.fromPlaceName || '原地点'}」`
+            ? localizedCopy('mca3a321586', { p0: (recovered.place.name), p1: (recovered.fromPlaceName || localizedCopy('mce3ebf5a94', undefined, 'en')) }, 'en')
+            : localizedCopy('mca3a321586', { p0: (recovered.place.name), p1: (recovered.fromPlaceName || uiCopy('m450121ee1b', undefined)) }, 'zh-CN')
           : locale === 'en'
-            ? `Found “${recovered.place.name}”. Please confirm on the detail page whether to add it to day ${recovered.dayNum}.`
-            : `已找到「${recovered.place.name}」，请在详情页确认是否加入第 ${recovered.dayNum} 天`
+            ? localizedCopy('m2f9e7007ce', { p0: (recovered.place.name), p1: (recovered.dayNum) }, 'en')
+            : localizedCopy('m2f9e7007ce', { p0: (recovered.place.name), p1: (recovered.dayNum) }, 'zh-CN')
       const detailConfirmNeedle = locale === 'en' ? /confirm on the detail page/i : /请在详情页确认/
       return {
         reply: clarifyReplyForPending(reply, [recovered]),
@@ -1368,7 +1370,7 @@ export function TripChatPanel({
   function cancelPending(rejected: PendingPlaceConfirm) {
     if (rejected.status === 'rerecommending') return
     setPendingPlaces((prev) => prev.filter((p) => p.id !== rejected.id))
-    setActionNotes((prev) => [...prev, `已取消「${rejected.place.name}」。`])
+    setActionNotes((prev) => [...prev, uiCopy('ma88fa61b51', { p0: (rejected.place.name) })])
   }
 
   function confirmPending(pending: PendingPlaceConfirm) {
@@ -1391,26 +1393,26 @@ export function TripChatPanel({
 
       if (pending.kind === 'replace') {
         if (!pending.replaceStopId) {
-          const from = pending.fromPlaceName || '原地点'
+          const from = pending.fromPlaceName || uiCopy('m450121ee1b', undefined)
           setActionNotes((prev) => [
             ...prev,
             (translate('chat.actionNoteReplaceMissingStopInfo' as never, { from }, locale) ||
               (locale === 'en'
-                ? `Couldn’t replace “${from}”: missing stop info, please say it again.`
-                : `无法替换「${from}」：缺少行程停点信息，请再说一次。`)),
+                ? localizedCopy('mae9f401a9a', { p0: (from) }, 'en')
+                : localizedCopy('mae9f401a9a', { p0: (from) }, 'zh-CN'))),
           ])
           return
         }
         handlers.replaceStop(pending.dayNum, pending.replaceStopId, place, {
           select: false,
         })
-        const from = pending.fromPlaceName || '原地点'
+        const from = pending.fromPlaceName || uiCopy('m450121ee1b', undefined)
         setActionNotes((prev) => [
           ...prev,
           (translate('chat.actionNoteReplacedOnDay' as never, { from, to: place.name, day: pending.dayNum }, locale) ||
             (locale === 'en'
-              ? `Replaced “${from}” with “${place.name}” on day ${pending.dayNum}.`
-              : `已将第 ${pending.dayNum} 天的「${from}」替换为「${place.name}」`)),
+              ? localizedCopy('m35c57f4c67', { p0: (from), p1: (place.name), p2: (pending.dayNum) }, 'en')
+              : localizedCopy('m35c57f4c67', { p0: (pending.dayNum), p1: (from), p2: (place.name) }, 'zh-CN'))),
         ])
         return
       }
@@ -1423,12 +1425,12 @@ export function TripChatPanel({
         mode === 'end'
           ? (translate('chat.actionNoteAddedToEndOfDay' as never, { place: place.name, day: pending.dayNum }, locale) ||
               (locale === 'en'
-                ? `Added “${place.name}” to the end of day ${pending.dayNum}.`
-                : `已将「${place.name}」加到第 ${pending.dayNum} 天末尾`))
+                ? localizedCopy('m686aa7d733', { p0: (place.name), p1: (pending.dayNum) }, 'en')
+                : localizedCopy('m686aa7d733', { p0: (place.name), p1: (pending.dayNum) }, 'zh-CN')))
           : (translate('chat.actionNoteAddedByRouteOfDay' as never, { place: place.name, day: pending.dayNum }, locale) ||
               (locale === 'en'
-                ? `Inserted “${place.name}” on the most convenient spot of day ${pending.dayNum}.`
-                : `已将「${place.name}」按最顺路插入第 ${pending.dayNum} 天`)),
+                ? localizedCopy('m34866db529', { p0: (place.name), p1: (pending.dayNum) }, 'en')
+                : localizedCopy('m34866db529', { p0: (place.name), p1: (pending.dayNum) }, 'zh-CN'))),
       ])
     } finally {
       setConfirmBusy(false)
@@ -1459,7 +1461,7 @@ export function TripChatPanel({
       { role: 'assistant', content: '' },
     ])
     setActionNotes([
-      t('chat.actionNoteReRecommending') || (locale === 'en' ? 'Re-recommending…' : '正在重新推荐…'),
+      t('chat.actionNoteReRecommending') || (locale === 'en' ? localizedCopy('m64dddce8b8', undefined, 'en') : localizedCopy('m64dddce8b8', undefined, 'zh-CN')),
     ])
     setBusy(true)
     setStreamingReply(false)
@@ -1572,7 +1574,7 @@ export function TripChatPanel({
                       ? {
                           ...s,
                           status: 'pending' as const,
-                          label: t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'),
+                          label: t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? localizedCopy('m3785b62630', undefined, 'en') : localizedCopy('m3785b62630', undefined, 'zh-CN')),
                         }
                       : s,
                   ),
@@ -1593,8 +1595,8 @@ export function TripChatPanel({
               activateChatWorkStep(prev, 'apply', {
                 labels: {
                   apply: detail?.pending
-                    ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'))
-                    : (t('chat.actionNoteApplying') || (locale === 'en' ? 'Applying changes…' : '应用改动…')),
+                    ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? localizedCopy('m3785b62630', undefined, 'en') : localizedCopy('m3785b62630', undefined, 'zh-CN')))
+                    : (t('chat.actionNoteApplying') || (locale === 'en' ? localizedCopy('m3808c735e0', undefined, 'en') : localizedCopy('m3808c735e0', undefined, 'zh-CN'))),
                 },
                 badges: {
                   apply: detail?.badges,
@@ -1629,8 +1631,8 @@ export function TripChatPanel({
             ? []
             : [t('chat.actionNoteNoNewRecommendations') ||
               (locale === 'en'
-                ? 'No new recommendations came back. Try a different area or style.'
-                : '没有拿到新的地点推荐，请再说一下你想要的风格或区域。')],
+                ? localizedCopy('mf0f3b451cc', undefined, 'en')
+                : localizedCopy('mf0f3b451cc', undefined, 'zh-CN'))],
       )
       setPendingPlaces((prev) => {
         const rest = prev.filter((p) => p.id !== rejected.id)
@@ -1716,8 +1718,8 @@ export function TripChatPanel({
       const compactLabel = compactNames
         ? (translate('chat.actionNoteResolvePlacesActive' as never, { names: compactNames }, locale) ||
             (locale === 'en'
-              ? `Verifying places: ${compactNames}`
-              : `正在核对地点：${compactNames}`))
+              ? localizedCopy('m67818d77ca', { p0: (compactNames) }, 'en')
+              : localizedCopy('m67818d77ca', { p0: (compactNames) }, 'zh-CN')))
         : chatWorkStepLabel('resolvePlaces', locale)
       options?.onProgress?.('resolvePlaces', {
         label: compactLabel,
@@ -1733,7 +1735,7 @@ export function TripChatPanel({
         if (action.type === 'switch_day') {
           activeDay = action.day
           handlers.switchDay(action.day)
-          notes.push(`已切换到第 ${action.day} 天`)
+          notes.push(uiCopy('m2fe1c77eab', { p0: (action.day) }))
           continue
         }
 
@@ -1742,12 +1744,12 @@ export function TripChatPanel({
           const hit = matchPlaceInDay(day, customPlaces, action.placeName)
           if (!hit) {
             notes.push(
-              `当前第 ${activeDay} 天没有「${action.placeName}」。若要改其它天，请明确说「第N天」。`,
+              uiCopy('m00b79ad799', { p0: (activeDay), p1: (action.placeName) }),
             )
             continue
           }
           handlers.selectPlace(hit.placeId)
-          notes.push(`已选中「${hit.place.name}」`)
+          notes.push(uiCopy('mca8e0332f7', { p0: (hit.place.name) }))
           continue
         }
 
@@ -1783,12 +1785,12 @@ export function TripChatPanel({
 
           const day = workingDays.find((d) => d.day === dayNum)
           if (!day) {
-            notes.push(`没有第 ${dayNum} 天`)
+            notes.push(uiCopy('mae0cc9db4e', { p0: (dayNum) }))
             continue
           }
           const hit = matchPlaceInDay(day, customPlaces, action.placeName)
           if (!hit) {
-            notes.push(`第 ${dayNum} 天没有「${action.placeName}」`)
+            notes.push(uiCopy('mc58388823e', { p0: (dayNum), p1: (action.placeName) }))
             continue
           }
           handlers.removeStop(dayNum, hit.stopId)
@@ -1797,7 +1799,7 @@ export function TripChatPanel({
               ? { ...d, stops: d.stops.filter((_, stopIdx) => stopIdx !== hit.stopIndex) }
               : d,
           )
-          notes.push(`已从第 ${dayNum} 天移除「${hit.place.name}」`)
+          notes.push(uiCopy('m18906e5d19', { p0: (dayNum), p1: (hit.place.name) }))
           continue
         }
 
@@ -1819,17 +1821,17 @@ export function TripChatPanel({
           const dayNum = action.day || activeDay
           const day = workingDays.find((d) => d.day === dayNum)
           if (!day) {
-            notes.push(`没有第 ${dayNum} 天`)
+            notes.push(uiCopy('mae0cc9db4e', { p0: (dayNum) }))
             continue
           }
           const hit = matchPlaceInDay(day, customPlaces, action.placeName)
           if (!hit) {
-            notes.push(`第 ${dayNum} 天没有「${action.placeName}」`)
+            notes.push(uiCopy('mc58388823e', { p0: (dayNum), p1: (action.placeName) }))
             continue
           }
           const to = Math.min(action.toIndex, Math.max(0, day.stops.length - 1))
           handlers.reorderStop(dayNum, hit.stopIndex, to)
-          notes.push(`已将「${hit.place.name}」调整到第 ${dayNum} 天第 ${to + 1} 位`)
+          notes.push(uiCopy('m8161cafbd8', { p0: (hit.place.name), p1: (dayNum), p2: (to + 1) }))
           continue
         }
 
@@ -1889,7 +1891,7 @@ export function TripChatPanel({
                         placeId: result.appliedPlace!.id,
                         note: result.appliedPlace!.description,
                         walkLevel: 'short',
-                        duration: result.appliedPlace!.durationHint || t('chat.durationMinutes60') || (locale === 'en' ? '60 min' : '60 分钟'),
+                        duration: result.appliedPlace!.durationHint || t('chat.durationMinutes60') || (locale === 'en' ? localizedCopy('mf9f13aa5ba', undefined, 'en') : localizedCopy('mf9f13aa5ba', undefined, 'zh-CN')),
                       },
                     ],
                   }
@@ -1904,14 +1906,14 @@ export function TripChatPanel({
         if (action.type === 'select_hotel') {
           const hit = matchHotelCandidate(workingCandidates, action.hotelName)
           if (!hit) {
-            notes.push(`候选项里没有「${action.hotelName}」，可让我用 add_hotel 添加`)
+            notes.push(uiCopy('mcf1e959fff', { p0: (action.hotelName) }))
             continue
           }
           const selectedHotel = candidateToSelected(hit)
           handlers.setHotel(selectedHotel)
           persistHotelState(workingCandidates, selectedHotel)
           workingHotel = selectedHotel
-          notes.push(`已将住宿切换为「${hit.name}」`)
+          notes.push(uiCopy('mdc0d3a0304', { p0: (hit.name) }))
           continue
         }
 
@@ -1928,13 +1930,13 @@ export function TripChatPanel({
           if (!hit) {
             notes.push(
               locale === 'en'
-                ? `“${action.hotelName}” is not in your hotel candidates`
-                : `候选项里没有「${action.hotelName}」`,
+                ? localizedCopy('m0e1a944cd1', { p0: (action.hotelName) }, 'en')
+                : localizedCopy('m0e1a944cd1', { p0: (action.hotelName) }, 'zh-CN'),
             )
             continue
           }
           if (workingCandidates.length <= 1) {
-            notes.push(t('chat.actionNoteAtLeastOneHotel') || (locale === 'en' ? 'Keep at least one hotel candidate.' : '至少保留一家酒店候选项'))
+            notes.push(t('chat.actionNoteAtLeastOneHotel') || (locale === 'en' ? localizedCopy('m8d8f73ef65', undefined, 'en') : localizedCopy('m8d8f73ef65', undefined, 'zh-CN')))
             continue
           }
           const next = workingCandidates.filter((h) => h.id !== hit.id)
@@ -1946,10 +1948,10 @@ export function TripChatPanel({
             handlers.setHotel(selectedHotel)
             persistHotelState(next, selectedHotel)
             workingHotel = selectedHotel
-            notes.push(`已移除「${hit.name}」，并改选「${fallback.name}」`)
+            notes.push(uiCopy('m876ecf729c', { p0: (hit.name), p1: (fallback.name) }))
           } else {
             persistHotelState(next, workingHotel)
-            notes.push(`已从候选项移除「${hit.name}」`)
+            notes.push(uiCopy('m6611c301ed', { p0: (hit.name) }))
           }
           continue
         }
@@ -1966,8 +1968,8 @@ export function TripChatPanel({
           workingHotel = result.selected
           notes.push(
             action.preferences?.trim()
-              ? `已按「${action.preferences.trim()}」重新推荐 ${result.candidates.filter((c) => c.source === 'llm').length} 家酒店，并选中「${result.selected.name}」`
-              : `已重新推荐一批酒店，并选中「${result.selected.name}」`,
+              ? uiCopy('mc84e048685', { p0: (action.preferences.trim()), p1: (result.candidates.filter((c) => c.source === 'llm').length), p2: (result.selected.name) })
+              : uiCopy('m0024aa6ffb', { p0: (result.selected.name) }),
           )
           continue
         }
@@ -1975,7 +1977,7 @@ export function TripChatPanel({
         if (action.type === 'replace_hotel') {
           const from = matchHotelCandidate(workingCandidates, action.fromHotelName)
           if (!from) {
-            notes.push(`候选项里没有「${action.fromHotelName}」`)
+            notes.push(uiCopy('m3c11019f0a', { p0: (action.fromHotelName) }))
             continue
           }
           const result = await replaceOneHotelCandidate({
@@ -1999,7 +2001,7 @@ export function TripChatPanel({
           for (const name of action.fromHotelNames) {
             const hit = matchHotelCandidate(workingCandidates, name)
             if (!hit) {
-              notes.push(`候选项里没有「${name}」`)
+              notes.push(uiCopy('m3c11019f0a', { p0: (name) }))
               continue
             }
             if (!fromHotels.some((h) => h.id === hit.id)) fromHotels.push(hit)
@@ -2018,7 +2020,7 @@ export function TripChatPanel({
           notes.push(result.note)
         }
       } catch (err) {
-        notes.push(err instanceof Error ? err.message : t('chat.actionNoteOpFailed') || (locale === 'en' ? 'Action failed' : '操作失败'))
+        notes.push(err instanceof Error ? err.message : t('chat.actionNoteOpFailed') || (locale === 'en' ? localizedCopy('mb56540f339', undefined, 'en') : localizedCopy('mb56540f339', undefined, 'zh-CN')))
       }
     }
 
@@ -2062,8 +2064,8 @@ export function TripChatPanel({
     setActionNotes([])
     // New user turn supersedes any lingering recommend-confirm sheet.
     setPendingPlaces([])
-    setBusyUserText(message || (locale === 'en' ? 'Analyzing image…' : '分析图片中…'))
-    beginWorkPipeline(message || (locale === 'en' ? 'Image message' : '图片消息'), imagesToSend.length > 0)
+    setBusyUserText(message || (locale === 'en' ? localizedCopy('m29996ce910', undefined, 'en') : localizedCopy('m29996ce910', undefined, 'zh-CN')))
+    beginWorkPipeline(message || (locale === 'en' ? localizedCopy('me535989b31', undefined, 'en') : localizedCopy('me535989b31', undefined, 'zh-CN')), imagesToSend.length > 0)
     if (!retry) {
       setInput('')
       setAskQuote(null)
@@ -2114,7 +2116,7 @@ export function TripChatPanel({
             if (imagesToSend.length > 0) {
               return activateChatWorkStep(relabeled, 'visualAnalysis', {
                 labels: {
-                  visualAnalysis: locale === 'en' ? 'Analyzing image…' : '正在分析图片…',
+                  visualAnalysis: locale === 'en' ? localizedCopy('m7a7e4c1130', undefined, 'en') : localizedCopy('m7a7e4c1130', undefined, 'zh-CN'),
                 },
                 badges: {
                   visualAnalysis: visualAnalysisStepBadges(
@@ -2142,7 +2144,7 @@ export function TripChatPanel({
             setWorkSteps((prev) =>
               activateChatWorkStep(prev, 'visualAnalysis', {
                 labels: {
-                  visualAnalysis: locale === 'en' ? 'Analyzing image…' : '正在分析图片…',
+                  visualAnalysis: locale === 'en' ? localizedCopy('m7a7e4c1130', undefined, 'en') : localizedCopy('m7a7e4c1130', undefined, 'zh-CN'),
                 },
                 badges: {
                   visualAnalysis: detail
@@ -2251,7 +2253,7 @@ export function TripChatPanel({
                       ? {
                           ...s,
                           status: 'pending' as const,
-                          label: t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'),
+                          label: t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? localizedCopy('m3785b62630', undefined, 'en') : localizedCopy('m3785b62630', undefined, 'zh-CN')),
                         }
                       : s,
                   ),
@@ -2272,8 +2274,8 @@ export function TripChatPanel({
               activateChatWorkStep(prev, 'apply', {
                 labels: {
                   apply: detail?.pending
-                    ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? 'Opening confirm page…' : '打开确认页…'))
-                    : (t('chat.actionNoteApplying') || (locale === 'en' ? 'Applying changes…' : '应用改动…')),
+                    ? (t('chat.actionNoteOpeningConfirm') || (locale === 'en' ? localizedCopy('m3785b62630', undefined, 'en') : localizedCopy('m3785b62630', undefined, 'zh-CN')))
+                    : (t('chat.actionNoteApplying') || (locale === 'en' ? localizedCopy('m3808c735e0', undefined, 'en') : localizedCopy('m3808c735e0', undefined, 'zh-CN'))),
                 },
                 badges: {
                   apply: detail?.badges,
@@ -2750,7 +2752,7 @@ export function TripChatPanel({
                                   <img
                                     key={idx}
                                     src={img}
-                                    alt="Attached"
+                                    alt={uiCopy('attachedImage')}
                                     className="max-h-40 max-w-full rounded-lg object-cover shadow-sm ring-1 ring-white/20"
                                   />
                                 ))}
@@ -2788,11 +2790,11 @@ export function TripChatPanel({
               <div className="flex items-start gap-2 rounded-2xl border border-red-200/80 bg-red-50/80 dark:border-red-900/50 dark:bg-red-950/40 p-3 text-xs leading-relaxed text-red-900 dark:text-red-300 shadow-2xs backdrop-blur-md">
                 <span className="shrink-0 mt-[5px] h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
                 <p className="min-w-0 flex-1">{error}</p>
-                {failedRequest && <button type="button" disabled={busy} onClick={() => void submit(failedRequest.text, failedRequest)}>{locale === 'en' ? 'Retry' : '重试'}</button>}
+                {failedRequest && <button type="button" disabled={busy} onClick={() => void submit(failedRequest.text, failedRequest)}>{locale === 'en' ? localizedCopy('m56a418dc24', undefined, 'en') : localizedCopy('m56a418dc24', undefined, 'zh-CN')}</button>}
               </div>
             )}
-            {storageConflict && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">{locale === 'en' ? 'This chat changed in another tab. Copy your draft, then refresh to continue.' : '另一窗口已更新此聊天。请先复制草稿，再刷新继续。'}</p>}
-            {storageFailed && <p role="status" className="text-xs text-[var(--stone)]">{locale === 'en' ? 'Chat could not be saved on this device.' : '当前设备暂时无法保存聊天记录。'}</p>}
+            {storageConflict && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">{locale === 'en' ? localizedCopy('m4534090414', undefined, 'en') : localizedCopy('m4534090414', undefined, 'zh-CN')}</p>}
+            {storageFailed && <p role="status" className="text-xs text-[var(--stone)]">{locale === 'en' ? localizedCopy('m0c50a0d423', undefined, 'en') : localizedCopy('m0c50a0d423', undefined, 'zh-CN')}</p>}
             <div ref={bottomRef} />
           </div>
 
@@ -2811,7 +2813,7 @@ export function TripChatPanel({
                   <div key={idx} className="group relative inline-block">
                     <img
                       src={img}
-                      alt="Preview"
+                      alt={uiCopy('imagePreview')}
                       className="h-12 w-12 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/20 shadow-sm"
                     />
                     <button
@@ -2939,36 +2941,36 @@ export function TripChatPanel({
                       if (activeWorkStep) {
                         switch (activeWorkStep.id) {
                           case 'preprocessPlan':
-                            dynamicLabel = locale === 'en' ? 'Planning…' : '规划策略中…'
+                            dynamicLabel = locale === 'en' ? localizedCopy('md99cd8cdd6', undefined, 'en') : localizedCopy('md99cd8cdd6', undefined, 'zh-CN')
                             spinnerMode = requestThinkingEnabled ? 'thinking' : 'generating'
                             break
                           case 'visualAnalysis':
-                            dynamicLabel = locale === 'en' ? 'Analyzing images…' : '解析图片中…'
+                            dynamicLabel = locale === 'en' ? localizedCopy('m3ad95ee321', undefined, 'en') : localizedCopy('m3ad95ee321', undefined, 'zh-CN')
                             spinnerMode = 'generating'
                             break
                           case 'webSearch':
-                            dynamicLabel = locale === 'en' ? 'Searching web…' : '搜索网络中…'
+                            dynamicLabel = locale === 'en' ? localizedCopy('mdcff43e89b', undefined, 'en') : localizedCopy('mdcff43e89b', undefined, 'zh-CN')
                             spinnerMode = 'generating'
                             break
                           case 'generate':
                             if (requestThinkingEnabled && !streamingReply) {
-                              dynamicLabel = locale === 'en' ? 'Thinking…' : '深度思考中…'
+                              dynamicLabel = locale === 'en' ? localizedCopy('mb28b1ee564', undefined, 'en') : localizedCopy('mb28b1ee564', undefined, 'zh-CN')
                               spinnerMode = 'thinking'
                             } else {
-                              dynamicLabel = locale === 'en' ? 'Generating…' : '生成回答中…'
+                              dynamicLabel = locale === 'en' ? localizedCopy('m7c87a2abf2', undefined, 'en') : localizedCopy('m7c87a2abf2', undefined, 'zh-CN')
                               spinnerMode = 'generating'
                             }
                             break
                           case 'parse':
-                            dynamicLabel = locale === 'en' ? 'Parsing actions…' : '解析动作中…'
+                            dynamicLabel = locale === 'en' ? localizedCopy('mf58f4bb436', undefined, 'en') : localizedCopy('mf58f4bb436', undefined, 'zh-CN')
                             spinnerMode = 'generating'
                             break
                           case 'resolvePlaces':
-                            dynamicLabel = locale === 'en' ? 'Verifying places…' : '核对地点中…'
+                            dynamicLabel = locale === 'en' ? localizedCopy('m2267402ab3', undefined, 'en') : localizedCopy('m2267402ab3', undefined, 'zh-CN')
                             spinnerMode = 'generating'
                             break
                           case 'apply':
-                            dynamicLabel = locale === 'en' ? 'Updating itinerary…' : '应用改动中…'
+                            dynamicLabel = locale === 'en' ? localizedCopy('med3d8a78f0', undefined, 'en') : localizedCopy('med3d8a78f0', undefined, 'zh-CN')
                             spinnerMode = 'generating'
                             break
                           default:
@@ -3086,8 +3088,8 @@ export function TripChatPanel({
               {activePending.status === 'rerecommending' ? (
                 <div className="rounded-xl bg-white/80 px-3 py-2">
                   <LoadingIndicator
-                    thinkingLabel="正在重新思考推荐…"
-                    generatingLabel="正在重新推荐…"
+                    thinkingLabel={uiCopy('mabc44440fd', undefined)}
+                    generatingLabel={uiCopy('m2fdca9e1ca', undefined)}
                     showDots
                     size="sm"
                     mode="thinking"
@@ -3098,8 +3100,8 @@ export function TripChatPanel({
                 <>
                   <p className="text-sm text-[var(--stone)]">
                     {activePending.kind === 'replace'
-                      ? `确认用「${activePending.place.name}」替换「${activePending.fromPlaceName}」吗？`
-                      : `确认将「${activePending.place.name}」加入第 ${activePending.dayNum} 天吗？`}
+                      ? uiCopy('m877668d980', { p0: (activePending.place.name), p1: (activePending.fromPlaceName) })
+                      : uiCopy('m8e06c37ded', { p0: (activePending.place.name), p1: (activePending.dayNum) })}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -3110,8 +3112,8 @@ export function TripChatPanel({
                     >
                       {confirmBusy && <ButtonSpinner />}
                       {activePending.kind === 'replace'
-                        ? (t('chat.actionNoteConfirmReplace') || (locale === 'en' ? 'Confirm replace' : '确认替换'))
-                        : (t('chat.actionNoteAddToTrip') || (locale === 'en' ? 'Add to trip' : '加入行程'))}
+                        ? (t('chat.actionNoteConfirmReplace') || (locale === 'en' ? localizedCopy('m723bc307f6', undefined, 'en') : localizedCopy('m723bc307f6', undefined, 'zh-CN')))
+                        : (t('chat.actionNoteAddToTrip') || (locale === 'en' ? localizedCopy('m1ad771af76', undefined, 'en') : localizedCopy('m1ad771af76', undefined, 'zh-CN')))}
                     </button>
                     <button
                       type="button"
@@ -3119,8 +3121,7 @@ export function TripChatPanel({
                       onClick={() => void rerecommendPending(activePending)}
                       className="rounded-xl border border-[var(--stone)]/30 px-3 py-2.5 text-sm text-[var(--stone)] disabled:opacity-50"
                     >
-                      返回重新推荐
-                    </button>
+                      {uiCopy('m463a903903', undefined)}</button>
                   </div>
                 </>
               )}

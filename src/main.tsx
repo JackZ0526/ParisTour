@@ -15,13 +15,9 @@ initLocale()
 // Keep <title> in sync with the active locale. Static strings are
 // "Paris Tour" (brand) + a locale-aware tagline. We intentionally
 // don't depend on a particular destination so the app stays generic.
-const APP_TITLE_BY_LOCALE: Record<string, string> = {
-  'zh-CN': 'Paris Tour · 行程规划',
-  en: 'Paris Tour · Trip Planner',
-}
 function syncDocumentTitle() {
   const locale = getLocale()
-  const base = APP_TITLE_BY_LOCALE[locale] ?? APP_TITLE_BY_LOCALE.en
+  const base = 'Paris Tour'
   document.title = `${base} · ${translate('app.brandTagline', undefined, locale)}`
 }
 syncDocumentTitle()
@@ -80,16 +76,30 @@ if ('serviceWorker' in navigator) {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AuthProvider>
-      <AuthGate>
-        <App />
-        <AppUpdatePrompt />
-      </AuthGate>
-    </AuthProvider>
-  </StrictMode>,
-)
+function renderApp() {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <AuthProvider>
+        <AuthGate>
+          <App />
+          <AppUpdatePrompt />
+        </AuthGate>
+      </AuthProvider>
+    </StrictMode>,
+  )
+}
+
+// An explicit development URL can populate an empty local preview before hydration.
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('previewTrip') === 'sample') {
+  import('./dev/previewTrip').then(({ seedPreviewTrip }) => {
+    seedPreviewTrip()
+    const url = new URL(location.href)
+    url.searchParams.delete('previewTrip')
+    history.replaceState(null, '', url)
+  }).catch(() => console.warn('[preview] Could not load sample trip')).finally(renderApp)
+} else {
+  renderApp()
+}
 
 // PWA mode detection + orientation class for portrait lock.
 // Triggers `body.is-pwa` and `body.orientation-landscape` when running

@@ -45,7 +45,8 @@ describe('Google Places New V2 request shape', () => {
     expect(postHeaders['X-Goog-FieldMask']).toContain('places.websiteUri')
     expect(postHeaders['X-Goog-FieldMask']).not.toContain('places.reviews')
     expect(postHeaders['X-Goog-FieldMask']).not.toContain('places.editorialSummary')
-    expect(postHeaders['X-Goog-FieldMask']).not.toContain('places.currentOpeningHours')
+    expect(postHeaders['X-Goog-FieldMask']).toContain('places.currentOpeningHours')
+    expect(postHeaders['X-Goog-FieldMask']).toContain('places.regularOpeningHours')
   })
 
   it('strips the places/ resource prefix from details IDs', () => {

@@ -1,3 +1,9 @@
+import { englishPromptFragments, chinesePromptFragments } from '../../../i18n/prompts/place-fragments-d4bd87'
+import { runtimeCopy4 } from '../../../i18n/copy/place-runtime4-d4bd87'
+import { englishPrompt, chinesePrompt } from '../../../i18n/prompts/place-d4bd87'
+import { runtimeCopy3 } from '../../../i18n/copy/place-runtime3-d4bd87'
+import { runtimeCopy } from '../../../i18n/copy/place-runtime-d4bd87'
+import { localizedCopy } from '../../../i18n/copy/place-d4bd87'
 /**
  * LLM call sites for places (description / detail copy / day copy / recommend).
  *
@@ -69,25 +75,20 @@ export async function resolveOfficialWebsite(input: {
     async () => {
       const research = await openaiResponsesWithWebSearch({
         instructions: buildPrompt(
-          '查找商家自己的官方网站。只根据检索到的公开结果作答，禁止编造域名。',
+          runtimeCopy3('m0013ebef00', undefined),
           null,
-          `<hard_rules>
-- 只要该店自己的官网（他们自己的域名）。
-- 不要 Google Maps、Tripadvisor、Yelp、TheFork、Booking、Instagram、Facebook、Wikipedia。
-- 若 Google 给的网址是社交主页、404 或不存在，改找真正的官网。
-- 不确定就返回 null。
-</hard_rules>`,
+          runtimeCopy3('m4ae5d03e0f', undefined),
           jsonContract(
             '{ website: "https://..." | null }',
             '{ "website": "https://www.rest-maxan.com/" }',
           ),
         ),
         user: [
-          `地点：${name}`,
-          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
-          input.address ? `地址：${input.address}` : '',
-          input.googleWebsite ? `Google websiteUri：${input.googleWebsite}` : 'Google 未提供 websiteUri',
-          '输出 JSON：{"website":"https://..."} 或 {"website":null}',
+          runtimeCopy3('m6906ecd787', { p0: (name) }),
+          input.nameLocal ? runtimeCopy3('meb155f3d9f', { p0: (input.nameLocal) }) : '',
+          input.address ? runtimeCopy3('ma2b5dae902', { p0: (input.address) }) : '',
+          input.googleWebsite ? localizedCopy('m0132cf2cfb', { p0: (input.googleWebsite) }) : localizedCopy('websiteMissing'),
+          runtimeCopy3('me95967f264', undefined),
         ]
           .filter(Boolean)
           .join('\n'),
@@ -146,25 +147,20 @@ export async function resolveTripadvisorRestaurantListing(input: {
     async () => {
       const research = await openaiResponsesWithWebSearch({
         instructions: buildPrompt(
-          '查找这家餐厅在 Tripadvisor 上的餐厅详情页。只根据检索到的公开结果作答，禁止编造。',
+          runtimeCopy3('me7c5e673d6', undefined),
           null,
-          `<hard_rules>
-- 只要 tripadvisor.com / tripadvisor.fr 的 Restaurant_Review 链接，且 URL 里必须带 -d 数字 id（例如 -d5943832-）。
-- 不要酒店、景点、城市页，也不要搜索结果页。
-- 店名和地址必须能对上；不确定就返回 {"url":null}。
-- 禁止编造 URL，也禁止只输出 contentId / locationId 数字。
-</hard_rules>`,
+          runtimeCopy3('m6d4c334321', undefined),
           jsonContract(
             '{ url: "https://www.tripadvisor.com/Restaurant_Review-..." | null, name?: string }',
-            '{ "url": "https://www.tripadvisor.com/Restaurant_Review-g187147-d698123-Reviews-Bouillon_Chartier-Paris_Ile_de_France.html", "name": "Bouillon Chartier" }',
+            englishPrompt('m7df6fa414a'),
           ),
         ),
         user: [
-          `地点：${name}`,
-          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
-          input.address ? `地址：${input.address}` : '',
-          city ? `城市：${city}` : '',
-          '输出 JSON：{"url":"https://www.tripadvisor.com/Restaurant_Review-...","name":"..."} 或 {"url":null}',
+          runtimeCopy3('m6906ecd787', { p0: (name) }),
+          input.nameLocal ? runtimeCopy3('meb155f3d9f', { p0: (input.nameLocal) }) : '',
+          input.address ? runtimeCopy3('ma2b5dae902', { p0: (input.address) }) : '',
+          city ? runtimeCopy3('ma8de5b267b', { p0: (city) }) : '',
+          runtimeCopy3('m0c6af123cd', undefined),
         ]
           .filter(Boolean)
           .join('\n'),
@@ -215,23 +211,18 @@ export async function resolveAttractionCanonicalName(input: {
     async () => {
       const text = await generateText(
         buildPrompt(
-          '把旅行者口中的巴黎景点名称解析成 Tripadvisor 上常用的正式名称。',
+          runtimeCopy3('mbc90cf09b9', undefined),
           null,
-          `<hard_rules>
-- 只处理巴黎都会区的真实景点、博物馆、街道、公园。
-- nameEn 必须是拉丁字母的常用英文名（Tripadvisor 列表里会出现的那种，例如 "Champs-Elysees"、"Pont Neuf"、"Eiffel Tower"）。
-- 不确定、不是景点、或找不到对应地点时返回 {"nameEn":null}。
-- 禁止编造不存在的景点。
-</hard_rules>`,
+          runtimeCopy3('m3b4bd6d4e8', undefined),
           jsonContract(
             '{ nameEn: string | null, nameFr?: string, aliases?: string[] }',
-            '{ "nameEn": "Champs-Elysees", "nameFr": "Avenue des Champs-Élysées", "aliases": ["Champs-Élysées"] }',
+            englishPrompt('md94d8b5f81'),
           ),
         ),
         [
-          `地点：${name}`,
-          input.nameLocal ? `当地名称：${input.nameLocal}` : '',
-          '城市：Paris',
+          runtimeCopy3('m6906ecd787', { p0: (name) }),
+          input.nameLocal ? runtimeCopy3('meb155f3d9f', { p0: (input.nameLocal) }) : '',
+          runtimeCopy3('m283af41da7', undefined),
         ]
           .filter(Boolean)
           .join('\n'),
@@ -259,15 +250,15 @@ export async function generatePlaceDescription(input: {
     async () => {
       const system = buildPrompt(
         isEn
-          ? 'Travel copywriter. Write a concise, punchy 1-2 sentence itinerary note for a stop.'
-          : '旅行文案助手。用简短精炼的 1–2 句话为行程地点写游玩亮点。',
+          ? localizedCopy('m30a559e649', undefined, 'en')
+          : localizedCopy('m30a559e649', undefined, 'zh-CN'),
         null,
         `<hard_rules>
 - ${langRule}
 - ${
           isEn
-            ? '<output_format>1–2 short sentences (maximum 30 words). Focus strictly on what to do or see here. Do NOT write an encyclopedia essay, background history, or marketing fluff. No title, no bullet points.</output_format>'
-            : '<output_format>1–2 句精炼游玩亮点（不超过 40 字）。突出游览体验，切勿写长篇百科历史。不要标题，不要列表。</output_format>'
+            ? localizedCopy('m84997a6e3e', undefined, 'en')
+            : localizedCopy('m84997a6e3e', undefined, 'zh-CN')
         }
 </hard_rules>`,
         getCafeVsRestaurantRule(activeLocale),
@@ -278,16 +269,16 @@ export async function generatePlaceDescription(input: {
             `Type: ${input.type}`,
             input.address ? `Address: ${input.address}` : '',
             input.googleSummary ? `Reference: ${input.googleSummary}` : '',
-            'Output the short note directly without any title or formatting.',
+            englishPrompt('m728959227c'),
           ]
             .filter(Boolean)
             .join('\n')
         : [
-            `地点：${input.name}`,
-            `类型：${input.type}`,
-            input.address ? `地址：${input.address}` : '',
-            input.googleSummary ? `参考信息：${input.googleSummary}` : '',
-            '请直接输出简短亮点正文，不要标题。',
+            runtimeCopy3('m6906ecd787', { p0: (input.name) }),
+            runtimeCopy3('m984b5e7dd5', { p0: (input.type) }),
+            input.address ? runtimeCopy3('ma2b5dae902', { p0: (input.address) }) : '',
+            input.googleSummary ? runtimeCopy3('m594f56e51a', { p0: (input.googleSummary) }) : '',
+            runtimeCopy3('m769e7f4d11', undefined),
           ]
             .filter(Boolean)
             .join('\n')
@@ -328,88 +319,41 @@ function placeDetailHardRules(kind: 'attraction' | 'food' | 'other', locale: Loc
   const langRule = getLlmLanguageInstruction(locale)
   if (locale === 'en') {
     if (kind === 'attraction') {
-      return `<hard_rules>
-- ${langRule}
-- intro: Detailed, structured English intro in 2–3 short paragraphs separated by newlines. No subheadings or bullet points.
-  First paragraph explains what the place is, its history, origins, or significance.
-  Second paragraph describes the main highlights, atmosphere, and visitor experience.
-- reason: 2–3 sentences summarizing visit value, visitor review highlights, and route pacing.
-- tripFit: Always output an empty string.
-- Do not fabricate exact ticket prices or hours. Do not mention Tripadvisor/Google in the reason.
-- Field order: Write intro first, then reason.
-</hard_rules>`
+      return englishPrompt('m11f0c42ee9', { p0: (langRule) })
     }
     if (kind === 'food') {
-      return `<hard_rules>
-- ${langRule}
-- intro: Introduce the restaurant/cafe neighborhood, cuisine type, specialty dishes mentioned in reviews, and price level. 1–2 paragraphs separated by newlines.
-- reason: 2–3 sentences summarizing food reputation, route connection, and value.
-- tripFit: Always output an empty string.
-- Do not fabricate menus or exact prices.
-- Field order: Write intro first, then reason.
-</hard_rules>`
+      return englishPrompt('m029c6ef9c4', { p0: (langRule) })
     }
-    return `<hard_rules>
-- ${langRule}
-- intro: 2–3 sentence introduction explaining what it is and who it suits.
-- reason: 2–3 sentences explaining why it fits today's itinerary.
-- tripFit: Always output an empty string.
-- Field order: Write intro first, then reason.
-</hard_rules>`
+    return englishPrompt('m3e8be33ef9', { p0: (langRule) })
   }
 
   if (kind === 'attraction') {
-    return `<hard_rules>
-- ${langRule}
-- intro：详细、结构清晰的中文简介，2–3 小段，段与段用换行分隔，不要小标题或项目符号。
-  第一段写清楚这是什么地方，以及历史、建造缘由或相关故事；
-  第二段写主要看点、空间气质与参观体验。可吸收 existingDescription 与 listingDescription，不要整段照抄英文。
-- reason：2–3 句。综合参观价值、featuredReviews 里的游客评价要点、以及当天行程主题/节奏/前后停点。不要罗列评论原文。
-- tripFit：固定输出空字符串（地点详情页不展示此项）。
-- 不要推荐卢浮宫或凡尔赛；不要编造精确年代、营业时间、票价或欧元数字。
-- 推荐理由不要出现 Tripadvisor、Google 等产品名。
-- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
-</hard_rules>`
+    return chinesePrompt('m970b2b322d', { p0: (langRule) })
   }
   if (kind === 'food') {
-    return `<hard_rules>
-- ${langRule}
-- intro：介绍这家餐厅/咖啡馆的位置或片区、菜系或品类、资料或评论里提到的特色菜/招牌、以及价格档（只用 priceLevel；没有则不要编造具体欧元数字）。1–2 小段，换行分段，不要小标题。
-- reason：2–3 句。综合评论口碑、与当天行程的衔接（餐点时段与路线）、以及性价比。不要罗列评论原文。
-- tripFit：固定输出空字符串（地点详情页不展示此项）。
-- 不要推荐卢浮宫或凡尔赛；不要编造营业时间、菜单或未提供的价格。
-- 推荐理由不要出现 Tripadvisor、Google 等产品名。
-- 字段顺序：先写 intro（用户可见简介），再写 reason；不要先输出 reason。
-</hard_rules>`
+    return chinesePrompt('m0da3981a01', { p0: (langRule) })
   }
-  return `<hard_rules>
-- ${langRule}
-- intro：2–3 句中文简介，写清这是什么、氛围与适合谁。
-- reason：2–3 句，结合当天行程说明为何值得安排。
-- tripFit：固定输出空字符串。
-- 不要编造营业时间与价格；不要出现 Tripadvisor、Google 等产品名。
-- 字段顺序：先写 intro，再写 reason。
-</hard_rules>`
+  return chinesePrompt('mc913de69a5', { p0: (langRule) })
 }
 
 function placeDetailExample(kind: 'attraction' | 'food' | 'other', locale: Locale = getLocale()): string {
   if (locale === 'en') {
     if (kind === 'attraction') {
-      return '{ "intro": "The Arc de Triomphe is an iconic monument commissioned by Napoleon to celebrate French victories, standing proudly at the center of Place Charles de Gaulle with twelve grand avenues radiating outward.\\n\\nClimbing to the top offers panoramic views over the Champs-Élysées and La Défense. The Tomb of the Unknown Soldier and its eternal flame below add historical reverence to the visit.", "reason": "Serving as a visual anchor for the Right Bank classic day, it ties together urban scale and iconic vistas. Visitors appreciate the view, making it a great spacer between museums.", "tripFit": "" }'
+      return englishPrompt('ma48c7b294e')
     }
     if (kind === 'food') {
-      return '{ "intro": "Sphère is located in the 8th arrondissement, offering refined contemporary French dining with a focus on seasonal vegetables and seafood starters. Price level sits around €€, perfect for a sit-down meal between daytime stops.", "reason": "Diners consistently praise the stable execution and quiet ambiance. Fitting neatly into today\'s lunch slot, it keeps the pace relaxed before afternoon sights.", "tripFit": "" }'
+      return englishPrompt('mf452114730')
     }
-    return '{ "intro": "A classic riverside spot ideal for taking in the city atmosphere at a leisurely pace.", "reason": "Conveniently along today\'s route, serving as a brief and relaxing transition stop.", "tripFit": "" }'
+    return englishPrompt('mac66fe2b99')
   }
 
   if (kind === 'attraction') {
-    return '{ "intro": "凯旋门是拿破仑为纪念法国军队胜利下令建造的纪念碑，矗立在星形广场中央，十二条大道从这里向外辐射。门身上的浮雕与阵亡将士名字，把帝国战争的荣耀与代价刻在同一座石头上。\\n\\n登顶可以把香榭丽舍与拉德芳斯尽收眼底；地面的无名战士墓与长明火，让参观不只是看景，也是一次对历史的停留。", "reason": "作为右岸经典日的视觉锚点，它把轴线、城市尺度和仪式感一次讲清楚。游客普遍觉得登顶视野值得排队，安排在当天博物馆之间也能把节奏拉开。", "tripFit": "" }'
+    return chinesePrompt('m4c94ca28c4')
   }
   if (kind === 'food') {
-    return '{ "intro": "斯菲尔在玛黑区，主打现代法餐小馆，评论里常点季节蔬菜与海鲜前菜。价格大约在 €€，适合当作白天行程之间的正餐，而不是米其林式的仪式感。", "reason": "食客普遍称赞出品稳定、座位相对安静；放在今天右岸经典日的午餐档，能把博物馆人流和晚餐分开。同区里性价比更扎实，排队通常可控。", "tripFit": "" }'
+    return chinesePrompt('m16ddbfe9aa')
   }
-  return '{ "intro": "塞纳河畔的经典停留点，适合放慢脚步看城市尺度。", "reason": "和今天的路线顺路，当作转换节奏的短停即可。", "tripFit": "" }'
+  return chinesePrompt('mbd1e6193a7')
 }
 
 /** Rich place narrative for the detail popup (same structure as hotel). */
@@ -443,8 +387,8 @@ export async function generatePlaceDetailCopy(input: {
   const kind = placeDetailKind(input.type)
   const system = buildPrompt(
     activeLocale === 'en'
-      ? 'Travel advisor. Write an engaging place review.'
-      : '旅行顾问。为地点详情页写中文点评。',
+      ? localizedCopy('m2b46e94290', undefined, 'en')
+      : localizedCopy('m2b46e94290', undefined, 'zh-CN'),
     null,
     placeDetailHardRules(kind, activeLocale),
     jsonContract(
@@ -531,8 +475,8 @@ export async function generatePlaceDetailCopy(input: {
   if (!intro && !reason) return null
 
   const result: HotelDetailCopy = {
-    intro: intro || input.existingDescription || `${input.name}，适合安排进巴黎行程。`,
-    reason: reason || input.stopNote || '适合补充进今天的行程节奏。',
+    intro: intro || input.existingDescription || runtimeCopy4('m989d380323', { p0: (input.name) }),
+    reason: reason || input.stopNote || runtimeCopy4('m9e46a5a4a2', undefined),
     tripFit: '',
   }
   if (
@@ -561,37 +505,37 @@ function fallbackDayCopy(input: {
   if (isEn) {
     title =
       input.pace === 'park'
-        ? 'Disney Day'
+        ? englishPromptFragments('md43078bfa1')
         : input.pace === 'self-drive'
-          ? 'Scenic Drive'
+          ? englishPromptFragments('madd0c567bb')
           : input.day === 1
-            ? 'Arrival in Paris'
+            ? englishPromptFragments('m51f63f0cb2')
             : lastDay != null && input.day === lastDay
-              ? 'Departure Day'
+              ? englishPromptFragments('md5775f34f9')
               : highlights.slice(0, 18) || `Day ${input.day}`
   } else {
     title =
       input.pace === 'park'
-        ? '迪士尼日'
+        ? runtimeCopy4('m0cb92ec098', undefined)
         : input.pace === 'self-drive'
-          ? '近郊自驾'
+          ? runtimeCopy4('mc1a13b1393', undefined)
           : input.day === 1
-            ? '抵达巴黎'
+            ? runtimeCopy('m5985017e99', undefined)
             : lastDay != null && input.day === lastDay
-              ? '返程日'
-              : highlights.slice(0, 6) || `第 ${input.day} 天`
+              ? runtimeCopy4('m2a62487e50', undefined)
+              : highlights.slice(0, 6) || runtimeCopy('m98cd75602d', { p0: (input.day) })
   }
 
-  const theme = isEn ? `${input.pace} pace` : `${input.pace}节奏`
+  const theme = isEn ? localizedCopy('me9bb5d43cd', { p0: (input.pace) }, 'en') : localizedCopy('me9bb5d43cd', { p0: (input.pace) }, 'zh-CN')
   let summary: string
   if (isEn) {
     summary = highlights
-      ? `Main stops today: ${highlights}${input.placeNames.length > 3 ? ', and more' : ''}. Adjust pace and timing based on real-time energy.`
-      : 'No places scheduled for today yet.'
+      ? englishPrompt('m1e66d852e7', { p0: (highlights), p1: (input.placeNames.length > 3 ? englishPromptFragments('mddee2e5158') : '') })
+      : englishPromptFragments('m0d987c8ee3')
   } else {
     summary = highlights
-      ? `今天主要安排：${highlights}${input.placeNames.length > 3 ? '等' : ''}。可根据体力微调顺序与停留时间。`
-      : '今天还没有安排地点。'
+      ? runtimeCopy4('m713a3fee13', { p0: (highlights), p1: (input.placeNames.length > 3 ? '等' : '') })
+      : runtimeCopy4('md6f624e596', undefined)
   }
 
   return {
@@ -622,11 +566,11 @@ export async function generateDayCopy(input: {
 
   if (!input.placeNames.length) {
     return {
-      title: isEn ? `Day ${input.day}` : `第 ${input.day} 天`,
-      theme: isEn ? 'Free time' : '自由安排',
+      title: isEn ? localizedCopy('m284e918fd8', { p0: (input.day) }, 'en') : localizedCopy('m284e918fd8', { p0: (input.day) }, 'zh-CN'),
+      theme: isEn ? localizedCopy('mc80f6ce28a', undefined, 'en') : localizedCopy('mc80f6ce28a', undefined, 'zh-CN'),
       summary: isEn
-        ? 'No places added yet — pick spots on the map to start building this day.'
-        : '今天还没有安排地点，添加景点后会自动生成标题与总结。',
+        ? localizedCopy('me73362652d', undefined, 'en')
+        : localizedCopy('me73362652d', undefined, 'zh-CN'),
     }
   }
 
@@ -637,46 +581,41 @@ export async function generateDayCopy(input: {
     key,
     async () => {
       const lengthHint = isEn
-        ? (totalDays ? `${totalDays}-day trip` : 'trip')
-        : (totalDays ? `${totalDays} 日行程` : '本次行程')
+        ? (totalDays ? englishPromptFragments('mb1c0493db3', { p0: (totalDays) }) : 'trip')
+        : (totalDays ? runtimeCopy4('mc4a06175d3', { p0: (totalDays) }) : runtimeCopy4('md9860f81f5', undefined))
 
       const baseRule = isEn
         ? hotelLabel
-          ? `<hard_rules>
-- If mentioning the hotel area or home base, write "${hotelLabel}", never fabricate or substitute another area.
-- Output text in natural, elegant English.
-</hard_rules>`
-          : '<hard_rules>Do not fabricate wrong hotel districts. Output text in natural, elegant English.</hard_rules>'
+          ? englishPrompt('mad09cceefb', { p0: (hotelLabel) })
+          : englishPrompt('mb49430cb9e')
         : hotelLabel
-          ? `<hard_rules>
-- 若提到酒店落脚片区，必须写「${hotelLabel}」，不要写成其他区（如圣日耳曼、玛黑）。
-</hard_rules>`
-          : '<hard_rules>不要编造错误的酒店落脚片区。</hard_rules>'
+          ? chinesePrompt('m7db260bb30', { p0: (hotelLabel) })
+          : chinesePrompt('mae311b531c')
 
       const langRule = getLlmLanguageInstruction(locale)
 
       const system = isEn
         ? buildPrompt(
-            `Paris ${lengthHint} editor. Based on the day's places, generate a concise headline, theme, and 2-sentence summary in English.`,
+            englishPrompt('mdc265913e9', { p0: (lengthHint) }),
             null,
             langRule,
-            '<output_format>Title: short and punchy, 2–4 words, max 18 characters (e.g. "Right Bank Classics", "Eiffel & Left Bank", "Marais Stroll"). Do NOT chain multiple long landmark names together (e.g. avoid "Champs-Élysées & Arc de Triomphe", use "Etoile Stroll" or "Champs-Élysées"). Theme 3–6 words, summary 2 sentences describing rhythm and highlights. Output JSON only.</output_format>',
+            englishPrompt('mb5c41cdc35'),
             baseRule,
             jsonContract(
               '{ title: "string", theme: "string", summary: "string" }',
-              '{ "title": "Right Bank Classics", "theme": "Eiffel Tower & Seine Cruise", "summary": "Morning at Trocadéro platform, afternoon stroll along the Seine to the Eiffel Tower. Evening dinner at a local bistro before returning to the hotel." }',
+              englishPrompt('mabb8b6b85f'),
               locale,
             ),
           )
         : buildPrompt(
-            `巴黎${lengthHint}编辑。根据当天地点列表，用简体中文生成短标题、主题与总结。`,
+            chinesePromptFragments('m8d21fe1d0c', { p0: (lengthHint) }),
             null,
             langRule,
-            '<output_format>标题极简：2–5 字（如「西侧经典」「左岸轻松」），切勿罗列多个长地名。主题一句话，总结 2 句说明节奏与亮点。只输出 JSON。</output_format>',
+            chinesePrompt('medefd579be'),
             baseRule,
             jsonContract(
               '{ title: "string", theme: "string", summary: "string" }',
-              '{ "title": "西侧经典", "theme": "埃菲尔铁塔与塞纳河", "summary": "上午登特罗卡德罗平台，下午沿塞纳河步道散步到特罗卡德罗。傍晚在附近小馆用餐，回 16区酒店。" }',
+              chinesePrompt('mabc3cd2cf5'),
               locale,
             ),
           )
@@ -761,11 +700,11 @@ function coerceRecommendType(
   let resolved: RecommendPlaceType | null = null
   if (requestedTypes.includes(value as RecommendPlaceType)) {
     resolved = value as RecommendPlaceType
-  } else if (['咖啡馆', '咖啡', 'coffee', 'bakery', 'brunch'].includes(value)) {
+  } else if ([runtimeCopy('ma7e5deeeba', undefined, 'zh-CN'), '咖啡', 'coffee', 'bakery', 'brunch'].includes(value)) {
     resolved = 'cafe'
-  } else if (['景点', '博物馆', 'museum', 'park'].includes(value)) {
+  } else if ([runtimeCopy('m5cf9828b5c', undefined, 'zh-CN'), '博物馆', 'museum', 'park'].includes(value)) {
     resolved = 'attraction'
-  } else if (['餐厅', '餐馆', '饭店', 'bistro', 'brasserie'].includes(value)) {
+  } else if ([runtimeCopy('m8eafe03b67', undefined, 'zh-CN'), '餐馆', '饭店', 'bistro', 'brasserie'].includes(value)) {
     resolved = 'restaurant'
   }
   if (resolved && requestedTypes.includes(resolved)) return resolved
@@ -838,67 +777,34 @@ export async function recommendPlacesForDay(input: {
 
   const system = isEn
     ? buildPrompt(
-        'Paris travel advisor. Based on the traveler’s existing itinerary for today and recommendation preferences, select complementary, non-duplicative spots from verified candidates.',
+        englishPrompt('ma4b954a567'),
         null,
         langRule,
         getCommonRules(locale),
         getPlaceResearchDiscipline(locale),
         getCafeVsRestaurantRule(locale),
-        `<hard_rules>
-- ${langRule}
-- Only recommend categories in requestedTypes; strictly provide ${countPerType} spots per category, totaling ${
-          requestedTypes.length * countPerType
-        }.
-- cafe: Prioritize Google top-rated specialty coffee shops, sit-down bakeries, brunch spots; do NOT recommend sit-down meal brasseries / café-restaurants.
-- restaurant: Sit-down meals (lunch/dinner), including bistros, brasseries, international cuisines; do not use coffee or dessert-only shops.
-- Strictly avoid recommending spots in alreadyOnThisDay and alreadyOnTrip.
-- Avoid spots in avoidAlso (previous batch); when batch>1, provide distinctly different spots.
-- Use the official discoverable name on Google Maps; optionally include nameLocal.
-- ONLY select from verifiedCandidates; copy name and googlePlaceId verbatim without inventing names, addresses, ratings, or distances.
-- When comparing candidates, consider distance, rating, and review count; missing ratings does not mean low quality, but do not make up ratings.
-- ${
-          input.recommendationPreferences.avoidLouvreAndVersailles
-            ? 'Soft preference: Avoid Louvre and Versailles by default unless explicitly asked.'
-            : 'Louvre and Versailles can participate normally in candidate comparison.'
-        }
-- reason: One concise sentence explaining why it fits today.
-- intro: 2–3 sentence introduction in English.
-</hard_rules>`,
+        englishPrompt('m80eef28f3a', { p0: (langRule), p1: (countPerType), p2: (requestedTypes.length * countPerType), p3: (input.recommendationPreferences.avoidLouvreAndVersailles
+            ? englishPromptFragments('m96b9c54e38')
+            : englishPromptFragments('m37f03acf49')) }),
         jsonContract(
           '{ recommendations: [{ name, googlePlaceId?, nameLocal?, type: "cafe|attraction|restaurant", reason, intro, area? }] }',
-          '{ "recommendations": [{ "name": "Du Pain et des Idées", "googlePlaceId": "...", "type": "cafe", "reason": "Close to the 10th arr. canal with 4.6 rating, avoiding Marais crowds.", "intro": "Classic artisanal Parisian bakery with light seating, renowned for consistent quality and fresh pastries.", "area": "10th arr." }] }',
+          englishPrompt('mefa84e5d3e'),
           locale,
         ),
       )
     : buildPrompt(
-        '巴黎旅行顾问。根据游客当天已有行程和推荐偏好，从已验证候选中挑选互补、少重复的地点。',
+        chinesePromptFragments('m44da01c4d1'),
         null,
         langRule,
         getCommonRules(locale),
         getPlaceResearchDiscipline(locale),
         getCafeVsRestaurantRule(locale),
-        `<hard_rules>
-- 只推荐 requestedTypes 中的类别；每个类别严格给出 ${countPerType} 个地点，共 ${
-          requestedTypes.length * countPerType
-        } 个。
-- cafe 类：优先 Google 高分 specialty coffee、烘焙店可坐位、brunch/早午餐小店；不要推荐以正餐为主的 brasserie / café-restaurant。
-- restaurant 类：正餐（午餐/晚餐），可含 bistro、brasserie、各国菜；不要用咖啡店/纯甜品店凑数。
-- 严禁推荐 alreadyOnThisDay 与 alreadyOnTrip 中的地点。
-- 尽量避开 avoidAlso（上一批推荐）；batch>1 时必须给出明显不同的新名单，不要复用上一批。
-- name 用可被 Google Maps 搜到的正式名称，可附 nameLocal 中文名。
-- 只能从 verifiedCandidates 选择地点；name 与 googlePlaceId 必须原样复制，禁止另造店名、地址、评分或距离。
-- 比较候选时同时考虑距离、评分和评论量；没有评分不等于低质量，但不得自行补评分。
-- ${
-          input.recommendationPreferences.avoidLouvreAndVersailles
-            ? '软偏好：默认避开卢浮宫和凡尔赛；用户明确要求时可以推荐。'
-            : '卢浮宫和凡尔赛可正常参与候选比较。'
-        }
-- reason：一句话说明为何适合插入今天。
-- intro：2–3 句中文介绍。
-</hard_rules>`,
+        chinesePrompt('md8c13f4cc6', { p0: (countPerType), p1: (requestedTypes.length * countPerType), p2: (input.recommendationPreferences.avoidLouvreAndVersailles
+            ? chinesePromptFragments('m3ce5c77592')
+            : chinesePromptFragments('m96ff8bc2e3')) }),
         jsonContract(
           '{ recommendations: [{ name, googlePlaceId?, nameLocal?, type: "cafe|attraction|restaurant", reason, intro, area? }] }',
-          '{ "recommendations": [{ "name": "Du Pain et des Idées", "googlePlaceId": "...", "type": "cafe", "reason": "近 10区运河，brunch 评分 4.6，避开玛黑热门点。", "intro": "巴黎老牌手工面包与早午餐小店，店面小巧但出品稳定。", "area": "10区" }] }',
+          chinesePrompt('m2703776c41'),
           locale,
         ),
       )
@@ -956,10 +862,10 @@ export async function recommendPlacesForDay(input: {
         ? verified.type
         : coerceRecommendType(row.type ?? row.类型 ?? row.category, requestedTypes, requestedTypes[0])
       if (!requestedTypes.includes(type) || typeCounts[type] >= countPerType) continue
-      const reason = firstRowString(row, ['reason', '理由', '推荐理由']) ||
-        (isEn ? "Fits well into today's rhythm." : '适合补充进今天的行程')
+      const reason = firstRowString(row, ['reason', '理由', runtimeCopy('m56741142db', undefined, 'zh-CN')]) ||
+        (isEn ? localizedCopy('m9e8dbfa115', undefined, 'en') : localizedCopy('m9e8dbfa115', undefined, 'zh-CN'))
       const intro =
-        firstRowString(row, ['intro', 'description', '介绍', '简介']) || reason
+        firstRowString(row, ['intro', 'description', '介绍', runtimeCopy('m5ea2e0cde2', undefined, 'zh-CN')]) || reason
       seen.add(key)
       typeCounts[type] += 1
       outList.push({
@@ -1006,7 +912,7 @@ export async function recommendPlacesForDay(input: {
     userText: [input.title, input.theme, input.pace].filter(Boolean).join(' '),
   })
   if (!text) {
-    throw new LlmRequestError('大模型没有返回内容，请再试一次。')
+    throw new LlmRequestError(runtimeCopy3('mdf0d7fdbeb', undefined))
   }
 
   const { parsed, list } = parseRecommendPayload(text)
@@ -1015,8 +921,8 @@ export async function recommendPlacesForDay(input: {
       parsed == null && (text.includes('"recommendations"') || /```/.test(text) || text.includes('{'))
     throw new LlmRequestError(
       looksTruncated
-        ? '推荐结果不完整（可能被截断），请再点「换一批」。'
-        : '大模型返回了内容，但无法解析成地点列表，请再点「换一批」。',
+        ? runtimeCopy3('mefb0668812', undefined)
+        : runtimeCopy3('m2d37ad6434', undefined),
     )
   }
 

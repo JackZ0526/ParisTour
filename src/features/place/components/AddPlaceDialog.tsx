@@ -1,3 +1,7 @@
+import { samePlace, uniquePlaces } from '../../../shared/utils/placeIdentity'
+import { localizedCopy } from '../../../shared/i18n/copy/AddPlaceDialog-c09b1a'
+import { RankedRecommendationQueue } from '../services/rankedRecommendations'
+import { fastGenerationEnabled, generationTimer } from '../../../shared/services/generationPerformance'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
@@ -69,6 +73,7 @@ interface Props {
   recommendationPreferences: RecommendationPreferences
   currentPlaceNames: string[]
   tripPlaceNames: string[]
+  tripPlaces: Place[]
   onClose: () => void
   onAddCustom: (place: Place, mode: 'best' | 'end') => void
 }
@@ -108,10 +113,12 @@ export function AddPlaceDialog({
   recommendationPreferences,
   currentPlaceNames,
   tripPlaceNames,
+  tripPlaces,
   onClose,
   onAddCustom,
 }: Props) {
   const { t, locale } = useTranslation()
+  const legacyTakenNames = [...currentPlaceNames, ...tripPlaceNames].filter(name => !tripPlaces.some(place => place.name === name))
   const [mainTab, setMainTab] = useState<'ai' | 'google'>('ai')
   const [category, setCategory] = useState<RecommendPlaceType>('attraction')
   const [googleQuery, setGoogleQuery] = useState('')
@@ -261,7 +268,13 @@ export function AddPlaceDialog({
     })
   }
 
-  async function loadVerifiedCandidates(types: RecommendPlaceType[]) {
+  const rankedQueueRef = useRef(new RankedRecommendationQueue())
+  useEffect(() => {
+    const queue = rankedQueueRef.current
+    return () => queue.clear()
+  }, [])
+
+  async function loadVerifiedCandidates(types: RecommendPlaceType[], round = 0) {
     const queryByType: Record<RecommendPlaceType, string> = {
       attraction: 'tourist attraction Paris',
       cafe: 'specialty coffee bakery brunch Paris',
@@ -270,22 +283,18 @@ export function AddPlaceDialog({
     const rows = await Promise.all(
       types.map(async (type) => {
         const candidates = await searchNearbyGooglePlaceCandidates({
-          textQuery: queryByType[type],
+          textQuery: `${queryByType[type]}${round ? ` ${['highly rated', 'local favorites', 'hidden gems'][Math.min(round - 1, 2)]}` : ''}`,
           location: hotelLocation,
           maxDistanceMeters: type === 'attraction' ? 20_000 : 12_000,
-          limit: 12,
+          limit: fastGenerationEnabled() ? 24 : 12,
         })
         return candidates.map((candidate) => ({ ...candidate, type }))
       }),
     )
-    return rows.flat().filter((candidate) => {
-      const key = candidate.name.trim().toLowerCase()
-      return (
-        key &&
-        !currentPlaceNames.some((name) => name.trim().toLowerCase() === key) &&
-        !tripPlaceNames.some((name) => name.trim().toLowerCase() === key)
-      )
-    })
+    return uniquePlaces(rows.flat()).filter(candidate =>
+      !tripPlaces.some(place => samePlace(candidate, place)) &&
+      !legacyTakenNames.some(name => samePlace(candidate, { name }))
+    )
   }
 
   async function fetchRecommendations(options: {
@@ -317,38 +326,55 @@ export function AddPlaceDialog({
     }
 
     try {
-      const verifiedCandidates = await loadVerifiedCandidates(types)
-      if (!verifiedCandidates.length) {
-        throw new Error(t('errors.googleNoCandidates'))
+      const mark = generationTimer('recommendations', fastGenerationEnabled() ? 'fast' : 'baseline')
+      let list: PlaceRecommendation[] = []
+      let usedRanking = false
+      if (fastGenerationEnabled()) {
+        const context = { day: dayNumber, title: dayTitle, theme: dayTheme, pace: dayPace, hotelArea, hotelLocation, recommendationPreferences, currentPlaceNames, tripPlaceNames, locale }
+        const batches = await Promise.all(types.map((type) => rankedQueueRef.current.take({
+          key: JSON.stringify({ ...context, type }), context,
+          excludeNames: [...legacyTakenNames, ...(options.excludeNames || [])],
+          count: 4, locale, excludePlaces: tripPlaces,
+          load: (round) => loadVerifiedCandidates([type], round),
+        })))
+        usedRanking = batches.every((rows) => rows !== null)
+        if (usedRanking) list = batches.flatMap((rows) => rows || [])
       }
-      let list = await recommendPlacesForDay({
-        day: dayNumber,
-        title: dayTitle,
-        pace: dayPace,
-        theme: dayTheme,
-        hotelArea,
-        currentPlaceNames,
-        tripPlaceNames,
-        excludeNames: options.excludeNames,
-        batch,
-        types,
-        countPerType: 4,
-        verifiedCandidates,
-        recommendationPreferences,
-        locale,
-        onProgress: (partialList) => {
-          if (epoch !== recommendationEpochRef.current) return
-          if (!partialList.length) return
-          const partialTypes = new Set(partialList.map((item) => item.type))
-          const progressive = [
-            ...recommendationsRef.current.filter(
-              (item) => !partialTypes.has(item.type),
-            ),
-            ...partialList,
-          ]
-          setRecommendations(progressive)
-        },
-      })
+      if (!usedRanking) {
+        const verifiedCandidates = await loadVerifiedCandidates(types)
+        if (!verifiedCandidates.length) {
+          throw new Error(t('errors.googleNoCandidates'))
+        }
+        list = await recommendPlacesForDay({
+          day: dayNumber,
+          title: dayTitle,
+          pace: dayPace,
+          theme: dayTheme,
+          hotelArea,
+          currentPlaceNames,
+          tripPlaceNames,
+          excludeNames: options.excludeNames,
+          batch,
+          types,
+          countPerType: 4,
+          verifiedCandidates,
+          recommendationPreferences,
+          locale,
+          onProgress: (partialList) => {
+            if (epoch !== recommendationEpochRef.current) return
+            if (!partialList.length) return
+            const partialTypes = new Set(partialList.map((item) => item.type))
+            const progressive = [
+              ...recommendationsRef.current.filter(
+                (item) => !partialTypes.has(item.type),
+              ),
+              ...partialList,
+            ]
+            setRecommendations(progressive)
+          },
+        })
+      }
+      mark('first-usable')
       if (epoch !== recommendationEpochRef.current) return false
 
       // Models occasionally return a duplicate or a place already present in
@@ -365,7 +391,7 @@ export function AddPlaceDialog({
       }
       const initialCounts = countByType(list)
       const missingTypes = types.filter((type) => initialCounts[type] < 4)
-      if (missingTypes.length) {
+      if (!usedRanking && missingTypes.length) {
         const missingCount = Math.max(
           ...missingTypes.map((type) => 4 - initialCounts[type]),
         )
@@ -386,7 +412,7 @@ export function AddPlaceDialog({
             batch,
             types: missingTypes,
             countPerType: missingCount,
-            verifiedCandidates,
+            verifiedCandidates: await loadVerifiedCandidates(missingTypes),
             recommendationPreferences,
             locale,
           })
@@ -433,6 +459,7 @@ export function AddPlaceDialog({
       recBatchesRef.current = nextBatches
       setRecommendations(next)
       persistRecommendations()
+      mark(usedRanking ? 'complete-ranked' : 'complete-legacy')
       return true
     } catch (err) {
       if (epoch !== recommendationEpochRef.current) return false
@@ -458,6 +485,7 @@ export function AddPlaceDialog({
   // background request. Reopening uses the persisted per-day cache.
   useEffect(() => {
     if (!open) {
+      rankedQueueRef.current.clear()
       recommendationEpochRef.current += 1
       return
     }
@@ -542,8 +570,7 @@ export function AddPlaceDialog({
       .filter((item) => item.type === type)
       .map((item) => item.name)
     setRefreshingCategory(type)
-    setRecommendations((prev) => prev.filter((item) => item.type !== type))
-    recommendationsRef.current = recommendationsRef.current.filter((item) => item.type !== type)
+    // Keep the current batch usable while its replacement is loading.
     try {
       await fetchRecommendations({
         types: [type],
@@ -559,11 +586,11 @@ export function AddPlaceDialog({
 
   /** Hide places already on the trip; restore them automatically when removed. */
   const availableRecommendations = useMemo(() => {
-    const taken = new Set(
-      [...currentPlaceNames, ...tripPlaceNames].map((n) => n.toLowerCase().trim()).filter(Boolean),
+    return uniquePlaces(recommendations).filter(item =>
+      !tripPlaces.some(place => samePlace(item, place)) &&
+      ![...currentPlaceNames, ...tripPlaceNames].filter(name => !tripPlaces.some(place => place.name === name)).some(name => samePlace(item, { name }))
     )
-    return recommendations.filter((item) => !taken.has(item.name.toLowerCase().trim()))
-  }, [recommendations, currentPlaceNames, tripPlaceNames])
+  }, [recommendations, currentPlaceNames, tripPlaceNames, tripPlaces])
 
   const grouped = useMemo(() => {
     const map: Record<RecommendPlaceType, PlaceRecommendation[]> = {
@@ -788,7 +815,7 @@ export function AddPlaceDialog({
           : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
               details.nameOriginal || details.name,
             )}`,
-        durationHint: locale === 'en' ? 'Custom' : '自定',
+        durationHint: locale === 'en' ? localizedCopy('mb58c2c6603', undefined, 'en') : localizedCopy('mb58c2c6603', undefined, 'zh-CN'),
       }
       onAddCustom(place, mode)
       setGoogleQuery('')

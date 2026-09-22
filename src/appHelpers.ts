@@ -1,3 +1,6 @@
+import { AREA_KEY_CN, AREA_KEY_EN, AREA_LABEL_ALIASES } from './shared/i18n/areas'
+export { AREA_KEY_CN, AREA_KEY_EN, AREA_LABEL_ALIASES } from './shared/i18n/areas'
+import { runtimeCopy } from './shared/i18n/copy/appHelpers-runtime-9082f3'
 /**
  * Helpers + constants extracted from App.tsx during stage 3.3.
  *
@@ -49,24 +52,10 @@ export const ITINERARY_LOADING_ROTATE_MS = 3200
 /** Stable fallback when `days` is empty — avoid `blankDay(1)` per render (breaks useDayNav deps). */
 export const EMPTY_DAY_FALLBACK = blankDay(1)
 
-export const AREA_KEY_CN: Record<string, string> = {
-  marais: '玛黑',
-  opera: '歌剧院一带',
-  boulevards: '大林荫道',
-  saintGermain: '圣日耳曼',
-  latin: '拉丁区',
-  trocadero: '16区特罗卡德罗',
-}
+
 
 /** Aliases that may appear in LLM day theme/summary as the hotel base. */
-export const AREA_LABEL_ALIASES: Record<string, string[]> = {
-  marais: ['玛黑'],
-  opera: ['歌剧院一带', '歌剧院', '欧培拉'],
-  boulevards: ['大林荫道'],
-  saintGermain: ['圣日耳曼', 'Saint-Germain', 'Saint Germain'],
-  latin: ['拉丁区'],
-  trocadero: ['16区特罗卡德罗', '特罗卡德罗', 'Trocadéro', 'Trocadero'],
-}
+
 
 export function placeOccurrenceAt(
   stops: readonly ItineraryStop[],
@@ -124,7 +113,7 @@ export function rewriteHotelBaseAreaMentions(text: string, hotelAreaKey: string)
   let next = text
 
   next = next.replace(/以([^，。；！？\n]{1,20})为落脚点/g, (full, area: string) =>
-    mentionsWrong(area) || mentionsAnyArea(area) ? `以${correct}为落脚点` : full,
+    mentionsWrong(area) || mentionsAnyArea(area) ? runtimeCopy('m5baf5f7a41', { p0: (correct) }) : full,
   )
 
   next = next.replace(
@@ -238,7 +227,7 @@ export function dayCountLabel(n: number, locale: Locale = getLocale()): string {
     9: '九',
     10: '十',
   }
-  return `${map[n] || n}天`
+  return runtimeCopy('m384e6a0cae', { p0: (map[n] || n) }, locale)
 }
 
 /**
@@ -246,14 +235,7 @@ export function dayCountLabel(n: number, locale: Locale = getLocale()): string {
  * locale is `en`. Kept side-by-side with `AREA_KEY_CN` so any other locale
  * in the future can add its own map.
  */
-export const AREA_KEY_EN: Record<string, string> = {
-  marais: 'Marais',
-  opera: 'Opéra',
-  boulevards: ' Grands Boulevards',
-  saintGermain: 'Saint-Germain',
-  latin: 'Latin Quarter',
-  trocadero: 'Trocadéro',
-}
+
 
 /**
  * Resolve a short area label for a hotel, switching by active locale.

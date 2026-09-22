@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/tripDates-runtime-316f73'
 export interface TripDateRange {
   startDate: string // YYYY-MM-DD
   endDate: string
@@ -102,7 +103,7 @@ export function formatDayNightLabel(dayCount: number, locale: Locale = getLocale
   if (locale === 'en') {
     return `${n} ${n === 1 ? 'Day' : 'Days'} · ${nights} ${nights === 1 ? 'Night' : 'Nights'}`
   }
-  return `${n}个白天 · ${nights}晚`
+  return runtimeCopy('m8f7a64e226', { p0: (n), p1: (nights) }, locale)
 }
 
 /** Format for UI, e.g. 9月15日 or Sep 15 */
@@ -112,7 +113,7 @@ export function formatTripDayLabel(isoDate: string, locale: Locale = getLocale()
   if (locale === 'en') {
     return `${MONTH_NAMES_EN[d.getMonth()]} ${d.getDate()}`
   }
-  return `${d.getMonth() + 1}月${d.getDate()}日`
+  return runtimeCopy('mb33f8fa7f5', { p0: (d.getMonth() + 1), p1: (d.getDate()) }, locale)
 }
 
 /** Calendar date for itinerary day N (1-based) from itinerary start. */

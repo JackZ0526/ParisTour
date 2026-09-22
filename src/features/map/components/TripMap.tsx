@@ -1,3 +1,4 @@
+import { mapLocales } from '../../../shared/i18n/mapLocale'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FullscreenControl,
@@ -138,7 +139,9 @@ export function TripMap({
   const routeSvgRef = useRef<SVGSVGElement | null>(null)
   const pathHandlesRef = useRef<Map<string, SegmentPathHandles>>(new Map())
   const seenSegmentCacheKeysRef = useRef<Map<string, string>>(new Map())
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const cameraRef = useRef<{ center: [number, number]; zoom: number; bearing: number; pitch: number } | null>(null)
+  const skipLocaleFitRef = useRef(false)
   const [mapReady, setMapReady] = useState(false)
   const [segmentEntries, setSegmentEntries] = useState<
     Array<MapRouteSegmentEntry | null>
@@ -181,11 +184,13 @@ export function TripMap({
     const map = new MapLibreMap({
       container: containerRef.current,
       style: OPEN_STREET_MAP_STYLE,
+      locale: mapLocales[locale],
       center: [dayOrigin.lng, dayOrigin.lat],
       zoom: 13,
       attributionControl: { compact: true },
       cooperativeGestures: true,
     })
+    if (cameraRef.current) { map.jumpTo(cameraRef.current); skipLocaleFitRef.current = true }
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-left')
     map.addControl(
       new FullscreenControl({
@@ -199,6 +204,8 @@ export function TripMap({
     const observer = new ResizeObserver(() => map.resize())
     observer.observe(containerRef.current)
     return () => {
+      const center = map.getCenter()
+      cameraRef.current = { center: [center.lng, center.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() }
       observer.disconnect()
       map.remove()
       mapRef.current = null
@@ -206,7 +213,7 @@ export function TripMap({
     }
     // The map instance is deliberately retained while days change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [locale])
 
   // Track the segment list we're currently rendering so the loader effect
   // can detect when the underlying day changes underneath an in-flight request.
@@ -326,6 +333,7 @@ export function TripMap({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
+    if (skipLocaleFitRef.current) { skipLocaleFitRef.current = false; return }
     const bounds = new LngLatBounds()
     for (const segment of segments) {
       bounds.extend([segment.from.lng, segment.from.lat])

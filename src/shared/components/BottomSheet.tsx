@@ -1,3 +1,4 @@
+import { uiCopy } from '../i18n/copy/ui'
 import React, { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -67,7 +68,7 @@ export function BottomSheet({
         <>
           <motion.button
             type="button"
-            aria-label="关闭"
+            aria-label={uiCopy('m6c14bd7f6f', undefined)}
             initial={backdrop.initial}
             animate={backdrop.animate}
             exit={backdrop.exit}

@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../shared/i18n/copy/useTripSync-runtime-b7325b'
 import { useEffect, useRef } from 'react'
 import type { FlightSelection } from '../features/flight/services/flightSelection'
 import type { DayPlan, HotelCandidate, Place, SelectedHotel } from '../types'
@@ -190,7 +191,7 @@ export function useTripSync(
         ? resolveItineraryStartSync({
             tripStartDate: nextDates.startDate,
             tripEndDate: nextDates.endDate,
-            destination: '巴黎',
+            destination: runtimeCopy('m4d45f90234', undefined),
             hotelName: nextHotels.hotel ? nextHotels.hotel.name : null,
             outbound: nextFlights.outbound,
             returnFlight: nextFlights.returnFlight,

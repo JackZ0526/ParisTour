@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Clock3 } from 'lucide-react'
@@ -347,7 +348,7 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                   transition={{ duration: 0.15 }}
                   className="text-xs font-medium text-[var(--stone)]"
                 >
-                  {label ? `选择${label}` : '选择开始时间'}
+                  {label ? uiCopy('m9dd3657cdc', { p0: (label) }) : uiCopy('m668822a22d', undefined)}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -404,13 +405,13 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                         items={HOURS}
                         value={draftHour}
                         onChange={setDraftHour}
-                        ariaLabel="小时滚轮选择"
+                        ariaLabel={uiCopy('m382e742820', undefined)}
                       />
                       <TimeWheelColumn
                         items={minuteOptions}
                         value={draftMinute}
                         onChange={setDraftMinute}
-                        ariaLabel="分钟滚轮选择"
+                        ariaLabel={uiCopy('m1af5ffc128', undefined)}
                       />
                     </div>
 
@@ -427,15 +428,13 @@ export function TimePicker({ value, onChange, label, id: idProp }: Props) {
                     onClick={handleCancel}
                     className="rounded-full border border-white/90 dark:border-white/10 bg-white/75 dark:bg-white/10 px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] shadow-2xs backdrop-blur-sm transition hover:bg-white dark:hover:bg-white/20 active:scale-95 cursor-pointer"
                   >
-                    取消
-                  </button>
+                    {uiCopy('m4d0b4688c7', undefined)}</button>
                   <button
                     type="button"
                     onClick={handleConfirm}
                     className="rounded-full bg-[var(--ink)] dark:bg-[var(--copper)] px-4.5 py-1.5 text-xs font-semibold text-[var(--paper)] dark:text-white transition hover:bg-black dark:hover:bg-[var(--copper)]/90 shadow-[0_3px_10px_rgba(0,0,0,0.18)] active:scale-95 cursor-pointer"
                   >
-                    完成
-                  </button>
+                    {uiCopy('m33246f6a5e', undefined)}</button>
                 </div>
               </div>
             </motion.div>

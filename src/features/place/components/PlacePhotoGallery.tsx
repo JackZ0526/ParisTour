@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import {
   useLayoutEffect,
   useRef,
@@ -314,7 +315,7 @@ export function PlacePhotoGallery({
             className="absolute bottom-2 left-2 z-10 max-w-[70%] truncate rounded-full bg-black/50 px-2 py-1 text-[10px] text-white backdrop-blur-sm hover:bg-black/65"
             title={`${wikimediaPhoto.attribution || 'Wikimedia Commons'}${wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}`}
           >
-            图片：{wikimediaPhoto.attribution || 'Wikimedia Commons'}
+            {uiCopy('m1c2b11a06a', undefined)}{wikimediaPhoto.attribution || 'Wikimedia Commons'}
             {wikimediaPhoto.license ? ` · ${wikimediaPhoto.license}` : ''}
           </a>
         )}

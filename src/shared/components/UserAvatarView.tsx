@@ -1,3 +1,4 @@
+import { uiCopy } from '../i18n/copy/ui'
 import { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
 import type { UserAvatar } from '../../features/auth/services/avatarStore'
@@ -42,7 +43,7 @@ export function UserAvatarView({
   size = 'md',
   shape = 'squircle',
   className = '',
-  alt = '用户头像',
+  alt = uiCopy('m2b78f76f26', undefined),
 }: UserAvatarViewProps) {
   const [imageError, setImageError] = useState(false)
 

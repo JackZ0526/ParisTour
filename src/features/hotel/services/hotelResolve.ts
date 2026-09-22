@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/hotelResolve-runtime-0b76bf'
 import { hotelAreaKeyFromLabel, normalizeHotelAreaLabel } from '../constants/hotels'
 import type { HotelCandidate, SelectedHotel } from '../../../types'
 import { geocodeParisAddress } from '../../map/services/geocode'
@@ -142,7 +143,7 @@ export async function resolveHotelCandidate(input: {
   }
 
   const name = details?.name || input.name
-  const hint = ratingHint(details) || input.priceHint || '巴黎酒店'
+  const hint = ratingHint(details) || input.priceHint || runtimeCopy('mcfbbf42958', undefined)
   const area = normalizeHotelAreaLabel({
     area: input.area,
     address,
@@ -162,9 +163,9 @@ export async function resolveHotelCandidate(input: {
     description:
       input.description ||
       details?.description ||
-      `${name}，适合作为巴黎行程住宿起点。`,
+      runtimeCopy('m54ed77bc93', { p0: (name) }),
     priceHint: hint,
-    nearestMetro: input.nearestMetro || '请确认最近地铁站',
+    nearestMetro: input.nearestMetro || runtimeCopy('m7a0b145afa', undefined),
     image: details?.image || details?.photos[0] || FALLBACK_HOTEL_IMAGE,
     photos: details?.photos,
     rating: details?.rating,

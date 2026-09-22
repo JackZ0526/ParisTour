@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { useEffect, useRef, useState } from 'react'
 import { Check, RotateCcw, X, ZoomIn, ZoomOut } from 'lucide-react'
 import {
@@ -65,7 +66,7 @@ export function AvatarCropper({
         const w = el.naturalWidth || el.width
         const h = el.naturalHeight || el.height
         if (!w || !h) {
-          setLoadError('图片尺寸异常')
+          setLoadError(uiCopy('m16585eb5f7', undefined))
           return
         }
         setImg(el)
@@ -74,7 +75,7 @@ export function AvatarCropper({
       })
       .catch((e) => {
         if (cancelled) return
-        setLoadError(e instanceof Error ? e.message : '加载图片失败')
+        setLoadError(e instanceof Error ? e.message : uiCopy('mb8286a1e65', undefined))
       })
 
     return () => {
@@ -249,8 +250,7 @@ export function AvatarCropper({
         {/* Loading / error states */}
         {!img && !loadError && (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-white/80">
-            加载中…
-          </div>
+            {uiCopy('m300ee3dee4', undefined)}</div>
         )}
         {loadError && (
           <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs text-red-200">

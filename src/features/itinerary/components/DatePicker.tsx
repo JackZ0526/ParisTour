@@ -1,3 +1,5 @@
+import { calendarMonth, calendarYear, calendarWeekdays } from '../../../shared/i18n/calendar'
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -15,7 +17,6 @@ interface Props {
   id?: string
 }
 
-const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'] as const
 
 function toIso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -39,7 +40,7 @@ function daysInMonth(y: number, m: number): number {
 }
 
 function monthLabel(y: number, m: number): string {
-  return `${y}年${m + 1}月`
+  return calendarMonth(y, m)
 }
 
 export function DatePicker({
@@ -54,7 +55,7 @@ export function DatePicker({
   const id = idProp ?? autoId
   const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('common.selectDateAria')
 
   const parsed = parseIso(value)
@@ -120,7 +121,7 @@ export function DatePicker({
 
   const selected = Boolean(value)
   const displayText = selected ? formatTripDayLabel(value) : placeholder
-  const yearHint = parsed ? `${parsed.y}年` : ''
+  const yearHint = parsed ? calendarYear(parsed.y, locale) : ''
 
   const popover = useEnterExit('popover')
 
@@ -189,8 +190,8 @@ export function DatePicker({
 
             {/* Weekdays Row */}
             <div className="mb-1.5 grid grid-cols-7 text-center text-[11px] font-semibold text-[var(--stone)]">
-              {WEEKDAYS.map((w) => (
-                <div key={w} className="py-1">
+              {calendarWeekdays(locale).map((w, index) => (
+                <div key={index} className="py-1">
                   {w}
                 </div>
               ))}
@@ -231,7 +232,7 @@ export function DatePicker({
 
             {minParsed && (
               <motion.p layout transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} className="mt-2.5 pt-2 border-t border-black/5 text-center text-[11px] text-[var(--stone)]">
-                不可早于 {formatTripDayLabel(min!)}
+                {uiCopy('md34868fb68', undefined)}{formatTripDayLabel(min!)}
               </motion.p>
             )}
           </motion.div>

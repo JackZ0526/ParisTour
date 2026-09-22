@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/flightLookup-runtime-c1edbd'
 import type { FlightInfo, FlightLegTemplate } from '../../../types'
 import {
   clearCachedFlight,
@@ -437,15 +438,15 @@ function mapTimetableLeg(leg: TimetableLeg, displayFlightNumber: string): Flight
   const airlineName = leg.marketingName || leg.operatingName || leg.marketingAirline
   const operatedNote =
     operatingId && operatingId !== display
-      ? `实际承运 ${operatingId}${leg.operatingName ? `（${leg.operatingName}）` : ''}`
+      ? runtimeCopy('m9ddd7a3e28', { p0: (operatingId), p1: (leg.operatingName ? `（${leg.operatingName}）` : '') })
       : marketingId !== display && marketingId
-        ? `时刻表班次 ${marketingId}`
+        ? runtimeCopy('m8f7598e3e4', { p0: (marketingId) })
         : null
   return {
     flightNumber: display,
     airline:
       operatingId && operatingId !== display && airlineName
-        ? `${airlineName}（票面 ${display}）`
+        ? runtimeCopy('m8f65989f6d', { p0: (airlineName), p1: (display) })
         : airlineName,
     from: {
       code: leg.depCode || undefined,
@@ -477,9 +478,9 @@ function mapTimetableLeg(leg: TimetableLeg, displayFlightNumber: string): Flight
     aircraft: leg.aircraft ? cleanAircraftName(leg.aircraft) : undefined,
     source: 'timetable',
     rawNote: [
-      '计划时刻仅供参考，可能与订票网站略有差异',
+      runtimeCopy('mb2635d52c0', undefined),
       operatedNote,
-      '请以机票为准',
+      runtimeCopy('m2522c5ddca', undefined),
     ]
       .filter(Boolean)
       .join(' · '),
@@ -504,7 +505,7 @@ async function fetchTimetableXml(
   const text = await res.text().catch(() => '')
   if (!res.ok) {
     throw new Error(
-      `TimeTable 查询失败 (${res.status})${text ? `: ${text.slice(0, 120)}` : ''}`,
+      runtimeCopy('m7882432a80', { p0: (res.status), p1: (text ? `: ${text.slice(0, 120)}` : '') }),
     )
   }
   return text
@@ -568,7 +569,7 @@ async function lookupFlightViaTimeTable(
   throw (
     lastError ||
     new Error(
-      `未在 TimeTable 找到 ${flightNumber}（${lookupDate}，航线 ${routes.map((r) => r.join('→')).join(' / ')}）`,
+      runtimeCopy('m7b63156362', { p0: (flightNumber), p1: (lookupDate), p2: (routes.map((r) => r.join('→')).join(' / ')) }),
     )
   )
 }
@@ -584,13 +585,13 @@ function mapAeroDataBoxFlight(
   const airline = airlineFromFlight(flight)
   const operatedNote =
     operating && operating !== display
-      ? `实际承运 ${operating}${airline ? `（${airline}）` : ''}`
+      ? runtimeCopy('m9ddd7a3e28', { p0: (operating), p1: (airline ? `（${airline}）` : '') })
       : null
   return {
     flightNumber: display,
     airline:
       operating !== display && airline
-        ? `${airline}（票面 ${display}）`
+        ? runtimeCopy('m8f65989f6d', { p0: (airline), p1: (display) })
         : airline,
     status: meaningfulFlightStatus(asString(flight.status)),
     from: airportFromMovement(asObj(flight.departure)),
@@ -599,9 +600,9 @@ function mapAeroDataBoxFlight(
     aircraft: aircraftFromFlight(flight),
     source: 'aerodatabox',
     rawNote: [
-      '计划时刻仅供参考，可能与订票网站略有差异',
+      runtimeCopy('mb2635d52c0', undefined),
       operatedNote,
-      '请以机票为准',
+      runtimeCopy('m2522c5ddca', undefined),
     ]
       .filter(Boolean)
       .join(' · '),
@@ -695,7 +696,7 @@ async function fetchAeroDataBoxRaw(
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(
-      `AeroDataBox 查询失败 (${res.status})${text ? `: ${text.slice(0, 120)}` : ''}`,
+      runtimeCopy('mb9ce73a099', { p0: (res.status), p1: (text ? `: ${text.slice(0, 120)}` : '') }),
     )
   }
   const data: unknown = await res.json()

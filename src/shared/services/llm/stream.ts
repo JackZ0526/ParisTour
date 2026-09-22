@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../i18n/copy/stream-runtime-be52c1'
 /**
  * SSE + JSON helpers for streaming LLM responses.
  *
@@ -588,7 +589,7 @@ export async function openaiResponsesWithWebSearch(input: {
   onWebSearchQuery?: (query: string) => void
 }): Promise<{ text: string; webSearchQueries: string[] }> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy('m3bb953077e', undefined), 'missing_key')
   }
 
   const { authFetch } = await import('../../../features/auth/services/authFetch')
@@ -631,6 +632,6 @@ export async function openaiResponsesWithWebSearch(input: {
     input.signal,
     input.onWebSearchQuery,
   )
-  if (!text) throw new LlmRequestError('OpenAI 联网查询没有返回内容。', 'empty')
+  if (!text) throw new LlmRequestError(runtimeCopy('m142ba457c6', undefined), 'empty')
   return { text, webSearchQueries }
 }

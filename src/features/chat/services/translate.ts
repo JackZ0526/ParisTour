@@ -1,3 +1,5 @@
+import { englishPromptFragments, chinesePromptFragments } from '../../../shared/i18n/prompts/translate-fragments-f37c5d'
+import { chinesePrompt } from '../../../shared/i18n/prompts/translate-f37c5d'
 import {
   extractLlmJsonObject,
   extractPartialJsonStringArray,
@@ -75,10 +77,10 @@ export async function translateTextsToChinese(
   return translateWithPrompt(texts, {
     artifactKey: TRANSLATIONS_ARTIFACT_KEY,
     batchKeyPrefix: 'translate',
-    systemPrompt: '翻译助手。把用户给出的文本译成简洁通顺的简体中文。',
+    systemPrompt: chinesePromptFragments('mfc2907b1df'),
     example:
-      '{ "translations": ["这家咖啡馆的拿铁口感非常顺滑，店员也很热情。", "位置便利，出门就是地铁站。"] }',
-    outputRules: '<output_format>数组顺序与输入 texts 一致，长度必须相同。不要解释。为便于流式展示：尽快开始输出 translations 数组。</output_format>',
+      chinesePrompt('m1c94ce909a'),
+    outputRules: chinesePrompt('m7f9602e43d'),
     onPartial: options?.onPartial,
   })
 }
@@ -190,18 +192,10 @@ export async function translateHotelLocationTextsToChinese(
     artifactKey: HOTEL_LOCATION_ARTIFACT_KEY,
     batchKeyPrefix: 'translate-hotel-location',
     systemPrompt:
-      '酒店简介翻译与排版助手。把 Booking 酒店位置、客房与设施描述译成简体中文，并优化可读排版。',
+      chinesePrompt('m56d7226650'),
     example:
-      '{ "translations": ["位于巴黎玛黑区中心，步行约 350 米可达蓬皮杜中心；朗布托地铁站约 3 分钟路程，可直达共和国广场与市政厅。\\n\\n客房配备空调、平板电视、笔记本电脑保险箱与迷你吧；私人浴室含吹风机与免费洗浴用品。\\n\\n• 餐厅每日供应早餐\\n• 24 小时前台与礼宾服务\\n• 行李寄存、免费 Wi-Fi、洗衣服务"] }',
-    outputRules: `<output_format>
-- 数组顺序与输入 texts 一致，长度必须相同。
-- 译意准确，不编造设施、距离或政策；保留数字与站名/地名。
-- 第一段写区位与交通（1–2 句）；客房亮点单独一段（若有）。
-- 餐饮、设施、服务用「• 」开头的列表，每项一行。
-- 段与段之间用空一行（\\n\\n）分隔；不要标题、不要 markdown、不要编号。
-- 语气简洁通顺，适合酒店详情页快速扫读。
-- 为便于流式展示：尽快开始输出 translations 数组。
-</output_format>`,
+      chinesePrompt('mc2e60fc7bf'),
+    outputRules: chinesePrompt('m5ec7849aa9'),
     onPartial: options?.onPartial,
   })
 }
@@ -249,14 +243,10 @@ export async function translatePlaceNameToChinese(
           {
             role: 'system',
             content: buildPrompt(
-              '旅行应用的地名翻译助手。把巴黎等地的店名/景点名译成简洁自然的简体中文显示名。',
+              chinesePromptFragments('m8f79ac954b'),
               null,
-              jsonContract('{ zh: "..." }', '{ "zh": "卢浮宫" }'),
-              `<output_format>
-- 专有品牌可音译或意译；不要解释；不要保留整句英文。
-- 若无法翻译则 zh 原样返回。
-- 为便于流式展示：尽快开始输出 zh 字段。
-</output_format>`,
+              jsonContract('{ zh: "..." }', chinesePromptFragments('m1327a71f58')),
+              chinesePrompt('m278480dfe6'),
             ),
           },
           {
@@ -264,7 +254,7 @@ export async function translatePlaceNameToChinese(
             content: JSON.stringify({
               name: key,
               locale: 'zh-CN',
-              context: 'Paris travel itinerary',
+              context: englishPromptFragments('mb36980739a'),
             }),
           },
         ],

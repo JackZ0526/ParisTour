@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseJevRoute, tryJevRoute } from '../shared/services/llm/jev-router'
+import { callOpenAIMessages } from '../shared/services/llm/transport'
+import { clearJevEnglishCache } from '../shared/services/llm/jev-english'
+import { jevClientCircuit } from '../shared/services/llm/jev-request'
 import { authFetch } from '../features/auth/services/authFetch'
 
 vi.mock('../features/auth/services/authFetch', () => ({ authFetch: vi.fn() }))
+vi.mock('../shared/services/llm/transport', () => ({ callOpenAIMessages: vi.fn() }))
 const response = () => ({
   answers: {
     needsWeb: { type: 'boolean', probability: 0.05 },
@@ -12,7 +16,7 @@ const response = () => ({
   providerMetadata: { typesafe: { confidence: { intent: 1, reasoningEffort: 0.49 } } },
 })
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); clearJevEnglishCache(); jevClientCircuit.reset() })
 afterEach(() => vi.useRealTimers())
 
 describe('Jev decision interpretation', () => {
@@ -47,9 +51,10 @@ describe('Jev decision interpretation', () => {
 
 describe('Jev authenticated client', () => {
   it('uses the server endpoint and returns typed decisions', async () => {
+    vi.mocked(callOpenAIMessages).mockResolvedValue(JSON.stringify({ translations: ['Move it to day three'] }))
     vi.mocked(authFetch).mockResolvedValue(Response.json(response()))
     expect((await tryJevRoute('chat', { request: '移到第三天' }))?.intent).toBe('mutate')
-    expect(authFetch).toHaveBeenCalledWith('/api/jev', expect.objectContaining({ method: 'POST', body: JSON.stringify({ kind: 'chat', state: JSON.stringify({ request: '移到第三天' }) }) }))
+    expect(authFetch).toHaveBeenCalledWith('/api/jev', expect.objectContaining({ method: 'POST', body: JSON.stringify({ kind: 'chat', state: JSON.stringify({ request: 'Move it to day three' }) }) }))
   })
   it('falls back on unavailable or malformed responses', async () => {
     vi.mocked(authFetch).mockResolvedValue(new Response('', { status: 502 }))
@@ -65,6 +70,7 @@ describe('Jev authenticated client', () => {
     const timed = tryJevRoute('chat', {})
     await vi.advanceTimersByTimeAsync(5_000)
     expect(await timed).toBeNull()
+    jevClientCircuit.reset()
     const controller = new AbortController()
     const pending = tryJevRoute('chat', {}, controller.signal)
     const assertion = expect(pending).rejects.toMatchObject({ name: 'AbortError' })

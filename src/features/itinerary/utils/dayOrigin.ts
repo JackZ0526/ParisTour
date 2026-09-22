@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/dayOrigin-runtime-285d09'
 import type { Coordinates, Place, SelectedHotel } from '../../../types'
 import { getLocale, translate } from '../../../shared/i18n'
 
@@ -20,10 +21,10 @@ export function placeFromHotel(hotel: SelectedHotel): Place {
     type: 'hotel',
     description:
       hotel.description ||
-      `办理入住、放下行李。地址：${hotel.address}`,
+      runtimeCopy('m10ef913e0b', { p0: (hotel.address) }),
     ratingHint:
       hotel.ratingHint ||
-      (hotel.nearestMetro ? `地铁 ${hotel.nearestMetro}` : '酒店'),
+      (hotel.nearestMetro ? runtimeCopy('m6c63690cc5', { p0: (hotel.nearestMetro) }) : runtimeCopy('mf01540c8a6', undefined)),
     image:
       hotel.image ||
       'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80',

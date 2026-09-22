@@ -1,3 +1,12 @@
+import { openingWindows } from '../../../../features/place/services/openingAvailability'
+import { openingCopy } from '../../../i18n/copy/openingAvailability'
+import { englishPromptFragments, chinesePromptFragments } from '../../../i18n/prompts/itinerary-fragments-146f65'
+import { runtimeCopy4 } from '../../../i18n/copy/itinerary-runtime4-146f65'
+import { englishPrompt, chinesePrompt } from '../../../i18n/prompts/itinerary-146f65'
+import { translationDirection } from '../../../i18n/languageNames'
+import { runtimeCopy3 } from '../../../i18n/copy/itinerary-runtime3-146f65'
+import { runtimeCopy } from '../../../i18n/copy/itinerary-runtime-146f65'
+import { localizedCopy } from '../../../i18n/copy/itinerary-146f65'
 /**
  * LLM call sites for itinerary generation (start / full / single-day).
  *
@@ -187,6 +196,9 @@ export interface OccupiedPlaceBrief {
 }
 
 export interface GenerateSingleDayItineraryInput {
+  openingRepair?: { rejectedVisits: Array<{ name: string; time: string; duration?: string; openingWindows: string[] | null }> }
+  /** Compact IDs-only plan; descriptions and source fields are hydrated locally. */
+  compact?: boolean
   destination: string
   dayCount: number
   dayNumber: number
@@ -227,7 +239,7 @@ function normalizeIsoDate(value: unknown): string | null {
 function formatZhMonthDay(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00`)
   if (Number.isNaN(d.getTime())) return isoDate
-  return `${d.getMonth() + 1}月${d.getDate()}日`
+  return runtimeCopy('mb33f8fa7f5', { p0: (d.getMonth() + 1), p1: (d.getDate()) })
 }
 
 function addCalendarDays(isoDate: string, amount: number): string {
@@ -284,10 +296,10 @@ function fallbackItineraryStart(
     itineraryStartDate: arrivalDateParis,
     startsOnTripStartDate,
     reasonZh: startsOnTripStartDate
-      ? `去程预计巴黎当地 ${formatZhMonthDay(arrivalDateParis)} 抵达，行程从出发日当天起算。`
+      ? runtimeCopy4('m4af69d006b', { p0: (formatZhMonthDay(arrivalDateParis)) })
       : explicitArrivalDate
-        ? `去程航班显示巴黎当地 ${formatZhMonthDay(arrivalDateParis)} 抵达，行程从该日起算。`
-        : `航班未提供完整抵达日期；根据已有结构化时刻，行程暂从 ${formatZhMonthDay(arrivalDateParis)} 起算。`,
+        ? runtimeCopy4('m61cbf8ddcd', { p0: (formatZhMonthDay(arrivalDateParis)) })
+        : runtimeCopy4('mc54655d63b', { p0: (formatZhMonthDay(arrivalDateParis)) }),
   }
 }
 
@@ -299,10 +311,10 @@ function seasonForDate(isoDate: string, locale: Locale = 'zh-CN'): string {
     if (month <= 8) return 'summer'
     return 'autumn'
   }
-  if (month === 12 || month <= 2) return '冬季'
-  if (month <= 5) return '春季'
-  if (month <= 8) return '夏季'
-  return '秋季'
+  if (month === 12 || month <= 2) return runtimeCopy('mc63d5b7467', undefined, locale)
+  if (month <= 5) return runtimeCopy('m58ecc8701f', undefined, locale)
+  if (month <= 8) return runtimeCopy('m76e4fbe256', undefined, locale)
+  return runtimeCopy('mce4e99b183', undefined, locale)
 }
 
 /**
@@ -320,108 +332,44 @@ export function buildFullItineraryPrompt(
 ): { role: string; hardRules: string; outputFormat: string; jsonShape: string; jsonExample: string } {
   if (locale === 'en') {
     return {
-      role: `${destination} ${season} travel planner. Generate a complete multi-day itinerary from the traveler's dates, flights, hotel, and verified place candidates.`,
-      hardRules: `<hard_rules>
-- Output exactly ${n} days (the "day" field is 1..${n}), each with title / theme / pace / summary / stops. Day title: short and punchy, 2–4 words, max 18 characters (e.g. "Eiffel & Left Bank", "Louvre Classics", "Marais Stroll"). Never list multiple long place names together (e.g. avoid "Champs-Élysées & Arc de Triomphe").
-- Day 1 (arrival): the first stop MUST be hotel check-in (placeKey "hotel-selected", type hotel). Keep it light, beat the jet lag first; do not require a coffee shop opener on Day 1.
-- For all days except the last: the last stop MUST be returning to the hotel (placeKey "hotel-selected", type hotel). On Day 1, if there are outbound stops too, include both check-in and end-of-day hotel; mid-trip days start from the hotel (the hotel is the origin and need not appear at the top of stops) but the last stop must still be hotel-selected.
-- ${
-        prefs.preferCafeStart
-          ? 'Soft preference: except for Day 1 and the Disney day, prefer starting ordinary sightseeing days with a cafe from verifiedCandidates; skip if route or timing does not work.'
-          : 'No requirement to start with a coffee shop.'
-      }
-- ${
-        disneyDay
-          ? `Hard rule: the second-to-last day (Day ${disneyDay}) MUST be a full Disney Paris day: pace="park" (乐园日 → code "park"), only one outing stop "attr-disney" plus end-of-day hotel; no in-park dining or other attractions; other days must not include Disney.`
-          : 'Itineraries shorter than 3 days, or with Disney preference off, do not get a dedicated Disney day.'
-      }
-- ${
-        prefs.includeChampsAndArc
-          ? 'Soft preference: prefer including Champs-Élysées ("attr-champs") and Arc de Triomphe ("attr-arc") when the route allows, ideally on the same day.'
-          : 'No requirement to include Champs-Élysées or the Arc de Triomphe.'
-      }
-- Last day (return): the hotel is only the default origin, do not put hotel-selected in that day\'s stops (no end-of-day hotel either). The day is planned entirely backwards from the return flight\'s departure. Allow 3–3.5 hours to reach CDG including ground transport. If a 10:00 wake-up leaves the day too tight, schedule just the airport stop (placeKey "attr-cdg"); do not force in extra sights; lunch/dinner may be omitted. If the morning still has slack, a light lunch or a quick coffee / pastry / brunch (NOT a brasserie sit-down) is fine before heading to the airport.
-- Dedup (hard rule): the same attraction / landmark (same official name or same placeKey) must not appear more than once across the whole itinerary; not within a single day either. The hotel "hotel-selected" and the airport "attr-cdg" are exempt; the Disney day allows exactly one "attr-disney".
-- Soft preference: ordinary sightseeing days start around ${prefs.dayStartTime}; flights, reservations, opening hours, and explicit user requests take priority.
-- ${
-        prefs.preferLunchAndDinner
-          ? 'Soft preference: when timing allows, prefer scheduling both lunch and dinner (type=restaurant); may be reduced on flight days, Disney days, or tight-pace days.'
-          : 'Plan meals flexibly per route and time of day; never substitute cafe for a sit-down meal.'
-      }
-- Day 1 meals: after hotel check-in, if there is still time in the day, add lunch and/or dinner; if arrival is late, only dinner.
-- ${
-        prefs.preferLowWalking
-          ? 'Soft preference: cluster same-area spots on the same day; prefer minimal walking and transfers.'
-          : 'Moderate walking for richer itineraries is acceptable when the route is sound.'
-      }
-- Transport classification (hard rule): transport must be one of "transit" or "walking" (codes). Do NOT guess specific lines, train numbers, station names, or taxis. The note for a stop should describe only what happens AT that stop, not the transport that leaves it. walkLevel is the walking intensity for the segment arriving at this stop, and must agree with transport.
-- ${
-        prefs.avoidLouvreAndVersailles
-          ? 'Soft preference: do not volunteer Louvre or Versailles; honour the user if they explicitly ask for one.'
-          : 'Louvre and Versailles are fair game based on route and time.'
-      }
-- The "places[]" array\'s ordinary entries MUST come from verifiedCandidates. Copy "name" and "googlePlaceId" verbatim; never invent places, addresses, ratings, or distances.
-- User "explicitRequest" is the highest priority; "recommendationPreferences" is a soft preference; flights, date boundaries, place authenticity, and output structure are hard constraints.
-- Reserved placeKeys (do not duplicate in places[]): "hotel-selected" (hotel), "attr-disney" (Disney), "attr-cdg" (Charles de Gaulle), "attr-champs" (Champs-Élysées), "attr-arc" (Arc de Triomphe).
-- metroHintFromArea: at least one English metro/transit hint under "custom".
-- time uses HH:MM. The airport-bound day may use "back-calculated from flight".
-</hard_rules>`,
-      outputFormat: 'Output JSON only. No markdown. No explanation. Use the target locale language for user-visible copy (concise, lightly playful but not cheesy).',
+      role: englishPrompt('m0be6815d6e', { p0: (destination), p1: (season) }),
+      hardRules: englishPrompt('mb7a0a90764', { p0: (n), p1: (n), p2: (prefs.preferCafeStart
+          ? englishPromptFragments('m7cc3fa5b6d')
+          : englishPromptFragments('m3006f55b55')), p3: (disneyDay
+          ? localizedCopy('disneyRequired', { p0: (disneyDay) }, 'en')
+          : localizedCopy('me217445c10', undefined, 'en')), p4: (prefs.includeChampsAndArc
+          ? englishPromptFragments('mbc6c7f1431')
+          : englishPromptFragments('mbd8d7f7467')), p5: (prefs.dayStartTime), p6: (prefs.preferLunchAndDinner
+          ? englishPromptFragments('ma81432d4a4')
+          : englishPromptFragments('m0884b45a37')), p7: (prefs.preferLowWalking
+          ? englishPromptFragments('m9dbc30a490')
+          : englishPromptFragments('m6983aa22f1')), p8: (prefs.avoidLouvreAndVersailles
+          ? englishPromptFragments('m1345d16985')
+          : englishPromptFragments('m1f3b1cacd2')) }),
+      outputFormat: englishPrompt('m7804c2f1aa'),
       jsonShape: '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], days: [{ day, title, theme, pace: "relaxed|moderate|park|self-drive", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?: "transit|walking", walkLevel: "minimal|short|moderate", duration? }] }] }',
-      jsonExample: '{ "places": [{ "key": "cafe-day2", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "area": "1st arr.", "description": "Specialty coffee shop inside the Royal Palace in the 1st, with seating." }], "days": [{ "day": 1, "title": "Arrival in Paris", "theme": "Settle in", "pace": "relaxed", "summary": "After landing at CDG, head straight to the hotel to check in and unwind; a short stroll nearby in the afternoon.", "metroHintFromArea": { "custom": "Pick a route that fits real-time conditions." }, "stops": [{ "time": "15:30", "placeKey": "hotel-selected", "note": "Check in and rest briefly.", "transport": "transit", "walkLevel": "minimal" }] }] }',
+      jsonExample: englishPrompt('m29e654246f'),
     }
   }
   // Chinese (default)
   return {
-    role: `${destination}${season}旅行规划师。根据旅客的日期、航班、酒店和已验证地点候选生成完整多日行程。`,
-    hardRules: `<hard_rules>
-- 必须输出恰好 ${n} 天（day 字段为 1..${n}），每天都有 title/theme/pace/summary/stops。标题极简：2–5 字（如「西侧经典」「左岸轻松」），切勿罗列多个长地名。
-- Day 1：抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；Day 1 不强制咖啡馆开场。
-- 除最后一天外：每一天的最后一站必须是回酒店过夜（placeKey "hotel-selected"，type hotel）。Day 1 若还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）；中间日早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站仍须写回酒店。
-- ${
-      prefs.preferCafeStart
-        ? '软偏好：除 Day 1 与迪士尼日外，普通游览日优先以 verifiedCandidates 中的 cafe 开始；路线或时间不合适时可不安排。'
-        : '不要求以咖啡馆开始。'
-    }
-- ${
-      disneyDay
-        ? `硬规则：倒数第二天（Day ${disneyDay}）必须为巴黎迪士尼全日：pace=乐园日，出游站只保留一个 "attr-disney" 与末站回酒店，不另列园内餐饮或其它景点；其它天禁止安排迪士尼。`
-        : '行程不足 3 天或未开启迪士尼偏好时，不安排独立迪士尼日。'
-    }
-- ${
-      prefs.includeChampsAndArc
-        ? '软偏好：优先包含香榭丽舍大街（"attr-champs"）与凯旋门（"attr-arc"），适合时同日顺路安排。'
-        : '不强制包含香榭丽舍大街与凯旋门。'
-    }
-- 最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆（咖啡/甜点/brunch，非正餐 brasserie）。
-- 去重（硬规则）：整个行程不要重复同一景点/地标（同一正式名或同一 placeKey 只出现一次）；同一天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。
-- 软偏好：普通游览日约 ${prefs.dayStartTime} 开始；航班、预约、营业时间和用户明确要求优先。
-- ${
-      prefs.preferLunchAndDinner
-        ? '软偏好：时间允许时优先安排午餐与晚餐两顿正餐（type=restaurant）；航班日、迪士尼日或节奏过紧时可减少。'
-        : '餐饮站按当天路线与时间灵活安排，正餐不得用 cafe 类型代替。'
-    }
-- Day 1 餐饮：抵达办入住后若仍有空档，再安排午餐和/或晚餐；落地过晚可只安排晚餐。
-- ${
-      prefs.preferLowWalking
-        ? '软偏好：同日地点尽量同片区聚类，优先少步行、少换乘。'
-        : '在路线合理的前提下可接受适量步行以丰富行程。'
-    }
-- 交通分类（硬规则）：transport 只能输出「公共交通」或「步行」（对应 code "transit" / "walking"），不要猜测或输出具体线路、车次、站名、出租车等；具体路线以 Google Maps 为准。note 只写本站在做什么，不写离开本站的交通。walkLevel 表示到达本站这一段的步行强度，并与 transport 保持一致。
-- ${
-      prefs.avoidLouvreAndVersailles
-        ? '软偏好：默认不主动安排卢浮宫或凡尔赛；用户明确要求时优先服从。'
-        : '卢浮宫和凡尔赛可按路线与时间正常考虑。'
-    }
-- places[] 的普通地点只能从 verifiedCandidates 选择；name 与 googlePlaceId 必须原样复制，禁止另造地点、地址、评分或距离。
-- 用户 explicitRequest 是最高优先级；recommendationPreferences 是可让步的偏好；航班时刻、日期边界、地点真实性和输出结构是硬约束。
-- 特殊 placeKey 固定："hotel-selected"（酒店）、"attr-disney"（迪士尼）、"attr-cdg"（戴高乐机场）、"attr-champs"（香榭丽舍大街）、"attr-arc"（凯旋门）——这些可不必重复写在 places[]。
-- metroHintFromArea 至少给 custom 一条中文地铁/交通提示。
-- time 用 HH:MM；最后一天去机场可用「按航班倒推」。
-</hard_rules>`,
-    outputFormat: '只输出 JSON，不要 markdown，不要解释。文案用简体中文，可带一点俏皮但不油腻。',
+    role: chinesePromptFragments('mcd7467f666', { p0: (destination), p1: (season) }),
+    hardRules: chinesePrompt('m8db34c3703', { p0: (n), p1: (n), p2: (prefs.preferCafeStart
+        ? chinesePromptFragments('m4bc04a8a66')
+        : chinesePromptFragments('md2ce2d3868')), p3: (disneyDay
+        ? chinesePromptFragments('m566b63729b', { p0: (disneyDay) })
+        : chinesePromptFragments('m6bcce49c37')), p4: (prefs.includeChampsAndArc
+        ? chinesePromptFragments('m975fff2af8')
+        : chinesePromptFragments('m6989a610a4')), p5: (prefs.dayStartTime), p6: (prefs.preferLunchAndDinner
+        ? chinesePromptFragments('m314c318245')
+        : chinesePromptFragments('mcaf6738894')), p7: (prefs.preferLowWalking
+        ? chinesePromptFragments('mefd4b93896')
+        : chinesePromptFragments('m8f5450803c')), p8: (prefs.avoidLouvreAndVersailles
+        ? chinesePromptFragments('mbd01ca4386')
+        : chinesePromptFragments('m63cc2fb15d')) }),
+    outputFormat: chinesePromptFragments('mcc1eb6756c'),
     jsonShape: '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], days: [{ day, title, theme, pace: "relaxed|moderate|park|self-drive", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?: "transit|walking", walkLevel: "minimal|short|moderate", duration? }] }] }',
-    jsonExample: '{ "places": [{ "key": "cafe-day2", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "area": "1区", "description": "1区皇家宫殿内的精品咖啡小店，可坐位。" }], "days": [{ "day": 1, "title": "抵达巴黎", "theme": "落地 · 安顿", "pace": "relaxed", "summary": "抵达 CDG 后直奔酒店办理入住，下午就近闲逛。", "metroHintFromArea": { "custom": "按实时地图选择合适路线。" }, "stops": [{ "time": "15:30", "placeKey": "hotel-selected", "note": "办理入住，稍作休息。", "transport": "transit", "walkLevel": "minimal" }] }] }',
+    jsonExample: chinesePrompt('mc84ea44827'),
   }
 }
 
@@ -442,83 +390,83 @@ export function buildSingleDayRoleRules(
   if (locale === 'en') {
     if (isFirst) {
       return [
-        'Today is Day 1 (arrival). The first stop MUST be hotel check-in (placeKey "hotel-selected", type hotel). Keep it light, beat the jet lag; do not require a coffee shop opener.',
-        'If Day 1 has any outbound stops, include both check-in and end-of-day hotel-selected.',
-        'Day 1 meals: after check-in, if there is still time, add lunch and/or dinner; if arrival is late, only dinner.',
+        englishPrompt('m0e5ecf3374'),
+        englishPrompt('m7dde5e9476'),
+        englishPrompt('m9c6972526b'),
         disneyDay != null
-          ? `Hard rule: the full Disney day is already locked to Day ${disneyDay}; today MUST NOT include Disney.`
-          : 'No standalone Disney day today.',
+          ? englishPrompt('m4fa84a239c', { p0: (disneyDay) })
+          : englishPromptFragments('m7b5a1f810b'),
       ]
     }
     if (isLast) {
       return [
-        'Today is the last day (return): the hotel is only the default origin, do NOT put hotel-selected in today\'s stops (no end-of-day hotel either). Plan entirely backwards from the return flight\'s departure.',
-        'Allow 3–3.5 hours to reach CDG including ground transport. If a 10:00 wake-up leaves the day too tight, schedule just the airport stop (placeKey "attr-cdg"); lunch/dinner may be omitted. If the morning has slack, a light lunch or a quick coffee / pastry / brunch (NOT a brasserie sit-down) is fine before heading to the airport.',
+        englishPrompt('m5c851e4eff'),
+        englishPrompt('m6389f0057c'),
         disneyDay != null
-          ? `Hard rule: the full Disney day is already locked to Day ${disneyDay}; today MUST NOT include Disney.`
-          : 'No standalone Disney day today.',
+          ? englishPrompt('m4fa84a239c', { p0: (disneyDay) })
+          : englishPromptFragments('m7b5a1f810b'),
       ]
     }
     if (isDisney) {
       return [
-        `Hard rule: Day ${dayNumber} is the second-to-last day and MUST be a full Disney Paris day. pace must be "park"; only one outing stop "attr-disney" plus end-of-day hotel (placeKey "hotel-selected"); no in-park dining, cafes, or other attractions.`,
+        englishPrompt('m06d9fffd97', { p0: (dayNumber) }),
       ]
     }
     return [
-      'Mid-trip day: start from the hotel (the hotel is the origin, no need to write it at the top of stops); the last stop MUST be returning to the hotel (placeKey "hotel-selected", type hotel).',
+      englishPrompt('ma425546efb'),
       disneyDay != null
-        ? `Hard rule: the full Disney day is already locked to Day ${disneyDay}; today MUST NOT include "attr-disney" or any Disney-related stop.`
-        : 'No standalone Disney day today.',
+        ? englishPrompt('md1a2840ead', { p0: (disneyDay) })
+        : englishPromptFragments('m7b5a1f810b'),
       prefs.preferCafeStart
-        ? 'Soft preference: prefer starting ordinary sightseeing days with a cafe from verifiedCandidates; skip if the route does not work.'
-        : 'No requirement to start with a coffee shop.',
+        ? englishPrompt('mba0a9f34c0')
+        : englishPromptFragments('m3006f55b55'),
       prefs.preferLunchAndDinner
-        ? 'Soft preference: when timing allows, prefer scheduling both lunch and dinner (type=restaurant).'
-        : 'Plan meals flexibly per route and time.',
+        ? englishPrompt('m622cbbe12b')
+        : englishPromptFragments('mee31a150fd'),
       prefs.includeChampsAndArc
-        ? 'If the route fits and occupiedElsewhere does not yet include Champs-Élysées / Arc de Triomphe, prefer "attr-champs" and "attr-arc".'
-        : 'No requirement to include Champs-Élysées or the Arc de Triomphe.',
+        ? englishPrompt('m136f8d31ae')
+        : englishPrompt('mbd8d7f7467'),
     ]
   }
   // Chinese (default)
   if (isFirst) {
     return [
-      '今天是 Day 1 抵达日。第一站必须是酒店办理入住（placeKey 用 "hotel-selected"，type hotel）。轻行程、倒时差优先；不强制咖啡馆开场。',
-      '若 Day 1 还有出门行程，则首站入住酒店 + 末站回酒店过夜（可两个 hotel-selected）。',
-      'Day 1 餐饮：抵达办入住后若仍有空档，再安排午餐和/或晚餐；落地过晚可只安排晚餐。',
+      chinesePrompt('m9feae861e0'),
+      chinesePrompt('m867b85a7f6'),
+      chinesePromptFragments('m326725c072'),
       disneyDay != null
-        ? `硬规则：迪士尼全日已固定在 Day ${disneyDay}，今天禁止安排迪士尼。`
-        : '今天不安排独立迪士尼日。',
+        ? chinesePromptFragments('m97edffa19f', { p0: (disneyDay) })
+        : chinesePromptFragments('maaeef7238f'),
     ]
   }
   if (isLast) {
     return [
-      '今天是最后一天（返程日）：酒店仅作默认出发原点，不要把 hotel-selected 写入当天 stops（也不要末站回酒店）。完全由返程航班起飞时间倒推。',
-      '国际航班预留 3–3.5 小时到 CDG（含交通）。若约 10:00 起床后时间紧张，可只安排机场一站（placeKey "attr-cdg"），不要硬塞景点；此时午餐/晚餐可省略。若上午仍有空档，可在去机场前安排一顿午餐或轻量咖啡馆（咖啡/甜点/brunch，非正餐 brasserie）。',
+      chinesePrompt('m96c37fa0a5'),
+      chinesePrompt('m6ca5e514a9'),
       disneyDay != null
-        ? `硬规则：迪士尼全日已固定在 Day ${disneyDay}，今天禁止安排迪士尼。`
-        : '今天不安排独立迪士尼日。',
+        ? chinesePromptFragments('m97edffa19f', { p0: (disneyDay) })
+        : chinesePromptFragments('maaeef7238f'),
     ]
   }
   if (isDisney) {
     return [
-      `硬规则：Day ${dayNumber} 是倒数第二天，必须安排为巴黎迪士尼全日。pace 必须为「乐园日」；出游站只保留一个 "attr-disney"，末站回酒店过夜（placeKey "hotel-selected"）；不另列园内餐饮、咖啡馆或其它景点。`,
+      chinesePrompt('m6c106d148a', { p0: (dayNumber) }),
     ]
   }
   return [
-    '中间日：早晨从酒店出发（酒店为原点，不必写在 stops 开头），末站必须回酒店过夜（placeKey "hotel-selected"，type hotel）。',
+    chinesePrompt('m1391b30038'),
     disneyDay != null
-      ? `硬规则：迪士尼全日已固定在 Day ${disneyDay}，今天禁止安排 "attr-disney" 或任何迪士尼相关站点。`
-      : '今天不安排独立迪士尼日。',
+      ? chinesePrompt('m915f772a57', { p0: (disneyDay) })
+      : chinesePromptFragments('maaeef7238f'),
     prefs.preferCafeStart
-      ? '软偏好：普通游览日优先以 verifiedCandidates 中的 cafe 开始；路线不合适时可不安排。'
-      : '不要求以咖啡馆开始。',
+      ? chinesePrompt('m7925c596e3')
+      : chinesePromptFragments('md2ce2d3868'),
     prefs.preferLunchAndDinner
-      ? '软偏好：时间允许时优先安排午餐与晚餐两顿正餐（type=restaurant）。'
-      : '餐饮站按当天路线与时间灵活安排。',
+      ? chinesePromptFragments('m1cd39fe1a2')
+      : chinesePromptFragments('mb0d8375c00'),
     prefs.includeChampsAndArc
-      ? '若路线合适且 occupiedElsewhere 尚未包含香榭丽舍/凯旋门，可优先安排 "attr-champs" 与 "attr-arc"。'
-      : '不强制安排香榭丽舍或凯旋门。',
+      ? chinesePrompt('m3cd1f9d816')
+      : chinesePromptFragments('m36cd58f391'),
   ]
 }
 
@@ -553,8 +501,8 @@ export async function generateFullItinerary(
     const locale = getLocale()
     throw new LlmRequestError(
       locale === 'en'
-        ? 'OpenAI API key is not configured; cannot generate itinerary.'
-        : '未配置 OpenAI API Key，无法生成行程。',
+        ? localizedCopy('m3eb4a7227f', undefined, 'en')
+        : localizedCopy('m3eb4a7227f', undefined, 'zh-CN'),
       'missing_key',
     )
   }
@@ -567,13 +515,13 @@ export async function generateFullItinerary(
   const hotelArea =
     input.hotel.area ||
     input.hotel.areaKey ||
-    (isEn ? 'Paris city center' : '巴黎市区')
+    (isEn ? localizedCopy('m412dec02ce', undefined, 'en') : localizedCopy('m412dec02ce', undefined, 'zh-CN'))
 
   const { role, hardRules, outputFormat, jsonShape, jsonExample } = buildFullItineraryPrompt(
     n,
     prefs,
     disneyDay,
-    input.destination || (isEn ? 'the destination' : '目的地'),
+    input.destination || (isEn ? localizedCopy('maf2071f42c', undefined, 'en') : localizedCopy('maf2071f42c', undefined, 'zh-CN')),
     seasonForDate(input.itineraryStartDate, locale),
     locale,
   )
@@ -593,7 +541,7 @@ export async function generateFullItinerary(
 
   const user = JSON.stringify({
     trip: {
-      destination: input.destination || (isEn ? 'Paris' : '巴黎'),
+      destination: input.destination || (isEn ? localizedCopy('mde73486121', undefined, 'en') : localizedCopy('mde73486121', undefined, 'zh-CN')),
       dayCount: n,
       nights: input.nights ?? Math.max(0, n - 1),
       tripStartDate: input.tripStartDate,
@@ -632,13 +580,13 @@ export async function generateFullItinerary(
     userText: input.preferences || input.destination,
   })
   if (!text) {
-    throw new LlmRequestError('大模型没有返回行程。')
+    throw new LlmRequestError(runtimeCopy3('m8026eb273e', undefined))
   }
 
   const parsed = extractJsonObject(text)
   if (!parsed) {
     throw new LlmRequestError(
-      `无法解析行程 JSON，请再试一次。\npreview=${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+      runtimeCopy3('md6d3cb1805', { p0: (text.slice(0, 240).replace(/\s+/g, ' ')) }),
       'invalid_json',
     )
   }
@@ -647,7 +595,7 @@ export async function generateFullItinerary(
   const rawDays = Array.isArray(parsed.days) ? (parsed.days as unknown[]) : []
   if (!rawDays.length) {
     throw new LlmRequestError(
-      `行程天数为空，请再试一次。\nkeys=${Object.keys(parsed).join(',') || '(none)'}`,
+      runtimeCopy3('m4897c42c42', { p0: (Object.keys(parsed).join(',') || '(none)') }),
       'invalid_json',
     )
   }
@@ -718,7 +666,7 @@ export async function generateFullItinerary(
       stops.push({
         time: String(stop.time || '10:00').trim() || '10:00',
         placeKey,
-        note: String(stop.note || '').trim() || '按当天节奏灵活调整。',
+        note: String(stop.note || '').trim() || runtimeCopy('mb36f1f6772', undefined),
         transport: normalizeTransportChoice(stop.transport),
         walkLevel: normalizeWalkLevel(stop.walkLevel),
         duration: String(stop.duration || '').trim() || undefined,
@@ -729,23 +677,23 @@ export async function generateFullItinerary(
     const metro =
       row.metroHintFromArea && typeof row.metroHintFromArea === 'object'
         ? (row.metroHintFromArea as Record<string, string>)
-        : { custom: '按导航或地铁前往下一个地点。' }
+        : { custom: runtimeCopy3('m4f6b1c05b6', undefined) }
 
-    const rawTitle = String(row.title || `第 ${dayNum} 天`).trim()
+    const rawTitle = String(row.title || runtimeCopy('m98cd75602d', { p0: (dayNum) })).trim()
     const cleanTitle = rawTitle.slice(0, 20).replace(/\s*[&,，、·\-]\s*$/, '').trim()
     days.push({
       day: dayNum,
       title: cleanTitle || rawTitle.slice(0, 20),
-      theme: String(row.theme || '').trim() || '巴黎日程',
+      theme: String(row.theme || '').trim() || runtimeCopy('me3c015188d', undefined),
       pace,
-      summary: String(row.summary || '').trim() || '今天按地图与体力微调即可。',
+      summary: String(row.summary || '').trim() || runtimeCopy('m0e4c137d43', undefined),
       metroHintFromArea: metro,
       stops,
     })
   }
 
   if (!days.length) {
-    throw new LlmRequestError('无法解析行程天数，请再试一次。')
+    throw new LlmRequestError(runtimeCopy3('mff20f6c2d9', undefined))
   }
 
   return { days, places }
@@ -815,7 +763,7 @@ function parseItineraryDay(
     stops.push({
       time: String(stop.time || '10:00').trim() || '10:00',
       placeKey,
-      note: String(stop.note || '').trim() || '按当天节奏灵活调整。',
+      note: String(stop.note || '').trim() || runtimeCopy('mb36f1f6772', undefined),
       transport: normalizeTransportChoice(stop.transport),
       walkLevel: normalizeWalkLevel(stop.walkLevel),
       duration: String(stop.duration || '').trim() || undefined,
@@ -828,16 +776,16 @@ function parseItineraryDay(
   const metro =
     row.metroHintFromArea && typeof row.metroHintFromArea === 'object'
       ? (row.metroHintFromArea as Record<string, string>)
-      : { custom: '按导航或地铁前往下一个地点。' }
+      : { custom: runtimeCopy3('m4f6b1c05b6', undefined) }
 
-  const rawTitle = String(row.title || `第 ${day} 天`).trim()
+  const rawTitle = String(row.title || runtimeCopy('m98cd75602d', { p0: (day) })).trim()
   const cleanTitle = rawTitle.slice(0, 20).replace(/\s*[&,，、·\-]\s*$/, '').trim()
   return {
     day,
     title: cleanTitle || rawTitle.slice(0, 20),
-    theme: String(row.theme || '').trim() || '巴黎日程',
+    theme: String(row.theme || '').trim() || runtimeCopy('me3c015188d', undefined),
     pace,
-    summary: String(row.summary || '').trim() || '今天按地图与体力微调即可。',
+    summary: String(row.summary || '').trim() || runtimeCopy('m0e4c137d43', undefined),
     metroHintFromArea: metro,
     stops,
   }
@@ -908,7 +856,7 @@ export async function generateSingleDayItinerary(
   input: GenerateSingleDayItineraryInput,
 ): Promise<SingleDayItineraryDraft> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('未配置 OpenAI API Key，无法生成行程。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy('ma8ce6d4840', undefined), 'missing_key')
   }
 
   const n = Math.max(1, Math.min(30, Math.floor(input.dayCount) || 1))
@@ -923,7 +871,7 @@ export async function generateSingleDayItinerary(
   const hotelArea =
     input.hotel.area ||
     input.hotel.areaKey ||
-    (isEn ? 'Paris city center' : '巴黎市区')
+    (isEn ? localizedCopy('m412dec02ce', undefined, 'en') : localizedCopy('m412dec02ce', undefined, 'zh-CN'))
 
   const roleRules: string[] = buildSingleDayRoleRules(
     dayNumber,
@@ -943,63 +891,27 @@ export async function generateSingleDayItinerary(
     .filter(Boolean)
 
   const role = isEn
-    ? `${input.destination || (isEn ? 'the destination' : '目的地')} ${seasonForDate(input.calendarDate || input.itineraryStartDate, locale)} travel planner. Re-plan only the specified day based on the traveler's dates, flights, hotel, and verified place candidates.`
-    : `${input.destination || '目的地'}${seasonForDate(input.calendarDate || input.itineraryStartDate, locale)}旅行规划师。根据旅客的日期、航班、酒店与已验证地点候选，只重新规划指定的一天。`
+    ? localizedCopy('mafee72c991', { p0: (input.destination || (isEn ? englishPromptFragments('m296e0c9a1b') : runtimeCopy('me203a4c760', undefined))), p1: (seasonForDate(input.calendarDate || input.itineraryStartDate, locale)) }, 'en')
+    : localizedCopy('mafee72c991', { p0: (input.destination || runtimeCopy('me203a4c760', undefined)), p1: (seasonForDate(input.calendarDate || input.itineraryStartDate, locale)) }, 'zh-CN')
   const langRule = getLlmLanguageInstruction(locale)
   const outputFormat = isEn
-    ? 'Output JSON only. No markdown. No explanation. Use the target locale language for user-visible copy.'
-    : '只输出 JSON，不要 markdown，不要解释。文案用简体中文。'
+    ? localizedCopy('m11269ea89f', undefined, 'en')
+    : localizedCopy('m11269ea89f', undefined, 'zh-CN')
   const jsonShape = '{ places: [{ key, googlePlaceId, name, nameLocal?, type: "cafe|attraction|restaurant|transport|hotel", area?, description, durationHint? }], day: { day, title, theme, pace: "relaxed|moderate|park|self-drive", summary, metroHintFromArea: { custom: "string" }, stops: [{ time: "HH:MM", placeKey, note, transport?: "transit|walking", walkLevel: "minimal|short|moderate", duration? }] } }'
   const jsonExample = isEn
-    ? '{ "places": [{ "key": "cafe-day3", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "description": "Specialty coffee shop in the 1st arr." }], "day": { "day": 3, "title": "Right Bank Classics", "theme": "Louvre and Tuileries", "pace": "moderate", "summary": "Louvre in the morning, Tuileries stroll in the afternoon, Seine cruise at sunset.", "metroHintFromArea": { "custom": "Pick a route that fits real-time conditions." }, "stops": [{ "time": "09:30", "placeKey": "attr-louvre", "note": "Early entry; the three masterpieces first.", "transport": "transit", "walkLevel": "minimal" }] } }'
-    : '{ "places": [{ "key": "cafe-day3", "googlePlaceId": "...", "name": "Café Kitsuné Palais Royal", "type": "cafe", "description": "1区精品咖啡小店。" }], "day": { "day": 3, "title": "右岸经典", "theme": "卢浮宫与杜伊勒里", "pace": "moderate", "summary": "上午卢浮宫，下午杜伊勒里花园散步，傍晚塞纳河游船。", "metroHintFromArea": { "custom": "按实时地图选择合适路线。" }, "stops": [{ "time": "09:30", "placeKey": "attr-louvre", "note": "早场入馆，先看镇馆三宝。", "transport": "transit", "walkLevel": "minimal" }] } }'
+    ? localizedCopy('m5f25914412', undefined, 'en')
+    : localizedCopy('m5f25914412', undefined, 'zh-CN')
   const hardRules = isEn
-    ? `<hard_rules>
-- Output only Day ${dayNumber} (the "day" field must equal ${dayNumber}), plus any non-reserved places from the day's "places[]".
-- Output structure (hard rule): the top level must include an object field "day" (with title / theme / pace / summary / stops). Do NOT spread title / stops at the root. "day.day" must be the number ${dayNumber}. Day title: short and punchy, 2–4 words, max 18 characters.
-${roleRules.map((r) => `- ${r}`).join('\n')}
-- Dedup (hard rule): do not use attractions / landmarks already present in occupiedElsewhere (same official name or same placeId); not within today either. The hotel "hotel-selected" and the airport "attr-cdg" are exempt; the Disney day allows exactly one "attr-disney".
-- Soft preference: ordinary sightseeing days start around ${prefs.dayStartTime}; flights, reservations, opening hours, and explicit user requests take priority.
-- ${
-        prefs.preferLowWalking
-          ? 'Soft preference: cluster same-area spots on the same day; prefer minimal walking and transfers.'
-          : 'Moderate walking for richer days is acceptable when the route is sound.'
-      }
-- Transport classification (hard rule): transport must be one of "transit" or "walking" (codes). Do NOT guess specific lines, train numbers, station names, or taxis. The note for a stop should describe only what happens AT that stop, not the transport that leaves it. walkLevel is the walking intensity for the segment arriving at this stop, and must agree with transport.
-- ${
-        prefs.avoidLouvreAndVersailles
-          ? 'Soft preference: do not volunteer Louvre or Versailles; honour the user if they explicitly ask for one.'
-          : 'Louvre and Versailles are fair game based on route and time.'
-      }
-- The "places[]" array\'s ordinary entries MUST come from verifiedCandidates. Copy "name" and "googlePlaceId" verbatim; never invent places, ratings, addresses, or distances.
-- User "explicitRequest" is the highest priority; "recommendationPreferences" is a soft preference; flights, date boundaries, place authenticity, and output structure are hard constraints.
-- Reserved placeKeys (do not duplicate in places[]): "hotel-selected" (hotel), "attr-disney" (Disney), "attr-cdg" (Charles de Gaulle), "attr-champs" (Champs-Élysées), "attr-arc" (Arc de Triomphe).
-- metroHintFromArea: at least one English metro/transit hint under "custom".
-- time uses HH:MM. The airport-bound day may use "back-calculated from flight".
-</hard_rules>`
-    : `<hard_rules>
-- 只输出 Day ${dayNumber} 这一天（day 字段必须为 ${dayNumber}），以及 places[] 中当天用到的非特殊地点。
-- 输出结构硬规则：顶层必须包含对象字段 "day"（含 title/theme/pace/summary/stops），不要把 title/stops 直接摊在根上；"day.day" 必须是数字 ${dayNumber}。标题极简 2–5 字。
-${roleRules.map((r) => `- ${r}`).join('\n')}
-- 去重（硬规则）：不要使用 occupiedElsewhere 中已出现的景点/地标（同一正式名或同一 placeId）；当天内也不要重复。酒店 "hotel-selected"、机场 "attr-cdg" 除外；迪士尼日仅允许一个 "attr-disney"。
-- 软偏好：普通游览日约 ${prefs.dayStartTime} 开始；航班、预约、营业时间和用户明确要求优先。
-- ${
-      prefs.preferLowWalking
-        ? '软偏好：同日地点尽量同片区聚类，优先少步行、少换乘。'
-        : '可接受适量步行以换取更丰富的行程。'
-    }
-- 交通分类（硬规则）：transport 只能输出「公共交通」或「步行」（对应 code "transit" / "walking"），不要猜测或输出具体线路、车次、站名、出租车等；具体路线以 Google Maps 为准。note 只写本站在做什么，不写离开本站的交通。walkLevel 表示到达本站这一段的步行强度，并与 transport 保持一致。
-- ${
-      prefs.avoidLouvreAndVersailles
-        ? '软偏好：默认不主动安排卢浮宫或凡尔赛；用户明确要求时优先服从。'
-        : '卢浮宫和凡尔赛可按路线与时间正常考虑。'
-    }
-- places[] 的普通地点只能从 verifiedCandidates 选择；name 与 googlePlaceId 必须原样复制，禁止另造地点、评分、地址或距离。
-- 用户 explicitRequest 是最高优先级；recommendationPreferences 是可让步偏好；航班、日期、地点真实性和输出结构是硬约束。
-- 特殊 placeKey 固定："hotel-selected"（酒店）、"attr-disney"（迪士尼）、"attr-cdg"（戴高乐机场）、"attr-champs"（香榭丽舍大街）、"attr-arc"（凯旋门）——这些可不必重复写在 places[]。
-- metroHintFromArea 至少给 custom 一条中文地铁/交通提示。
-- time 用 HH:MM；最后一天去机场可用「按航班倒推」。
-</hard_rules>`
+    ? localizedCopy('m157baffbe4', { p0: (dayNumber), p1: (dayNumber), p2: (dayNumber), p3: (roleRules.map((r) => `- ${r}`).join('\n')), p4: (prefs.dayStartTime), p5: (prefs.preferLowWalking
+          ? englishPrompt('m9dbc30a490')
+          : englishPrompt('m8645e3e7b4')), p6: (prefs.avoidLouvreAndVersailles
+          ? englishPrompt('m1345d16985')
+          : englishPrompt('m1f3b1cacd2')) }, 'en')
+    : localizedCopy('m157baffbe4', { p0: (dayNumber), p1: (dayNumber), p2: (dayNumber), p3: (roleRules.map((r) => `- ${r}`).join('\n')), p4: (prefs.dayStartTime), p5: (prefs.preferLowWalking
+        ? chinesePromptFragments('mefd4b93896')
+        : chinesePromptFragments('m7e6249b075')), p6: (prefs.avoidLouvreAndVersailles
+        ? chinesePromptFragments('mbd01ca4386')
+        : chinesePromptFragments('m63cc2fb15d')) }, 'zh-CN')
 
   const system = buildPrompt(
     role,
@@ -1008,14 +920,19 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
     getCommonRules(locale),
     getPlaceResearchDiscipline(locale),
     getCafeVsRestaurantRule(locale),
-    `<output_format>${outputFormat}</output_format>`,
-    hardRules,
-    jsonContract(jsonShape, jsonExample, locale),
+    openingCopy('rule'),
+    input.openingRepair ? openingCopy('repairRule') : '',
+    input.compact ? '' : `<output_format>${outputFormat}</output_format>`,
+    input.compact ? hardRules.split('\n').filter((line) => !/places\[\]|metroHintFromArea|title\/theme\/pace\/summary/.test(line)).join('\n') : hardRules,
+    input.compact
+      ? englishPrompt('mc6da50dfc9', { p0: (dayNumber) })
+      : jsonContract(jsonShape, jsonExample, locale),
   )
 
   const user = JSON.stringify({
+    openingRepair: input.openingRepair,
     trip: {
-      destination: input.destination || (isEn ? 'Paris' : '巴黎'),
+      destination: input.destination || (isEn ? localizedCopy('mde73486121', undefined, 'en') : localizedCopy('mde73486121', undefined, 'zh-CN')),
       dayCount: n,
       nights: input.nights ?? Math.max(0, n - 1),
       tripStartDate: input.tripStartDate,
@@ -1051,7 +968,7 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
       placeIds: occupiedIds,
       detail: input.occupiedPlaces.slice(0, 80),
     },
-    verifiedCandidates: input.verifiedCandidates,
+    verifiedCandidates: input.compact ? input.verifiedCandidates.map((row, index) => ({ key: `p${index}`, name: row.name, type: row.type, address: row.address, location: row.location, distanceMeters: row.distanceMeters, openingWindows: openingWindows(row.openingSchedule, input.calendarDate || input.itineraryStartDate) })) : input.verifiedCandidates.map(row => ({ ...row, openingWindows: openingWindows(row.openingSchedule, input.calendarDate || input.itineraryStartDate) })),
   })
 
   const text = await generateText(system, user, {
@@ -1075,24 +992,27 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
       : undefined,
   })
   if (!text) {
-    throw new LlmRequestError('大模型没有返回单日行程。')
+    throw new LlmRequestError(runtimeCopy3('m8e24503f06', undefined))
   }
 
   const parsed = extractJsonObject(text)
   if (!parsed) {
     throw new LlmRequestError(
-      `无法解析单日行程 JSON，请再试一次。\npreview=${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+      runtimeCopy3('mdc12471a08', { p0: (text.slice(0, 240).replace(/\s+/g, ' ')) }),
       'invalid_json',
     )
   }
 
+  if (input.compact) {
+    parsed.places = input.verifiedCandidates.map((row, index) => ({ key: `p${index}`, name: row.name, googlePlaceId: row.id }))
+  }
   const rawPlaces = Array.isArray(parsed.places) ? (parsed.places as unknown[]) : []
   const places = parseItineraryPlaces(rawPlaces, input.verifiedCandidates)
 
   const dayRow = pickSingleDayRow(parsed, dayNumber)
   if (!dayRow) {
     throw new LlmRequestError(
-      `单日行程为空，请再试一次。\npreview=${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+      runtimeCopy3('m00f4728c54', { p0: (text.slice(0, 240).replace(/\s+/g, ' ')) }),
       'empty_day',
     )
   }
@@ -1114,13 +1034,13 @@ ${roleRules.map((r) => `- ${r}`).join('\n')}
         ),
       }
     : null
-  if (!day) {
-    throw new LlmRequestError('无法解析单日行程站点，请再试一次。')
+  if (!day || !day.stops.length) {
+    throw new LlmRequestError(runtimeCopy3('m840997ab9d', undefined))
   }
 
   return {
     day: { ...day, day: dayNumber },
-    places,
+    places: input.compact ? places.filter((place) => day.stops.some((stop) => stop.placeKey === place.key)) : places,
   }
 }
 
@@ -1218,45 +1138,17 @@ export function buildTranslateSystemPrompt(
 ): string {
   const role =
     targetLocale === 'en'
-      ? 'Paris itinerary translator. You translate the human-readable copy of a Paris trip from one language to another, preserving the day structure, IDs, and codes verbatim.'
-      : '巴黎行程翻译专家。把一段巴黎行程的可读文案从源语言翻成目标语言，严格保留日程结构、ID 与各种 code 字段不译。'
-  const sourceLabel = sourceLocale === 'en' ? 'English' : '简体中文'
-  const targetLabel = targetLocale === 'en' ? 'English' : '简体中文'
+      ? localizedCopy('m087572949b', undefined, 'en')
+      : localizedCopy('m087572949b', undefined, 'zh-CN')
   const hardRules =
     targetLocale === 'en'
-      ? `<hard_rules>
-- ${langRule}
-- Translate EVERY user-facing string. NEVER change day numbers, pace, transport / walkLevel / type / placeKey / placeId values, times, or any other structured field.
-- For every stop, translate the string fields: note, duration, and transport (if it is a human-readable label rather than a code).
-- Preserve all placeKey values (e.g. "hotel-selected", "attr-cdg", "attr-disney", "attr-champs", "attr-arc") verbatim.
-- Preserve all metroHintFromArea KEYS (marais / opera / boulevards / saintGermain / latin / trocadero / custom) verbatim; only translate the string VALUES.
-- Translate naturally — no machine-translation stiltedness, no brand-name changes, no emoji added.
-- Keep each tag concise. Day titles: 4–8 words. Day themes: 4–8 words. Summaries: 2–4 sentences, 40–80 words.
-- For stop.duration: keep the same meaning (a duration estimate like "30–45 min" or "2 hours") and translate the wording. Do NOT drop the duration field.
-- For stop.transport: if it is one of the codes "transit" / "walking" / "driving" / "cycling" keep it as the code; if it is a free-form Chinese/English description (e.g. "RER B / taxi from CDG") translate the free-form text.
-- Keep the JSON structure EXACTLY identical (same keys, same array lengths, same nested object shape).
-- Output the FULL translated days array — do not summarize or omit days.
-- Strict JSON output: {"days":[...]} — no markdown, no commentary.
-</hard_rules>`
-      : `<hard_rules>
-- ${langRule}
-- 翻译所有面向用户的字符串，绝不改 day 编号 / pace / transport / walkLevel / type / placeKey / placeId / time 等任何结构化字段。
-- 每个 stop 都必须翻译字符串字段：note、duration；如果 transport 是人话描述而不是 code，也要翻译。
-- 保留所有 placeKey（如 "hotel-selected"、"attr-cdg"、"attr-disney"、"attr-champs"、"attr-arc"）原样。
-- 保留所有 metroHintFromArea 的 KEY（marais / opera / boulevards / saintGermain / latin / trocadero / custom）原样，只翻字符串 VALUE。
-- 译文自然地道，不要机翻腔、不改品牌名、不加 emoji。
-- 标题简短：day.title 4–8 个字，day.theme 4–8 个字，summary 2–4 句 40–80 字。
-- stop.duration：保留时长含义（"30–45 min" / "2 小时" 这种），只翻译措辞；不要把 duration 字段丢掉。
-- stop.transport：如果是 "transit" / "walking" / "driving" / "cycling" 这些 code，保持原样；如果是中文/英文的人话描述（例如 "RER B / 出租车自戴高乐机场"），翻译人话。
-- JSON 结构完全一致（同 key、同数组长度、同嵌套对象）。
-- 输出完整 days 数组，不要省略任何一天。
-- 严格 JSON 输出：{"days":[...]}，不要 markdown，不要解释。
-</hard_rules>`
+      ? localizedCopy('me092cd7a76', { p0: (langRule) }, 'en')
+      : localizedCopy('me092cd7a76', { p0: (langRule) }, 'zh-CN')
 
   const sourceNote =
     sourceLocale === targetLocale
       ? ''
-      : `The source content is in ${sourceLabel}; translate it into ${targetLabel}.`
+      : translationDirection(sourceLocale, targetLocale)
   return buildPrompt(
     role,
     null,
@@ -1264,10 +1156,10 @@ export function buildTranslateSystemPrompt(
     sourceNote,
     hardRules,
     jsonContract(
-      `{"days":[{day,title,theme,pace:"relaxed|moderate|park|self-drive",summary,metroHintFromArea:{custom:"string",...},stops:[{time:"HH:MM",placeKey,note,transport?:"transit|walking"|"free-form text",walkLevel:"minimal|short|moderate",duration?:"duration estimate"}]}]}`,
+      englishPrompt('m549911f96f'),
       targetLocale === 'en'
-        ? '{"days":[{"day":1,"title":"Arrival in Paris","theme":"Settle in & jet lag","pace":"relaxed","summary":"After landing at CDG, head straight to the hotel to check in and unwind. A light stroll nearby in the afternoon.","metroHintFromArea":{"custom":"Pick a route that fits real-time conditions."},"stops":[{"time":"15:30","placeKey":"hotel-selected","note":"Check in and rest briefly.","transport":"transit","walkLevel":"minimal","duration":"30–45 min"},{"time":"17:30","placeKey":"cafe-lepro","note":"Coffee near the hotel.","transport":"walking","walkLevel":"short","duration":"45 min"}]}]}'
-        : '{"days":[{"day":1,"title":"抵达巴黎","theme":"落地 · 安顿","pace":"relaxed","summary":"抵达 CDG 后直奔酒店办理入住，下午就近闲逛。","metroHintFromArea":{"custom":"按实时地图选择合适路线。"},"stops":[{"time":"15:30","placeKey":"hotel-selected","note":"办理入住，稍作休息。","transport":"transit","walkLevel":"minimal","duration":"30–45 分钟"},{"time":"17:30","placeKey":"cafe-lepro","note":"在酒店附近找家咖啡馆坐坐。","transport":"walking","walkLevel":"short","duration":"45 分钟"}]}]}',
+        ? localizedCopy('m379a6fcd78', undefined, 'en')
+        : localizedCopy('m379a6fcd78', undefined, 'zh-CN'),
       targetLocale,
     ),
   )
@@ -1277,7 +1169,7 @@ export async function translateItineraryText(
   input: TranslateItineraryTextInput,
 ): Promise<TranslateItineraryTextResult> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('未配置 OpenAI API Key，无法翻译行程文案。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy3('mc35e8b33b6', undefined), 'missing_key')
   }
   if (input.sourceLocale === input.targetLocale) {
     return { days: input.days }
@@ -1387,8 +1279,8 @@ export async function translateItineraryText(
   if (!itineraryCopyMatchesLocale(translatedDays, targetLocale)) {
     throw new LlmRequestError(
       targetLocale === 'en'
-        ? 'Itinerary translation did not complete. Please try again.'
-        : '行程文案翻译未完成，请重试。',
+        ? localizedCopy('m1c136e10eb', undefined, 'en')
+        : localizedCopy('m1c136e10eb', undefined, 'zh-CN'),
       'translate_incomplete',
     )
   }

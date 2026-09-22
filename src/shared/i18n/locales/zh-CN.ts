@@ -966,7 +966,7 @@ export const zhCN: I18nSchema = {
     headerProfileTitle: '查看个人中心与偏好',
     switchTripFailed: '切换失败',
     // Brand
-    brandTagline: 'Tour · Travel Planning & Guide',
+    brandTagline: '旅行规划与指南',
     // Share role group aria (cloud-sync/components/ShareDialog)
     roleGroupAria: '成员角色',
     // Trip selector (cloud-sync/components/TripSelectorCapsule)

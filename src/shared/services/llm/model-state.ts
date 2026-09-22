@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../i18n/copy/model-state-runtime-e0c46c'
 /**
  * LLM model + thinking-mode runtime state.
  *
@@ -266,7 +267,7 @@ export function getActiveLlmLabel(modelId = getOpenAIModel()): string {
   const mode = getThinkingMode()
   const think =
     supportsThinkingControls(modelId) && mode !== 'off'
-      ? ` · 思考${getThinkingModeLabel(mode)}`
+      ? runtimeCopy('m7153d91387', { p0: (getThinkingModeLabel(mode)) })
       : ''
   if (isDeepSeekModel(modelId)) {
     const base = label.startsWith('DeepSeek') ? label : `DeepSeek · ${label}`

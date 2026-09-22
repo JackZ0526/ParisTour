@@ -1,3 +1,6 @@
+import { runtimeCopy2 } from '../../../shared/i18n/copy/chatHelpers-runtime2-b143a9'
+import { runtimeCopy } from '../../../shared/i18n/copy/chatHelpers-runtime-b143a9'
+import { localizedCopy } from '../../../shared/i18n/copy/chatHelpers-b143a9'
 /**
  * Constants, types, and small helpers used by TripChatPanel + its sub-components.
  *
@@ -52,9 +55,9 @@ export const SUGGESTIONS = [
 
 export function pendingFallbackReason(pending: PendingPlaceConfirm): string {
   if (pending.kind === 'replace') {
-    return `用于替换第 ${pending.dayNum} 天的「${pending.fromPlaceName || '原地点'}」`
+    return runtimeCopy('m5c5836f85d', { p0: (pending.dayNum), p1: (pending.fromPlaceName || runtimeCopy2('m450121ee1b', undefined)) })
   }
-  return `计划加入第 ${pending.dayNum} 天行程`
+  return runtimeCopy('md4440fa5a4', { p0: (pending.dayNum) })
 }
 
 /** Chat-model action.note often describes insertion logistics, not the place. */
@@ -92,9 +95,9 @@ export function pickTravelerStopNote(opts: {
 }
 
 export function placeTypeLabel(type: PlaceType): string {
-  if (type === 'cafe') return '咖啡馆'
-  if (type === 'restaurant') return '餐厅'
-  return '景点'
+  if (type === 'cafe') return runtimeCopy('ma7e5deeeba', undefined)
+  if (type === 'restaurant') return runtimeCopy('m8eafe03b67', undefined)
+  return runtimeCopy('m5cf9828b5c', undefined)
 }
 
 /** Soften false "already added" copy when confirm UI is still required. */
@@ -106,8 +109,8 @@ export function clarifyReplyForPending(
   const names = pending.map((p) => `「${p.place.name}」`).join('、')
   const confirmHint =
     pending[0].kind === 'replace'
-      ? `行程尚未改动——请在详情页确认是否用${names}替换「${pending[0].fromPlaceName || '原地点'}」。`
-      : `行程尚未改动——请在详情页确认是否将${names}加入行程。`
+      ? runtimeCopy('m7a42b7b1e9', { p0: (names), p1: (pending[0].fromPlaceName || runtimeCopy2('m450121ee1b', undefined)) })
+      : runtimeCopy('me1d5f69ab6', { p0: (names) })
   if (replyClaimsDetailConfirm(reply) || !/详情|确认是否/.test(reply)) {
     const cleaned = reply
       ? `${stripDetailConfirmClaim(reply)}\n\n${confirmHint}`.trim()
@@ -130,19 +133,19 @@ export function buildRerecommendMessage(rejected: PendingPlaceConfirm, excluded:
   const excludeText = excluded.map((n) => `「${n}」`).join('、')
   if (rejected.kind === 'replace') {
     return [
-      `刚才推荐的「${rejected.place.name}」我不想用。`,
-      `请再推荐另一个不同的地点，用来替换第 ${rejected.dayNum} 天的「${rejected.fromPlaceName}」。`,
-      `绝对不要再推荐：${excludeText}。`,
-      `请直接输出 replace_place（fromPlaceName 仍为「${rejected.fromPlaceName}」，source 必须为 "recommend"）。`,
+      runtimeCopy('m33314b696d', { p0: (rejected.place.name) }),
+      runtimeCopy('m682d30329c', { p0: (rejected.dayNum), p1: (rejected.fromPlaceName) }),
+      runtimeCopy('m3b0ae048c6', { p0: (excludeText) }),
+      runtimeCopy('me67f4e1945', { p0: (rejected.fromPlaceName) }),
     ].join('')
   }
   const typeLabel = placeTypeLabel(rejected.place.type)
-  const modeHint = rejected.mode === 'end' ? '加到当天末尾' : '按最顺路插入'
+  const modeHint = rejected.mode === 'end' ? runtimeCopy('m98529f1fbc', undefined) : runtimeCopy('mdf2b817b21', undefined)
   return [
-    `刚才推荐的「${rejected.place.name}」我不喜欢。`,
-    `请再推荐另一家${typeLabel}加入第 ${rejected.dayNum} 天（${modeHint}）。`,
-    `绝对不要再推荐：${excludeText}。`,
-    '请直接输出 add_place（source 必须为 "recommend"）。',
+    runtimeCopy('md4034d8050', { p0: (rejected.place.name) }),
+    runtimeCopy('m21bb8843ed', { p0: (typeLabel), p1: (rejected.dayNum), p2: (modeHint) }),
+    runtimeCopy('m3b0ae048c6', { p0: (excludeText) }),
+    runtimeCopy('m8e63935a38', undefined),
   ].join('')
 }
 
@@ -151,8 +154,8 @@ import { type Locale } from '../../../shared/i18n'
 export function friendlyChatError(err: unknown, locale: Locale = 'zh-CN'): string {
   const fallback =
     locale === 'en'
-      ? 'Chat assistant encountered an error. Please try again later.'
-      : '对话助手出错了，请稍后再试。'
+      ? localizedCopy('me90f381b27', undefined, 'en')
+      : localizedCopy('me90f381b27', undefined, 'zh-CN')
   if (err instanceof Error) {
     // Already a user-facing message in most cases; trim instead of rewrapping.
     return err.message || fallback

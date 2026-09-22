@@ -1,3 +1,6 @@
+import { SUPPORTED_LOCALES } from '../../../shared/i18n/locales/registry'
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/ProfileTab-fd6991'
 import { version } from '../../../../package.json'
 import { useState, useSyncExternalStore } from 'react'
 import { LayoutGroup, motion } from 'framer-motion'
@@ -106,10 +109,10 @@ function useLiveCloudSync() {
     enabled: isCloudSyncEnabled(),
     isBusy,
     label: isSaving
-      ? '云端正在保存…'
+      ? uiCopy('me051796a8a', undefined)
       : isSyncing
-        ? '正在同步最新更改…'
-        : '云端已实时加密同步',
+        ? uiCopy('mc905ec566f', undefined)
+        : uiCopy('m804fb69ad0', undefined),
   }
 }
 
@@ -403,16 +406,12 @@ export function ProfileTab({
                           <div className="truncate text-[11px] text-[var(--stone)] dark:text-zinc-400">
                             {isItemShared
                               ? (locale === 'en'
-                                  ? `From ${
-                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                  ? localizedCopy('meb3b1e14e5', { p0: ((trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
                                       trip.ownerName ||
-                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : 'Others')
-                                    }`
-                                  : `来自 ${
-                                      (trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
+                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : uiCopy('m24fb8a842f', undefined, 'en'))) }, 'en')
+                                  : localizedCopy('meb3b1e14e5', { p0: ((trip.ownerEmail ? getUserNickname(trip.ownerEmail) : '') ||
                                       trip.ownerName ||
-                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : '他人')
-                                    }`)
+                                      (trip.ownerEmail ? formatOwnerHandle(trip.ownerEmail) : uiCopy('m24fb8a842f', undefined))) }, 'zh-CN'))
                               : t('profile.createdByYou')}
                           </div>
                         </div>
@@ -675,10 +674,7 @@ export function ProfileTab({
         <LayoutGroup id="profile-language-selector">
           <div className="relative grid grid-cols-2 gap-1 sm:gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/5 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
             {(
-              [
-                { id: 'zh-CN', label: '简体中文' },
-                { id: 'en', label: 'English' },
-              ] as const
+              SUPPORTED_LOCALES.map(({ id, nativeName }) => ({ id, label: nativeName }))
             ).map(({ id, label }) => {
               const isActive = locale === id
               return (

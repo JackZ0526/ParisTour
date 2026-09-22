@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { getGoogleMapsApiKey, googleMapsEmbedApiUrl } from '../services/googleMapsKey'
 
 interface Props {
@@ -34,8 +35,7 @@ export function GoogleMapsEmbed({
   if (!searchQuery) {
     return (
       <div className={`rounded-xl bg-[var(--mist)]/40 px-4 py-6 text-sm text-[var(--stone)] ${className}`}>
-        缺少地点信息，无法加载 Google Maps。
-      </div>
+        {uiCopy('m21a9effc7c', undefined)}</div>
     )
   }
 
@@ -57,8 +57,7 @@ export function GoogleMapsEmbed({
         allowFullScreen
       />
       <p className="px-3 py-2 text-xs text-[var(--stone)]">
-        Google Maps · 可查看地点位置；在地图内点开地点卡片可看图片与评分
-      </p>
+        {uiCopy('m2c0a037dc0', undefined)}</p>
     </div>
   )
 }

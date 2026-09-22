@@ -1,3 +1,9 @@
+import { samePlace } from '../shared/utils/placeIdentity'
+import { runtimeCopy } from '../shared/i18n/copy/useItineraryGeneration-runtime-f7067e'
+import { localizedCopy } from '../shared/i18n/copy/useItineraryGeneration-f7067e'
+import { runConflictSafePool } from '../shared/services/asyncPool'
+import { fastGenerationEnabled } from '../shared/services/generationPerformance'
+import { mergePlaceEnrichment } from '../features/itinerary/services/placeEnrichment'
 /**
  * useItineraryGeneration — plan generation lifecycle.
  *
@@ -466,6 +472,8 @@ export function useItineraryGeneration(
       if (dayRestoreTimerRef.current != null) {
         window.clearTimeout(dayRestoreTimerRef.current)
       }
+      genRequestIdRef.current += 1
+      dayRegenRequestIdRef.current += 1
       fullGenAbortRef.current?.abort('itinerary_generation_unmount')
       dayGenAbortRef.current?.abort('itinerary_day_unmount')
       fullGenAbortRef.current = null
@@ -586,7 +594,7 @@ export function useItineraryGeneration(
     async (options?: { resume?: boolean }) => {
       if (!tripDates?.startDate || !tripDates?.endDate || !hotelReady) return
       if (!isLlmConfigured()) {
-        setItineraryGenError('暂时无法生成行程，请稍后再试。')
+        setItineraryGenError(runtimeCopy('m005602ce1f', undefined))
         return
       }
 
@@ -661,6 +669,7 @@ export function useItineraryGeneration(
                     return {
                       day: d.day,
                       name: place.name,
+                      nameLocal: place.nameLocal, googlePlaceId: place.googlePlaceId, tripadvisorContentId: place.tripadvisorContentId, location: place.location,
                       placeId: s.placeId,
                       type: place.type,
                     }
@@ -703,12 +712,24 @@ export function useItineraryGeneration(
           // Union places so parallel batch results don't clobber each other.
           currentCustomPlaces = {
             ...currentCustomPlaces,
-            ...result.customPlaces,
+            ...Object.fromEntries(Object.entries(result.customPlaces).filter(([id]) => syncedDay.stops.some((stop) => stop.placeId === id))),
           }
           setDays(currentDays)
           setCustomPlaces(currentCustomPlaces)
-          setItineraryGeneratedUpToDay((prev) => Math.max(prev, dayNumber))
+          setItineraryGeneratedUpToDay(() => {
+            let contiguous = 0
+            while (currentDays.some((d) => d.day === contiguous + 1 && d.stops.length > 0)) contiguous++
+            return contiguous
+          })
           emitDayReplace(dayNumber, currentDays, currentCustomPlaces)
+          if (result.enrich) {
+            void result.enrich().then((updates) => {
+              if (requestId !== genRequestIdRef.current || abortController.signal.aborted) return
+              currentCustomPlaces = mergePlaceEnrichment(currentCustomPlaces, result.customPlaces, updates)
+              setCustomPlaces((prev) => mergePlaceEnrichment(prev, result.customPlaces, updates))
+            }).catch(() => { /* The usable itinerary remains available if enrichment fails. */ })
+          }
+
         }
 
         if (!canResume) {
@@ -758,6 +779,7 @@ export function useItineraryGeneration(
               lastDayError = null
               break
             } catch (err) {
+              result = null
               lastDayError = err
               if (abortController.signal.aborted) throw err
               if (attempt === 0) {
@@ -856,7 +878,7 @@ export function useItineraryGeneration(
 
           // Mid days: parallel window of 2 (shared occupied snapshot).
           const batch: number[] = []
-          while (batch.length < PARALLEL_WINDOW && remaining.length) {
+          while ((fastGenerationEnabled() || batch.length < PARALLEL_WINDOW) && remaining.length) {
             const d = remaining[0]
             if (disneyDay != null && d === disneyDay) break
             if (d === dayCount && dayCount > 1) break
@@ -869,15 +891,25 @@ export function useItineraryGeneration(
 
           const dayTimeoutId = window.setTimeout(() => {
             abortController.abort('itinerary_day_timeout')
-          }, 135_000)
+          }, 135_000 * (fastGenerationEnabled() ? Math.ceil(batch.length / PARALLEL_WINDOW) : 1))
           fullGenTimeoutRef.current = dayTimeoutId
           try {
-            const results = await Promise.all(
-              batch.map((dayNumber) => generateDayWithRetry(dayNumber)),
-            )
-            if (requestId !== genRequestIdRef.current) return
-            for (let i = 0; i < batch.length; i++) {
-              mergeDayResult(results[i], batch[i])
+            if (fastGenerationEnabled()) {
+              await runConflictSafePool(batch, PARALLEL_WINDOW, generateDayWithRetry, (result, dayNumber) => {
+                const occupied = buildOccupied(dayNumber)
+                const day = result.days.find((d) => d.day === dayNumber)
+                return Boolean(day?.stops.some((stop) => {
+                  const place = result.customPlaces[stop.placeId]
+                  return place?.type === 'attraction' && occupied.some((other) => samePlace(place, other))
+                }))
+              }, (result, dayNumber) => {
+                if (requestId !== genRequestIdRef.current || abortController.signal.aborted) return
+                mergeDayResult(result, dayNumber)
+              })
+            } else {
+              const results = await Promise.all(batch.map((dayNumber) => generateDayWithRetry(dayNumber)))
+              if (requestId !== genRequestIdRef.current) return
+              for (let i = 0; i < batch.length; i++) mergeDayResult(results[i], batch[i])
             }
           } finally {
             if (fullGenTimeoutRef.current === dayTimeoutId) {
@@ -904,7 +936,7 @@ export function useItineraryGeneration(
         if (requestId !== genRequestIdRef.current) return
         if (abortController.signal.aborted) return
         setItineraryGenError(
-          formatItineraryFailure(err, '行程生成失败，请再试一次。'),
+          formatItineraryFailure(err, runtimeCopy('mcf7d21139c', undefined)),
         )
       } finally {
         releaseTripCloudSaves()
@@ -996,7 +1028,7 @@ export function useItineraryGeneration(
       if (!itineraryGenerated || !days.length) return
       if (dayRegenerating || itineraryGenerating) return
       if (!isLlmConfigured()) {
-        setDayRegenError('暂时无法重新生成当天行程，请稍后再试。')
+        setDayRegenError(runtimeCopy('md04abf225c', undefined))
         return
       }
 
@@ -1031,6 +1063,7 @@ export function useItineraryGeneration(
                 return {
                   day: d.day,
                   name: place.name,
+                      nameLocal: place.nameLocal, googlePlaceId: place.googlePlaceId, tripadvisorContentId: place.tripadvisorContentId, location: place.location,
                   placeId: s.placeId,
                   type: place.type,
                 }
@@ -1073,6 +1106,13 @@ export function useItineraryGeneration(
         setDays(synced)
         setCustomPlaces(result.customPlaces)
         emitDayReplace(active.day, synced, result.customPlaces)
+        if (result.enrich) {
+          void result.enrich().then((updates) => {
+            if (requestId !== dayRegenRequestIdRef.current || abortController.signal.aborted) return
+            setCustomPlaces((prev) => mergePlaceEnrichment(prev, result.customPlaces, updates))
+          }).catch(() => { /* Optional details must not discard the route. */ })
+        }
+
         setItineraryGenerated(true)
         saveItineraryState(synced, result.customPlaces, {
           generated: true,
@@ -1082,7 +1122,7 @@ export function useItineraryGeneration(
         setDayRegenError(null)
       } catch (err) {
         if (requestId !== dayRegenRequestIdRef.current) return
-        setDayRegenError(formatItineraryFailure(err, '当天行程重新生成失败，请再试一次。'))
+        setDayRegenError(formatItineraryFailure(err, runtimeCopy('m92a7c89836', undefined)))
       } finally {
         releaseTripCloudSaves()
         if (dayGenTimeoutRef.current === timeoutId) {
@@ -1212,8 +1252,8 @@ export function useItineraryGeneration(
         if (!itineraryCopyMatchesLocale(translatedDays, targetLocale)) {
           throw new LlmRequestError(
             targetLocale === 'en'
-              ? 'Itinerary translation did not complete. Please try again.'
-              : '行程文案翻译未完成，请重试。',
+              ? localizedCopy('m1c136e10eb', undefined, 'en')
+              : localizedCopy('m1c136e10eb', undefined, 'zh-CN'),
             'translate_incomplete',
           )
         }

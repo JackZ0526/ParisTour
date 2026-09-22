@@ -1,94 +1,13 @@
+import { PROPERTY_TYPE_LABELS, PROPERTY_TYPE_EN_LABELS, FACILITY_LABELS, PAYMENT_METHOD_LABELS, REVIEW_SCORE_EN_MAP } from '../../../shared/i18n/hotelLabels'
+export { PROPERTY_TYPE_LABELS, PROPERTY_TYPE_EN_LABELS, FACILITY_LABELS } from '../../../shared/i18n/hotelLabels'
+import { runtimeCopy } from '../../../shared/i18n/copy/hotelDisplay-runtime-261271'
 import { getLocale, type Locale } from '../../../shared/i18n'
 
-export const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  hotel: '酒店',
-  hotels: '酒店',
-  aparthotel: '公寓酒店',
-  aparthotels: '公寓酒店',
-  hostel: '青年旅舍',
-  hostels: '青年旅舍',
-  guesthouse: '民宿',
-  'bed and breakfast': '床与早餐',
-  motel: '汽车旅馆',
-  resort: '度假村',
-  villa: '别墅',
-  apartment: '公寓',
-  apartments: '公寓',
-  'serviced apartment': '服务式公寓',
-}
 
-export const PROPERTY_TYPE_EN_LABELS: Record<string, string> = {
-  hotel: 'Hotel',
-  hotels: 'Hotel',
-  aparthotel: 'Aparthotel',
-  aparthotels: 'Aparthotel',
-  hostel: 'Hostel',
-  hostels: 'Hostel',
-  guesthouse: 'Guesthouse',
-  'bed and breakfast': 'Bed & Breakfast',
-  motel: 'Motel',
-  resort: 'Resort',
-  villa: 'Villa',
-  apartment: 'Apartment',
-  apartments: 'Apartment',
-  'serviced apartment': 'Serviced Apartment',
-}
 
-export const FACILITY_LABELS: Record<string, string> = {
-  'non-smoking rooms': '禁烟客房',
-  'facilities for disabled guests': '无障碍设施',
-  restaurant: '餐厅',
-  'wifi in all areas': '全区域 Wi-Fi',
-  'free wifi': '免费 Wi-Fi',
-  'free wi-fi': '免费 Wi-Fi',
-  wifi: 'Wi-Fi',
-  internet: '网络',
-  'air conditioning': '空调',
-  'baggage storage': '行李寄存',
-  '24-hour front desk': '24 小时前台',
-  'room service': '客房服务',
-  'family rooms': '家庭房',
-  bar: '酒吧',
-  elevator: '电梯',
-  heating: '暖气',
-  parking: '停车场',
-  'airport shuttle': '机场接送',
-  'private bathroom': '独立浴室',
-  'attached bathroom': '独立浴室',
-  bath: '浴缸',
-  'hot tub': '按摩浴缸',
-  shower: '淋浴',
-  minibar: '迷你吧',
-  'flat-screen tv': '平板电视',
-  tv: '电视',
-  'cable channels': '有线频道',
-  'satellite channels': '卫星频道',
-  'soundproof rooms': '隔音客房',
-  'daily housekeeping': '每日清洁',
-  'smoke-free property': '全馆禁烟',
-  'cctv outside property': '室外监控',
-  'cctv in common areas': '公共区域监控',
-  refrigerator: '冰箱',
-  'ironing facilities': '熨烫设施',
-  'safety deposit box': '保险箱',
-  'hairdryer': '吹风机',
-  'concierge service': '礼宾服务',
-  'laundry service': '洗衣服务',
-  'express check-in/check-out': '快速入住/退房',
-  'express check-in': '快速入住',
-  'express check-out': '快速退房',
-  'breakfast in the room': '客房早餐',
-  'breakfast available': '提供早餐',
-  sauna: '桑拿',
-  spa: '水疗',
-  'fitness centre': '健身中心',
-  'fitness center': '健身中心',
-  'swimming pool': '游泳池',
-  terrace: '露台',
-  garden: '花园',
-  'pets allowed': '允许携带宠物',
-  'no pets allowed': '不允许携带宠物',
-}
+
+
+
 
 const FACILITY_CATEGORY_RULES: Array<{ category: string; patterns: RegExp[] }> = [
   {
@@ -115,25 +34,14 @@ const FACILITY_CATEGORY_RULES: Array<{ category: string; patterns: RegExp[] }> =
   },
 ]
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  visa: 'Visa',
-  mastercard: 'Mastercard',
-  'american express': 'American Express',
-  amex: 'American Express',
-  maestro: 'Maestro',
-  'diners club': 'Diners Club',
-  discover: 'Discover',
-  jcb: 'JCB',
-  unionpay: '银联',
-  cash: '现金',
-  'bank transfer': '银行转账',
-}
+
 
 export function localizePropertyType(value: string, locale?: Locale | unknown): string {
   const current = typeof locale === 'string' ? (locale as Locale) : getLocale()
   const key = value.trim().toLowerCase()
   if (current === 'en') {
-    const direct = PROPERTY_TYPE_EN_LABELS[key]
+    const originalKey = Object.keys(PROPERTY_TYPE_LABELS).find((k) => PROPERTY_TYPE_LABELS[k] === value.trim()) || key
+    const direct = PROPERTY_TYPE_EN_LABELS[originalKey]
     if (direct) return direct
     if (key.endsWith('s')) {
       const singular = PROPERTY_TYPE_EN_LABELS[key.slice(0, -1)]
@@ -161,7 +69,8 @@ export function localizeFacility(value: string, locale?: Locale | unknown): stri
   const current = typeof locale === 'string' ? (locale as Locale) : getLocale()
   if (current === 'en') {
     // If it's already English, return clean title case or direct value
-    return toEnglishTitleCase(value.trim())
+    const key = Object.keys(FACILITY_LABELS).find((k) => FACILITY_LABELS[k] === value.trim())
+    return toEnglishTitleCase(key || value.trim())
   }
   return FACILITY_LABELS[value.trim().toLowerCase()] || value
 }
@@ -236,9 +145,9 @@ export function localizePaymentMethod(value: string, locale?: Locale): string {
   const current = locale || getLocale()
   const key = value.trim().toLowerCase()
   if (current === 'en') {
-    if (key === 'cash') return 'Cash'
-    if (key === 'bank transfer') return 'Bank Transfer'
-    if (key === 'unionpay') return 'UnionPay'
+    if (key === 'cash' || value === PAYMENT_METHOD_LABELS.cash) return toEnglishTitleCase('cash')
+    if (key === 'bank transfer' || value === PAYMENT_METHOD_LABELS['bank transfer']) return toEnglishTitleCase('bank transfer')
+    if (key === 'unionpay' || value === PAYMENT_METHOD_LABELS.unionpay) return 'UnionPay'
     return PAYMENT_METHOD_LABELS[key] || toEnglishTitleCase(value)
   }
   return PAYMENT_METHOD_LABELS[key] || value
@@ -266,15 +175,15 @@ export function categorizeFacilities(
     buckets.set(matched.category, list)
   }
 
-  const ordered = ['网络', '餐饮', '客房', '服务']
-    .map((category) => {
-      const items = buckets.get(category)
+  const ordered = [runtimeCopy('m0cbda6b524', undefined, locale), runtimeCopy('m4fb5c52c92', undefined, locale), runtimeCopy('m37188c928f', undefined, locale), runtimeCopy('m4b81846f62', undefined, locale)]
+    .map((category, index) => {
+      const items = buckets.get(FACILITY_CATEGORY_RULES[index].category)
       return items?.length ? { category, items } : null
     })
     .filter((item): item is { category: string; items: string[] } => Boolean(item))
 
   if (uncategorized.length) {
-    ordered.push({ category: '其他', items: uncategorized })
+    ordered.push({ category: runtimeCopy('m1a26edf94a', undefined, locale), items: uncategorized })
   }
 
   return ordered
@@ -282,38 +191,20 @@ export function categorizeFacilities(
 
 export function hotelScoreText(score?: number, locale?: Locale): string {
   if (score == null) return ''
-  const current = locale || getLocale()
-  if (current === 'en') {
-    if (score >= 9) return 'Wonderful'
-    if (score >= 8) return 'Very good'
-    if (score >= 7) return 'Good'
-    return 'Pleasant'
-  }
-  if (score >= 9) return '好极了'
-  if (score >= 8) return '非常好'
-  if (score >= 7) return '好'
-  return '令人愉悦'
+  if (score >= 9) return runtimeCopy('md685485797', undefined, locale)
+  if (score >= 8) return runtimeCopy('mb997afc069', undefined, locale)
+  if (score >= 7) return runtimeCopy('m27e4fe4c3f', undefined, locale)
+  return runtimeCopy('m05c4965a75', undefined, locale)
 }
 
-const REVIEW_SCORE_EN_MAP: Record<string, string> = {
-  员工服务: 'Staff',
-  设施服务: 'Facilities',
-  清洁程度: 'Cleanliness',
-  舒适程度: 'Comfort',
-  性价比: 'Value for money',
-  位置: 'Location',
-  '免费 Wi-Fi': 'Free WiFi',
-  'Wi-Fi': 'WiFi',
-  早餐: 'Breakfast',
-  步行便利: 'Walking score',
-}
+
 
 export function localizeReviewScoreLabel(label: string, locale?: Locale): string {
   const current = locale || getLocale()
   if (current === 'en') {
     return REVIEW_SCORE_EN_MAP[label] || toEnglishTitleCase(label)
   }
-  return label
+  return Object.keys(REVIEW_SCORE_EN_MAP).find((key) => REVIEW_SCORE_EN_MAP[key].toLowerCase() === label.toLowerCase()) || label
 }
 
 const ORDINAL_SUFFIX: Record<number, string> = {

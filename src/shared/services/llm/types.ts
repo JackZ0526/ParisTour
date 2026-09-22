@@ -1,3 +1,4 @@
+import type { PlaceIdentity } from '../../utils/placeIdentity'
 /**
  * Public type definitions used across the LLM layer.
  *
@@ -154,6 +155,8 @@ export interface PlaceRecommendation {
 }
 
 export interface VerifiedPlaceCandidate {
+  openingSchedule?: import('../../../features/place/services/openingAvailability').OpeningSchedule
+  location?: { lat: number; lng: number }
   id?: string
   name: string
   type: RecommendPlaceType
@@ -256,7 +259,7 @@ export interface GenerateFullItineraryInput {
   verifiedCandidates: VerifiedPlaceCandidate[]
 }
 
-export interface OccupiedPlaceBrief {
+export interface OccupiedPlaceBrief extends PlaceIdentity {
   name: string
   placeId?: string
 }

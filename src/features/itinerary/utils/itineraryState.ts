@@ -1,3 +1,5 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/itineraryState-runtime-019122'
+import { localizedCopy } from '../../../shared/i18n/copy/itineraryState-019122'
 import type { DayPlan, ItineraryStop, Place } from '../../../types'
 import { SELECTED_HOTEL_PLACE_ID } from './dayOrigin'
 import { getLocale, translate } from '../../../shared/i18n'
@@ -58,10 +60,10 @@ function makeOvernightHotelStop(dayNum: number, existing?: ItineraryStop): Itine
     id: existing?.id || `d${dayNum}-${SELECTED_HOTEL_PLACE_ID}-overnight`,
     time: existing?.time || '21:30',
     placeId: SELECTED_HOTEL_PLACE_ID,
-    note: existing?.note || '回酒店休息，结束今天的行程。',
-    transport: existing?.transport || '地铁 / 步行回酒店',
+    note: existing?.note || runtimeCopy('m15cc9b300c', undefined),
+    transport: existing?.transport || runtimeCopy('m7dad739c5f', undefined),
     walkLevel: existing?.walkLevel || 'minimal',
-    duration: existing?.duration || '过夜',
+    duration: existing?.duration || runtimeCopy('ma8cafdfc74', undefined),
   }
 }
 
@@ -136,8 +138,8 @@ export function ensureDay1HotelFirst(days: DayPlan[]): DayPlan[] {
         checkIn?.note ||
         // Pre-LLM default; when the LLM fills in Day 1 it always overrides this.
         (getLocale() === 'en'
-          ? 'After clearing CDG, head to the hotel to check in, drop your bags, and rest before going out.'
-          : '从 CDG 出关后先到酒店办理入住、放下行李，稍作休息再出门。'),
+          ? localizedCopy('m0ba00e0d01', undefined, 'en')
+          : localizedCopy('m0ba00e0d01', undefined, 'zh-CN')),
       transport:
         checkIn?.transport ||
         translate('itinerary.hotelCheckInTransport' as never, undefined, getLocale()),
@@ -181,19 +183,19 @@ export function blankDay(dayNumber: number): DayPlan {
     day: dayNumber,
     // Use existing nav.dayN; falls back to a locale-aware template.
     title: translate('nav.dayN' as never, { day: dayNumber }, locale) ||
-      (locale === 'en' ? `Day ${dayNumber}` : `第 ${dayNumber} 天`),
+      (locale === 'en' ? localizedCopy('m284e918fd8', { p0: (dayNumber) }, 'en') : localizedCopy('m284e918fd8', { p0: (dayNumber) }, 'zh-CN')),
     theme: translate('itinerary.defaultDayTheme' as never, undefined, locale) ||
-      (locale === 'en' ? 'Free time' : '自由安排'),
+      (locale === 'en' ? localizedCopy('mc80f6ce28a', undefined, 'en') : localizedCopy('mc80f6ce28a', undefined, 'zh-CN')),
     pace: 'moderate',
     summary:
       translate('itinerary.defaultDaySummary' as never, undefined, locale) ||
       (locale === 'en'
-        ? 'No places added yet — pick spots on the map to start building this day.'
-        : '今天还没有安排地点，添加景点后会自动生成标题与总结。'),
+        ? localizedCopy('me73362652d', undefined, 'en')
+        : localizedCopy('me73362652d', undefined, 'zh-CN')),
     metroHintFromArea: {
       custom:
         translate('itinerary.navigateHint' as never, undefined, locale) ||
-        (locale === 'en' ? 'Follow navigation to the next stop.' : '按导航前往下一个地点。'),
+        (locale === 'en' ? localizedCopy('mce0802155e', undefined, 'en') : localizedCopy('mce0802155e', undefined, 'zh-CN')),
     },
     stops: [],
   }

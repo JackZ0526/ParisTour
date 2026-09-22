@@ -1,0 +1,48 @@
+import { createCopy } from '../copyFactory'
+export const en = {
+  "1": "1st Arr. (Louvre)",
+  "2": "2nd Arr. (Grands Boulevards)",
+  "3": "3rd Arr. (Marais)",
+  "4": "4th Arr. (Marais)",
+  "5": "5th Arr. (Quartier Latin)",
+  "6": "6th Arr. (Saint-Germain)",
+  "7": "7th Arr. (Tour Eiffel)",
+  "8": "8th Arr. (Champs-Élysées)",
+  "9": "9th Arr. (Opéra)",
+  "10": "10th Arr. (Canal Saint-Martin)",
+  "11": "11th Arr. (Bastille)",
+  "12": "12th Arr. (Bercy)",
+  "13": "13th Arr. (Place d’Italie)",
+  "14": "14th Arr. (Montparnasse)",
+  "15": "15th Arr. (Vaugirard)",
+  "16": "16th Arr. (Trocadéro)",
+  "17": "17th Arr. (Batignolles)",
+  "18": "18th Arr. (Montmartre)",
+  "19": "19th Arr. (La Villette)",
+  "20": "20th Arr. (Belleville)",
+  "pending": "Choose a hotel"
+} as const
+export const zhCN: Record<keyof typeof en, string> = {
+  "1": "1区 (Louvre / 卢浮宫)",
+  "2": "2区 (Grands Boulevards / 大林荫道)",
+  "3": "3区 (Marais / 玛黑)",
+  "4": "4区 (Marais / 玛黑)",
+  "5": "5区 (Quartier Latin / 拉丁区)",
+  "6": "6区 (Saint-Germain / 圣日耳曼)",
+  "7": "7区 (Tour Eiffel / 埃菲尔)",
+  "8": "8区 (Champs-Élysées / 香榭丽舍)",
+  "9": "9区 (Opéra / 歌剧院)",
+  "10": "10区 (Canal Saint-Martin / 圣马丁运河)",
+  "11": "11区 (Bastille / 巴士底)",
+  "12": "12区 (Bercy / 贝尔西)",
+  "13": "13区 (Place d’Italie / 意大利广场)",
+  "14": "14区 (Montparnasse / 蒙帕纳斯)",
+  "15": "15区 (Vaugirard / 沃吉拉尔)",
+  "16": "16区 (Trocadéro / 特罗卡德罗)",
+  "17": "17区 (Batignolles / 巴蒂尼奥勒)",
+  "18": "18区 (Montmartre / 蒙马特)",
+  "19": "19区 (La Villette / 维莱特)",
+  "20": "20区 (Belleville / 贝尔维尔)",
+  "pending": "待选择酒店"
+}
+export const hotelAreaCopy = createCopy(en, zhCN)

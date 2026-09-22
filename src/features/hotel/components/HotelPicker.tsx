@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import {
   useCallback,
   useEffect,
@@ -244,7 +245,7 @@ function HotelCardFace({
           ) : (
             <HotelTranslatedText
               text={hotel.reason || hotel.description}
-              loadingLabel="正在翻译酒店简介…"
+              loadingLabel={uiCopy('mcb89c595cb', undefined)}
               className="line-clamp-2 text-xs leading-relaxed text-[var(--stone)]"
             />
           )}
@@ -307,15 +308,15 @@ function needsBookingIdentityMigration(hotel: HotelCandidate): boolean {
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
-  en: '英语', fr: '法语', es: '西班牙语', pt: '葡萄牙语', de: '德语',
-  'en-gb': '英语', 'en-us': '英语', it: '意大利语', zh: '中文', ja: '日语', ar: '阿拉伯语', ru: '俄语',
-  'pt-pt': '葡萄牙语',
+  en: uiCopy('me2c72f15c0', undefined, 'zh-CN'), fr: uiCopy('mc50fca21e7', undefined, 'zh-CN'), es: uiCopy('m89a1c93fd0', undefined, 'zh-CN'), pt: uiCopy('m0621a6bca4', undefined, 'zh-CN'), de: uiCopy('mba99e16acc', undefined, 'zh-CN'),
+  'en-gb': uiCopy('me2c72f15c0', undefined, 'zh-CN'), 'en-us': uiCopy('me2c72f15c0', undefined, 'zh-CN'), it: uiCopy('mcf53b21ab2', undefined, 'zh-CN'), zh: uiCopy('m7be2d2d20c', undefined, 'zh-CN'), ja: uiCopy('mcb145f80ae', undefined, 'zh-CN'), ar: uiCopy('m398667634e', undefined, 'zh-CN'), ru: uiCopy('m39fd386a8c', undefined, 'zh-CN'),
+  'pt-pt': uiCopy('m0621a6bca4', undefined, 'zh-CN'),
 }
 
 const LANGUAGE_EN_LABELS: Record<string, string> = {
-  en: 'English', fr: 'French', es: 'Spanish', pt: 'Portuguese', de: 'German',
-  'en-gb': 'English', 'en-us': 'English', it: 'Italian', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic', ru: 'Russian',
-  'pt-pt': 'Portuguese',
+  en: uiCopy('me2c72f15c0', undefined, 'en'), fr: uiCopy('mc50fca21e7', undefined, 'en'), es: uiCopy('m89a1c93fd0', undefined, 'en'), pt: uiCopy('m0621a6bca4', undefined, 'en'), de: uiCopy('mba99e16acc', undefined, 'en'),
+  'en-gb': uiCopy('me2c72f15c0', undefined, 'en'), 'en-us': uiCopy('me2c72f15c0', undefined, 'en'), it: uiCopy('mcf53b21ab2', undefined, 'en'), zh: uiCopy('m7be2d2d20c', undefined, 'en'), ja: uiCopy('mcb145f80ae', undefined, 'en'), ar: uiCopy('m398667634e', undefined, 'en'), ru: uiCopy('m39fd386a8c', undefined, 'en'),
+  'pt-pt': uiCopy('m0621a6bca4', undefined, 'en'),
 }
 
 function localizeLanguage(value: string, locale?: Locale): string {
@@ -1128,7 +1129,7 @@ export function HotelPicker({
           : [],
       reviews: (popupCandidate.reviews || []).map((review) => ({
         text: review.negativeText
-          ? `${review.text}\n\n不足：${review.negativeText}`
+          ? uiCopy('mcb4e18fa09', { p0: (review.text), p1: (review.negativeText) })
           : review.text,
         rating: review.rating,
         author: review.author,
@@ -1240,7 +1241,7 @@ export function HotelPicker({
       .then((details) => {
         if (cancelled) return
         if (!details) {
-          setDetailsError('酒店资料暂时无法解析，请稍后重试。')
+          setDetailsError(uiCopy('m34408d306c', undefined))
           return
         }
         const enrich = (hotel: HotelCandidate): HotelCandidate =>
@@ -1314,7 +1315,7 @@ export function HotelPicker({
       .catch((cause) => {
         if (cancelled) return
         setDetailsError(
-          cause instanceof Error ? cause.message : '酒店资料加载失败，请稍后重试。',
+          cause instanceof Error ? cause.message : uiCopy('m25f428064b', undefined),
         )
       })
       .finally(() => {
@@ -1832,7 +1833,7 @@ export function HotelPicker({
       !hasValidParisBookingIdentity(card) ||
       !isBookingApiEnabled()
     ) {
-      setReviewsError('该酒店暂时无法获取 Booking.com 精选评论。')
+      setReviewsError(uiCopy('m225ebb5098', undefined))
       return
     }
     setReviewsLoadingId(card.id)
@@ -1865,7 +1866,7 @@ export function HotelPicker({
       })
       .catch((cause) => {
         setReviewsError(
-          cause instanceof Error ? cause.message : '精选评论加载失败，请稍后重试。',
+          cause instanceof Error ? cause.message : uiCopy('ma450fc5107', undefined),
         )
       })
       .finally(() => {
@@ -1876,7 +1877,7 @@ export function HotelPicker({
   function loadHotelPhotos(card: HotelCandidate) {
     if (card.bookingPhotosLoaded || photosLoadingId === card.id) return
     if (!card.bookingHotelId || !isBookingApiEnabled()) {
-      setPhotosError('该酒店暂时无法加载完整图集。')
+      setPhotosError(uiCopy('m5711903c6c', undefined))
       return
     }
     setPhotosLoadingId(card.id)
@@ -1884,7 +1885,7 @@ export function HotelPicker({
     void fetchBookingHotelPhotos({ id: card.bookingHotelId })
       .then((photos) => {
         if (!photos.length) {
-          setPhotosError('图片接口本次未返回可用照片，请稍后重试。')
+          setPhotosError(uiCopy('mf1ff4c04a2', undefined))
           return
         }
         const enrich = (hotel: HotelCandidate): HotelCandidate =>
@@ -1912,7 +1913,7 @@ export function HotelPicker({
       })
       .catch((cause) => {
         setPhotosError(
-          cause instanceof Error ? cause.message : '酒店图集加载失败，请稍后重试。',
+          cause instanceof Error ? cause.message : uiCopy('meb76a881b5', undefined),
         )
       })
       .finally(() => {

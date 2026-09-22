@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/hotelRecommend-runtime-cb1951'
 import { getOpenAIModel, recommendHotelsForTrip } from '../../../shared/services/llm/llm'
 import { translate } from '../../../shared/i18n'
 import { clearLlmMemo } from '../../../shared/services/llm/llmMemo'
@@ -151,7 +152,7 @@ export async function replaceOneHotelCandidate(input: {
     replacement = await resolveHotelCandidate({
       name: input.toHotelName.trim(),
       source: 'custom',
-      reason: `替换「${from.name}」`,
+      reason: runtimeCopy('m64daac63aa', { p0: (from.name) }),
     })
   } else {
     const [card] = await fetchResolvedHotelRecommendations({
@@ -160,12 +161,12 @@ export async function replaceOneHotelCandidate(input: {
       excludeNames: input.current.map((c) => c.name),
       preferences:
         input.preferences?.trim() ||
-        `替换「${from.name}」（${from.area}），给一家更合适的巴黎酒店`,
+        runtimeCopy('m770bb9ca1c', { p0: (from.name), p1: (from.area) }),
     })
     if (!card) throw new Error(translate('errors.couldNotGenerateReplacement'))
     replacement = {
       ...card,
-      reason: card.reason || `替换「${from.name}」`,
+      reason: card.reason || runtimeCopy('m64daac63aa', { p0: (from.name) }),
       isBest: false,
     }
   }
@@ -182,7 +183,7 @@ export async function replaceOneHotelCandidate(input: {
     return {
       candidates: marked,
       selected,
-      note: `已将「${from.name}」换成「${replacement.name}」，并设为当前住宿`,
+      note: runtimeCopy('mf43c61089f', { p0: (from.name), p1: (replacement.name) }),
     }
   }
 
@@ -193,7 +194,7 @@ export async function replaceOneHotelCandidate(input: {
   return {
     candidates: marked,
     selected,
-    note: `已将「${from.name}」换成「${replacement.name}」`,
+    note: runtimeCopy('me40ebbb363', { p0: (from.name), p1: (replacement.name) }),
   }
 }
 
@@ -215,7 +216,7 @@ export async function replaceHotelCandidates(input: {
     excludeNames: exclude,
     preferences:
       input.preferences?.trim() ||
-      `替换这些酒店：${input.fromHotels.map((h) => h.name).join('、')}`,
+      runtimeCopy('m5779a99596', { p0: (input.fromHotels.map((h) => h.name).join('、')) }),
   })
 
   if (fresh.length < input.fromHotels.length) {
@@ -240,7 +241,7 @@ export async function replaceHotelCandidates(input: {
     return {
       candidates: marked,
       selected,
-      note: `已替换 ${input.fromHotels.length} 家酒店；当前住宿改为「${pick.name}」`,
+      note: runtimeCopy('m746a60b63f', { p0: (input.fromHotels.length), p1: (pick.name) }),
     }
   }
 
@@ -250,6 +251,6 @@ export async function replaceHotelCandidates(input: {
   return {
     candidates: marked,
     selected,
-    note: `已按你的要求替换 ${input.fromHotels.length} 家酒店`,
+    note: runtimeCopy('md2bdc9d5dd', { p0: (input.fromHotels.length) }),
   }
 }

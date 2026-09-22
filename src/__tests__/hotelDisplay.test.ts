@@ -23,6 +23,13 @@ describe('hotelDisplay', () => {
     ).toEqual(['免费 Wi-Fi', '餐厅'])
   })
 
+  it('retains every facility when categories are displayed in English', () => {
+    const groups = categorizeFacilities(['Free Wifi', 'Restaurant', 'Private bathroom', '24-hour front desk'], 'en')
+    expect(groups).toHaveLength(4)
+    expect(groups.flatMap(group => group.items)).toHaveLength(4)
+    expect(JSON.stringify(groups)).not.toMatch(/\p{Script=Han}/u)
+  })
+
   it('groups facilities into categories', () => {
     const groups = categorizeFacilities([
       'Free Wifi',

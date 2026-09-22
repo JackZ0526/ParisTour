@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/tripCloud-runtime-40e121'
 import { getSupabase, isCloudSyncEnabled } from '../../../shared/lib/supabase'
 import { yieldToMain } from '../../../shared/lib/yieldToMain'
 import {
@@ -549,8 +550,8 @@ export async function listAccessibleTrips(
           if (nick) {
             trip.ownerName = nick
             if (trip.role !== 'owner') {
-              const perm = trip.role === 'editor' ? '可编辑' : '只读'
-              trip.label = `来自 ${nick} · ${perm}`
+              const perm = trip.role === 'editor' ? runtimeCopy('mbff55f2cd9', undefined) : runtimeCopy('mffc1d065fb', undefined)
+              trip.label = runtimeCopy('mc376d7a0b7', { p0: (nick), p1: (perm) })
             }
           }
         }
@@ -1860,7 +1861,7 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
     json = snapshotJson(snapshot)
   } catch (err) {
     console.warn('[tripCloud] snapshot serialize failed', err)
-    setCloudSaveStatus('error', '行程数据过大，无法写入云端')
+    setCloudSaveStatus('error', runtimeCopy('mdc6a73a7b2', undefined))
     flushQueuedRemote()
     return
   }
@@ -1889,7 +1890,7 @@ export async function flushTripCloudSave(options?: { urgent?: boolean }): Promis
       : generatedBaselineSnapshot(tripId) || previous
   if (!allowEmptyTrip && isUnexpectedEmptyRegression(safetyBaseline, snapshot)) {
     console.error('[tripCloud] blocked an unexpected empty-trip autosave')
-    setCloudSaveStatus('error', '已阻止异常空行程覆盖云端存档')
+    setCloudSaveStatus('error', runtimeCopy('mf516c6c646', undefined))
     flushQueuedRemote()
     return
   }

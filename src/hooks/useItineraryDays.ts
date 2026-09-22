@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../shared/i18n/copy/useItineraryDays-runtime-67327b'
 import {
   useCallback,
   useEffect,
@@ -446,7 +447,7 @@ export function useItineraryDays(
         placeId: place.id,
         note: place.description,
         walkLevel: 'short',
-        duration: place.durationHint || '60 分钟',
+        duration: place.durationHint || runtimeCopy('m1966ba1b9f', undefined),
       }
 
       const insertIntoDay = (d: DayPlan): ItineraryStop[] => {
@@ -596,7 +597,7 @@ export function useItineraryDays(
             placeId: place.id,
             note: place.description,
             walkLevel: old.walkLevel || 'short',
-            duration: place.durationHint || old.duration || '60 分钟',
+            duration: place.durationHint || old.duration || runtimeCopy('m1966ba1b9f', undefined),
             transport: old.transport,
           }
           const next = [...d.stops]
@@ -614,7 +615,7 @@ export function useItineraryDays(
             time: dayPlan.stops[oldIdx].time || '12:00',
             note: place.description,
             walkLevel: dayPlan.stops[oldIdx].walkLevel || 'short',
-            duration: place.durationHint || dayPlan.stops[oldIdx].duration || '60 分钟',
+            duration: place.durationHint || dayPlan.stops[oldIdx].duration || runtimeCopy('m1966ba1b9f', undefined),
             transport: dayPlan.stops[oldIdx].transport,
           },
         },

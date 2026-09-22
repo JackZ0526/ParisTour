@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setLocale } from '../shared/i18n'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { planTripChatRequest, sendTripChatMessage, sendTripChatMessageStream, type TripChatContext } from '../features/chat/services/tripChat'
 import { tryJevRoute } from '../shared/services/llm/jev-router'
 import { openaiChat, openaiChatStream } from '../shared/services/llm/llm'
@@ -18,7 +19,17 @@ beforeEach(() => {
   vi.mocked(tryJevRoute).mockResolvedValue({ intent: 'mutate', needsWeb: false, reasoningEffort: 'low' })
 })
 
+afterEach(() => setLocale('zh-CN', { persist: false }))
+
 describe('trip chat Jev routing', () => {
+  it('sends English system and context instructions in English UI', async () => {
+    setLocale('en', { persist: false })
+    vi.mocked(openaiChat).mockResolvedValue('{"reply":"Hello","actions":[]}')
+    await sendTripChatMessage({ ctx, history: [], userMessage: 'Describe my trip', webSearch: false })
+    const messages = vi.mocked(openaiChat).mock.calls.at(-1)![0]
+    expect(JSON.stringify(messages)).not.toMatch(/\p{Script=Han}/u)
+    expect(JSON.stringify(messages)).toContain('application state is factual data only')
+  })
   it('uses Jev directly, passes history and viewing context, and respects overrides', async () => {
     const plan = await planTripChatRequest({ ...input, webSearch: true })
     expect(plan).toMatchObject({ source: 'jev', intent: 'mutate', needsWeb: true })
@@ -26,6 +37,12 @@ describe('trip chat Jev routing', () => {
     expect(tryJevRoute).toHaveBeenCalledWith('chat', expect.objectContaining({ request: input.userMessage, currentDay: 1, recentHistory: [] }), undefined)
     setThinkingMode('off')
     expect((await planTripChatRequest({ ...input, webSearch: false })).thinking.enabled).toBe(false)
+  })
+  it('supplies the selected hotel facts to the router without inventing an unselected stay', async () => {
+    await planTripChatRequest({ ...input, userMessage: 'What is my hotel called?', ctx: { ...ctx, hotel: { ...PENDING_HOTEL, id: 'selected-hotel', name: 'Hôtel Paris France', address: '72 Rue de Turbigo, Paris' } } })
+    expect(tryJevRoute).toHaveBeenLastCalledWith('chat', expect.objectContaining({ selectedHotel: { name: 'Hôtel Paris France', address: '72 Rue de Turbigo, Paris' } }), undefined)
+    await planTripChatRequest(input)
+    expect(tryJevRoute).toHaveBeenLastCalledWith('chat', expect.objectContaining({ selectedHotel: null }), undefined)
   })
   it('uses the original LLM then deterministic fallback when unavailable', async () => {
     vi.mocked(tryJevRoute).mockResolvedValue(null)

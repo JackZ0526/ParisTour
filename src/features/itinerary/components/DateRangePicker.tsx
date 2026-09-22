@@ -1,7 +1,7 @@
+import { calendarMonth, calendarRange, calendarWeekdays } from '../../../shared/i18n/calendar'
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import { formatTripDayLabel } from '../services/tripDates'
 import { useReducedMotion } from '../../../shared/hooks/useReducedMotion'
 import {
   glassPopoverSurfaceClass,
@@ -22,14 +22,6 @@ interface Props {
   placeholder?: string
   id?: string
 }
-
-const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'] as const
-const WEEKDAYS_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] as const
-
-const MONTH_LONG_EN = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
 
 function toIso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -53,26 +45,11 @@ function daysInMonth(y: number, m: number): number {
 }
 
 function monthLabel(y: number, m: number, locale: Locale): string {
-  if (locale === 'en') {
-    return `${MONTH_LONG_EN[m]} ${y}`
-  }
-  return `${y}年${m + 1}月`
+  return calendarMonth(y, m, locale)
 }
 
 function formatRangeTrigger(start: string, end: string, locale: Locale): string {
-  const a = parseIso(start)
-  const b = parseIso(end)
-  if (!a || !b) return `${formatTripDayLabel(start, locale)} – ${formatTripDayLabel(end, locale)}`
-  if (locale === 'en') {
-    if (a.y === b.y) {
-      return `${formatTripDayLabel(start, 'en')} – ${formatTripDayLabel(end, 'en')}, ${a.y}`
-    }
-    return `${formatTripDayLabel(start, 'en')}, ${a.y} – ${formatTripDayLabel(end, 'en')}, ${b.y}`
-  }
-  if (a.y === b.y) {
-    return `${formatTripDayLabel(start, 'zh-CN')} – ${formatTripDayLabel(end, 'zh-CN')}`
-  }
-  return `${a.y}年${formatTripDayLabel(start, 'zh-CN')} – ${b.y}年${formatTripDayLabel(end, 'zh-CN')}`
+  return calendarRange(start, end, locale)
 }
 
 /**
@@ -252,7 +229,7 @@ export function DateRangePicker({
     }),
   }
 
-  const weekdays = locale === 'en' ? WEEKDAYS_EN : WEEKDAYS_ZH
+  const weekdays = calendarWeekdays(locale)
 
   return (
     <div ref={rootRef} className={`relative block text-sm ${open ? 'z-50' : 'z-30'}`}>
@@ -316,8 +293,8 @@ export function DateRangePicker({
 
             {/* Weekdays Row */}
             <div className="mb-1.5 grid grid-cols-7 text-center text-[11px] font-semibold text-[var(--stone)]">
-              {weekdays.map((w) => (
-                <div key={w} className="py-1">
+              {weekdays.map((w, index) => (
+                <div key={index} className="py-1">
                   {w}
                 </div>
               ))}

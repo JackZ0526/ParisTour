@@ -1,3 +1,5 @@
+import { uiCopy } from './shared/i18n/copy/ui'
+import { localizedCopy } from './shared/i18n/copy/App-835da5'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import {
@@ -193,7 +195,7 @@ export default function App() {
     hotelReady,
   } = useTripCore()
   // Destination UI temporarily hidden — lock trip to Paris.
-  const destination = '巴黎'
+  const destination = uiCopy('m4d45f90234', undefined)
   const destinationBrand = destinationBrandFromDestination(destination)
   const numberOfDaysRef = useRef(0)
   const mutationSinkRef = useRef<(mutation: TripMutationDraft) => void>(() => {})
@@ -534,6 +536,9 @@ export default function App() {
     }
     return null
   }, [selectedPlaceId, placesWithHotel, day.stops, day.day, viewingHotelDetail])
+  const tripPlaces = useMemo(() => days.flatMap(d => d.stops.flatMap(s => {
+    try { return [getPlace(s.placeId, placesWithHotel)] } catch { return [] }
+  })), [days, placesWithHotel])
   const tripPlaceNames = useMemo(() => {
     const names: string[] = []
     for (const d of days) {
@@ -1143,6 +1148,7 @@ export default function App() {
                                   handleRestoreDayDefault(dayIndex)
                                 }}
                                 tripPlaceNames={tripPlaceNames}
+                                tripPlaces={tripPlaces}
                                 readOnly={readOnly}
                                 recommendationPreferences={recommendationPreferences}
                               />
@@ -1466,7 +1472,7 @@ export default function App() {
                 onFlightsChange={setFlights}
                 readOnly={readOnly}
               />
-              <React.Suspense fallback={<div role="status" className="h-40 animate-pulse rounded-3xl bg-[var(--mist)]" aria-label={locale === 'en' ? 'Loading hotels' : '加载住宿'} />}>
+              <React.Suspense fallback={<div role="status" className="h-40 animate-pulse rounded-3xl bg-[var(--mist)]" aria-label={locale === 'en' ? localizedCopy('m538259cd3a', undefined, 'en') : localizedCopy('m538259cd3a', undefined, 'zh-CN')} />}>
               <HotelPicker
                 key={`hotel-${panelResetKey}-${syncRenderKey}`}
                 selected={hotel}
@@ -1503,7 +1509,7 @@ export default function App() {
           )}
 
           {activeTab === 'profile' && (
-            <React.Suspense fallback={<div role="status" className="h-64 animate-pulse rounded-3xl bg-[var(--mist)]" aria-label={locale === 'en' ? 'Loading profile' : '加载个人中心'} />}>
+            <React.Suspense fallback={<div role="status" className="h-64 animate-pulse rounded-3xl bg-[var(--mist)]" aria-label={locale === 'en' ? localizedCopy('m96c6ab37bc', undefined, 'en') : localizedCopy('m96c6ab37bc', undefined, 'zh-CN')} />}>
             <ProfileTab
               onAnimationStart={() => restoreTabScroll('profile')}
               email={email}

@@ -1,3 +1,4 @@
+import { uiCopy } from '../i18n/copy/ui'
 import { useEffect, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -25,8 +26,8 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  confirmText = '确定',
-  cancelText = '取消',
+  confirmText = uiCopy('mf526c89937', undefined),
+  cancelText = uiCopy('m4d0b4688c7', undefined),
   tone = 'danger',
   icon = 'trash',
   busy = false,
@@ -154,7 +155,7 @@ export function ConfirmDialog({
                 </div>
                 <button
                   type="button"
-                  aria-label="关闭"
+                  aria-label={uiCopy('m6c14bd7f6f', undefined)}
                   disabled={busy}
                   onClick={onClose}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--stone)]/80 transition-colors hover:bg-black/5 dark:hover:bg-white/10 hover:text-[var(--ink)] active:scale-95"
@@ -182,7 +183,7 @@ export function ConfirmDialog({
                   }}
                   className={`min-h-[38px] rounded-full px-5 py-2 text-xs sm:text-sm font-medium transition-all active:scale-95 disabled:opacity-50 ${confirmButtonClasses()}`}
                 >
-                  {busy ? '执行中…' : confirmText}
+                  {busy ? uiCopy('m666b4afff2', undefined) : confirmText}
                 </button>
               </div>
             </motion.div>

@@ -1,4 +1,4 @@
-import { authFetch } from '../../../features/auth/services/authFetch'
+import { requestJev } from './jev-request'
 
 type Effort = 'off' | 'low' | 'medium' | 'high'
 type Intent = 'answer' | 'recommend' | 'mutate'
@@ -42,25 +42,5 @@ export function parseJevRoute(value: unknown, kind: 'chat' | 'preflight'): JevRo
 
 /** Null means use the existing LLM router; user cancellation must propagate. */
 export async function tryJevRoute(kind: 'chat' | 'preflight', context: unknown, signal?: AbortSignal): Promise<JevRoute | null> {
-  signal?.throwIfAborted()
-  const controller = new AbortController()
-  const cancel = () => controller.abort(signal?.reason)
-  signal?.addEventListener('abort', cancel, { once: true })
-  const timeout = setTimeout(() => controller.abort(), 5_000)
-  try {
-    const response = await authFetch('/api/jev', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kind, state: JSON.stringify(context) }),
-      signal: controller.signal,
-    })
-    if (!response.ok) return null
-    return parseJevRoute(await response.json(), kind)
-  } catch {
-    signal?.throwIfAborted()
-    return null
-  } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', cancel)
-  }
+  return parseJevRoute(await requestJev(kind, context, signal), kind)
 }

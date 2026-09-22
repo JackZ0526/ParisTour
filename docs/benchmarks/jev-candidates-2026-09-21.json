@@ -1,0 +1,611 @@
+[
+  {
+    "id": "ChIJK10cATlv5kcRy-0a7MK_6bs",
+    "name": "Moka Brunch & Coffee - Champs Elysées",
+    "address": "11 Rue du Colisée, 75008 Paris",
+    "rating": 4.9,
+    "userRatingCount": 2866,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8706623,
+      "lng": 2.3079284
+    },
+    "distanceMeters": 3851.9794185311002,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJdzSPfQBv5kcR6RopUY5tivk",
+    "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+    "address": "42 Rue Rambuteau, 75003 Paris",
+    "rating": 4.8,
+    "userRatingCount": 1196,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.8614525,
+      "lng": 2.3528971
+    },
+    "distanceMeters": 885.3277104655249,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJwTltl4Bv5kcRw70gwNWZxmg",
+    "name": "Moka Brunch & Coffee - Galeries Lafayette",
+    "address": "8 Rue La Fayette, 75009 Paris",
+    "rating": 4.8,
+    "userRatingCount": 1413,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.873260599999995,
+      "lng": 2.3342986999999997
+    },
+    "distanceMeters": 2006.6817439985819,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJ0YtTRO5v5kcRbAWDnAz7PmU",
+    "name": "Kafeibaie",
+    "address": "5 Rue Blondel, 75003 Paris",
+    "rating": 4.8,
+    "userRatingCount": 453,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.8685498,
+      "lng": 2.3544152
+    },
+    "distanceMeters": 447.83127340241333,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJGR3TdqJv5kcRCtgkoouI29U",
+    "name": "Clove",
+    "address": "14 Rue Chappe, 75018 Paris",
+    "rating": 4.8,
+    "userRatingCount": 833,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.8846433,
+      "lng": 2.3418273
+    },
+    "distanceMeters": 2322.5714300954032,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJA-oUlcpv5kcRZKuiJ5HrfHs",
+    "name": "BlackBird Coffee",
+    "address": "77 Rue du Temple, 75003 Paris",
+    "rating": 4.7,
+    "userRatingCount": 863,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.861288800000004,
+      "lng": 2.3560345000000003
+    },
+    "distanceMeters": 781.1455559153173,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJZ4NqsAtv5kcRgYDJA6P5m4E",
+    "name": "FLUFFY'S - Bakery et brunch",
+    "address": "44 Rue de Cléry, 75002 Paris",
+    "rating": 4.7,
+    "userRatingCount": 762,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.868308899999995,
+      "lng": 2.3473870999999997
+    },
+    "distanceMeters": 954.2150986769086,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJn-Pj4fJv5kcRml4OLaoT8ug",
+    "name": "Perlant",
+    "address": "13 Rue Marie et Louise, 75010 Paris",
+    "rating": 4.8,
+    "userRatingCount": 228,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.8718976,
+      "lng": 2.366443
+    },
+    "distanceMeters": 642.8165345401945,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJTZbU3Axv5kcRtAayN1UKoBw",
+    "name": "Café Gigi",
+    "address": "95 Rue de Dunkerque, 75009 Paris",
+    "rating": 4.9,
+    "userRatingCount": 150,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.882622999999995,
+      "lng": 2.3448738
+    },
+    "distanceMeters": 2010.6703072887235,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJ3eZOkNtt5kcRKh4nlHOI5Es",
+    "name": "Best Bread Boba",
+    "address": "14 Rue Civiale, 75010 Paris",
+    "rating": 4.8,
+    "userRatingCount": 167,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.873100199999996,
+      "lng": 2.3750572
+    },
+    "distanceMeters": 1228.745478732433,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJ0W4nGQBv5kcRn1xGgp_6Sh8",
+    "name": "Broken Biscuits",
+    "address": "18 Rue du Faubourg Poissonnière, 75010 Paris",
+    "rating": 4.8,
+    "userRatingCount": 134,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.8721034,
+      "lng": 2.3480242
+    },
+    "distanceMeters": 1029.1193206242813,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJrWUgQldt5kcRTgM8_eRpZzI",
+    "name": "BACK IN BLACK",
+    "address": "25 Rue Amelot, 75011 Paris",
+    "rating": 4.5,
+    "userRatingCount": 1269,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8562232,
+      "lng": 2.3690393
+    },
+    "distanceMeters": 1424.0769096581162,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJUR2VuYBt5kcRF8Vxwp21JJc",
+    "name": "Extraction Coffee Paris 11",
+    "address": "29 Rue Amelot, 75011 Paris",
+    "rating": 4.5,
+    "userRatingCount": 1203,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8563938,
+      "lng": 2.3689931
+    },
+    "distanceMeters": 1405.5874195701697,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJt3JBx85x5kcRj1I8pc7m75Q",
+    "name": "Gast Baker’s House - Boulangerie Paris 7",
+    "address": "16 Av. de la Motte-Picquet, 75007 Paris",
+    "rating": 4.7,
+    "userRatingCount": 626,
+    "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+    "location": {
+      "lat": 48.8566004,
+      "lng": 2.3084135
+    },
+    "distanceMeters": 3998.1897309675023,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJG8GVSgBv5kcRlkACNBwta2s",
+    "name": "Simple Coffee Paris",
+    "address": "78 R. des Martyrs, 75018 Paris",
+    "rating": 4.6,
+    "userRatingCount": 495,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.882953099999995,
+      "lng": 2.3398564
+    },
+    "distanceMeters": 2265.8083291183684,
+    "type": "cafe"
+  },
+  {
+    "id": "ChIJHwzjqZJv5kcRCir2RjPAaKE",
+    "name": "Chouchou",
+    "address": "23 Bd de Sébastopol, 75001 Paris",
+    "rating": 4.8,
+    "userRatingCount": 28864,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8599744,
+      "lng": 2.3487234
+    },
+    "distanceMeters": 1211.4110381463588,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJhRphTthv5kcRvKcxdCJzbmY",
+    "name": "Mazmez",
+    "address": "70 Rue René Boulanger, 75010 Paris",
+    "rating": 4.9,
+    "userRatingCount": 2151,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.869253,
+      "lng": 2.3581309999999998
+    },
+    "distanceMeters": 239.50674006622637,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJZUHe-g5u5kcRwdKX01SNJKE",
+    "name": "La Petite Rose des Sables",
+    "address": "6 Rue de Lancry, 75010 Paris",
+    "rating": 4.9,
+    "userRatingCount": 1211,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8689454,
+      "lng": 2.3602061
+    },
+    "distanceMeters": 139.2065046644188,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJg5DO-ypv5kcRLo19dFCDJ6w",
+    "name": "Le P'tit Piano",
+    "address": "26 Rue Cadet, 75009 Paris",
+    "rating": 4.8,
+    "userRatingCount": 5105,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8756486,
+      "lng": 2.3436490000000005
+    },
+    "distanceMeters": 1510.6765436338678,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJL60lphJu5kcRgZU5AHRZHJI",
+    "name": "LE PARISIEN",
+    "address": "72 Bd de Magenta, 75010 Paris",
+    "rating": 4.8,
+    "userRatingCount": 3370,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8754539,
+      "lng": 2.3570669
+    },
+    "distanceMeters": 895.9947103429441,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJf-oe7Wdu5kcRRto099RQ9Fc",
+    "name": "Sacrée Fleur Montmartre",
+    "address": "50 Rue de Clignancourt, 75018 Paris",
+    "rating": 4.8,
+    "userRatingCount": 3706,
+    "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+    "location": {
+      "lat": 48.8876187,
+      "lng": 2.3479882
+    },
+    "distanceMeters": 2393.6288803898647,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJJahFcvFv5kcRZ9w_gYq5KQE",
+    "name": "LArchimede | Restaurant Republique Paris 10 (Canal Saint Martin) | Terrasse",
+    "address": "11 Rue Marie et Louise, 75010 Paris",
+    "rating": 4.8,
+    "userRatingCount": 1472,
+    "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+    "location": {
+      "lat": 48.871888999999996,
+      "lng": 2.366516
+    },
+    "distanceMeters": 645.8093368555872,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJf6lCNw5u5kcRD8J-bTWqqj8",
+    "name": "Le 17.45 Paris République - Planches à composer",
+    "address": "7 Rue René Boulanger, 75010 Paris",
+    "rating": 4.7,
+    "userRatingCount": 1788,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.86912840000001,
+      "lng": 2.3578996
+    },
+    "distanceMeters": 242.22876718937874,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJ38_szA1u5kcRtZZK4AhbCpQ",
+    "name": "Les Rupins - Restaurant Parisien",
+    "address": "35 Bd de Magenta, 75010 Paris",
+    "rating": 4.6,
+    "userRatingCount": 4058,
+    "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+    "location": {
+      "lat": 48.8718847,
+      "lng": 2.3596954
+    },
+    "distanceMeters": 468.1625360873701,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJSQwPxwdt5kcRbleMxeNvh1Y",
+    "name": "DEUX BISTROT DE CHEFS",
+    "address": "58 Rue de la Fontaine au Roi, 75011 Paris",
+    "rating": 4.8,
+    "userRatingCount": 693,
+    "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+    "location": {
+      "lat": 48.8681523,
+      "lng": 2.3739342999999997
+    },
+    "distanceMeters": 991.2253399645545,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJgQhmfqZv5kcR1G6PhtJwf40",
+    "name": "Picotte",
+    "address": "42 Rue de Malte, 75011 Paris",
+    "rating": 4.7,
+    "userRatingCount": 985,
+    "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+    "location": {
+      "lat": 48.8662365,
+      "lng": 2.3675037999999997
+    },
+    "distanceMeters": 544.4950232286162,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJ0Y7Uk_lv5kcRxQMuMKFtVmc",
+    "name": "Le Marais Restaurant Paris",
+    "address": "47 R. de Turbigo, 75003 Paris",
+    "rating": 4.6,
+    "userRatingCount": 2245,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8651072,
+      "lng": 2.3540124
+    },
+    "distanceMeters": 549.0185619498573,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJxYJUC2lv5kcRlhdpWba_aGU",
+    "name": "Le Tout-Paris",
+    "address": "8 Quai du Louvre, 75001 Paris",
+    "rating": 4.6,
+    "userRatingCount": 2200,
+    "location": {
+      "lat": 48.8587493,
+      "lng": 2.3422529
+    },
+    "distanceMeters": 1659.1398846622046,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJ7WkibR5u5kcR12JLnyKyw3E",
+    "name": "Le P'tit Bistrot",
+    "address": "8 Rue Saint-Martin, 75004 Paris",
+    "rating": 4.6,
+    "userRatingCount": 1556,
+    "priceLevel": "PRICE_LEVEL_MODERATE",
+    "location": {
+      "lat": 48.8575531,
+      "lng": 2.3496363
+    },
+    "distanceMeters": 1375.8603587879738,
+    "type": "restaurant"
+  },
+  {
+    "id": "ChIJ75I0XQRu5kcRHJRwpkFqu7I",
+    "name": "Dessance",
+    "address": "74 Rue des Archives, 75003 Paris",
+    "rating": 4.6,
+    "userRatingCount": 1072,
+    "priceLevel": "PRICE_LEVEL_VERY_EXPENSIVE",
+    "location": {
+      "lat": 48.862281499999995,
+      "lng": 2.3598519
+    },
+    "distanceMeters": 603.8421579729427,
+    "type": "restaurant"
+  },
+  {
+    "id": "ta-188151",
+    "location": {
+      "lat": 48.85837,
+      "lng": 2.294481
+    },
+    "name": "Eiffel Tower",
+    "type": "attraction",
+    "distanceMeters": 4932
+  },
+  {
+    "id": "ta-188757",
+    "location": {
+      "lat": 48.860611,
+      "lng": 2.337644
+    },
+    "name": "Louvre Museum",
+    "type": "attraction",
+    "distanceMeters": 1842
+  },
+  {
+    "id": "ta-188150",
+    "location": {
+      "lat": 48.86,
+      "lng": 2.3266
+    },
+    "name": "Musée d'Orsay",
+    "type": "attraction",
+    "distanceMeters": 2617
+  },
+  {
+    "id": "ta-188679",
+    "location": {
+      "lat": 48.853,
+      "lng": 2.3499
+    },
+    "name": "Cathédrale Notre-Dame de Paris",
+    "type": "attraction",
+    "distanceMeters": 1806
+  },
+  {
+    "id": "ta-188709",
+    "location": {
+      "lat": 48.8738,
+      "lng": 2.295
+    },
+    "name": "Arc de Triomphe",
+    "type": "attraction",
+    "distanceMeters": 4831
+  },
+  {
+    "id": "ta-209760",
+    "location": {
+      "lat": 48.8698,
+      "lng": 2.3075
+    },
+    "name": "Champs-Elysees",
+    "type": "attraction",
+    "distanceMeters": 3876
+  },
+  {
+    "id": "ta-189687",
+    "location": {
+      "lat": 48.8462,
+      "lng": 2.3372
+    },
+    "name": "Luxembourg Gardens",
+    "type": "attraction",
+    "distanceMeters": 2932
+  },
+  {
+    "id": "ta-190685",
+    "location": {
+      "lat": 48.8867,
+      "lng": 2.3431
+    },
+    "name": "Basilique Du Sacre-Coeur De Montmartre",
+    "type": "attraction",
+    "distanceMeters": 2463
+  },
+  {
+    "id": "ta-190204",
+    "location": {
+      "lat": 48.8719,
+      "lng": 2.3316
+    },
+    "name": "Palais Garnier",
+    "type": "attraction",
+    "distanceMeters": 2158
+  },
+  {
+    "id": "ta-590230",
+    "location": {
+      "lat": 48.86611,
+      "lng": 2.312454
+    },
+    "name": "Grand Palais",
+    "type": "attraction",
+    "distanceMeters": 3511
+  },
+  {
+    "id": "ta-189284",
+    "location": {
+      "lat": 48.8867,
+      "lng": 2.3431
+    },
+    "name": "Montmartre",
+    "type": "attraction",
+    "distanceMeters": 2463
+  },
+  {
+    "id": "ta-189683",
+    "location": {
+      "lat": 48.858,
+      "lng": 2.342
+    },
+    "name": "The Seine",
+    "type": "attraction",
+    "distanceMeters": 1725
+  },
+  {
+    "id": "ta-189193",
+    "location": {
+      "lat": 48.8738,
+      "lng": 2.332
+    },
+    "name": "Galeries Lafayette Paris Haussmann",
+    "type": "attraction",
+    "distanceMeters": 2185
+  },
+  {
+    "id": "ta-190202",
+    "location": {
+      "lat": 48.8554,
+      "lng": 2.345
+    },
+    "name": "Sainte-Chapelle",
+    "type": "attraction",
+    "distanceMeters": 1772
+  },
+  {
+    "id": "ta-292257",
+    "location": {
+      "lat": 48.8575,
+      "lng": 2.3588
+    },
+    "name": "Le Marais",
+    "type": "attraction",
+    "distanceMeters": 1140
+  },
+  {
+    "id": "ta-265635",
+    "location": {
+      "lat": 48.8638,
+      "lng": 2.3226
+    },
+    "name": "Musée de l’Orangerie",
+    "type": "attraction",
+    "distanceMeters": 2799
+  },
+  {
+    "id": "ta-188149",
+    "location": {
+      "lat": 48.8553,
+      "lng": 2.3158
+    },
+    "name": "Musée Rodin",
+    "type": "attraction",
+    "distanceMeters": 3542
+  },
+  {
+    "id": "ta-188486",
+    "location": {
+      "lat": 48.8644,
+      "lng": 2.2978
+    },
+    "name": "Musee d'Art Moderne de Paris",
+    "type": "attraction",
+    "distanceMeters": 4594
+  },
+  {
+    "id": "ta-246664",
+    "location": {
+      "lat": 48.8642,
+      "lng": 2.2973
+    },
+    "name": "Palais de Tokyo",
+    "type": "attraction",
+    "distanceMeters": 4632
+  }
+]

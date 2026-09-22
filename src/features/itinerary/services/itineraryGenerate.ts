@@ -1,3 +1,12 @@
+import { samePlace, uniquePlaces } from '../../../shared/utils/placeIdentity'
+import { openingAvailability, openingWindows, addCalendarDays } from '../../place/services/openingAvailability'
+import { validateDayOpeningHours } from './validateOpeningHours'
+import { openingCopy } from '../../../shared/i18n/copy/openingAvailability'
+import { runtimeCopy } from '../../../shared/i18n/copy/itineraryGenerate-runtime-82b352'
+import { localizedCopy } from '../../../shared/i18n/copy/itineraryGenerate-82b352'
+import { rankVerifiedCandidates } from '../../../shared/services/llm/jev-ranking'
+import { fastGenerationEnabled, generationTimer } from '../../../shared/services/generationPerformance'
+import { runPool } from '../../../shared/services/asyncPool'
 import { places as catalogPlaces } from '../../place/constants/places'
 import type {
   DayPlan,
@@ -109,6 +118,7 @@ function attractionCandidatesFromTripadvisor(
 ): VerifiedPlaceCandidate[] {
   return listSeededTripadvisorAttractions().map((item) => ({
     id: `ta-${item.contentId}`,
+    location: item.location,
     name: item.name,
     type: 'attraction' as const,
     distanceMeters: item.location
@@ -214,7 +224,7 @@ async function resolveAttractionPlace(
       ta?.description ||
       draft.description ||
       catalog?.description ||
-      `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
+      runtimeCopy('me11a33debc', { p0: (draft.name), p1: (draft.area ? `，${draft.area}` : '') }),
     googleRating: google?.rating,
     googleUserRatingCount: google?.userRatingCount,
     googleAddress: google?.address || draft.googleAddress,
@@ -222,11 +232,11 @@ async function resolveAttractionPlace(
       ta?.rating != null
         ? `Tripadvisor ★ ${ta.rating.toFixed(1)}`
         : catalog?.ratingHint?.replace(/Google/i, 'Tripadvisor') ||
-          'Tripadvisor 景点',
+          runtimeCopy('m1121bc4cec', undefined),
     image: ta?.photos[0] || wikimediaPhoto?.url || catalog?.image || FALLBACK_IMAGE,
     location: loc,
     googleMapsUrl: mapsUrl(ta?.name || catalog?.nameLocal || `${draft.name} Paris`),
-    durationHint: draft.durationHint || catalog?.durationHint || '60 分钟',
+    durationHint: draft.durationHint || catalog?.durationHint || runtimeCopy('m1966ba1b9f', undefined),
   }
   return { id, place }
 }
@@ -312,14 +322,14 @@ async function resolveDraftPlace(
     description:
       draft.description ||
       details?.summary ||
-      `${draft.name}${draft.area ? `，${draft.area}` : ''}，适合安排进巴黎行程。`,
+      runtimeCopy('me11a33debc', { p0: (draft.name), p1: (draft.area ? `，${draft.area}` : '') }),
     googleRating: details?.rating,
     googleUserRatingCount: details?.userRatingCount,
     googleAddress: details?.address || draft.googleAddress,
     ratingHint:
       details?.rating != null
         ? `Google ★ ${details.rating.toFixed(1)}`
-        : draft.ratingHint || 'Google 地点',
+        : draft.ratingHint || runtimeCopy('me6cd927b2d', undefined),
     priceHint: details?.priceLevel,
     image: websitePhoto || FALLBACK_IMAGE,
     location: loc || {
@@ -328,7 +338,7 @@ async function resolveDraftPlace(
       lng: hotel.lng + (Math.random() - 0.5) * 0.01,
     },
     googleMapsUrl: mapsUrl(details?.name || `${draft.name} Paris`),
-    durationHint: draft.durationHint || '60 分钟',
+    durationHint: draft.durationHint || runtimeCopy('m1966ba1b9f', undefined),
   }
   placeResolveCache.set(cacheKey, { id, place })
   if (place.googlePlaceId) {
@@ -357,10 +367,11 @@ async function loadItineraryCandidates(
 ): Promise<VerifiedPlaceCandidate[]> {
   const excluded = new Set(occupiedNames.map(normalizePlaceName))
   const specs: Array<{
-    type: Exclude<VerifiedPlaceCandidate['type'], 'attraction'>
+    type: VerifiedPlaceCandidate['type']
     query: string
     radius: number
   }> = [
+    { type: 'attraction', query: 'tourist attractions museums Paris', radius: 20_000 },
     { type: 'cafe', query: 'specialty coffee bakery brunch Paris', radius: 12_000 },
     { type: 'restaurant', query: 'restaurant Paris', radius: 12_000 },
   ]
@@ -378,7 +389,7 @@ async function loadItineraryCandidates(
     }),
   )
   const seen = new Set<string>()
-  return [...batches.flat(), ...attractionCandidatesFromTripadvisor(hotel)].filter(
+  return [...batches.flat(), ...(batches[0].length ? [] : attractionCandidatesFromTripadvisor(hotel))].filter(
     (row) => {
       const key = row.id || `${row.type}:${normalizePlaceName(row.name)}`
       if (seen.has(key) || excluded.has(normalizePlaceName(row.name))) return false
@@ -411,7 +422,7 @@ export async function getSharedItineraryCandidates(
 
 function blankMetroHints(): Record<string, string> {
   return {
-    custom: '按导航或地铁前往下一个地点，优先少换乘。',
+    custom: runtimeCopy('m2396819a03', undefined),
   }
 }
 
@@ -435,10 +446,10 @@ function collapseDisneyStopsOnDay(day: DayPlan, places: Record<string, Place>): 
     id: `d${day.day}-${DISNEY_PLACE_ID}-0`,
     time: '10:00',
     placeId: DISNEY_PLACE_ID,
-    note: '巴黎迪士尼乐园全日；建议提前购票与 App 排队。园内用餐即可，不必另排餐厅站。',
-    transport: 'RER A → Marne-la-Vallée–Chessy（约 45–60 分钟）',
+    note: runtimeCopy('m05363eb664', undefined),
+    transport: runtimeCopy('m6814f3629f', undefined),
     walkLevel: 'moderate',
-    duration: '全天',
+    duration: runtimeCopy('m79b62069f5', undefined),
   }
 
   const existingDisney = day.stops.find((s) => isDisneyStop(s, places))
@@ -459,19 +470,19 @@ function collapseDisneyStopsOnDay(day: DayPlan, places: Record<string, Place>): 
       id: overnight?.id || `d${day.day}-${SELECTED_HOTEL_PLACE_ID}-overnight`,
       time: overnight?.time || '21:30',
       placeId: SELECTED_HOTEL_PLACE_ID,
-      note: overnight?.note || '乐园归来回酒店休整；早出晚归预留疲惫。',
-      transport: overnight?.transport || 'RER A 回城',
+      note: overnight?.note || runtimeCopy('mf9147a636c', undefined),
+      transport: overnight?.transport || runtimeCopy('mbc4f5d0852', undefined),
       walkLevel: overnight?.walkLevel || 'minimal',
-      duration: overnight?.duration || '过夜',
+      duration: overnight?.duration || runtimeCopy('ma8cafdfc74', undefined),
     },
   ]
 
   return {
     ...day,
-    title: day.title.includes('迪士尼') ? day.title : '巴黎迪士尼',
-    theme: day.theme || 'RER A 乐园日',
+    title: day.title.includes('迪士尼') ? day.title : runtimeCopy('m26b07203b4', undefined),
+    theme: day.theme || runtimeCopy('macb35fba12', undefined),
     pace: 'park',
-    summary: day.summary || '今天只去迪士尼，不安排其他景点；园内玩够再回酒店。',
+    summary: day.summary || runtimeCopy('m73600e5f20', undefined),
     stops,
   }
 }
@@ -541,12 +552,12 @@ export function validateAndFixGeneratedDays(
             day: i,
             title: en
               ? i === 1 ? 'Arrival in Paris' : i === n ? 'Departure' : `Day ${i}`
-              : i === 1 ? '抵达巴黎' : i === n ? '返程' : `第 ${i} 天`,
-            theme: en ? 'Free time' : '自由安排',
+              : i === 1 ? runtimeCopy('m5985017e99', undefined) : i === n ? runtimeCopy('m1172f4a8f5', undefined) : runtimeCopy('m98cd75602d', { p0: (i) }),
+            theme: en ? localizedCopy('mc80f6ce28a', undefined, 'en') : localizedCopy('mc80f6ce28a', undefined, 'zh-CN'),
             pace: i === 1 || i === n ? 'relaxed' : 'moderate',
             summary: en
-              ? 'Day still to be filled in.'
-              : '今天行程待补全。',
+              ? localizedCopy('m8b4c1f5047', undefined, 'en')
+              : localizedCopy('m8b4c1f5047', undefined, 'zh-CN'),
             metroHintFromArea: blankMetroHints(),
             stops: [],
           },
@@ -574,10 +585,10 @@ export function validateAndFixGeneratedDays(
     filled[disneyIdx] = collapseDisneyStopsOnDay(
       {
         ...d,
-        title: d.title.includes('迪士尼') ? d.title : '巴黎迪士尼',
-        theme: d.theme || 'RER A 乐园日',
+        title: d.title.includes('迪士尼') ? d.title : runtimeCopy('m26b07203b4', undefined),
+        theme: d.theme || runtimeCopy('macb35fba12', undefined),
         pace: 'park',
-        summary: d.summary || '今天只去迪士尼，不安排其他景点。',
+        summary: d.summary || runtimeCopy('m6226fc9180', undefined),
       },
       places,
     )
@@ -616,18 +627,18 @@ export function validateAndFixGeneratedDays(
   if (!hasCdg) {
     filled[n - 1] = {
       ...last,
-      title: last.title || '返程',
+      title: last.title || runtimeCopy('m1172f4a8f5', undefined),
       pace: 'relaxed',
       stops: [
         ...last.stops,
         {
           id: `d${n}-${CDG_PLACE_ID}-fix`,
-          time: '按航班倒推',
+          time: runtimeCopy('ma1c8cd8ef8', undefined),
           placeId: CDG_PLACE_ID,
-          note: '国际航班建议起飞前 3–3.5 小时到 CDG；按返程时刻倒推离开酒店。',
-          transport: 'RER B 或出租车',
+          note: runtimeCopy('m618614f58c', undefined),
+          transport: runtimeCopy('m15d63a7e94', undefined),
           walkLevel: 'minimal',
-          duration: '离境',
+          duration: runtimeCopy('m3a1c2538bc', undefined),
         },
       ],
     }
@@ -638,6 +649,8 @@ export function validateAndFixGeneratedDays(
 }
 
 export interface GeneratedItineraryResult {
+  /** Explicitly started by the caller after publishing the usable route. */
+  enrich?: () => Promise<Record<string, Place>>
   days: DayPlan[]
   customPlaces: Record<string, Place>
 }
@@ -681,10 +694,10 @@ function softFixSingleDay(
       next = collapseDisneyStopsOnDay(
         {
           ...next,
-          title: next.title.includes('迪士尼') ? next.title : '巴黎迪士尼',
-          theme: next.theme || 'RER A 乐园日',
+          title: next.title.includes('迪士尼') ? next.title : runtimeCopy('m26b07203b4', undefined),
+          theme: next.theme || runtimeCopy('macb35fba12', undefined),
           pace: 'park',
-          summary: next.summary || '今天只去迪士尼，不安排其他景点。',
+          summary: next.summary || runtimeCopy('m6226fc9180', undefined),
         },
         places,
       )
@@ -700,7 +713,7 @@ function softFixSingleDay(
   if (n > 1 && next.day === n) {
     next = {
       ...next,
-      title: next.title || '返程',
+      title: next.title || runtimeCopy('m1172f4a8f5', undefined),
       pace: next.pace || 'relaxed',
       stops: next.stops.filter((s) => {
         if (s.placeId === SELECTED_HOTEL_PLACE_ID) return false
@@ -715,12 +728,12 @@ function softFixSingleDay(
           ...next.stops,
           {
             id: `d${n}-${CDG_PLACE_ID}-fix`,
-            time: '按航班倒推',
+            time: runtimeCopy('ma1c8cd8ef8', undefined),
             placeId: CDG_PLACE_ID,
-            note: '国际航班建议起飞前 3–3.5 小时到 CDG；按返程时刻倒推离开酒店。',
-            transport: 'RER B 或出租车',
+            note: runtimeCopy('m618614f58c', undefined),
+            transport: runtimeCopy('m15d63a7e94', undefined),
             walkLevel: 'minimal',
-            duration: '离境',
+            duration: runtimeCopy('m3a1c2538bc', undefined),
           },
         ],
       }
@@ -735,30 +748,13 @@ function stripDupesAgainstOccupied(
   places: Record<string, Place>,
   occupied: OccupiedPlaceBrief[],
 ): DayPlan {
-  const occupiedIds = new Set(
-    occupied.map((p) => p.placeId).filter((id): id is string => Boolean(id)),
-  )
-  const occupiedNames = new Set(
-    occupied
-      .map((p) => normalizePlaceName(p.name || ''))
-      .filter(Boolean),
-  )
-
-  const seenIds = new Set<string>()
-  const seenNames = new Set<string>()
-  const stops = day.stops.filter((s) => {
-    if (
-      s.placeId === SELECTED_HOTEL_PLACE_ID ||
-      s.placeId === CDG_PLACE_ID ||
-      s.placeId === DISNEY_PLACE_ID
-    ) {
-      return true
-    }
-    const name = normalizePlaceName(places[s.placeId]?.name || '')
-    if (occupiedIds.has(s.placeId) || seenIds.has(s.placeId)) return false
-    if (name && (occupiedNames.has(name) || seenNames.has(name))) return false
-    seenIds.add(s.placeId)
-    if (name) seenNames.add(name)
+  const seen: Place[] = []
+  const stops = day.stops.filter(stop => {
+    if ([SELECTED_HOTEL_PLACE_ID, CDG_PLACE_ID].includes(stop.placeId)) return true
+    const place = places[stop.placeId] || catalogPlaces[stop.placeId]
+    if (!place) return false
+    if (occupied.some(other => samePlace(place, other)) || seen.some(other => samePlace(place, other))) return false
+    seen.push(place)
     return true
   })
   return stops.length === day.stops.length ? day : { ...day, stops }
@@ -780,12 +776,12 @@ export function buildDisneyDayResult(input: {
   }
   const seeded: DayPlan = {
     day: input.dayNumber,
-    title: '巴黎迪士尼',
-    theme: 'RER A 乐园日',
+    title: runtimeCopy('m26b07203b4', undefined),
+    theme: runtimeCopy('macb35fba12', undefined),
     pace: 'park',
-    summary: '今天只去迪士尼，不安排其他景点；园内玩够再回酒店。',
+    summary: runtimeCopy('m73600e5f20', undefined),
     metroHintFromArea: {
-      custom: 'RER A 直达 Marne-la-Vallée–Chessy（约 45–60 分钟）。',
+      custom: runtimeCopy('mb4c2a245a0', undefined),
     },
     stops: [],
   }
@@ -801,10 +797,10 @@ export function buildDisneyDayResult(input: {
         ? { ...existing, day: i }
         : {
             day: i,
-            title: en ? `Day ${i}` : `第 ${i} 天`,
-            theme: en ? 'Free time' : '自由安排',
+            title: en ? localizedCopy('m284e918fd8', { p0: (i) }, 'en') : localizedCopy('m284e918fd8', { p0: (i) }, 'zh-CN'),
+            theme: en ? localizedCopy('mc80f6ce28a', undefined, 'en') : localizedCopy('mc80f6ce28a', undefined, 'zh-CN'),
             pace: 'moderate',
-            summary: en ? 'Day still to be filled in.' : '今天行程待补全。',
+            summary: en ? localizedCopy('m8b4c1f5047', undefined, 'en') : localizedCopy('m8b4c1f5047', undefined, 'zh-CN'),
             metroHintFromArea: blankMetroHints(),
             stops: [],
           },
@@ -824,11 +820,15 @@ export async function buildGeneratedSingleDay(
     hotelAreaLabel?: string
     existingDays: DayPlan[]
     existingCustomPlaces: Record<string, Place>
+    fast?: boolean
     /** Shared candidate pool (skip per-day Google nearby). */
     verifiedCandidates?: VerifiedPlaceCandidate[]
     onDayPreview?: (preview: { day: number; title?: string; theme?: string }) => void
   },
+  availabilityRetry = 0,
 ): Promise<GeneratedItineraryResult> {
+  const fast = input.fast ?? fastGenerationEnabled()
+  const mark = generationTimer(`itinerary-day-${input.dayNumber}`, fast ? 'fast' : 'baseline')
   const hotel = input.hotel
   const dayNumber = Math.max(1, Math.min(input.dayCount, input.dayNumber))
   const forceDisneyDay =
@@ -836,38 +836,69 @@ export async function buildGeneratedSingleDay(
       ? input.dayCount - 1
       : null
 
+  const calendarDate = input.calendarDate || addCalendarDays(input.itineraryStartDate, dayNumber - 1)
   // Disney day: local template, no LLM.
   if (forceDisneyDay != null && dayNumber === forceDisneyDay) {
-    return buildDisneyDayResult({
+    const result = buildDisneyDayResult({
       dayNumber,
       dayCount: input.dayCount,
       existingDays: input.existingDays,
       existingCustomPlaces: input.existingCustomPlaces,
     })
+    const disneyDay = result.days.find(day => day.day === dayNumber)!
+    if ((await validateDayOpeningHours(disneyDay, calendarDate, result.customPlaces, [], input.signal)).length) throw new Error(openingCopy('conflict'))
+    return result
   }
 
-  const verifiedCandidates =
-    input.verifiedCandidates && input.verifiedCandidates.length
+  let verifiedCandidates =
+    input.verifiedCandidates !== undefined
       ? input.verifiedCandidates.filter(
           (row) =>
             !(input.occupiedPlaces || []).some(
-              (p) => normalizePlaceName(p.name) === normalizePlaceName(row.name),
+              (p) => samePlace(p, row),
             ),
         )
       : await getSharedItineraryCandidates(
           hotel,
           (input.occupiedPlaces || []).map((place) => place.name),
         )
-  if (!verifiedCandidates.length) {
-    throw new Error(translate('errors.googleNoCandidates'))
+  // Google search includes periods in the same response. Resolve legacy/other-provider
+  // candidates once, with bounded concurrency, before trusting them for a date.
+  verifiedCandidates = await runPool(verifiedCandidates, 4, async row => {
+    if (row.openingSchedule !== undefined) return row
+    const details = await fetchGooglePlaceDetails(row.name, row.location, {
+      placeId: row.id?.startsWith('ta-') ? undefined : row.id, recoverPhotos: false,
+    }).catch(() => null)
+    input.signal?.throwIfAborted()
+    row.openingSchedule = details?.openingSchedule || {}
+    return row
+  })
+  verifiedCandidates = uniquePlaces(verifiedCandidates).filter(row =>
+    !(input.occupiedPlaces || []).some(p => samePlace(p, row)) &&
+    openingAvailability(row.openingSchedule, calendarDate) !== 'closed')
+  if (!verifiedCandidates.length) throw new Error(openingCopy('noCandidates'))
+  const eligibleCandidates = verifiedCandidates
+  mark('candidates')
+  if (fast && availabilityRetry === 0) {
+    const ranked = await rankVerifiedCandidates(verifiedCandidates, {
+      day: dayNumber, calendarDate, hotel: { name: hotel.name, lat: hotel.lat, lng: hotel.lng },
+      preferences: input.recommendationPreferences, explicitRequest: input.preferences, occupied: input.occupiedPlaces,
+    }, input.signal)
+    if (ranked) {
+      const counts = { attraction: 0, cafe: 0, restaurant: 0 }
+      verifiedCandidates = ranked.filter((row) => ++counts[row.type] <= (row.type === 'attraction' ? 12 : 6))
+    }
+    mark(ranked ? 'ranked' : 'rank-fallback')
   }
   const areaLabel =
     input.hotelAreaLabel || hotel.areaKey || undefined
   const draft = await generateSingleDayItinerary({
+    openingRepair: input.openingRepair,
+    compact: fast,
     destination: input.destination,
     dayCount: input.dayCount,
     dayNumber: input.dayNumber,
-    calendarDate: input.calendarDate,
+    calendarDate,
     tripStartDate: input.tripStartDate,
     tripEndDate: input.tripEndDate,
     itineraryStartDate: input.itineraryStartDate,
@@ -891,6 +922,8 @@ export async function buildGeneratedSingleDay(
     onDayPreview: input.onDayPreview,
   })
 
+  mark('model-complete')
+  input.signal?.throwIfAborted()
   const draftByKey = new Map(draft.places.map((p) => [p.key, p]))
   for (const stop of draft.day.stops) {
     const key = String(stop.placeKey || '').trim()
@@ -919,15 +952,38 @@ export async function buildGeneratedSingleDay(
     }
   }
 
+  const deferred: Array<{ row: FullItineraryPlaceDraft; id: string }> = []
+  const byCandidateId = new Map(verifiedCandidates.map((row) => [row.id, row]))
   const settled = await Promise.allSettled(
     [...draftByKey.values()].map(async (row) => {
-      const resolved = await resolveDraftPlace(
-        {
-          ...row,
-          type: normalizeType(row.type),
-        },
-        hotel,
-      )
+      const candidate = byCandidateId.get(row.googlePlaceId)
+      const special = resolveSpecialPlaceId(row.key, row.name, row.type)
+      if (fast && special && catalogPlaces[special] && special !== CDG_PLACE_ID && special !== DISNEY_PLACE_ID) {
+        deferred.push({ row, id: special })
+        return { key: row.key, id: special, place: { ...catalogPlaces[special], ...(candidate ? {
+          name: candidate.name,
+          location: candidate.location || catalogPlaces[special].location,
+          googlePlaceId: candidate.id?.startsWith('ta-') ? undefined : candidate.id,
+          tripadvisorContentId: candidate.id?.startsWith('ta-') ? candidate.id.slice(3) : undefined,
+        } : {}) } }
+      }
+      if (fast && !special && candidate?.location && Number.isFinite(candidate.location.lat) && Number.isFinite(candidate.location.lng)) {
+        const id = `gen-${slugKey(candidate.id || candidate.name)}`
+        const place: Place = {
+          id, name: candidate.name, type: candidate.type,
+          googlePlaceId: candidate.id?.startsWith('ta-') ? undefined : candidate.id,
+          tripadvisorContentId: candidate.id?.startsWith('ta-') ? candidate.id.slice(3) : undefined,
+          description: row.description || candidate.address || '',
+          location: candidate.location, image: FALLBACK_IMAGE,
+          googleRating: candidate.rating, googleUserRatingCount: candidate.userRatingCount,
+          googleAddress: candidate.address, priceHint: candidate.priceLevel,
+          ratingHint: candidate.rating != null ? `Google ★ ${candidate.rating.toFixed(1)}` : '',
+          googleMapsUrl: mapsUrl(candidate.name), durationHint: row.durationHint || '60 min',
+        }
+        deferred.push({ row, id })
+        return { key: row.key, id, place }
+      }
+      const resolved = await resolveDraftPlace({ ...row, type: normalizeType(row.type) }, hotel)
       return { key: row.key, ...resolved }
     }),
   )
@@ -952,7 +1008,7 @@ export async function buildGeneratedSingleDay(
       id: `d${dayNumber}-${placeId}-${index}`,
       time: String(s.time || '10:00').trim() || '10:00',
       placeId,
-      note: String(s.note || '').trim() || '按当天节奏灵活调整。',
+      note: String(s.note || '').trim() || runtimeCopy('mb36f1f6772', undefined),
       transport: normalizeTransportChoice(s.transport),
       walkLevel: normalizeWalk(s.walkLevel) || 'short',
       duration: s.duration ? String(s.duration).trim() : undefined,
@@ -961,10 +1017,10 @@ export async function buildGeneratedSingleDay(
 
   let newDay: DayPlan = {
     day: dayNumber,
-    title: String(draft.day.title || `第 ${dayNumber} 天`).trim().slice(0, 16),
-    theme: String(draft.day.theme || '').trim() || '巴黎日程',
+    title: String(draft.day.title || runtimeCopy('m98cd75602d', { p0: (dayNumber) })).trim().slice(0, 16),
+    theme: String(draft.day.theme || '').trim() || runtimeCopy('me3c015188d', undefined),
     pace: normalizePace(draft.day.pace),
-    summary: String(draft.day.summary || '').trim() || '今天按地图与体力微调即可。',
+    summary: String(draft.day.summary || '').trim() || runtimeCopy('m0e4c137d43', undefined),
     metroHintFromArea:
       draft.day.metroHintFromArea && typeof draft.day.metroHintFromArea === 'object'
         ? draft.day.metroHintFromArea
@@ -981,6 +1037,19 @@ export async function buildGeneratedSingleDay(
     input.occupiedPlaces || [],
   )
 
+  const conflicts = await validateDayOpeningHours(newDay, calendarDate, customPlaces, verifiedCandidates, input.signal, true, input.recommendationPreferences.dayStartTime)
+  if (conflicts.length) {
+    if (import.meta.env.DEV) console.debug('[itinerary-hours] Replanning unavailable stops', calendarDate, conflicts.map(place => ({ name: place.name, stops: newDay.stops.filter(stop => stop.placeId === place.id).map(stop => ({ time: stop.time, duration: stop.duration })) })))
+    if (availabilityRetry >= 1) throw new Error(openingCopy('conflict'))
+    // One bounded repair: exclude conflicting venues, then validate the replacement again.
+    return buildGeneratedSingleDay({ ...input,
+      verifiedCandidates: eligibleCandidates.filter(row => !conflicts.some(place => samePlace(place, row))),
+      openingRepair: { rejectedVisits: conflicts.flatMap(place => newDay.stops.filter(stop => stop.placeId === place.id).map(stop => ({
+        name: place.name, time: stop.time, duration: stop.duration,
+        openingWindows: openingWindows(eligibleCandidates.find(row => samePlace(place, row))?.openingSchedule, calendarDate),
+      }))) },
+    }, availabilityRetry + 1)
+  }
   const byDay = new Map(input.existingDays.map((d) => [d.day, d]))
   byDay.set(dayNumber, newDay)
   const merged: DayPlan[] = []
@@ -992,10 +1061,10 @@ export async function buildGeneratedSingleDay(
         ? { ...existing, day: i }
         : {
             day: i,
-            title: en ? `Day ${i}` : `第 ${i} 天`,
-            theme: en ? 'Free time' : '自由安排',
+            title: en ? localizedCopy('m284e918fd8', { p0: (i) }, 'en') : localizedCopy('m284e918fd8', { p0: (i) }, 'zh-CN'),
+            theme: en ? localizedCopy('mc80f6ce28a', undefined, 'en') : localizedCopy('mc80f6ce28a', undefined, 'zh-CN'),
             pace: 'moderate',
-            summary: en ? 'Day still to be filled in.' : '今天行程待补全。',
+            summary: en ? localizedCopy('m8b4c1f5047', undefined, 'en') : localizedCopy('m8b4c1f5047', undefined, 'zh-CN'),
             metroHintFromArea: blankMetroHints(),
             stops: [],
           },
@@ -1004,7 +1073,26 @@ export async function buildGeneratedSingleDay(
 
   // Hotel pin helpers: Day 1 check-in first; non-last end at hotel; last day hotel stripped.
   const fixed = ensureDay1HotelFirst(merged)
-  return { days: fixed, customPlaces }
+  mark('first-usable')
+  return { days: fixed, customPlaces, enrich: deferred.length ? async () => {
+    const enriched: Record<string, Place> = {}
+    await runPool(deferred, 3, async ({ row, id }) => {
+      input.signal?.throwIfAborted()
+      try {
+        const resolved = await resolveDraftPlace(row, hotel)
+        input.signal?.throwIfAborted()
+        const original = customPlaces[id]
+        if (resolved.place && samePlace(original, resolved.place)) enriched[id] = {
+          ...resolved.place, id, name: original.name, type: original.type, location: original.location,
+          ...(original.googlePlaceId ? { googlePlaceId: original.googlePlaceId } : {}),
+          ...(original.tripadvisorContentId ? { tripadvisorContentId: original.tripadvisorContentId } : {}),
+        }
+      } catch { input.signal?.throwIfAborted() }
+    })
+    mark('complete-enriched')
+    return enriched
+  } : undefined }
+
 }
 
 /**
@@ -1085,7 +1173,7 @@ export async function buildGeneratedItinerary(
         id: `d${d.day}-${placeId}-${index}`,
         time: String(s.time || '10:00').trim() || '10:00',
         placeId,
-        note: String(s.note || '').trim() || '按当天节奏灵活调整。',
+        note: String(s.note || '').trim() || runtimeCopy('mb36f1f6772', undefined),
         transport: normalizeTransportChoice(s.transport),
         walkLevel: normalizeWalk(s.walkLevel) || 'short',
         duration: s.duration ? String(s.duration).trim() : undefined,
@@ -1094,10 +1182,10 @@ export async function buildGeneratedItinerary(
 
     return {
       day: d.day,
-      title: String(d.title || `第 ${d.day} 天`).trim().slice(0, 16),
-      theme: String(d.theme || '').trim() || '巴黎日程',
+      title: String(d.title || runtimeCopy('m98cd75602d', { p0: (d.day) })).trim().slice(0, 16),
+      theme: String(d.theme || '').trim() || runtimeCopy('me3c015188d', undefined),
       pace: normalizePace(d.pace),
-      summary: String(d.summary || '').trim() || '今天按地图与体力微调即可。',
+      summary: String(d.summary || '').trim() || runtimeCopy('m0e4c137d43', undefined),
       metroHintFromArea:
         d.metroHintFromArea && typeof d.metroHintFromArea === 'object'
           ? (d.metroHintFromArea as Record<string, string>)
@@ -1116,6 +1204,9 @@ export async function buildGeneratedItinerary(
     input.dayCount,
     { forceDisneyDay },
   )
+  const conflicts = await Promise.all(fixed.map(day => validateDayOpeningHours(day,
+    addCalendarDays(input.itineraryStartDate, day.day - 1), customPlaces, verifiedCandidates)))
+  if (conflicts.some(rows => rows.length)) throw new Error(openingCopy('conflict'))
   return { days: fixed, customPlaces }
 }
 

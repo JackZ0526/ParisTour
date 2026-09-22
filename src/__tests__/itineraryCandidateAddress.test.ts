@@ -101,4 +101,23 @@ describe('itinerary candidate Google address', () => {
 
     expect(result.places[0].googleAddress).toBe(candidate.address)
   })
+  it('hydrates compact keys from verified data and drops invented IDs', async () => {
+    generateText.mockResolvedValue(JSON.stringify({ day: {
+      ...dayJson(2), stops: [
+        { time: '10:00', placeKey: 'p0', note: '咖啡' },
+        { time: '11:00', placeKey: 'invented', note: '不存在' },
+      ],
+    } }))
+    const result = await generateSingleDayItinerary({
+      compact: true, destination: 'Paris', dayCount: 3, dayNumber: 2,
+      tripStartDate: '2026-11-10', tripEndDate: '2026-11-12', itineraryStartDate: '2026-11-10',
+      hotel, occupiedPlaces: [], recommendationPreferences: DEFAULT_RECOMMENDATION_PREFERENCES,
+      verifiedCandidates: [candidate],
+    })
+    expect(result.places).toHaveLength(1)
+    expect(result.places[0]).toMatchObject({ key: 'p0', name: candidate.name, googleAddress: candidate.address })
+    expect(result.day.stops.map((stop) => stop.placeKey)).toEqual(['p0'])
+    expect(JSON.parse(generateText.mock.calls[0][1]).verifiedCandidates[0]).toMatchObject({ key: 'p0', name: candidate.name })
+  })
+
 })

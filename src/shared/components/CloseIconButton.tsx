@@ -1,3 +1,4 @@
+import { uiCopy } from '../i18n/copy/ui'
 import { X } from 'lucide-react'
 
 type Props = {
@@ -14,7 +15,7 @@ const BASE =
 
 export function CloseIconButton({
   onClick,
-  'aria-label': ariaLabel = '关闭',
+  'aria-label': ariaLabel = uiCopy('m6c14bd7f6f', undefined),
   title,
   className,
 }: Props) {

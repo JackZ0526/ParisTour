@@ -40,7 +40,7 @@ function warnMissingKey(key: string, activeLocale: Locale) {
   if (warnedKeys.has(tag)) return
   warnedKeys.add(tag)
   // eslint-disable-next-line no-console
-  console.warn(`[i18n] Missing key "${key}" in "${activeLocale}". Falling back to "${DEFAULT_LOCALE}".`)
+  console.warn(`[i18n] Missing key "${key}" in "${activeLocale}". No cross-language fallback will be used.`)
 }
 
 /* ------------------------------------------------------------------ *
@@ -140,10 +140,9 @@ export function subscribeLocale(listener: () => void): () => void {
  * Dot-path key lookup and parameter interpolation.
  * e.g. translate('nav.dayN', { day: 3 }) => '第 3 天' / 'Day 3'
  *
- * Lookup chain: active locale → DEFAULT_LOCALE → key string.
+ * Lookup chain: active locale → key string. Never borrow another language.
  * Missing keys in the active locale trigger a dev-only `console.warn`
- * (deduped per session). Missing keys in the default locale are always
- * silent (they're a developer bug, not a translation gap).
+ * (deduped per session).
  */
 export function translate(
   key: TranslationKey,
@@ -152,7 +151,6 @@ export function translate(
 ): string {
   const activeLocale = overrideLocale || currentLocale
   const activeDict = (LOCALES[activeLocale] ?? LOCALES[DEFAULT_LOCALE]).dictionary
-  const defaultDict = LOCALES[DEFAULT_LOCALE].dictionary
 
   const parts = key.split('.')
   let current: unknown = activeDict
@@ -169,16 +167,7 @@ export function translate(
 
   if (activeMissing) {
     warnMissingKey(key, activeLocale)
-    // Fall back to the default dictionary.
-    current = defaultDict
-    for (const part of parts) {
-      if (current && typeof current === 'object' && part in current) {
-        current = (current as Record<string, unknown>)[part]
-      } else {
-        current = undefined
-        break
-      }
-    }
+    return key
   }
 
   if (typeof current !== 'string') {

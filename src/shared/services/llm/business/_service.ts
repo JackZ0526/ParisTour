@@ -1,3 +1,4 @@
+import { runtimeCopy4 } from '../../../i18n/copy/_service-runtime4-7fc836'
 /**
  * Internal helpers shared by the business LLM call sites.
  *
@@ -114,8 +115,8 @@ export async function generateText(
     if (strict) {
       throw new LlmRequestError(
         ENABLE_LLM_PROVIDER_SWITCH
-          ? '未配置可用的大模型 API Key（OpenAI / Gemini）。'
-          : '未配置服务端 DEEPSEEK_API_KEY 或 OPENAI_API_KEY（请写在 .env / Vercel，不要用 VITE_ 前缀）。',
+          ? runtimeCopy4('m6eac4a4866', undefined)
+          : runtimeCopy4('mc703eb216c', undefined),
       )
     }
     return null
@@ -130,8 +131,8 @@ export async function generateText(
         text = await callProvider(
           provider,
           [
-            '你是 JSON 修复器。只输出一个有效 JSON 对象，不要 markdown 或解释。',
-            '保留原回复语义与字段；只修复引号、逗号、括号、转义或被截断的结构。',
+            runtimeCopy4('mdab89e7750', undefined),
+            runtimeCopy4('m131f711572', undefined),
           ].join('\n'),
           text.slice(0, 16000),
           {
@@ -146,9 +147,9 @@ export async function generateText(
       }
       if (ENABLE_LLM_PROVIDER_SWITCH && provider !== preferred) {
         const reason =
-          lastError instanceof Error ? lastError.message.replace(/。$/, '') : '上一个模型请求失败'
+          lastError instanceof Error ? lastError.message.replace(/。$/, '') : runtimeCopy4('ma1b5b93851', undefined)
         setLlmProvider(provider, {
-          notice: `${reason}，已自动切换到 ${getProviderLabel(provider)}`,
+          notice: runtimeCopy4('m12934b0877', { p0: (reason), p1: (getProviderLabel(provider)) }),
         })
       }
       return text
@@ -160,7 +161,7 @@ export async function generateText(
   if (strict) {
     throw lastError instanceof Error
       ? lastError
-      : new LlmRequestError('所有大模型请求都失败了。')
+      : new LlmRequestError(runtimeCopy4('m99a191b81c', undefined))
   }
   return null
 }

@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/bookingHotels-runtime-d4878f'
 import type { Coordinates } from '../../../types'
 import { authFetch } from '../../auth/services/authFetch'
 import {
@@ -150,17 +151,17 @@ function stringArray(value: unknown): string[] {
 
 function reviewScoreLabel(value: string): string {
   const labels: Record<string, string> = {
-    hotel_staff: '员工服务',
-    hotel_services: '设施服务',
-    hotel_clean: '清洁程度',
-    hotel_comfort: '舒适程度',
-    hotel_value: '性价比',
-    hotel_location: '位置',
-    hotel_free_wifi: '免费 Wi-Fi',
+    hotel_staff: runtimeCopy('m05abf0e9d8', undefined),
+    hotel_services: runtimeCopy('m4c998bdd54', undefined),
+    hotel_clean: runtimeCopy('m7e4ff80569', undefined),
+    hotel_comfort: runtimeCopy('mce0b67644a', undefined),
+    hotel_value: runtimeCopy('mbfa23313cf', undefined),
+    hotel_location: runtimeCopy('m88c34452cc', undefined),
+    hotel_free_wifi: runtimeCopy('mdde55047e7', undefined),
     hotel_wifi: 'Wi-Fi',
-    breakfast: '早餐',
-    hotel_breakfast: '早餐',
-    enjoy_walking_rating: '步行便利',
+    breakfast: runtimeCopy('mcc13bb1556', undefined),
+    hotel_breakfast: runtimeCopy('mcc13bb1556', undefined),
+    enjoy_walking_rating: runtimeCopy('m35380449b6', undefined),
   }
   const key = value.trim().toLowerCase()
   return labels[key] || value.replace(/^hotel_/i, '').replaceAll('_', ' ')
@@ -249,11 +250,11 @@ function extractPolicyDisplayDetails(value: unknown): string[] {
     text(asRecord(root.smoking)?.phrase),
     text(asRecord(root.checkin_age)?.phrase),
     text(asRecord(root.payment)?.phrase),
-    number(root.minimum_age) != null ? `最低入住年龄：${number(root.minimum_age)} 岁` : '',
-    text(root.minimum_age) ? `最低入住年龄：${text(root.minimum_age)} 岁` : '',
-    text(root.pets_allowed) === 'NO' ? '不允许携带宠物' : text(root.pets_allowed),
+    number(root.minimum_age) != null ? runtimeCopy('m071b0db316', { p0: (number(root.minimum_age)) }) : '',
+    text(root.minimum_age) ? runtimeCopy('m071b0db316', { p0: (text(root.minimum_age)) }) : '',
+    text(root.pets_allowed) === 'NO' ? runtimeCopy('me1883c6861', undefined) : text(root.pets_allowed),
     text(root.hotel_accepts_cash_status) === 'PATP_PROPERTY_DOES_NOT_ACCEPT_CASH'
-      ? '住宿不接受现金付款'
+      ? runtimeCopy('mf2cf894b2a', undefined)
       : '',
   ])
 
@@ -639,11 +640,11 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
       ...stringArray(data.important_information),
       ...stringArray(data.fine_print),
       ...stringArray(data.house_rules),
-      text(data.minimum_age) ? `最低入住年龄：${text(data.minimum_age)} 岁` : '',
-      text(data.pets_allowed) ? `宠物政策：${text(data.pets_allowed)}` : '',
+      text(data.minimum_age) ? runtimeCopy('m071b0db316', { p0: (text(data.minimum_age)) }) : '',
+      text(data.pets_allowed) ? runtimeCopy('ma56d755891', { p0: (text(data.pets_allowed)) }) : '',
       text(data.smoking_policy),
       text(data.quiet_hours),
-      cashNotAccepted ? '住宿不接受现金付款' : '',
+      cashNotAccepted ? runtimeCopy('mf2cf894b2a', undefined) : '',
     ])
 
     return {
@@ -767,14 +768,14 @@ export function normalizeBookingDetailResponse(payload: unknown): BookingHotelRe
   const propertyPolicies = uniqueStrings([
     ...finePrints,
     text(checkinAgeRestriction?.checkinAgeRestrictionPhrase) ||
-      (minAge != null ? `最低入住年龄：${minAge} 岁` : ''),
-    text(petsPolicy?.petsAllowed) === 'NO' ? '不允许携带宠物' : text(petsPolicy?.petsAllowed),
+      (minAge != null ? runtimeCopy('m071b0db316', { p0: (minAge) }) : ''),
+    text(petsPolicy?.petsAllowed) === 'NO' ? runtimeCopy('me1883c6861', undefined) : text(petsPolicy?.petsAllowed),
     text(smokingPolicy?.smokingNotAllowedAllRoomsPhrase),
     text(quietHours?.quietHoursPhrase),
     text(partiesPolicy?.partiesNotAllowedPhrase),
     text(groupsPolicy?.groupLimitPhrase),
     text(paymentPolicy?.hotelAcceptsCashStatus) === 'PATP_PROPERTY_DOES_NOT_ACCEPT_CASH'
-      ? '住宿不接受现金付款'
+      ? runtimeCopy('mf2cf894b2a', undefined)
       : '',
     text(translation?.finePrint),
   ])
@@ -924,7 +925,7 @@ export function normalizeBookingFeaturedReviews(
     const date = text(row.date) || text(relative?.date)
     const parsedDate = date ? Date.parse(date.replace(' ', 'T') + 'Z') : Number.NaN
     return [{
-      text: body || '住客未填写正面评价',
+      text: body || runtimeCopy('m98e7e5af9c', undefined),
       negativeText: cons || undefined,
       rating: number(row.average_score_out_of_10),
       author: text(author?.name) || undefined,

@@ -1,0 +1,5873 @@
+{
+  "method": "Isolated service-level, real APIs, frozen public candidates, per-process in-memory cache, three successful samples per scenario/variant; milliseconds rounded. Candidate acquisition, browser paint and mobile network excluded. Pilot failure retained separately.",
+  "baseCommit": "1e78e9f",
+  "summary": {
+    "recommend-first": {
+      "baselineMs": 4168,
+      "fastMs": 376,
+      "baselineSamples": [
+        4168,
+        3939,
+        4518
+      ],
+      "fastSamples": [
+        428,
+        376,
+        352
+      ],
+      "reductionPercent": 91.0
+    },
+    "recommend-refresh1": {
+      "baselineMs": 6405,
+      "fastMs": 0,
+      "baselineSamples": [
+        7372,
+        5084,
+        6405
+      ],
+      "fastSamples": [
+        0,
+        0,
+        0
+      ],
+      "reductionPercent": null,
+      "note": "Below 1 ms timer resolution; cache hit, not zero user-visible latency."
+    },
+    "recommend-refresh2": {
+      "baselineMs": 5213,
+      "fastMs": 0,
+      "baselineSamples": [
+        5213,
+        7564,
+        4917
+      ],
+      "fastSamples": [
+        0,
+        0,
+        0
+      ],
+      "reductionPercent": null,
+      "note": "Below 1 ms timer resolution; cache hit, not zero user-visible latency."
+    },
+    "day-route": {
+      "baselineMs": 6289,
+      "fastMs": 2608,
+      "baselineSamples": [
+        7190,
+        5554,
+        6289
+      ],
+      "fastSamples": [
+        2624,
+        2355,
+        2608
+      ],
+      "reductionPercent": 58.5
+    },
+    "day-complete": {
+      "baselineMs": 6289,
+      "fastMs": 5582,
+      "baselineSamples": [
+        7190,
+        5554,
+        6289
+      ],
+      "fastSamples": [
+        6168,
+        5202,
+        5582
+      ],
+      "reductionPercent": 11.2
+    },
+    "all-route": {
+      "baselineMs": 21573,
+      "fastMs": 11274,
+      "baselineSamples": [
+        21573,
+        20605,
+        25138
+      ],
+      "fastSamples": [
+        10838,
+        11274,
+        11604
+      ],
+      "reductionPercent": 47.7
+    },
+    "all-complete": {
+      "baselineMs": 21573,
+      "fastMs": 13428,
+      "baselineSamples": [
+        21573,
+        20605,
+        25138
+      ],
+      "fastSamples": [
+        13428,
+        15210,
+        11852
+      ],
+      "reductionPercent": 37.8
+    }
+  },
+  "runs": [
+    {
+      "variant": "baseline",
+      "scenario": "recommend",
+      "at": "2026-09-22T04:55:56.441Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 464
+        },
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 317
+        },
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 323
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "batches": [
+        {
+          "batch": 1,
+          "firstUsableMs": 2074,
+          "completeMs": 4168,
+          "names": [
+            "Kafeibaie",
+            "Perlant",
+            "BlackBird Coffee",
+            "Cuvée Noire - Rambuteau - Coffee Shop"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 2,
+          "firstUsableMs": 4895,
+          "completeMs": 7372,
+          "names": [
+            "FLUFFY'S - Bakery et brunch",
+            "Broken Biscuits",
+            "BACK IN BLACK",
+            "Moka Brunch & Coffee - Champs Elysées"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 3,
+          "firstUsableMs": 2711,
+          "completeMs": 5213,
+          "names": [
+            "Best Bread Boba",
+            "Extraction Coffee Paris 11",
+            "Moka Brunch & Coffee - Galeries Lafayette",
+            "Café Gigi"
+          ],
+          "count": 4
+        }
+      ],
+      "totalMs": 16755,
+      "timings": [],
+      "sample": 1
+    },
+    {
+      "variant": "baseline",
+      "scenario": "recommend",
+      "at": "2026-09-22T04:57:30.554Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 327
+        },
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 300
+        },
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 318
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "batches": [
+        {
+          "batch": 1,
+          "firstUsableMs": 1798,
+          "completeMs": 3939,
+          "names": [
+            "Cuvée Noire - Rambuteau - Coffee Shop",
+            "BlackBird Coffee",
+            "Kafeibaie",
+            "FLUFFY'S - Bakery et brunch"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 2,
+          "firstUsableMs": 2774,
+          "completeMs": 5084,
+          "names": [
+            "Perlant",
+            "Broken Biscuits",
+            "Moka Brunch & Coffee - Galeries Lafayette",
+            "Café Gigi"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 3,
+          "firstUsableMs": 5526,
+          "completeMs": 7564,
+          "names": [
+            "Best Bread Boba",
+            "Extraction Coffee Paris 11",
+            "Clove",
+            "Simple Coffee Paris"
+          ],
+          "count": 4
+        }
+      ],
+      "totalMs": 16588,
+      "timings": [],
+      "sample": 2
+    },
+    {
+      "variant": "baseline",
+      "scenario": "recommend",
+      "at": "2026-09-22T04:57:48.899Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 372
+        },
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 310
+        },
+        {
+          "path": "/api/deepseek/chat/completions",
+          "status": 200,
+          "headersMs": 302
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "batches": [
+        {
+          "batch": 1,
+          "firstUsableMs": 1884,
+          "completeMs": 4518,
+          "names": [
+            "Kafeibaie",
+            "Perlant",
+            "BlackBird Coffee",
+            "Cuvée Noire - Rambuteau - Coffee Shop"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 2,
+          "firstUsableMs": 4071,
+          "completeMs": 6405,
+          "names": [
+            "FLUFFY'S - Bakery et brunch",
+            "Broken Biscuits",
+            "BACK IN BLACK",
+            "Extraction Coffee Paris 11"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 3,
+          "firstUsableMs": 2552,
+          "completeMs": 4917,
+          "names": [
+            "Best Bread Boba",
+            "Moka Brunch & Coffee - Galeries Lafayette",
+            "Café Gigi",
+            "Clove"
+          ],
+          "count": 4
+        }
+      ],
+      "totalMs": 15842,
+      "timings": [],
+      "sample": 3
+    },
+    {
+      "variant": "baseline",
+      "scenario": "day",
+      "at": "2026-09-22T05:03:55.574Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 438
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 100
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 103
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 106
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 167
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 177
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 192
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 230
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 233
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 261
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 281
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 286
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 122
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 76
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 206
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 76
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1675
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 2,
+          "usableMs": 7190,
+          "taskMs": 7190,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-cafe-day2-pwe22"
+            },
+            {
+              "time": "11:15",
+              "name": "Le Marais",
+              "placeId": "gen-attr-marais-day2-3ia5h"
+            },
+            {
+              "time": "13:00",
+              "name": "Mazmez",
+              "placeId": "gen-rest-lunch-day2-c5g2r"
+            },
+            {
+              "time": "15:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-attr-louvre-day2-ks52v"
+            },
+            {
+              "time": "18:30",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "19:45",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "21:00",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-rest-dinner-day2-nce6z"
+            },
+            {
+              "time": "22:45",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 7190,
+      "totalMs": 7190,
+      "timings": [
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 5328
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 7189
+        }
+      ],
+      "sample": 3
+    },
+    {
+      "variant": "baseline",
+      "scenario": "day",
+      "at": "2026-09-22T05:05:52.406Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 443
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 90
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 140
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 147
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 151
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 65
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 246
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 100
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 266
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 68
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 512
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 529
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 271
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1538
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 2,
+          "usableMs": 5554,
+          "taskMs": 5554,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-cafe-day2-rpq01"
+            },
+            {
+              "time": "11:00",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "12:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "13:30",
+              "name": "Mazmez",
+              "placeId": "gen-rest-lunch-day2-s2mbr"
+            },
+            {
+              "time": "18:30",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-rest-dinner-day2-op1f0"
+            },
+            {
+              "time": "20:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 5554,
+      "totalMs": 5554,
+      "timings": [
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 3831
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5554
+        }
+      ],
+      "sample": 4
+    },
+    {
+      "variant": "baseline",
+      "scenario": "day",
+      "at": "2026-09-22T05:06:10.783Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 448
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 76
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 136
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 137
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 142
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 77
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 207
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 214
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 113
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 83
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 414
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 467
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 521
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 66
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 68
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 66
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1696
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 2,
+          "usableMs": 6289,
+          "taskMs": 6289,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-cafe-day2-idafw"
+            },
+            {
+              "time": "11:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-attr-louvre-yvwce"
+            },
+            {
+              "time": "14:00",
+              "name": "Mazmez",
+              "placeId": "gen-rest-lunch-day2-gkrea"
+            },
+            {
+              "time": "16:00",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "18:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "20:00",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-rest-dinner-day2-oseg6"
+            },
+            {
+              "time": "22:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 6289,
+      "totalMs": 6289,
+      "timings": [
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4446
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 6289
+        }
+      ],
+      "sample": 5
+    },
+    {
+      "variant": "baseline",
+      "scenario": "all",
+      "at": "2026-09-22T05:04:17.573Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 438
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 129
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 131
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 144
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 188
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 212
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 96
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 527
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 270
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 396
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 403
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 101
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 106
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 154
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 154
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 161
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 49
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 280
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 301
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 217
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 458
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 473
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 350
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 277
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 94
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 230
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 86
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1024
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 930
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1325
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 385
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 92
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 93
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 131
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 132
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 134
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 88
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 107
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 211
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 261
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 68
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 441
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 444
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 221
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1810
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 396
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 145
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 382
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 159
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1059
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 1,
+          "usableMs": 4870,
+          "taskMs": 4869,
+          "stops": [
+            {
+              "time": "14:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            },
+            {
+              "time": "15:30",
+              "name": "Kafeibaie",
+              "placeId": "gen-cafe-day1-rh9qj"
+            },
+            {
+              "time": "17:00",
+              "name": "Mazmez",
+              "placeId": "gen-rest-day1-lunch-czhwj"
+            },
+            {
+              "time": "18:30",
+              "name": "Le Marais",
+              "placeId": "gen-attr-marais-0kqnl"
+            },
+            {
+              "time": "20:00",
+              "name": "La Petite Rose des Sables",
+              "placeId": "gen-rest-day1-dinner-l1g4u"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 2,
+          "usableMs": 10503,
+          "taskMs": 5634,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-cafe-day2-vp4li"
+            },
+            {
+              "time": "11:15",
+              "name": "Louvre Museum",
+              "placeId": "gen-attr-louvre-bl5yo"
+            },
+            {
+              "time": "14:30",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-rest-day2-lunch-8bs9c"
+            },
+            {
+              "time": "16:30",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "18:15",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "20:00",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-rest-day2-dinner-23znl"
+            },
+            {
+              "time": "21:45",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "usableMs": 10503,
+          "taskMs": 5634,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Moka Brunch & Coffee - Galeries Lafayette",
+              "placeId": "gen-cafe-day3-uw478"
+            },
+            {
+              "time": "11:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-attr-louvre-nxeah"
+            },
+            {
+              "time": "13:00",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-rest-day3-lunch-1ili6"
+            },
+            {
+              "time": "15:00",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "16:30",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "19:00",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-rest-day3-dinner-e9mjj"
+            },
+            {
+              "time": "21:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "usableMs": 16759,
+          "taskMs": 6255,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "FLUFFY'S - Bakery et brunch",
+              "placeId": "gen-cafe-day4-k9py2"
+            },
+            {
+              "time": "11:30",
+              "name": "Sainte-Chapelle",
+              "placeId": "gen-attr-sainte-chapelle-yw55c"
+            },
+            {
+              "time": "12:40",
+              "name": "Cathédrale Notre-Dame de Paris",
+              "placeId": "gen-attr-notre-dame-hiiog"
+            },
+            {
+              "time": "13:30",
+              "name": "Le P'tit Bistrot",
+              "placeId": "gen-rest-day4-lunch-hvlux"
+            },
+            {
+              "time": "15:00",
+              "name": "Luxembourg Gardens",
+              "placeId": "gen-attr-luxembourg-v4w94"
+            },
+            {
+              "time": "18:30",
+              "name": "Le P'tit Piano",
+              "placeId": "gen-rest-day4-dinner-x8v0v"
+            },
+            {
+              "time": "20:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "usableMs": 21573,
+          "taskMs": 4814,
+          "stops": [
+            {
+              "time": "09:30",
+              "name": "Perlant",
+              "placeId": "gen-cafe-day5-ehid8"
+            },
+            {
+              "time": "11:30",
+              "name": "LArchimede | Restaurant Republique Paris 10 (Canal Saint Martin) | Terrasse",
+              "placeId": "gen-rest-day5-ycwld"
+            },
+            {
+              "time": "按航班倒推",
+              "name": "戴高乐机场 CDG",
+              "placeId": "attr-cdg"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 21573,
+      "totalMs": 21573,
+      "timings": [
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 3601
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 4869
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4149
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4343
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5625
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5633
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4306
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 6255
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 3607
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 4814
+        }
+      ],
+      "sample": 2
+    },
+    {
+      "variant": "baseline",
+      "scenario": "all",
+      "at": "2026-09-22T05:04:39.907Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 437
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 146
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 149
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 151
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 204
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 114
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 265
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 844
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 439
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 451
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 94
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 150
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 155
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 159
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 201
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 262
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 281
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 73
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 77
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 66
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 83
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 83
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 256
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 223
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 338
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 513
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 102
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 286
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 91
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 95
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 134
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1469
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1568
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 450
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 133
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 138
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 214
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 88
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 102
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 367
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 428
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 547
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 76
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 432
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 198
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 201
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 162
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 531
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 1,
+          "usableMs": 5226,
+          "taskMs": 5226,
+          "stops": [
+            {
+              "time": "14:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            },
+            {
+              "time": "15:30",
+              "name": "Kafeibaie",
+              "placeId": "gen-cafe-day1-3mg79"
+            },
+            {
+              "time": "17:00",
+              "name": "Mazmez",
+              "placeId": "gen-rest-day1-lunch-r8s4r"
+            },
+            {
+              "time": "18:30",
+              "name": "Le Marais",
+              "placeId": "gen-attr-marais-b7ara"
+            },
+            {
+              "time": "20:00",
+              "name": "La Petite Rose des Sables",
+              "placeId": "gen-rest-day1-dinner-33vdr"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 2,
+          "usableMs": 11372,
+          "taskMs": 6146,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-cafe-day2-jufxb"
+            },
+            {
+              "time": "12:00",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-rest-day2-lunch-if5op"
+            },
+            {
+              "time": "14:00",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "16:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "18:30",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-rest-day2-dinner-akopj"
+            },
+            {
+              "time": "20:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "usableMs": 11372,
+          "taskMs": 6145,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-cafe-day3-hej6n"
+            },
+            {
+              "time": "11:15",
+              "name": "Louvre Museum",
+              "placeId": "gen-attr-louvre-l60p2"
+            },
+            {
+              "time": "14:30",
+              "name": "Chouchou",
+              "placeId": "gen-rest-day3-lunch-qmsy7"
+            },
+            {
+              "time": "16:30",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "18:15",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "19:45",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-rest-day3-dinner-hxbct"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "usableMs": 16998,
+          "taskMs": 5626,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "FLUFFY'S - Bakery et brunch",
+              "placeId": "gen-cafe-day4-fj18h"
+            },
+            {
+              "time": "11:30",
+              "name": "Sainte-Chapelle",
+              "placeId": "gen-attr-sainte-chapelle-s1asz"
+            },
+            {
+              "time": "13:30",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-rest-day4-lunch-72t5b"
+            },
+            {
+              "time": "19:30",
+              "name": "Picotte",
+              "placeId": "gen-rest-day4-dinner-3dtt4"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "usableMs": 20605,
+          "taskMs": 3607,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Perlant",
+              "placeId": "gen-cafe-day5-kux7b"
+            },
+            {
+              "time": "12:00",
+              "name": "LE PARISIEN",
+              "placeId": "gen-rest-day5-lunch-8tig2"
+            },
+            {
+              "time": "按航班倒推",
+              "name": "戴高乐机场 CDG",
+              "placeId": "attr-cdg"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 20605,
+      "totalMs": 20605,
+      "timings": [
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4101
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5226
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4393
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4658
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 6146
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 6145
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4556
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5625
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 1
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 2873
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 3607
+        }
+      ],
+      "sample": 3
+    },
+    {
+      "variant": "baseline",
+      "scenario": "all",
+      "at": "2026-09-22T05:06:30.315Z",
+      "requests": [
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 486
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 148
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 150
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 195
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 233
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 122
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 97
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 380
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 576
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 259
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 404
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 428
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 87
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 128
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 138
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 138
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 220
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 230
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 270
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 77
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 184
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 73
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 405
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 540
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 513
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 278
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1574
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 85
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 88
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 155
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 165
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 165
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 167
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 45
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 272
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 132
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 307
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 259
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 843
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 173
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1052
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 393
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 114
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 122
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 127
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 133
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 133
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 73
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 200
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 215
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 215
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 233
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 120
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 107
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 110
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 109
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1381
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 2307
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 793
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 401
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 120
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 127
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 171
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1264
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 1,
+          "usableMs": 5385,
+          "taskMs": 5385,
+          "stops": [
+            {
+              "time": "14:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            },
+            {
+              "time": "15:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-cafe-day1-chvrh"
+            },
+            {
+              "time": "16:00",
+              "name": "Mazmez",
+              "placeId": "gen-rest-day1-lunch-zuq18"
+            },
+            {
+              "time": "17:30",
+              "name": "Le Marais",
+              "placeId": "gen-attr-marais-6p0t2"
+            },
+            {
+              "time": "19:30",
+              "name": "La Petite Rose des Sables",
+              "placeId": "gen-rest-day1-dinner-0ddcu"
+            },
+            {
+              "time": "21:15",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 2,
+          "usableMs": 12089,
+          "taskMs": 6704,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-cafe-day2-rkld7"
+            },
+            {
+              "time": "11:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-attr-louvre-jw6of"
+            },
+            {
+              "time": "13:30",
+              "name": "Chouchou",
+              "placeId": "gen-rest-day2-lunch-4jhw1"
+            },
+            {
+              "time": "15:00",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "17:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "19:30",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-rest-day2-dinner-2ca8o"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "usableMs": 12089,
+          "taskMs": 6703,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Moka Brunch & Coffee - Galeries Lafayette",
+              "placeId": "gen-cafe-day3-082zz"
+            },
+            {
+              "time": "11:15",
+              "name": "Palais Garnier",
+              "placeId": "gen-attr-opera-79f8c"
+            },
+            {
+              "time": "12:45",
+              "name": "Galeries Lafayette Paris Haussmann",
+              "placeId": "gen-attr-lafayette-j1eu7"
+            },
+            {
+              "time": "13:45",
+              "name": "Le P'tit Piano",
+              "placeId": "gen-rest-day3-lunch-12es4"
+            },
+            {
+              "time": "15:30",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "17:15",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "19:00",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-rest-day3-real-dinner-mi29d"
+            },
+            {
+              "time": "20:45",
+              "name": "FLUFFY'S - Bakery et brunch",
+              "placeId": "gen-rest-day3-dinner-5mugf"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "usableMs": 20573,
+          "taskMs": 8484,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Moka Brunch & Coffee - Champs Elysées",
+              "placeId": "gen-cafe-day4-87lj3"
+            },
+            {
+              "time": "11:15",
+              "name": "Eiffel Tower",
+              "placeId": "gen-attr-eiffel-falia"
+            },
+            {
+              "time": "13:30",
+              "name": "Picotte",
+              "placeId": "gen-rest-day4-lunch-9wso5"
+            },
+            {
+              "time": "15:00",
+              "name": "Cathédrale Notre-Dame de Paris",
+              "placeId": "gen-attr-notredame-b4ibw"
+            },
+            {
+              "time": "16:30",
+              "name": "Sainte-Chapelle",
+              "placeId": "gen-attr-saintechapelle-j9g7v"
+            },
+            {
+              "time": "19:00",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-rest-day4-dinner-lh3xl"
+            },
+            {
+              "time": "21:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "usableMs": 25138,
+          "taskMs": 4565,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Perlant",
+              "placeId": "gen-cafe-day5-z99ja"
+            },
+            {
+              "time": "12:00",
+              "name": "LArchimede | Restaurant Republique Paris 10 (Canal Saint Martin) | Terrasse",
+              "placeId": "gen-rest-day5-ncyty"
+            },
+            {
+              "time": "按航班倒推",
+              "name": "戴高乐机场 CDG",
+              "placeId": "attr-cdg"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 25138,
+      "totalMs": 25138,
+      "timings": [
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 4077
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5385
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 3840
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 5483
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 5559
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 6703
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 5373
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 8484
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "candidates",
+          "elapsedMs": 1
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "model-complete",
+          "elapsedMs": 3171
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "baseline",
+          "stage": "first-usable",
+          "elapsedMs": 4565
+        }
+      ],
+      "sample": 4
+    },
+    {
+      "variant": "fast",
+      "scenario": "recommend",
+      "at": "2026-09-22T04:57:10.269Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 362
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 427
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "batches": [
+        {
+          "batch": 1,
+          "firstUsableMs": 428,
+          "completeMs": 428,
+          "names": [
+            "Kafeibaie",
+            "Cuvée Noire - Rambuteau - Coffee Shop",
+            "BlackBird Coffee",
+            "Perlant"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 2,
+          "firstUsableMs": 0,
+          "completeMs": 0,
+          "names": [
+            "BACK IN BLACK",
+            "FLUFFY'S - Bakery et brunch",
+            "Moka Brunch & Coffee - Galeries Lafayette",
+            "Extraction Coffee Paris 11"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 3,
+          "firstUsableMs": 0,
+          "completeMs": 0,
+          "names": [
+            "Moka Brunch & Coffee - Champs Elysées",
+            "Broken Biscuits",
+            "Best Bread Boba",
+            "Café Gigi"
+          ],
+          "count": 4
+        }
+      ],
+      "totalMs": 430,
+      "timings": [],
+      "sample": 1
+    },
+    {
+      "variant": "fast",
+      "scenario": "recommend",
+      "at": "2026-09-22T04:57:47.496Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 318
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 375
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "batches": [
+        {
+          "batch": 1,
+          "firstUsableMs": 376,
+          "completeMs": 376,
+          "names": [
+            "Cuvée Noire - Rambuteau - Coffee Shop",
+            "Kafeibaie",
+            "BlackBird Coffee",
+            "Perlant"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 2,
+          "firstUsableMs": 0,
+          "completeMs": 0,
+          "names": [
+            "BACK IN BLACK",
+            "FLUFFY'S - Bakery et brunch",
+            "Moka Brunch & Coffee - Galeries Lafayette",
+            "Extraction Coffee Paris 11"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 3,
+          "firstUsableMs": 0,
+          "completeMs": 0,
+          "names": [
+            "Moka Brunch & Coffee - Champs Elysées",
+            "Broken Biscuits",
+            "Best Bread Boba",
+            "Café Gigi"
+          ],
+          "count": 4
+        }
+      ],
+      "totalMs": 378,
+      "timings": [],
+      "sample": 2
+    },
+    {
+      "variant": "fast",
+      "scenario": "recommend",
+      "at": "2026-09-22T04:57:48.207Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 286
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 350
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "batches": [
+        {
+          "batch": 1,
+          "firstUsableMs": 352,
+          "completeMs": 352,
+          "names": [
+            "Kafeibaie",
+            "Cuvée Noire - Rambuteau - Coffee Shop",
+            "BlackBird Coffee",
+            "Perlant"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 2,
+          "firstUsableMs": 0,
+          "completeMs": 0,
+          "names": [
+            "BACK IN BLACK",
+            "Moka Brunch & Coffee - Galeries Lafayette",
+            "FLUFFY'S - Bakery et brunch",
+            "Extraction Coffee Paris 11"
+          ],
+          "count": 4
+        },
+        {
+          "batch": 3,
+          "firstUsableMs": 0,
+          "completeMs": 0,
+          "names": [
+            "Moka Brunch & Coffee - Champs Elysées",
+            "Broken Biscuits",
+            "Best Bread Boba",
+            "Café Gigi"
+          ],
+          "count": 4
+        }
+      ],
+      "totalMs": 354,
+      "timings": [],
+      "sample": 3
+    },
+    {
+      "variant": "fast",
+      "scenario": "day",
+      "at": "2026-09-22T05:03:48.718Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 407
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 472
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 427
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 178
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 184
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 184
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 119
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 220
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 259
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 76
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 522
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 215
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 246
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1569
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 180
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 89
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 304
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 103
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 242
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 248
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 96
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 2,
+          "usableMs": 2622,
+          "taskMs": 2622,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-chij0yttro5v5kcrbawdnaz7pmu"
+            },
+            {
+              "time": "11:00",
+              "name": "Le Marais",
+              "placeId": "gen-ta-292257"
+            },
+            {
+              "time": "13:00",
+              "name": "Cathédrale Notre-Dame de Paris",
+              "placeId": "gen-ta-188679"
+            },
+            {
+              "time": "14:30",
+              "name": "Chouchou",
+              "placeId": "gen-chijhwzjqzjv5kcrcir2rjpaake"
+            },
+            {
+              "time": "16:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-ta-188757"
+            },
+            {
+              "time": "18:15",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "19:30",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "21:00",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-chijdzspfqbv5kcr6ropuy5tivk"
+            },
+            {
+              "time": "22:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 2624,
+      "totalMs": 6168,
+      "timings": [
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 473
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2620
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2622
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 6168
+        }
+      ],
+      "sample": 3
+    },
+    {
+      "variant": "fast",
+      "scenario": "day",
+      "at": "2026-09-22T05:05:58.634Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 294
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 356
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 409
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 142
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 150
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 118
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 380
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 196
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 364
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 305
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 66
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 136
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 76
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 257
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 77
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 168
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1514
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 68
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 261
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 217
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 109
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 2,
+          "usableMs": 2353,
+          "taskMs": 2353,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-chij0yttro5v5kcrbawdnaz7pmu"
+            },
+            {
+              "time": "11:15",
+              "name": "Le Marais",
+              "placeId": "gen-ta-292257"
+            },
+            {
+              "time": "13:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-ta-188757"
+            },
+            {
+              "time": "15:30",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-chij0y7uk-lv5kcrxqmumkftvmc"
+            },
+            {
+              "time": "17:30",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "19:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "20:30",
+              "name": "Mazmez",
+              "placeId": "gen-chijhrphtthv5kcrvkcxdcjzbmy"
+            },
+            {
+              "time": "22:15",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 2355,
+      "totalMs": 5202,
+      "timings": [
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 357
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2351
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2353
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 5202
+        }
+      ],
+      "sample": 4
+    },
+    {
+      "variant": "fast",
+      "scenario": "day",
+      "at": "2026-09-22T05:06:04.515Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 368
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 433
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 412
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 144
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 151
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 112
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 333
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 231
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 231
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 68
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 738
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 149
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 239
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 158
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1625
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 87
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 198
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 314
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 136
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 2,
+          "usableMs": 2607,
+          "taskMs": 2607,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-chij0yttro5v5kcrbawdnaz7pmu"
+            },
+            {
+              "time": "11:00",
+              "name": "Le Marais",
+              "placeId": "gen-ta-292257"
+            },
+            {
+              "time": "13:00",
+              "name": "Dessance",
+              "placeId": "gen-chij75i0xqru5kcrhjrwpkfqu7i"
+            },
+            {
+              "time": "15:00",
+              "name": "Louvre Museum",
+              "placeId": "gen-ta-188757"
+            },
+            {
+              "time": "17:45",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "19:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "20:15",
+              "name": "Le P'tit Piano",
+              "placeId": "gen-chijg5do-ypv5kcrlo19dfcdj6w"
+            },
+            {
+              "time": "22:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 2608,
+      "totalMs": 5582,
+      "timings": [
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 434
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2604
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2607
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 5582
+        }
+      ],
+      "sample": 5
+    },
+    {
+      "variant": "fast",
+      "scenario": "all",
+      "at": "2026-09-22T05:04:03.436Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 566
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 631
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 431
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 138
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 145
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 192
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 221
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 111
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 281
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 286
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 89
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 342
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 347
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 399
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 413
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 221
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 111
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 327
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 336
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 339
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 357
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 191
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 507
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 627
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 631
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 183
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 422
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 75
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 308
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 326
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 337
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1259
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 215
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 224
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 99
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 108
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 224
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 229
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 236
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 350
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 360
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 374
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 277
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 87
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 418
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 188
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 95
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 68
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 229
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 942
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 64
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 223
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 73
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 117
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 121
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 142
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 196
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 363
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 372
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 230
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 69
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 217
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 408
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 732
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 2240
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 101
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 112
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 1985
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 1631
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 759
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 744
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 2478
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 1,
+          "usableMs": 2288,
+          "taskMs": 2288,
+          "stops": [
+            {
+              "time": "15:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            },
+            {
+              "time": "16:30",
+              "name": "Kafeibaie",
+              "placeId": "gen-chij0yttro5v5kcrbawdnaz7pmu"
+            },
+            {
+              "time": "17:30",
+              "name": "Le Marais",
+              "placeId": "gen-ta-292257"
+            },
+            {
+              "time": "19:30",
+              "name": "La Petite Rose des Sables",
+              "placeId": "gen-chijzuhe-g5u5kcrwdkx01snjke"
+            },
+            {
+              "time": "21:15",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 2,
+          "usableMs": 4250,
+          "taskMs": 1958,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-chijdzspfqbv5kcr6ropuy5tivk"
+            },
+            {
+              "time": "11:30",
+              "name": "Louvre Museum",
+              "placeId": "gen-ta-188757"
+            },
+            {
+              "time": "14:15",
+              "name": "Chouchou",
+              "placeId": "gen-chijhwzjqzjv5kcrcir2rjpaake"
+            },
+            {
+              "time": "16:15",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "18:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "19:45",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-chij38-sza1u5kcrtzzk4ahbcpq"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "usableMs": 6861,
+          "taskMs": 2581,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Perlant",
+              "placeId": "gen-chijn-pj4fjv5kcrml4olaot8ug"
+            },
+            {
+              "time": "11:15",
+              "name": "Cathédrale Notre-Dame de Paris",
+              "placeId": "gen-ta-188679"
+            },
+            {
+              "time": "12:45",
+              "name": "Sainte-Chapelle",
+              "placeId": "gen-ta-190202"
+            },
+            {
+              "time": "14:00",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-chij0y7uk-lv5kcrxqmumkftvmc"
+            },
+            {
+              "time": "16:00",
+              "name": "Luxembourg Gardens",
+              "placeId": "gen-ta-189687"
+            },
+            {
+              "time": "19:00",
+              "name": "Mazmez",
+              "placeId": "gen-chijhrphtthv5kcrvkcxdcjzbmy"
+            },
+            {
+              "time": "20:45",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "usableMs": 9089,
+          "taskMs": 2228,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "BlackBird Coffee",
+              "placeId": "gen-chija-oulcpv5kcrzkuij5hrfhs"
+            },
+            {
+              "time": "12:00",
+              "name": "Dessance",
+              "placeId": "gen-chij75i0xqru5kcrhjrwpkfqu7i"
+            },
+            {
+              "time": "14:30",
+              "name": "Basilique Du Sacre-Coeur De Montmartre",
+              "placeId": "gen-ta-190685"
+            },
+            {
+              "time": "16:15",
+              "name": "Montmartre",
+              "placeId": "gen-ta-189284"
+            },
+            {
+              "time": "18:30",
+              "name": "Sacrée Fleur Montmartre",
+              "placeId": "gen-chijf-oe7wdu5kcrrto099rq9fc"
+            },
+            {
+              "time": "20:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "usableMs": 10838,
+          "taskMs": 1749,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Broken Biscuits",
+              "placeId": "gen-chij0w4ngqbv5kcrn1xggp-6sh8"
+            },
+            {
+              "time": "12:00",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-chijf6lcnw5u5kcrd8j-btwqqj8"
+            },
+            {
+              "time": "按航班倒推",
+              "name": "戴高乐机场 CDG",
+              "placeId": "attr-cdg"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 10838,
+      "totalMs": 13428,
+      "timings": [
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 632
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2286
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2288
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 286
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 348
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 3530
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 1957
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 1958
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 1987
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 1987
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 336
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "ranked",
+          "elapsedMs": 632
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2403
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2404
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2580
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2581
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 4778
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 236
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2227
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2228
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "ranked",
+          "elapsedMs": 373
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 1748
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 1748
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 7652
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 5880
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 4339
+        }
+      ],
+      "sample": 2
+    },
+    {
+      "variant": "fast",
+      "scenario": "all",
+      "at": "2026-09-22T05:05:01.196Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 431
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 492
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 392
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 149
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 247
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 325
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 339
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 92
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 421
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 428
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 437
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 450
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 234
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 431
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 405
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1058
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 303
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 110
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 122
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 299
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 333
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 342
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 344
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 93
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 224
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 427
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 433
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 253
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 65
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 72
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 153
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 386
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 332
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 509
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 227
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 91
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 234
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 83
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 97
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 290
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 343
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 90
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 77
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 184
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 413
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 430
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 166
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 269
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 121
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 828
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 837
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 318
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 1936
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 218
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 79
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 98
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 232
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 98
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 95
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 287
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 293
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 297
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 329
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 764
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 157
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 205
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 405
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 751
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 96
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 86
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 3063
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 342
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 1837
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 4877
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 764
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 1,
+          "usableMs": 2001,
+          "taskMs": 2001,
+          "stops": [
+            {
+              "time": "15:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            },
+            {
+              "time": "16:30",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-chijdzspfqbv5kcr6ropuy5tivk"
+            },
+            {
+              "time": "17:30",
+              "name": "Le Marais",
+              "placeId": "gen-ta-292257"
+            },
+            {
+              "time": "19:30",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-chij0y7uk-lv5kcrxqmumkftvmc"
+            },
+            {
+              "time": "21:15",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 2,
+          "usableMs": 4020,
+          "taskMs": 2013,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Kafeibaie",
+              "placeId": "gen-chij0yttro5v5kcrbawdnaz7pmu"
+            },
+            {
+              "time": "11:30",
+              "name": "Louvre Museum",
+              "placeId": "gen-ta-188757"
+            },
+            {
+              "time": "14:15",
+              "name": "Chouchou",
+              "placeId": "gen-chijhwzjqzjv5kcrcir2rjpaake"
+            },
+            {
+              "time": "16:15",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "18:00",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "19:30",
+              "name": "Moka Brunch & Coffee - Galeries Lafayette",
+              "placeId": "gen-chijwtltl4bv5kcrw70gwnwzxmg"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "usableMs": 6305,
+          "taskMs": 2251,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "BlackBird Coffee",
+              "placeId": "gen-chija-oulcpv5kcrzkuij5hrfhs"
+            },
+            {
+              "time": "11:15",
+              "name": "Cathédrale Notre-Dame de Paris",
+              "placeId": "gen-ta-188679"
+            },
+            {
+              "time": "12:30",
+              "name": "Sainte-Chapelle",
+              "placeId": "gen-ta-190202"
+            },
+            {
+              "time": "13:45",
+              "name": "Mazmez",
+              "placeId": "gen-chijhrphtthv5kcrvkcxdcjzbmy"
+            },
+            {
+              "time": "15:30",
+              "name": "Musée Rodin",
+              "placeId": "gen-ta-188149"
+            },
+            {
+              "time": "17:30",
+              "name": "Musée de l’Orangerie",
+              "placeId": "gen-ta-265635"
+            },
+            {
+              "time": "19:30",
+              "name": "La Petite Rose des Sables",
+              "placeId": "gen-chijzuhe-g5u5kcrwdkx01snjke"
+            },
+            {
+              "time": "21:15",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "usableMs": 9535,
+          "taskMs": 2883,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Perlant",
+              "placeId": "gen-chijn-pj4fjv5kcrml4olaot8ug"
+            },
+            {
+              "time": "12:30",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-chijf6lcnw5u5kcrd8j-btwqqj8"
+            },
+            {
+              "time": "15:30",
+              "name": "Musée d'Orsay",
+              "placeId": "gen-ta-188150"
+            },
+            {
+              "time": "18:00",
+              "name": "The Seine",
+              "placeId": "gen-ta-189683"
+            },
+            {
+              "time": "19:30",
+              "name": "Le Tout-Paris",
+              "placeId": "gen-chijxyjuc2lv5kcrlhdpwba-agu"
+            },
+            {
+              "time": "21:30",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "usableMs": 11274,
+          "taskMs": 1739,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "FLUFFY'S - Bakery et brunch",
+              "placeId": "gen-chijz4nqsatv5kcrgydja6p5m4e"
+            },
+            {
+              "time": "按航班倒推",
+              "name": "戴高乐机场 CDG",
+              "placeId": "attr-cdg"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 11274,
+      "totalMs": 15210,
+      "timings": [
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 493
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 1999
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2000
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 339
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 438
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 3363
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2011
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2012
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2046
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2046
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 343
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "ranked",
+          "elapsedMs": 433
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 3775
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2251
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2251
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2631
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2631
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "ranked",
+          "elapsedMs": 838
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2883
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2883
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 1
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 294
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 5837
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 1738
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 1739
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 1922
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 8558
+        }
+      ],
+      "sample": 3
+    },
+    {
+      "variant": "fast",
+      "scenario": "all",
+      "at": "2026-09-22T05:06:17.751Z",
+      "requests": [
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 483
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 544
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 316
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 144
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 149
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 201
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 90
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 241
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 67
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 382
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 388
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 314
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 459
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 465
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 456
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 386
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 73
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 104
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 153
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 219
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 229
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 325
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 182
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 56
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 200,
+          "headersMs": 456
+        },
+        {
+          "path": "/api/jev",
+          "status": 200,
+          "headersMs": 464
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 188
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 223
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 413
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 92
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 329
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 828
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 84
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 158
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1324
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 71
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 69
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 197
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 141
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 229
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 98
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 154
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 156
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 173
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 121
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 282
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 287
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 240
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 271
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 83
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 395
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 977
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 74
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 179
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 80
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 77
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 220
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 1640
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 100
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 107
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 109
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 259
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 96
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 110
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 66
+        },
+        {
+          "path": "/v4/ai/evaluation-model",
+          "status": 503,
+          "headersMs": 287
+        },
+        {
+          "path": "/api/jev",
+          "status": 502,
+          "headersMs": 294
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 190
+        },
+        {
+          "path": "/api/deepseek/responses",
+          "status": 200,
+          "headersMs": 497
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 729
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 948
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 165
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 69
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 2217
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 212
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 70
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 78
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 429,
+          "headersMs": 82
+        },
+        {
+          "path": "/api/google-places",
+          "status": 200,
+          "headersMs": 93
+        },
+        {
+          "path": "/api/place-website",
+          "status": 200,
+          "headersMs": 142
+        },
+        {
+          "path": "/api/tripadvisor",
+          "status": 200,
+          "headersMs": 275
+        }
+      ],
+      "candidateCount": 49,
+      "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+      "days": [
+        {
+          "day": 1,
+          "usableMs": 2311,
+          "taskMs": 2311,
+          "stops": [
+            {
+              "time": "14:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            },
+            {
+              "time": "15:30",
+              "name": "Kafeibaie",
+              "placeId": "gen-chij0yttro5v5kcrbawdnaz7pmu"
+            },
+            {
+              "time": "16:30",
+              "name": "Le Marais",
+              "placeId": "gen-ta-292257"
+            },
+            {
+              "time": "19:30",
+              "name": "Mazmez",
+              "placeId": "gen-chijhrphtthv5kcrvkcxdcjzbmy"
+            },
+            {
+              "time": "21:15",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 2,
+          "usableMs": 4670,
+          "taskMs": 2356,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "BlackBird Coffee",
+              "placeId": "gen-chija-oulcpv5kcrzkuij5hrfhs"
+            },
+            {
+              "time": "11:15",
+              "name": "Louvre Museum",
+              "placeId": "gen-ta-188757"
+            },
+            {
+              "time": "14:00",
+              "name": "Le Tout-Paris",
+              "placeId": "gen-chijxyjuc2lv5kcrlhdpwba-agu"
+            },
+            {
+              "time": "16:00",
+              "name": "Moka Brunch & Coffee - Champs Elysées",
+              "placeId": "gen-chijk10catlv5kcry-0a7mk-6bs"
+            },
+            {
+              "time": "17:00",
+              "name": "香榭丽舍大街（中段）",
+              "placeId": "attr-champs"
+            },
+            {
+              "time": "18:15",
+              "name": "凯旋门",
+              "placeId": "attr-arc"
+            },
+            {
+              "time": "20:00",
+              "name": "Les Rupins - Restaurant Parisien",
+              "placeId": "gen-chij38-sza1u5kcrtzzk4ahbcpq"
+            },
+            {
+              "time": "22:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "usableMs": 7318,
+          "taskMs": 2604,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Perlant",
+              "placeId": "gen-chijn-pj4fjv5kcrml4olaot8ug"
+            },
+            {
+              "time": "11:15",
+              "name": "Palais Garnier",
+              "placeId": "gen-ta-190204"
+            },
+            {
+              "time": "13:00",
+              "name": "Le 17.45 Paris République - Planches à composer",
+              "placeId": "gen-chijf6lcnw5u5kcrd8j-btwqqj8"
+            },
+            {
+              "time": "14:45",
+              "name": "Cuvée Noire - Rambuteau - Coffee Shop",
+              "placeId": "gen-chijdzspfqbv5kcr6ropuy5tivk"
+            },
+            {
+              "time": "15:45",
+              "name": "Musée d'Orsay",
+              "placeId": "gen-ta-188150"
+            },
+            {
+              "time": "17:45",
+              "name": "The Seine",
+              "placeId": "gen-ta-189683"
+            },
+            {
+              "time": "19:15",
+              "name": "La Petite Rose des Sables",
+              "placeId": "gen-chijzuhe-g5u5kcrwdkx01snjke"
+            },
+            {
+              "time": "21:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "usableMs": 9646,
+          "taskMs": 2328,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "Broken Biscuits",
+              "placeId": "gen-chij0w4ngqbv5kcrn1xggp-6sh8"
+            },
+            {
+              "time": "11:30",
+              "name": "Dessance",
+              "placeId": "gen-chij75i0xqru5kcrhjrwpkfqu7i"
+            },
+            {
+              "time": "13:00",
+              "name": "Le Marais Restaurant Paris",
+              "placeId": "gen-chij0y7uk-lv5kcrxqmumkftvmc"
+            },
+            {
+              "time": "15:00",
+              "name": "Cathédrale Notre-Dame de Paris",
+              "placeId": "gen-ta-188679"
+            },
+            {
+              "time": "16:30",
+              "name": "Sainte-Chapelle",
+              "placeId": "gen-ta-190202"
+            },
+            {
+              "time": "19:00",
+              "name": "Picotte",
+              "placeId": "gen-chijgqhmfqzv5kcr1g6phtjwf40"
+            },
+            {
+              "time": "21:00",
+              "name": "hotel-selected",
+              "placeId": "hotel-selected"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "usableMs": 11604,
+          "taskMs": 1957,
+          "stops": [
+            {
+              "time": "10:00",
+              "name": "FLUFFY'S - Bakery et brunch",
+              "placeId": "gen-chijz4nqsatv5kcrgydja6p5m4e"
+            },
+            {
+              "time": "按航班倒推",
+              "name": "戴高乐机场 CDG",
+              "placeId": "attr-cdg"
+            }
+          ]
+        }
+      ],
+      "routeReadyMs": 11604,
+      "totalMs": 11852,
+      "timings": [
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "ranked",
+          "elapsedMs": 545
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2310
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2311
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 388
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 465
+        },
+        {
+          "task": "itinerary-day-1",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 3398
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2355
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2356
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2399
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2400
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 0
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 231
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "ranked",
+          "elapsedMs": 465
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2287
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2288
+        },
+        {
+          "task": "itinerary-day-2",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 4794
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2604
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2604
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 1
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 288
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 2327
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 2328
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "candidates",
+          "elapsedMs": 1
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "rank-fallback",
+          "elapsedMs": 295
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "model-complete",
+          "elapsedMs": 1956
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "first-usable",
+          "elapsedMs": 1957
+        },
+        {
+          "task": "itinerary-day-4",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 4336
+        },
+        {
+          "task": "itinerary-day-5",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 2194
+        },
+        {
+          "task": "itinerary-day-3",
+          "variant": "fast",
+          "stage": "complete-enriched",
+          "elapsedMs": 7138
+        }
+      ],
+      "sample": 4
+    }
+  ],
+  "pilotFailure": {
+    "variant": "fast",
+    "scenario": "recommend",
+    "at": "2026-09-22T04:55:23.929Z",
+    "requests": [
+      {
+        "path": "/v4/ai/evaluation-model",
+        "status": 503,
+        "headersMs": 555
+      },
+      {
+        "path": "/api/jev",
+        "status": 502,
+        "headersMs": 1063
+      }
+    ],
+    "candidateCount": 49,
+    "candidateSource": "same frozen real provider candidates; acquisition excluded from generation timing",
+    "batches": [],
+    "error": "Jev rank unavailable (not counted as a successful optimized run)"
+  }
+}

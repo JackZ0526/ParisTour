@@ -130,7 +130,16 @@ describe('chat work-step labels are locale-aware', () => {
     ])
   })
 
+  it('localizes labels and badges saved in the other language', () => {
+    const saved = { id: 'generate', label: '生成回答', badges: ['信息查询', '无需联网', '推理: 关'], status: 'done' } as TripChatWorkStep
+    const display = parseStepDisplay(saved)
+    expect(display.label).toBe('Generating answer')
+    expect(display.badges).toEqual(['Info Query', 'No Web', 'Reasoning: Off'])
+    expect(saved.label).toBe('生成回答')
+  })
+
   it('parseStepDisplay handles badges and legacy string formatting', () => {
+    setLocale('zh-CN')
     // Native badges
     const native = parseStepDisplay({
       id: 'preprocessPlan',

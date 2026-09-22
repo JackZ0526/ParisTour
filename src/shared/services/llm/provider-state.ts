@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../i18n/copy/provider-state-runtime-19f1a6'
 /**
  * LLM provider runtime state (openai | gemini, switch notice).
  *
@@ -65,7 +66,7 @@ export function setLlmProvider(
   if (options?.notice !== undefined) {
     switchNotice = options.notice
   } else if (prev !== provider) {
-    switchNotice = `已切换到 ${getProviderLabel(provider)}`
+    switchNotice = runtimeCopy('mcb43f4f1f6', { p0: (getProviderLabel(provider)) })
   }
   notifyProviderListeners()
 }
@@ -76,7 +77,7 @@ export function toggleLlmProvider(): LlmProvider {
   const next: LlmProvider = current === 'openai' ? 'gemini' : 'openai'
   if (isProviderConfigured(next)) {
     setLlmProvider(next, {
-      notice: `已手动切换到 ${getProviderLabel(next)}`,
+      notice: runtimeCopy('m6116d5a1fb', { p0: (getProviderLabel(next)) }),
     })
     return next
   }

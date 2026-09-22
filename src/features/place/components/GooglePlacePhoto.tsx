@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { useEffect, useState } from 'react'
 import { Image } from 'lucide-react'
 import {
@@ -335,7 +336,7 @@ export function GooglePlacePhoto({
           wikimedia
             ? `Wikimedia Commons${wikimedia.attribution ? ` · ${wikimedia.attribution}` : ''}${wikimedia.license ? ` · ${wikimedia.license}` : ''}`
             : fromGoogle
-              ? `地图照片${attribution ? ` · ${attribution}` : ''}`
+              ? uiCopy('m7e194e8eee', { p0: (attribution ? ` · ${attribution}` : '') })
               : alt
         }
       >
@@ -372,7 +373,7 @@ export function GooglePlacePhoto({
       ) : null}
       {fromGoogle && showBadge && src && src !== fallbackSrc && !loading && (
         <span className="absolute bottom-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-          地图{attribution ? ` · ${attribution}` : ''}
+          {uiCopy('m46e1efeb26', undefined)}{attribution ? ` · ${attribution}` : ''}
         </span>
       )}
       {wikimedia && showBadge && src && src !== fallbackSrc && !loading && (

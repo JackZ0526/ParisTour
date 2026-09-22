@@ -1,3 +1,4 @@
+import { localizedCopy } from '../../../shared/i18n/copy/googleMapsDirectionsUrl-8851ad'
 import type { Coordinates } from '../../../types'
 import { getLocale, translate, type Locale } from '../../../shared/i18n'
 
@@ -53,12 +54,12 @@ export function googleMapsTravelModeLabel(
   if (mode === 'walking') {
     return (
       translate('transport.walking' as never, undefined, locale) ||
-      (locale === 'en' ? 'Walking' : '步行')
+      (locale === 'en' ? localizedCopy('mc11731f120', undefined, 'en') : localizedCopy('mc11731f120', undefined, 'zh-CN'))
     )
   }
   return (
     translate('transport.transit' as never, undefined, locale) ||
-    (locale === 'en' ? 'Transit' : '公共交通')
+    (locale === 'en' ? localizedCopy('me081344bb6', undefined, 'en') : localizedCopy('me081344bb6', undefined, 'zh-CN'))
   )
 }
 

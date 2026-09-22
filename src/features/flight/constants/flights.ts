@@ -1,3 +1,5 @@
+import { runtimeCopy4 } from '../../../shared/i18n/copy/flights-runtime4-4b4b69'
+import { runtimeCopy } from '../../../shared/i18n/copy/flights-runtime-4b4b69'
 import type { FlightLegTemplate } from '../../../types'
 
 /**
@@ -7,30 +9,30 @@ import type { FlightLegTemplate } from '../../../types'
 export const recommendedFlights: FlightLegTemplate[] = [
   {
     id: 'outbound-af375',
-    label: '去程（推荐）',
+    get label() { return runtimeCopy4('m09696609ca', undefined) },
     direction: 'outbound',
     airline: 'Air France',
     flightNumber: 'AF375',
-    from: { code: 'YVR', city: '温哥华' },
-    to: { code: 'CDG', city: '巴黎' },
-    departLocal: '加载中…',
-    arriveLocal: '加载中…',
-    duration: '约 9–10 小时',
+    from: { code: 'YVR', get city() { return runtimeCopy4('m841fc16c97', undefined) } },
+    to: { code: 'CDG', get city() { return runtimeCopy('m4d45f90234', undefined) } },
+    get departLocal() { return runtimeCopy('m300ee3dee4', undefined) },
+    get arriveLocal() { return runtimeCopy('m300ee3dee4', undefined) },
+    get duration() { return runtimeCopy4('m80715448b2', undefined) },
     aircraft: 'Airbus A350',
-    notes: '由大模型联网检索公开航班信息。',
+    get notes() { return runtimeCopy4('ma9df2fd523', undefined) },
   },
   {
     id: 'return-af374',
-    label: '返程（推荐）',
+    get label() { return runtimeCopy4('m0a749a7368', undefined) },
     direction: 'return',
     airline: 'Air France',
     flightNumber: 'AF374',
-    from: { code: 'CDG', city: '巴黎' },
-    to: { code: 'YVR', city: '温哥华' },
-    departLocal: '加载中…',
-    arriveLocal: '加载中…',
-    duration: '约 10 小时',
+    from: { code: 'CDG', get city() { return runtimeCopy('m4d45f90234', undefined) } },
+    to: { code: 'YVR', get city() { return runtimeCopy4('m841fc16c97', undefined) } },
+    get departLocal() { return runtimeCopy('m300ee3dee4', undefined) },
+    get arriveLocal() { return runtimeCopy('m300ee3dee4', undefined) },
+    get duration() { return runtimeCopy4('m395a2c3bbd', undefined) },
     aircraft: 'Airbus A350',
-    notes: '返程主飞 AF374；由大模型联网检索。若你的机票不同可自行改航班号。',
+    get notes() { return runtimeCopy4('m79d2d4c1d4', undefined) },
   },
 ]

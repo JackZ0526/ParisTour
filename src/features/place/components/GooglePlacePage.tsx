@@ -1,3 +1,5 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/GooglePlacePage-71ae35'
 import {
   useEffect,
   useLayoutEffect,
@@ -255,8 +257,7 @@ function PlaceReviewsShimmer() {
     <div className="space-y-2" aria-busy>
       <p className="flex items-center gap-1.5 text-sm font-medium">
         <PlaceSourceMark source="tripadvisor" showLabel={false} />
-        Tripadvisor 评论
-      </p>
+        {uiCopy('m1184d7de57', undefined)}</p>
       {Array.from({ length: 2 }, (_, index) => (
         <article
           key={index}
@@ -393,7 +394,7 @@ export function GooglePlacePage({
   providerOwnsSummary = false,
   detailsOverride,
   skipProviderLookup = false,
-  reviewSourceLabel = 'Google 评论',
+  reviewSourceLabel = uiCopy('mdba8d3191e', undefined),
   providerDetails,
   reviewsSection,
   llmNarrative,
@@ -1432,7 +1433,7 @@ export function GooglePlacePage({
     resolved.titleIsLlmTranslated && nameZhPhase === 'done',
   )
   const dialogLabel = showNameLoader
-    ? `正在翻译「${originalLabel}」`
+    ? uiCopy('m705c7a764a', { p0: (originalLabel) })
     : `${title || originalLabel} ${t('place.placeDetailsLabel')}`
   const priceLevelLabel = formatPriceLevelLabel(
     isAttraction
@@ -2105,8 +2106,8 @@ export function GooglePlacePage({
                 <div className="rounded-2xl border border-white/80 dark:border-white/10 bg-white/60 dark:bg-[#18201c]/80 p-3.5 text-sm shadow-sm backdrop-blur-md">
                   <p className="leading-relaxed text-[var(--stone)]">
                     {locale === 'en'
-                      ? 'Google provided the rating and review count, but text reviews are not available via Places API.'
-                      : 'Google 已返回评分与评论总数，但暂未向 Places API 提供可展示的评论正文。'}
+                      ? localizedCopy('m3efc48c121', undefined, 'en')
+                      : localizedCopy('m3efc48c121', undefined, 'zh-CN')}
                   </p>
                   {googleMapsPlaceUrl && (
                     <a

@@ -1,3 +1,5 @@
+import { uiCopy } from '../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../shared/i18n/copy/AuthProvider-edd27a'
 import {
   useCallback,
   useEffect,
@@ -57,7 +59,7 @@ import {
 function localDebugTrip(): AccessibleTrip {
   return {
     id: 'local-trip',
-    title: '本地调试行程',
+    title: uiCopy('m891b308fa2', undefined),
     ownerId: 'local-user',
     isPrimary: true,
     role: 'owner',
@@ -65,7 +67,7 @@ function localDebugTrip(): AccessibleTrip {
     artifactsRev: 0,
     daysRev: 0,
     snapshot: emptyTripSnapshot(),
-    label: '本地调试行程',
+    label: uiCopy('m891b308fa2', undefined),
   }
 }
 
@@ -83,8 +85,8 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
     /email not confirmed/i.test(lower)
   ) {
     return locale === 'en'
-      ? 'Email not confirmed yet. Please click the link in your confirmation email before signing in.'
-      : '邮箱尚未确认。请打开注册时收到的确认邮件，点击链接后再登录。'
+      ? localizedCopy('ma4b983fb0a', undefined, 'en')
+      : localizedCopy('ma4b983fb0a', undefined, 'zh-CN')
   }
   if (
     code === 'invalid_credentials' ||
@@ -92,16 +94,16 @@ function mapAuthError(err: { message?: string; code?: string; status?: number })
     /invalid email or password/i.test(lower)
   ) {
     return locale === 'en'
-      ? 'Incorrect email or password. If you just registered, please confirm your email first.'
-      : '邮箱或密码不正确。若刚注册，请先确认邮箱后再试。'
+      ? localizedCopy('m75bf2b583d', undefined, 'en')
+      : localizedCopy('m75bf2b583d', undefined, 'zh-CN')
   }
   if (code === 'user_already_exists' || /already registered|already been registered/i.test(lower)) {
     return t('auth.alreadyRegistered')
   }
   if (/rate limit|too many requests|over_email_send_rate_limit/i.test(lower) || code === 'over_email_send_rate_limit') {
     return locale === 'en'
-      ? 'Email sending limit reached. Please try again in about an hour.'
-      : '邮件发送过于频繁（Supabase 免费邮箱约每小时 2 封）。请约 1 小时后再试，或在 Dashboard 关闭「Confirm email」。'
+      ? localizedCopy('mb7db4024e1', undefined, 'en')
+      : localizedCopy('mb7db4024e1', undefined, 'zh-CN')
   }
   if (/password/i.test(lower) && /weak|at least|characters/i.test(lower)) {
     return t('auth.passwordTooShort')

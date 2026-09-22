@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
-    "lint": "oxlint && node scripts/check-lucide-icons.mjs",
+    "lint": "oxlint && node scripts/check-lucide-icons.mjs && node scripts/check-i18n.mjs",
     "lint:icons": "node scripts/check-lucide-icons.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -18,7 +18,8 @@
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
     "release:major": "node scripts/release.mjs major",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "check:i18n": "node scripts/check-i18n.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.9",

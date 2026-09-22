@@ -1,3 +1,6 @@
+import { localizeStoredUiCopy } from '../../../shared/i18n/storedUiCopy'
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/DayTimeline-7ff932'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { getPlace } from '../../place/constants/places'
@@ -381,7 +384,7 @@ function LegConnector({
               chipRow(
                 <LoadingIndicator
                   variant="badge"
-                  label={fallbackLabel || translate('itinerary.calculatingNavigation' as never, undefined, getLocale()) || (getLocale() === 'en' ? 'Calculating navigation…' : '正在计算导航…')}
+                  label={fallbackLabel || translate('itinerary.calculatingNavigation' as never, undefined, getLocale()) || (getLocale() === 'en' ? localizedCopy('m9d73d2eaaa', undefined, 'en') : localizedCopy('m9d73d2eaaa', undefined, 'zh-CN'))}
                   size="sm"
                   showDots
                 />,
@@ -435,7 +438,7 @@ function LegConnector({
                   </a>
                 ) : (
                   <span className={`${timelineCapsuleClass} px-2.5 py-1 text-xs ${tone}`}>
-                    {leg?.label || fallbackLabel || translate('itinerary.viewMapDirections' as never, undefined, getLocale()) || (getLocale() === 'en' ? 'View map directions' : '查看地图导航')}
+                    {leg?.label || fallbackLabel || translate('itinerary.viewMapDirections' as never, undefined, getLocale()) || (getLocale() === 'en' ? localizedCopy('m8ba45f2ac6', undefined, 'en') : localizedCopy('m8ba45f2ac6', undefined, 'zh-CN'))}
                   </span>
                 ),
               )
@@ -474,6 +477,7 @@ interface Props {
   canRestoreDayDefault?: boolean
   onRestoreDayDefault?: () => void
   tripPlaceNames: string[]
+  tripPlaces: Place[]
   recommendationPreferences: RecommendationPreferences
   readOnly?: boolean
   direction?: 1 | -1
@@ -568,6 +572,7 @@ export function DayTimeline({
   canRestoreDayDefault = false,
   onRestoreDayDefault,
   tripPlaceNames,
+  tripPlaces,
   recommendationPreferences,
   readOnly = false,
   direction = 1,
@@ -1531,7 +1536,7 @@ export function DayTimeline({
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.copper} px-2.5 py-1 text-xs text-[var(--copper)]`}>
-              Day {day.day}
+              {uiCopy('dayLabel', { p0: day.day })}
             </span>
             <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.sage} px-2.5 py-1 text-xs text-[var(--sage)] dark:text-emerald-300`}>
               {dayPending ? (
@@ -1926,7 +1931,7 @@ export function DayTimeline({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
-                      {stop.time}
+                      {localizeStoredUiCopy(stop.time, locale)}
                     </span>
                     <span className="text-xs text-[var(--stone)]">
                       {typeLabelKey[place.type] ? t(typeLabelKey[place.type] as never) : place.type}
@@ -2274,7 +2279,7 @@ export function DayTimeline({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
-                        {stop.time}
+                        {localizeStoredUiCopy(stop.time, locale)}
                       </span>
                       <span className="text-xs text-[var(--stone)]">
                         {typeLabelKey[place.type] ? t(typeLabelKey[place.type] as never) : place.type}
@@ -2364,6 +2369,7 @@ export function DayTimeline({
               }
             })}
             tripPlaceNames={tripPlaceNames}
+            tripPlaces={tripPlaces}
             onClose={() => setAddOpen(false)}
             onAddCustom={handleAddCustomLocal}
           />

@@ -1,3 +1,7 @@
+import { localizeStoredUiCopy } from '../../../shared/i18n/storedUiCopy'
+import { en as stepCopyEn, zhCN as stepCopyZh } from '../../../shared/i18n/copy/ChatWorkStepList-18e7b1'
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/ChatWorkStepList-18e7b1'
 /**
  * Pure work-step pipeline helpers for the trip chat panel.
  *
@@ -62,27 +66,15 @@ export function getChatWorkStepLabels(locale: Locale = getLocale()): Record<Chat
       out[id] = translated
       return
     }
-    out[id] = FALLBACK_LABELS_ZH[id]
+    out[id] = key
   })
   return out
 }
 
-/** Locale-aware single-step label, with a Chinese last-resort fallback. */
+/** Locale-aware single-step label, without cross-language fallback. */
 export function chatWorkStepLabel(id: ChatWorkStepId, locale: Locale = getLocale()): string {
   const key = STEP_LABEL_KEYS[id]
-  return translate(key, undefined, locale) || FALLBACK_LABELS_ZH[id]
-}
-
-/** Internal Chinese fallback used only when the registry is missing the key. */
-const FALLBACK_LABELS_ZH: Record<ChatWorkStepId, string> = {
-  preprocessPlan: '理解问题',
-  preprocessFallback: '兜底路由',
-  visualAnalysis: '解析图片',
-  webSearch: '搜索网络',
-  generate: '生成回答',
-  parse: '解析动作',
-  resolvePlaces: '核对地点',
-  apply: '应用改动',
+  return translate(key, undefined, locale)
 }
 
 export function initialChatWorkSteps(_userText: string, hasImages = false): ChatWorkStep[] {
@@ -107,7 +99,7 @@ export function searchStepLabel(
   locale: Locale = getLocale(),
 ): string {
   const prefix = translate('chat.workStepSearchPrefix' as never, undefined, locale) ||
-    (locale === 'en' ? 'Search: ' : '搜索：')
+    (locale === 'en' ? localizedCopy('mdf37b27b19', undefined, 'en') : localizedCopy('mdf37b27b19', undefined, 'zh-CN'))
   const fallback = chatWorkStepLabel('webSearch', locale)
   if (detail?.query) {
     const extracted = extractSearchKeyword(detail.query)
@@ -171,7 +163,7 @@ export function requestPlanStepLabel(
 ): string {
   return (
     translate('chat.workStepPlanLabel' as never, undefined, locale) ||
-    (locale === 'en' ? 'Analyzing question' : '分析问题')
+    (locale === 'en' ? localizedCopy('md47898f16f', undefined, 'en') : localizedCopy('md47898f16f', undefined, 'zh-CN'))
   )
 }
 
@@ -184,45 +176,50 @@ export function requestPlanStepBadges(
 
   let intentLabel: string
   if (hasImages && intent === 'answer') {
-    intentLabel = locale === 'en' ? 'Visual Recognition' : '识图识别'
+    intentLabel = locale === 'en' ? localizedCopy('me32b064eb7', undefined, 'en') : localizedCopy('me32b064eb7', undefined, 'zh-CN')
   } else if (intent === 'recommend') {
     intentLabel =
       translate('chat.workStepPlanIntentRecommend' as never, undefined, locale) ||
-      (locale === 'en' ? 'Recommend' : '推荐')
+      (locale === 'en' ? localizedCopy('ma7dcfbd21e', undefined, 'en') : localizedCopy('ma7dcfbd21e', undefined, 'zh-CN'))
   } else if (intent === 'mutate') {
     intentLabel =
       translate('chat.workStepPlanIntentMutate' as never, undefined, locale) ||
-      (locale === 'en' ? 'Edit Plan' : '行程调整')
+      (locale === 'en' ? localizedCopy('m6099d4c455', undefined, 'en') : localizedCopy('m6099d4c455', undefined, 'zh-CN'))
   } else if (intent === 'answer') {
     intentLabel =
       translate('chat.workStepPlanIntentAnswer' as never, undefined, locale) ||
-      (locale === 'en' ? 'Info Query' : '信息查询')
+      (locale === 'en' ? localizedCopy('m0a3fc2326a', undefined, 'en') : localizedCopy('m0a3fc2326a', undefined, 'zh-CN'))
   } else {
     intentLabel =
       translate('chat.workStepPlanIntentUnderstand' as never, undefined, locale) ||
-      (locale === 'en' ? 'Analyze' : '理解问题')
+      (locale === 'en' ? localizedCopy('m69f5bf446b', undefined, 'en') : localizedCopy('m69f5bf446b', undefined, 'zh-CN'))
   }
 
   const needsWebLabel = plan.needsWeb
-    ? (locale === 'en' ? 'Web Search' : '联网搜索')
-    : (locale === 'en' ? 'No Web' : '无需联网')
+    ? (locale === 'en' ? localizedCopy('mca02849fd9', undefined, 'en') : localizedCopy('mca02849fd9', undefined, 'zh-CN'))
+    : (locale === 'en' ? localizedCopy('m20e1509673', undefined, 'en') : localizedCopy('m20e1509673', undefined, 'zh-CN'))
 
   const effort = plan.recommendedEffort
   const effortLabel =
     effort === 'off'
-      ? (locale === 'en' ? 'Reasoning: Off' : '推理: 关')
+      ? (locale === 'en' ? localizedCopy('m36bf512180', undefined, 'en') : localizedCopy('m36bf512180', undefined, 'zh-CN'))
       : effort === 'low'
-        ? (locale === 'en' ? 'Reasoning: Low' : '推理: 低')
+        ? (locale === 'en' ? localizedCopy('m3db2f459eb', undefined, 'en') : localizedCopy('m3db2f459eb', undefined, 'zh-CN'))
         : effort === 'medium'
-          ? (locale === 'en' ? 'Reasoning: Med' : '推理: 中')
-          : (locale === 'en' ? 'Reasoning: High' : '推理: 高')
+          ? (locale === 'en' ? localizedCopy('md8c22d7e8b', undefined, 'en') : localizedCopy('md8c22d7e8b', undefined, 'zh-CN'))
+          : (locale === 'en' ? localizedCopy('m9bc92bf2cd', undefined, 'en') : localizedCopy('m9bc92bf2cd', undefined, 'zh-CN'))
 
   return [intentLabel, needsWebLabel, effortLabel]
 }
 
 export function parseStepDisplay(step: TripChatWorkStep): { label: string; badges: string[] } {
+  const locale = getLocale()
+  const localize = (text: string) => {
+    const key = (Object.keys(stepCopyEn) as Array<keyof typeof stepCopyEn>).find((key) => stepCopyEn[key] === text || stepCopyZh[key] === text)
+    return key ? localizedCopy(key, undefined, locale) : localizeStoredUiCopy(text, locale)
+  }
   if (step.badges && step.badges.length > 0) {
-    return { label: step.label, badges: step.badges }
+    return { label: localize(step.label), badges: step.badges.map(localize) }
   }
   // Fallback for legacy persisted format: "分析问题：信息查询 · 无需联网 · 推理强度：中"
   const colonIdx =
@@ -235,10 +232,10 @@ export function parseStepDisplay(step: TripChatWorkStep): { label: string; badge
       .map((s) => s.trim())
       .filter(Boolean)
     if (rawBadges.length > 0) {
-      return { label: mainLabel, badges: rawBadges }
+      return { label: localize(mainLabel), badges: rawBadges.map(localize) }
     }
   }
-  return { label: step.label, badges: [] }
+  return { label: localize(step.label), badges: [] }
 }
 
 export function visualAnalysisStepBadges(
@@ -248,15 +245,15 @@ export function visualAnalysisStepBadges(
 ): string[] {
   const badges: string[] = []
   if (isProxy) {
-    badges.push(locale === 'en' ? 'V4 Vision Proxy' : '调用 V4 Vision')
+    badges.push(locale === 'en' ? localizedCopy('mdeba1736ad', undefined, 'en') : localizedCopy('mdeba1736ad', undefined, 'zh-CN'))
   } else {
-    badges.push(locale === 'en' ? 'Multimodal Vision' : '多模态识图')
+    badges.push(locale === 'en' ? localizedCopy('m14b6720798', undefined, 'en') : localizedCopy('m14b6720798', undefined, 'zh-CN'))
   }
   if (imageCount > 0) {
     badges.push(
       locale === 'en'
         ? `${imageCount} ${imageCount === 1 ? 'image' : 'images'}`
-        : `${imageCount} 张图片`,
+        : uiCopy('m61330f39c4', { p0: (imageCount) }, locale),
     )
   }
   return badges
@@ -270,11 +267,11 @@ export function searchStepBadges(
   if (detail?.sourcesCount && detail.sourcesCount > 0) {
     badges.push(
       locale === 'en'
-        ? `Ref ${detail.sourcesCount} ${detail.sourcesCount === 1 ? 'source' : 'sources'}`
-        : `参考了 ${detail.sourcesCount} 篇资料`,
+        ? localizedCopy('m5fb1f0aeb0', { p0: (detail.sourcesCount), p1: (detail.sourcesCount === 1 ? 'source' : 'sources') }, 'en')
+        : localizedCopy('m5fb1f0aeb0', { p0: (detail.sourcesCount) }, 'zh-CN'),
     )
   } else if (detail?.source === 'google_places') {
-    badges.push(locale === 'en' ? 'Nearby places' : '周边候选')
+    badges.push(locale === 'en' ? localizedCopy('m0651c0084e', undefined, 'en') : localizedCopy('m0651c0084e', undefined, 'zh-CN'))
   }
   return badges
 }
@@ -291,7 +288,7 @@ export function resolvePlacesStepBadges(
   const count = totalCount || uniqueNames.length
   return [
     summaryName,
-    `${count}/${count} ${locale === 'en' ? 'verified' : '已核实'}`,
+    `${count}/${count} ${locale === 'en' ? localizedCopy('md7c1831c9b', undefined, 'en') : localizedCopy('md7c1831c9b', undefined, 'zh-CN')}`,
   ]
 }
 
@@ -364,27 +361,14 @@ export function completedWorkSummary(
   const hasApply = doneIds.has('apply')
   const hasResolvePlaces = doneIds.has('resolvePlaces')
 
-  if (locale === 'en') {
-    const parts: string[] = []
-    if (hasReasoning) parts.push('Thought')
-    if (hasVisual) parts.push('Analyzed image')
-    if (hasWebSearch) parts.push('Web searched')
-    if (hasApply) parts.push('Applied changes')
-    else if (hasResolvePlaces) parts.push('Verified places')
-    else parts.push('Answer ready')
-    parts.push(`${doneCount} ${doneCount === 1 ? 'step' : 'steps'}`)
-    return parts.join(' · ')
-  }
-
-  // zh-CN
   const parts: string[] = []
-  if (hasReasoning) parts.push('思考完成')
-  if (hasVisual) parts.push('已解析图片')
-  if (hasWebSearch) parts.push('联网搜索')
-  if (hasApply) parts.push('已调整行程')
-  else if (hasResolvePlaces) parts.push('已核实地点')
-  else parts.push('已生成回答')
-  parts.push(`共 ${doneCount} 步`)
+  if (hasReasoning) parts.push(uiCopy('medab852efe', undefined, locale))
+  if (hasVisual) parts.push(uiCopy('m88b3aaf6e8', undefined, locale))
+  if (hasWebSearch) parts.push(uiCopy('m45e62e474f', undefined, locale))
+  if (hasApply) parts.push(uiCopy('m2ad3f5aed2', undefined, locale))
+  else if (hasResolvePlaces) parts.push(uiCopy('m08a078b845', undefined, locale))
+  else parts.push(uiCopy('m6aa6f21675', undefined, locale))
+  parts.push(uiCopy(doneCount === 1 ? 'oneStep' : 'mf49f2ac957', { p0: doneCount }, locale))
   return parts.join(' · ')
 }
 

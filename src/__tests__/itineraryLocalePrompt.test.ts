@@ -53,7 +53,7 @@ describe('itinerary LLM prompts are locale-aware', () => {
       expect(out.hardRules).toContain('"attr-cdg"')
       expect(out.outputFormat).toMatch(/JSON only/i)
       // No Chinese sentence should leak
-      expect(out.hardRules).not.toContain('必须输出')
+      expect(JSON.stringify(out)).not.toMatch(/\p{Script=Han}/u)
     })
 
     it('inlines includeDisneyDay branch correctly in en mode', () => {
@@ -174,6 +174,7 @@ describe('itinerary LLM prompts are locale-aware', () => {
       expect(prompt).toMatch(/"duration"\s*:\s*"[^"]+"/)
       // The hard rules must explicitly call out duration so the LLM doesn't drop it.
       expect(prompt).toMatch(/stop\.duration/i)
+      expect(prompt).not.toMatch(/\p{Script=Han}/u)
       expect(prompt).toMatch(/Translate.*duration|do NOT drop the duration/i)
     })
 

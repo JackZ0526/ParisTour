@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/avatarStore-runtime-628bf7'
 import { useCallback, useSyncExternalStore } from 'react'
 
 export type AvatarType = 'initial' | 'image'
@@ -141,7 +142,7 @@ export function loadImageElement(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('解析图片失败'))
+    img.onerror = () => reject(new Error(runtimeCopy('md515aa08ae', undefined)))
     img.src = src
   })
 }
@@ -190,7 +191,7 @@ export function encodeAvatarCrop(img: HTMLImageElement, crop: AvatarCrop): strin
 
   const ctx = canvas.getContext('2d')
   if (!ctx) {
-    throw new Error('无法创建图像画布上下文')
+    throw new Error(runtimeCopy('mf1844fd87b', undefined))
   }
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
@@ -209,21 +210,21 @@ export function encodeAvatarCrop(img: HTMLImageElement, crop: AvatarCrop): strin
 export function processAvatarImage(file: File, crop?: AvatarCrop): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
-      reject(new Error('请选择有效的图片文件 (JPG / PNG / WebP)'))
+      reject(new Error(runtimeCopy('m51c1dd58a9', undefined)))
       return
     }
 
     const reader = new FileReader()
-    reader.onerror = () => reject(new Error('读取图片文件失败'))
+    reader.onerror = () => reject(new Error(runtimeCopy('mbcaea6243a', undefined)))
     reader.onload = (e) => {
       const src = e.target?.result as string
       if (!src) {
-        reject(new Error('图片数据为空'))
+        reject(new Error(runtimeCopy('mc24a80ece6', undefined)))
         return
       }
 
       const img = new Image()
-      img.onerror = () => reject(new Error('解析图片失败'))
+      img.onerror = () => reject(new Error(runtimeCopy('md515aa08ae', undefined)))
       img.onload = () => {
         const w = img.naturalWidth || img.width
         const h = img.naturalHeight || img.height
@@ -235,7 +236,7 @@ export function processAvatarImage(file: File, crop?: AvatarCrop): Promise<strin
 
         const ctx = canvas.getContext('2d')
         if (!ctx) {
-          reject(new Error('无法创建图像画布上下文'))
+          reject(new Error(runtimeCopy('mf1844fd87b', undefined)))
           return
         }
 

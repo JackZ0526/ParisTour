@@ -1,17 +1,48 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { JEV_COOLDOWN_MS, JEV_SERVER_BUDGET_MS } from '../shared/services/jevCircuit'
 import { POST as openaiPost } from '../../api/openai'
 import vercelConfig from '../../vercel.json'
-import { handleJev as POST } from '../../api/_lib/jev-handler'
+import { handleJev as POST, jevServerCircuit } from '../../api/_lib/jev-handler'
 import { requireAllowlistedUser } from '../../api/_lib/auth'
 import { evaluateRoute } from '../../api/_lib/jev'
 vi.mock('../../api/_lib/auth', () => ({ requireAllowlistedUser: vi.fn() }))
 vi.mock('../../api/_lib/jev', () => ({ evaluateRoute: vi.fn() }))
 beforeEach(() => {
   vi.clearAllMocks()
+  jevServerCircuit.reset()
   vi.mocked(requireAllowlistedUser).mockResolvedValue({ ok: true, user: { id: 'test', email: 'test@example.com' } })
 })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 const request = (body: unknown) => new Request('https://paristour.test/api/jev', { method: 'POST', body: JSON.stringify(body) })
 describe('Jev server boundary', () => {
+  it('preserves the upstream outage category, redacts errors and retries only after cooldown', async () => {
+    vi.useFakeTimers()
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(evaluateRoute).mockRejectedValue({ statusCode: 503, message: 'secret-token-and-prompt' })
+    const first = await POST(request({ kind: 'chat', state: '{}' }))
+    expect(first.status).toBe(503)
+    expect(await first.json()).toMatchObject({ reason: 'upstream_unavailable' })
+    expect(first.headers.get('cache-control')).toBe('no-store')
+    expect(first.headers.get('retry-after')).toBe('30')
+    const second = await POST(request({ kind: 'chat', state: '{}' }))
+    expect(await second.json()).toMatchObject({ reason: 'cooldown' })
+    expect(evaluateRoute).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret-token-and-prompt')
+    vi.advanceTimersByTime(JEV_COOLDOWN_MS)
+    vi.mocked(evaluateRoute).mockResolvedValue({ answers: {}, providerMetadata: { typesafe: {} } } as Awaited<ReturnType<typeof evaluateRoute>>)
+    expect((await POST(request({ kind: 'chat', state: '{}' }))).status).toBe(200)
+  })
+  it('enforces the server deadline even when the provider never settles', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(evaluateRoute).mockImplementation(() => new Promise(() => {}))
+    const pending = POST(request({ kind: 'chat', state: '{}' }))
+    await vi.advanceTimersByTimeAsync(JEV_SERVER_BUDGET_MS)
+    const response = await pending
+    expect(response.status).toBe(504)
+    expect(await response.json()).toMatchObject({ reason: 'timeout' })
+    expect(vi.getTimerCount()).toBe(0)
+  })
   it('routes the public Jev URL through the existing function without requiring an OpenAI key', async () => {
     const route = vercelConfig.rewrites.find((r) => r.source === '/api/jev')
     expect(route?.destination).toBe('/api/openai?rest=jev')
@@ -41,6 +72,11 @@ describe('Jev server boundary', () => {
       expect((await POST(request(body))).status).toBe(400)
     }
     expect((await POST(request({ kind: 'chat', state: 'a'.repeat(32_001) }))).status).toBe(413)
+    expect(evaluateRoute).not.toHaveBeenCalled()
+  })
+  it('rejects Chinese even when encoded as JSON unicode escapes', async () => {
+    const state = '{"message":"\\u4e2d\\u6587"}'
+    expect((await POST(request({ kind: 'chat', state }))).status).toBe(422)
     expect(evaluateRoute).not.toHaveBeenCalled()
   })
   it('returns typed answers without caching', async () => {

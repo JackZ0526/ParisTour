@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/flightTime-runtime-3f9d82'
 /**
  * Format airport-local times (TimeTable / AeroDataBox) for flight cards.
  * Prefer wall-clock from the local string; abbreviation from IANA zone / offset.
@@ -145,12 +146,12 @@ export function formatAirportLocalTime(
     abbr = offsetLabel(parsed.offsetMinutes)
   }
 
-  const dateLabel = `${parsed.month}月${parsed.day}日`
+  const dateLabel = runtimeCopy('mb33f8fa7f5', { p0: (parsed.month), p1: (parsed.day) })
   const timeLabel = `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
   const base = abbr ? `${dateLabel} ${timeLabel} (${abbr})` : `${dateLabel} ${timeLabel}`
 
   if (opts?.withCityHint && opts.city?.trim()) {
-    return `${base} · ${opts.city.trim()}当地`
+    return runtimeCopy('mf181fc0a13', { p0: (base), p1: (opts.city.trim()) })
   }
   return base
 }

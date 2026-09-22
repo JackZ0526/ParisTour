@@ -1,3 +1,4 @@
+import type { OpeningHours, OpeningSchedule } from '../../place/services/openingAvailability'
 import type { Coordinates } from '../../../types'
 import {
   getLlmArtifact,
@@ -40,6 +41,7 @@ export interface GooglePlaceDetails {
   summary?: string
   phone?: string
   website?: string
+  openingSchedule?: OpeningSchedule
   openingHours?: string[]
   priceLevel?: string
   location?: Coordinates
@@ -73,6 +75,7 @@ export interface NearbyGooglePlaceCandidate {
   userRatingCount?: number
   priceLevel?: string
   location: Coordinates
+  openingSchedule?: OpeningSchedule
   distanceMeters: number
 }
 
@@ -101,8 +104,10 @@ interface RapidPlace {
   internationalPhoneNumber?: string
   websiteUri?: string
   websiteURI?: string
-  regularOpeningHours?: { weekdayDescriptions?: string[] }
-  currentOpeningHours?: { weekdayDescriptions?: string[] }
+  regularOpeningHours?: OpeningHours
+  currentOpeningHours?: OpeningHours
+  businessStatus?: string
+  utcOffsetMinutes?: number
   priceLevel?: string
   photos?: Array<{
     name?: string
@@ -133,8 +138,8 @@ interface RapidSearchResponse {
 
 type RapidPhoto = NonNullable<RapidPlace['photos']>[number]
 
-const DETAILS_PREFIX = 'rapid-google-place:v4:'
-const CANDIDATES_PREFIX = 'rapid-google-candidates:v3:'
+const DETAILS_PREFIX = 'rapid-google-place:v5:'
+const CANDIDATES_PREFIX = 'rapid-google-candidates:v4:'
 const PHOTO_URI_PREFIX = 'rapid-google-photo-uri:v1:'
 const WEBSITE_RECOVERY_PREFIX = 'rapid-google-website-recovery:v1:'
 const RAPID_DETAILS_FALLBACK_PREFIX = 'rapid-google-details-fallback:v1:'
@@ -609,6 +614,7 @@ function normalizeRapidPlace(place: RapidPlace, query: string): GooglePlaceDetai
     summary: textOf(place.editorialSummary) || undefined,
     phone: place.nationalPhoneNumber || place.internationalPhoneNumber,
     website: place.websiteUri || place.websiteURI,
+    openingSchedule: { regular: place.regularOpeningHours, current: place.currentOpeningHours, businessStatus: place.businessStatus, utcOffsetMinutes: place.utcOffsetMinutes, observedAt: new Date().toISOString() },
     openingHours:
       place.regularOpeningHours?.weekdayDescriptions ||
       place.currentOpeningHours?.weekdayDescriptions,
@@ -962,6 +968,7 @@ export async function searchNearbyGooglePlaceCandidates(input: {
         priceLevel: place.priceLevel,
         location: place.location,
         distanceMeters,
+        openingSchedule: place.openingSchedule,
       }
     })
     .filter((item): item is NearbyGooglePlaceCandidate => Boolean(item))

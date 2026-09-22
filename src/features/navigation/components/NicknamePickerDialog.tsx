@@ -1,3 +1,4 @@
+import { localizedCopy } from '../../../shared/i18n/copy/NicknamePickerDialog-257180'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Check, Edit3, Loader2, Sparkles, X } from 'lucide-react'
 import { BottomSheet } from '../../../shared/components/BottomSheet'
@@ -38,8 +39,8 @@ export function NicknamePickerDialog({ open, onClose, email }: Props) {
     if (clean.length > MAX_NICKNAME_LENGTH) {
       setError(
         locale === 'en'
-          ? `Nickname cannot exceed ${MAX_NICKNAME_LENGTH} characters`
-          : `昵称不能超过 ${MAX_NICKNAME_LENGTH} 个字符`,
+          ? localizedCopy('m69e224ceb4', { p0: (MAX_NICKNAME_LENGTH) }, 'en')
+          : localizedCopy('m69e224ceb4', { p0: (MAX_NICKNAME_LENGTH) }, 'zh-CN'),
       )
       return
     }

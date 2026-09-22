@@ -1,3 +1,4 @@
+import { localizedCopy } from '../../../shared/i18n/copy/recommendationPreferences-72afb4'
 import { LEGACY_PREF_TAG_MAP, localizePrefTag } from '../../../shared/i18n/localeEnum'
 import { getLocale, type Locale } from '../../../shared/i18n'
 
@@ -294,8 +295,8 @@ export function recommendationPreferencesPrompt(
   } else {
     lines.push(
       isEn
-        ? 'No custom preference tags set; plan at a classic comfortable pace.'
-        : '用户未设置特殊偏好标签，按经典舒适节奏安排。',
+        ? localizedCopy('m7432b3e7a1', undefined, 'en')
+        : localizedCopy('m7432b3e7a1', undefined, 'zh-CN'),
     )
   }
 

@@ -8,6 +8,10 @@ export const GOOGLE_PLACES_SEARCH_FIELD_MASK = [
   'places.userRatingCount',
   'places.websiteUri',
   'places.priceLevel',
+  'places.regularOpeningHours',
+  'places.currentOpeningHours',
+  'places.businessStatus',
+  'places.utcOffsetMinutes',
 ].join(',')
 
 /** Core Place Details used by non-detail workflows; capped at the Enterprise SKU. */
@@ -21,6 +25,8 @@ export const GOOGLE_PLACES_DETAILS_CORE_FIELD_MASK = [
   'nationalPhoneNumber',
   'internationalPhoneNumber',
   'websiteUri',
+  'businessStatus',
+  'utcOffsetMinutes',
   'regularOpeningHours',
   'currentOpeningHours',
   'priceLevel',

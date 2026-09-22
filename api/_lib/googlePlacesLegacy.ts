@@ -105,7 +105,23 @@ export function mapLegacyPlaceToNew(place: unknown): Json | null {
     nationalPhoneNumber: text(row.formatted_phone_number) || undefined,
     internationalPhoneNumber: text(row.international_phone_number) || undefined,
     websiteUri: text(row.website) || text(row.websiteUri) || undefined,
-    regularOpeningHours: weekday?.length ? { weekdayDescriptions: weekday } : undefined,
+    regularOpeningHours: hours ? {
+      ...(weekday?.length ? { weekdayDescriptions: weekday } : {}),
+      ...(Array.isArray(hours.periods) ? { periods: hours.periods.map(item => {
+        const period = asRecord(item)
+        const point = (value: unknown) => {
+          const p = asRecord(value)
+          if (!p) return undefined
+          const time = text(p.time)
+          if (!/^\d{4}$/.test(time)) return undefined
+          return { day: num(p.day), hour: /^\d{4}$/.test(time) ? Number(time.slice(0, 2)) : undefined,
+            minute: /^\d{4}$/.test(time) ? Number(time.slice(2)) : undefined }
+        }
+        return { open: point(period?.open), close: point(period?.close) }
+      }) } : {}),
+    } : undefined,
+    businessStatus: text(row.business_status) || undefined,
+    utcOffsetMinutes: num(row.utc_offset),
     priceLevel: mapLegacyPriceLevel(row.price_level),
     editorialSummary: editorialOverview ? { text: editorialOverview } : undefined,
     reviews,

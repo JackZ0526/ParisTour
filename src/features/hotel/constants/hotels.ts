@@ -1,9 +1,11 @@
+import { hotelAreaCopy, en as areaKeys } from '../../../shared/i18n/copy/hotelAreas'
+import { runtimeCopy } from '../../../shared/i18n/copy/hotels-runtime-129109'
 import type { SelectedHotel } from '../../../types'
 
 /** Soft placeholder until LLM / custom hotel is ready. */
 export const PENDING_HOTEL: SelectedHotel = {
   id: 'hotel-pending',
-  name: '待选择酒店',
+  get name() { return hotelAreaCopy('pending') },
   address: 'Paris, France',
   lat: 48.8566,
   lng: 2.3522,
@@ -32,28 +34,7 @@ export function isPlaceholderHotelArea(area?: string): boolean {
 }
 
 /** Unified card label: `N区 (Français / 中文)`. */
-const ARRONDISSEMENT_LABELS: Record<number, string> = {
-  1: '1区 (Louvre / 卢浮宫)',
-  2: '2区 (Grands Boulevards / 大林荫道)',
-  3: '3区 (Marais / 玛黑)',
-  4: '4区 (Marais / 玛黑)',
-  5: '5区 (Quartier Latin / 拉丁区)',
-  6: '6区 (Saint-Germain / 圣日耳曼)',
-  7: '7区 (Tour Eiffel / 埃菲尔)',
-  8: '8区 (Champs-Élysées / 香榭丽舍)',
-  9: '9区 (Opéra / 歌剧院)',
-  10: '10区 (Canal Saint-Martin / 圣马丁运河)',
-  11: '11区 (Bastille / 巴士底)',
-  12: '12区 (Bercy / 贝尔西)',
-  13: '13区 (Place d’Italie / 意大利广场)',
-  14: '14区 (Montparnasse / 蒙帕纳斯)',
-  15: '15区 (Vaugirard / 沃吉拉尔)',
-  16: '16区 (Trocadéro / 特罗卡德罗)',
-  17: '17区 (Batignolles / 巴蒂尼奥勒)',
-  18: '18区 (Montmartre / 蒙马特)',
-  19: '19区 (La Villette / 维莱特)',
-  20: '20区 (Belleville / 贝尔维尔)',
-}
+
 
 /** Approximate centroids for fallback when address has no postal code. */
 const ARRONDISSEMENT_CENTROIDS: Array<{ arr: number; lat: number; lng: number }> = [
@@ -103,7 +84,7 @@ const NAMED_DISTRICT_ARR: Array<{ match: RegExp; arr: number }> = [
 ]
 
 function labelForArr(n: number): string {
-  return ARRONDISSEMENT_LABELS[n] || `${n}区`
+  return Object.hasOwn(areaKeys, String(n)) ? hotelAreaCopy(String(n) as keyof typeof areaKeys) : runtimeCopy('m2b5e719937', { p0: n })
 }
 
 /**
@@ -119,7 +100,7 @@ function parseParisPostal(text: string): number | null {
 function parseExplicitArrondissement(text: string): number | null {
   const patterns = [
     /(?:第\s*)?([1-9]|1\d|20)\s*区/,
-    /\b([1-9]|1\d|20)\s*(?:e|ème|eme)\s*(?:arr(?:ondissement)?)?\b/i,
+    /\b([1-9]|1\d|20)\s*(?:st|nd|rd|th|e|ème|eme)\s*(?:arr(?:ondissement)?)?\b/i,
     /\bparis\s*([1-9]|1\d|20)\b/i,
     /\barr(?:ondissement)?\s*([1-9]|1\d|20)\b/i,
   ]
@@ -174,7 +155,7 @@ function parseArrondissementNumber(text: string): number | null {
 
 /**
  * Infer a card-style area label from address / hotel name / coords.
- * Format is always `N区 (Français / 中文)` when known.
+ * Uses the active locale for the district display name.
  */
 export function inferParisAreaLabel(
   address?: string,
@@ -191,11 +172,11 @@ export function inferParisAreaLabel(
   const fromCoords = arrondissementFromCoords(coords?.lat, coords?.lng)
   if (fromCoords != null) return labelForArr(fromCoords)
 
-  return '巴黎市区'
+  return runtimeCopy('mb93610fe1f', undefined)
 }
 
 /**
- * Normalize any free-text / LLM area into the unified `N区 (Français / 中文)` format.
+ * Normalize free-text / LLM areas into a localized district display name.
  * Prefers address postal code, then names, then coordinates.
  */
 export function normalizeHotelAreaLabel(opts: {
@@ -209,11 +190,11 @@ export function normalizeHotelAreaLabel(opts: {
     lat: opts.lat,
     lng: opts.lng,
   })
-  if (inferred !== '巴黎市区') return inferred
+  if (inferred !== runtimeCopy('mb93610fe1f')) return inferred
 
   const existing = (opts.area || '').trim()
   if (/^\d{1,2}区\s*\(/.test(existing) || /^\d{1,2}区$/.test(existing)) return existing
-  return '巴黎市区'
+  return runtimeCopy('mb93610fe1f', undefined)
 }
 
 /**

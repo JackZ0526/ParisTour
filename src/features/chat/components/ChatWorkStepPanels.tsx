@@ -1,3 +1,5 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/ChatWorkStepPanels-b8e449'
 import { useState } from 'react'
 import {
   Braces,
@@ -77,12 +79,12 @@ export function ChatWorkStepsPanel({
   if (!visible.length && !hasReasoning) return null
   // "Skipped: " prefix used for the inline skipped-step label.
   const skippedPrefix = t('chat.workStepSkippedPrefix' as never) ||
-    (locale === 'en' ? 'Skipped: ' : '已跳过：')
+    (locale === 'en' ? localizedCopy('m99551c1ae1', undefined, 'en') : localizedCopy('m99551c1ae1', undefined, 'zh-CN'))
   // "Waiting: " prefix for the pending visual; only relevant when the label
   // starts with the active-step prefix word. In English we just show the label
   // as-is since we don't have a 1:1 active→pending word swap.
   const waitingPrefix = t('chat.workStepWaitingPrefix' as never) ||
-    (locale === 'en' ? 'Waiting: ' : '等待：')
+    (locale === 'en' ? localizedCopy('mf652ae72de', undefined, 'en') : localizedCopy('mf652ae72de', undefined, 'zh-CN'))
 
   // Live turn: always show the full pipeline (all steps, including skipped ones).
   if (!completed) {
@@ -115,7 +117,7 @@ export function ChatWorkStepsPanel({
             const label =
               step.status === 'pending'
                 ? locale === 'zh-CN'
-                  ? cleanLabel.replace(/^正在/, '等待')
+                  ? cleanLabel.replace(/^正在/, uiCopy('m25d23b92b2', undefined))
                   : `${waitingPrefix}${cleanLabel}`
                 : skipped
                   ? `${skippedPrefix}${cleanLabel}`
@@ -207,9 +209,9 @@ export function ChatWorkStepsPanel({
                       onClick={() => setReasoningExpanded((v) => !v)}
                       className="group flex min-h-[1.25rem] w-full items-center justify-between gap-1.5 leading-5 text-left font-medium hover:text-[var(--stone)]/90 cursor-pointer outline-none"
                     >
-                      <span>{locale === 'en' ? 'Reasoning Process' : '深度思考过程'}</span>
+                      <span>{locale === 'en' ? localizedCopy('m8b8cbf31e3', undefined, 'en') : localizedCopy('m8b8cbf31e3', undefined, 'zh-CN')}</span>
                       <span className="inline-flex items-center gap-0.5 rounded px-1 text-[10px] text-[var(--stone)]/60 group-hover:text-[var(--stone)]/80">
-                        <span>{reasoningExpanded ? (locale === 'en' ? 'Collapse' : '收起') : (locale === 'en' ? 'View' : '展开')}</span>
+                        <span>{reasoningExpanded ? (locale === 'en' ? localizedCopy('m5bb34a4081', undefined, 'en') : localizedCopy('m5bb34a4081', undefined, 'zh-CN')) : (locale === 'en' ? localizedCopy('mab58149f37', undefined, 'en') : localizedCopy('mab58149f37', undefined, 'zh-CN'))}</span>
                         <ChevronRight size={12} className={`transition-transform duration-200 ${reasoningExpanded ? 'rotate-90' : ''}`} />
                       </span>
                     </button>

@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../../../shared/i18n/copy/openRouteService-runtime-2c1469'
 import { authFetch } from '../../auth/services/authFetch'
 import { translate } from '../../../shared/i18n'
 import {
@@ -422,7 +423,7 @@ async function fetchSegmentGroup(
     ) {
       disableOpenRouteService()
     }
-    throw new Error(payload.error || `道路路线请求失败（HTTP ${response.status}）`)
+    throw new Error(payload.error || runtimeCopy('m2bdf5c8ea7', { p0: (response.status) }))
   }
   return parseRouteResponse(payload, key, profile)
 }

@@ -1,3 +1,5 @@
+import { runtimeCopy } from '../../i18n/copy/transport-runtime-cd1574'
+import { localizedCopy } from '../../i18n/copy/transport-cd1574'
 /**
  * HTTP transport for the LLM layer.
  *
@@ -271,7 +273,7 @@ async function callDeepSeekResponses(
       if (sig?.aborted || /timeout/i.test(reasonStr)) {
         const isTimeout = /timeout/i.test(reasonStr)
         throw new LlmRequestError(
-          isTimeout ? '请求超时（已终止）。' : '请求已取消。',
+          isTimeout ? runtimeCopy('mcddf6b7f3d', undefined) : runtimeCopy('mdf6c507959', undefined),
           isTimeout ? 'timeout' : 'aborted',
         )
       }
@@ -292,7 +294,7 @@ async function callDeepSeekResponses(
             return text
           }
           lastError = new LlmRequestError(
-            'deepseek Responses 流式没有返回内容。',
+            runtimeCopy('me08e92d810', undefined),
             'empty',
           )
         } else {
@@ -305,7 +307,7 @@ async function callDeepSeekResponses(
           }
           if (data.status === 'failed') {
             throw new LlmRequestError(
-              data.error?.message || 'DeepSeek Responses 请求失败。',
+              data.error?.message || runtimeCopy('m27a262e0b5', undefined),
               data.error?.code || 'failed',
             )
           }
@@ -332,7 +334,7 @@ async function callDeepSeekResponses(
               continue
             }
             throw new LlmRequestError(
-              `模型输出不完整（incomplete · reason=${reason}${usageBits ? ` · ${usageBits}` : ''}）。`,
+              runtimeCopy('m7d7b9521cb', { p0: (reason), p1: (usageBits ? ` · ${usageBits}` : '') }),
               'truncated',
             )
           }
@@ -340,7 +342,7 @@ async function callDeepSeekResponses(
           if (text) return text
 
           lastError = new LlmRequestError(
-            `deepseek Responses 没有返回内容（status=${data.status || 'unknown'} · model=${body.model}${usageBits ? ` · ${usageBits}` : ''}）。`,
+            runtimeCopy('m518b87e7a7', { p0: (data.status || 'unknown'), p1: (body.model), p2: (usageBits ? ` · ${usageBits}` : '') }),
             'empty',
           )
         }
@@ -376,7 +378,7 @@ async function callDeepSeekResponses(
   }
   throw (
     lastError ??
-    new LlmRequestError('DeepSeek Responses 没有返回内容。', 'empty')
+    new LlmRequestError(runtimeCopy('m3e597483de', undefined), 'empty')
   )
 }
 
@@ -406,15 +408,15 @@ export function friendlyLlmError(
 
   if (status === 429 || code === 'insufficient_quota' || /quota|rate limit/i.test(apiMessage)) {
     if (provider === 'deepseek') {
-      return new LlmRequestError('DeepSeek 额度不足或触发限流（429）。', code || 'insufficient_quota')
+      return new LlmRequestError(runtimeCopy('m8b48b81e6a', undefined), code || 'insufficient_quota')
     }
     if (provider === 'openai') {
       return new LlmRequestError(
-        'OpenAI 额度不足或触发限流（429）。',
+        runtimeCopy('me132b02501', undefined),
         code || 'insufficient_quota',
       )
     }
-    return new LlmRequestError('Gemini 额度不足或触发限流。', code || 'rate_limit')
+    return new LlmRequestError(runtimeCopy('m13f04e3fb3', undefined), code || 'rate_limit')
   }
   const combined = `${apiMessage} ${body}`
   if (
@@ -422,18 +424,18 @@ export function friendlyLlmError(
       combined,
     )
   ) {
-    return new LlmRequestError('当前没有有效登录，无法调用付费 API。', code || 'auth_error')
+    return new LlmRequestError(runtimeCopy('m595b9a7d22', undefined), code || 'auth_error')
   }
   if (/invite-allowlisted|Allowlist check failed/i.test(combined)) {
-    return new LlmRequestError('当前账号不在邀请白名单，无法调用付费 API。', code || 'auth_error')
+    return new LlmRequestError(runtimeCopy('m41daba2dee', undefined), code || 'auth_error')
   }
   if (status === 401 || status === 403 || /invalid.?key|incorrect api key/i.test(apiMessage)) {
     const keyHint =
       provider === 'deepseek'
-        ? 'DeepSeek API Key 无效（检查 DEEPSEEK_API_KEY）。'
+        ? runtimeCopy('ma8e87884a7', undefined)
         : provider === 'openai'
-          ? 'OpenAI API Key 无效。'
-          : 'Gemini API Key 无效。'
+          ? runtimeCopy('maa30d7d259', undefined)
+          : runtimeCopy('m63da103e91', undefined)
     return new LlmRequestError(keyHint, code || 'auth_error')
   }
 
@@ -444,13 +446,13 @@ export function friendlyLlmError(
     const locale = getLocale()
     const msg =
       locale === 'en'
-        ? 'Unsupported image format. Please upload JPG, PNG, WebP, or GIF images.'
-        : '图片格式不支持，请上传 JPG、PNG、WebP 或 GIF 格式的图片。'
+        ? localizedCopy('md773dda0fa', undefined, 'en')
+        : localizedCopy('md773dda0fa', undefined, 'zh-CN')
     return new LlmRequestError(msg, code || 'unsupported_image')
   }
 
   const detail = apiMessage || body.slice(0, 160) || `HTTP ${status}`
-  return new LlmRequestError(`${label} 请求失败：${detail}`, code || String(status))
+  return new LlmRequestError(runtimeCopy('m6f6a6028ea', { p0: (label), p1: (detail) }), code || String(status))
 }
 
 /**
@@ -465,10 +467,10 @@ export async function readResponseJson<T>(
   if (!raw.trim()) {
     const emptyHint =
       provider === 'deepseek'
-        ? 'DeepSeek 返回了空响应（可能被网关中断），请稍后再试。'
+        ? runtimeCopy('mc91c6b3209', undefined)
         : provider === 'gemini'
-          ? 'Gemini 返回了空响应，请稍后再试。'
-          : '模型返回了空响应（可能被网关中断），请稍后再试。'
+          ? runtimeCopy('m08a0997259', undefined)
+          : runtimeCopy('m55e27b70ec', undefined)
     throw new LlmRequestError(emptyHint, 'empty_body')
   }
   try {
@@ -476,10 +478,10 @@ export async function readResponseJson<T>(
   } catch {
     const parseHint =
       provider === 'deepseek'
-        ? 'DeepSeek 响应不完整或无法解析，请再试一次。'
+        ? runtimeCopy('m0edfcddea7', undefined)
         : provider === 'gemini'
-          ? 'Gemini 响应不完整或无法解析，请再试一次。'
-          : '模型响应不完整或无法解析，请再试一次。'
+          ? runtimeCopy('m91dc08fb74', undefined)
+          : runtimeCopy('mba44192dcd', undefined)
     throw new LlmRequestError(parseHint, 'invalid_json')
   }
 }
@@ -512,7 +514,7 @@ export async function callGemini(
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
   }>(res, 'gemini')
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
-  if (!text.trim()) throw new LlmRequestError('Gemini 没有返回内容。', 'empty')
+  if (!text.trim()) throw new LlmRequestError(runtimeCopy('m230c1aada0', undefined), 'empty')
   return text.trim()
 }
 
@@ -633,10 +635,10 @@ export async function callOpenAIMessages(
   options?: ChatCallOptions,
 ): Promise<string> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy('m3bb953077e', undefined), 'missing_key')
   }
   if (options?.signal?.aborted) {
-    throw new LlmRequestError('请求已取消。', 'aborted')
+    throw new LlmRequestError(runtimeCopy('mdf6c507959', undefined), 'aborted')
   }
 
   // DeepSeek itinerary: Responses API with thinking off + optional web_search.
@@ -681,7 +683,7 @@ export async function callOpenAIMessages(
       if (sig?.aborted || /timeout/i.test(reasonStr)) {
         const isTimeout = /timeout/i.test(reasonStr)
         throw new LlmRequestError(
-          isTimeout ? '请求超时（已终止）。' : '请求已取消。',
+          isTimeout ? runtimeCopy('mcddf6b7f3d', undefined) : runtimeCopy('mdf6c507959', undefined),
           isTimeout ? 'timeout' : 'aborted',
         )
       }
@@ -706,7 +708,7 @@ export async function callOpenAIMessages(
         const choice = data.choices?.[0]
         const refusal = choice?.message?.refusal?.trim()
         if (refusal) {
-          throw new LlmRequestError(`模型拒绝回答：${refusal}`, 'refusal')
+          throw new LlmRequestError(runtimeCopy('m839907924a', { p0: (refusal) }), 'refusal')
         }
         const text = extractOpenAIMessageText(data)
         const finish = choice?.finish_reason || ''
@@ -737,13 +739,13 @@ export async function callOpenAIMessages(
             truncationDebugBits(body, backend, finish, text.length),
             usageBits,
             text
-              ? '最终回复被截断（有部分 content）。'
-              : '最终 content 为空（额度可能全用在内部推理上）。',
+              ? runtimeCopy('m48bf294dc2', undefined)
+              : runtimeCopy('m55b91da217', undefined),
           ]
             .filter(Boolean)
             .join(' · ')
           throw new LlmRequestError(
-            `模型输出被截断。\n${detail}`,
+            runtimeCopy('mf36fb17e4a', { p0: (detail) }),
             'truncated',
           )
         }
@@ -769,14 +771,14 @@ export async function callOpenAIMessages(
         const usageBitsExtended = [
           usageBits,
           reasoningTok > 0 && completionTok > 0 && reasoningTok >= completionTok
-            ? '（推理占满输出额度，未生成正文）'
+            ? runtimeCopy('m4c8f1dec82', undefined)
             : '',
         ]
           .filter(Boolean)
           .join(' · ')
 
         lastError = new LlmRequestError(
-          `${backend} 没有返回内容（finish_reason=${finish || 'unknown'} · model=${body.model || getOpenAIModel()}${usageBitsExtended ? ` · ${usageBitsExtended}` : ''}）。`,
+          runtimeCopy('m22a7bf1365', { p0: (backend), p1: (finish || 'unknown'), p2: (body.model || getOpenAIModel()), p3: (usageBitsExtended ? ` · ${usageBitsExtended}` : '') }),
           'empty',
         )
       } catch (parseError) {
@@ -818,7 +820,7 @@ export async function callOpenAIMessages(
   throw (
     lastError ??
     new LlmRequestError(
-      `${backend} 没有返回内容。`,
+      runtimeCopy('m9fc69be2e0', { p0: (backend) }),
       backend === 'deepseek' ? 'empty' : 'empty_body',
     )
   )
@@ -829,10 +831,10 @@ export async function callOpenAIMessagesStream(
   options?: ChatStreamOptions,
 ): Promise<string> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy('m3bb953077e', undefined), 'missing_key')
   }
   if (options?.signal?.aborted) {
-    throw new LlmRequestError('请求已取消。', 'aborted')
+    throw new LlmRequestError(runtimeCopy('mdf6c507959', undefined), 'aborted')
   }
   const { body, backend, url } = prepareOpenAIChatBody(messages, options, true)
   const provider: LlmProvider | ChatBackend = backend
@@ -856,7 +858,7 @@ export async function callOpenAIMessagesStream(
     if (sig?.aborted || /timeout/i.test(reasonStr)) {
       const isTimeout = /timeout/i.test(reasonStr)
       throw new LlmRequestError(
-        isTimeout ? '请求超时（已终止）。' : '请求已取消。',
+        isTimeout ? runtimeCopy('mcddf6b7f3d', undefined) : runtimeCopy('mdf6c507959', undefined),
         isTimeout ? 'timeout' : 'aborted',
       )
     }
@@ -868,7 +870,7 @@ export async function callOpenAIMessagesStream(
     throw friendlyLlmError(res.status, errText, provider)
   }
   if (!res.body) {
-    throw new LlmRequestError('流式响应没有正文。', 'empty')
+    throw new LlmRequestError(runtimeCopy('m8d410c9c95', undefined), 'empty')
   }
 
   let receivedContent = false
@@ -958,7 +960,7 @@ async function consumeChatStream(
         }
         if (ev.raw) dataJson = ev.raw
       }
-      if (options?.signal?.aborted) throw new LlmRequestError('请求已取消。', 'aborted')
+      if (options?.signal?.aborted) throw new LlmRequestError(runtimeCopy('mdf6c507959', undefined), 'aborted')
       if (done || finished) {
         if (!done) await reader.cancel()
         break
@@ -1034,7 +1036,7 @@ export async function openaiChat(
   options?: ChatCallOptions,
 ): Promise<string> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy('m3bb953077e', undefined), 'missing_key')
   }
   return callOpenAIMessages(messages, options)
 }
@@ -1051,7 +1053,7 @@ export async function openaiChatStream(
   options?: ChatStreamOptions,
 ): Promise<string> {
   if (!isLlmConfigured()) {
-    throw new LlmRequestError('大模型已关闭（VITE_LLM_ENABLED=false）。', 'missing_key')
+    throw new LlmRequestError(runtimeCopy('m3bb953077e', undefined), 'missing_key')
   }
   return callOpenAIMessagesStream(messages, options)
 }

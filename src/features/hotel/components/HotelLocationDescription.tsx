@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { HotelTranslatedText } from './hotelTranslation'
 
 export function HotelLocationDescription({
@@ -14,7 +15,7 @@ export function HotelLocationDescription({
   return (
     <HotelTranslatedText
       text={text}
-      loadingLabel="正在翻译酒店简介…"
+      loadingLabel={uiCopy('mcb89c595cb', undefined)}
       className={className}
       layout="hotelLocation"
       showShimmer={showShimmer}

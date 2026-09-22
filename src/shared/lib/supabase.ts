@@ -1,3 +1,4 @@
+import { runtimeCopy } from '../i18n/copy/supabase-runtime-34e7dc'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || ''
@@ -36,7 +37,7 @@ let client: SupabaseClient | null = null
 /** Browser Supabase client (anon key). Missing env → throws on use. */
 export function getSupabase(): SupabaseClient {
   if (!isSupabaseConfigured()) {
-    throw new Error('缺少 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY')
+    throw new Error(runtimeCopy('m2677449d6e', undefined))
   }
   if (!client) {
     client = createClient(url, anonKey, {

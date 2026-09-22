@@ -1,3 +1,5 @@
+import { chinesePromptFragments } from '../../../i18n/prompts/preference-fragments-f69118'
+import { englishPrompt, chinesePrompt } from '../../../i18n/prompts/preference-f69118'
 /**
  * LLM call site for intelligent preference tag extraction from natural language.
  */
@@ -69,59 +71,26 @@ function buildSystemPrompt(locale: Locale): string {
   const langRule = getLlmLanguageInstruction(locale)
   if (locale === 'en') {
     return buildPrompt(
-      'Paris travel preference extractor. Your job is to deeply condense a user\'s free-form, conversational travel wishes into a tight set of professional, plain-text travel preference chips.',
+      englishPrompt('mc370355366'),
       null,
       getCommonRules(locale),
-      `<hard_rules>
-- ${langRule}
-- Strip the user's conversational phrasing entirely; never return raw fragments of the input as a tag.
-- Produce 2 to 5 concise, professional preference tags.
-- NO EMOJI. Tags must be plain text only — no emojis, symbols, or punctuation.
-- Length: each tag is 1 to 4 English words (do NOT exceed 4 words).
-- Prefer mapping the user\'s intent to one of the canonical tag codes below when it fits; otherwise invent a new short English tag.
-- Canonical tag codes (return the chip text, not the code):
-  * Morning coffee, Lunch + dinner, Light walking, Disney Paris, Arc de Triomphe & Champs, Skip big museums
-  * Photo spots, Art galleries, French bakery, Seine cruise, Marais vintage, Local markets
-  * Eiffel night view, Family-friendly, Affordable eats
-- Concrete examples:
-  * "I love art, can we hit a few museums and historic houses, and I love Italian food and steak" -> ["Art galleries", "Italian food", "Steak", "Historic houses"]
-  * "I want indie coffee shops for photos, oysters at night, and minimal walking" -> ["Indie coffee", "Photo spots", "Seafood", "Light walking"]
-  * "Traveling with kids, nothing too tiring, want to see the Eiffel Tower lit up at night" -> ["Family-friendly", "Eiffel night view"]
-  * "I love vintage markets and French pastries" -> ["Marais vintage", "French bakery"]
-- Strict JSON output: {"tags": ["tag1", "tag2", ...]}
-</hard_rules>`,
+      englishPrompt('m6ebfec7d93', { p0: (langRule) }),
       jsonContract(
-        '{ tags: ["Art galleries", "Italian food", "Steak"] }',
-        '{ "tags": ["Art galleries", "Italian food", "Steak"] }',
+        englishPrompt('mc14ffa7414'),
+        englishPrompt('m64f1eba9b0'),
       ),
     )
   }
 
   // Chinese (default)
   return buildPrompt(
-    '巴黎旅行偏好提炼专家。你的任务是将用户自由输入的口语化旅行期望与需求，深度归纳、提炼为极简、专业的纯文字旅行偏好标签（Tag Chips）。',
+    chinesePrompt('m3b74eca145'),
     null,
     getCommonRules(locale),
-    `<hard_rules>
-- ${langRule}
-- 彻底摆脱用户的口语化原句，严禁直接把用户原句断句作为标签！
-- 提炼 2 到 5 个精炼、专业的独立偏好标签。
-- 【严禁包含 Emoji】：标签必须是纯中文汉字短语，绝对不要包含任何 Emoji 表情或符号！
-- 【字数硬性红线】：每个标签严格在 2 到 5 个汉字之间（严禁超过 5 个汉字）！
-- 优先映射到下方的标准 tag code（直接返回中文文案，而不是 code）：
-  * 晨间咖啡、两顿正餐、轻松少步行、巴黎迪士尼、凯旋门香街、避开大展馆
-  * 摄影出片、艺术画廊、法式烘焙、塞纳河游船、玛黑中古店、在地市集
-  * 铁塔夜景、亲子友好、平价美食
-- 经典极简转换示例：
-  * "我喜欢文艺，能不能多去博物馆和名人故居，然后我爱吃意大利菜，喜欢吃肉" -> ["艺术画廊", "意式风味", "牛排肉食", "名人故居"]
-  * "想多去小众咖啡馆拍照，晚上吃生蚝，尽量少走路" -> ["小众咖啡", "摄影出片", "生蚝海鲜", "轻松少步行"]
-  * "带小孩，不要太累，想看铁塔夜景" -> ["亲子友好", "铁塔夜景"]
-  * "喜欢复古市集和法式甜点" -> ["玛黑中古店", "法式烘焙"]
-- 严格输出 JSON 格式：{"tags": ["标签1", "标签2", ...]}
-</hard_rules>`,
+    chinesePrompt('mabb58481c2', { p0: (langRule) }),
     jsonContract(
-      '{ tags: ["艺术画廊", "意式风味", "牛排肉食"] }',
-      '{ "tags": ["艺术画廊", "意式风味", "牛排肉食"] }',
+      chinesePromptFragments('m020620eecf'),
+      chinesePromptFragments('m7465a7d69b'),
     ),
   )
 }
@@ -187,7 +156,7 @@ export async function extractPreferenceTags(
       }
     }
   } catch (err) {
-    console.error('[extractPreferenceTags] LLM extraction encountered error:', err)
+    console.error(englishPrompt('m5d9444677d'), err)
   }
 
   // Fallback if LLM failed

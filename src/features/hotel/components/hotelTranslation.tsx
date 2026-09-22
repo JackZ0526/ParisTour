@@ -1,3 +1,4 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import {
   looksChinese,
@@ -208,7 +209,7 @@ function FormattedHotelLocationText({
 
 export function HotelTranslatedText({
   text,
-  loadingLabel = '正在翻译…',
+  loadingLabel = uiCopy('ma26a9982c7', undefined),
   className,
   layout = 'plain',
   showShimmer = true,

@@ -1,3 +1,5 @@
+import { uiCopy } from '../../../shared/i18n/copy/ui'
+import { localizedCopy } from '../../../shared/i18n/copy/FlightPanel-30b000'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { lookupFlight, meaningfulFlightStatus } from '../services/flightLookup'
@@ -37,39 +39,21 @@ function formatEndpointTime(raw: string | undefined, endpoint?: FlightEndpoint):
 
 /** Origin label for the flight-card badge. */
 function flightSourceLabel(source: FlightInfo['source'], locale: Locale = getLocale()): string {
-  if (locale === 'en') {
-    switch (source) {
-      case 'timetable':
-        return 'Timetable'
-      case 'aerodatabox':
-        return 'Live Schedule'
-      case 'recommended':
-        return 'Recommended'
-      case 'live':
-        return 'Live'
-      case 'manual':
-        return 'Manual'
-      case 'llm':
-        return 'Backup Data'
-      default:
-        return 'Source'
-    }
-  }
   switch (source) {
     case 'timetable':
-      return '计划时刻'
+      return uiCopy('m7cfae81424', undefined, locale)
     case 'aerodatabox':
-      return '在线时刻'
+      return uiCopy('m56b11c1218', undefined, locale)
     case 'recommended':
-      return '推荐班次'
+      return uiCopy('m11dfb9e08d', undefined, locale)
     case 'live':
-      return '实时动态'
+      return uiCopy('m8db657e199', undefined, locale)
     case 'manual':
-      return '手动录入'
+      return uiCopy('m380a48764f', undefined, locale)
     case 'llm':
-      return '备用数据'
+      return uiCopy('m43693890ae', undefined, locale)
     default:
-      return '未知来源'
+      return uiCopy('m13f5a71b47', undefined, locale)
   }
 }
 
@@ -310,12 +294,12 @@ export function FlightPanel({
               </p>
               <p className="mt-1 text-xs text-[var(--stone)] leading-relaxed">
                 {locale === 'en'
-                  ? 'Queries scheduled times based on trip dates. If not found, please check the flight number and date; times may vary slightly from booking sites, please refer to your ticket.'
-                  : '按行程日期查询计划起降时间。查不到时请核对航班号与日期；时刻可能与订票网站略有差异，请以机票为准。'}
+                  ? localizedCopy('m5dee034255', undefined, 'en')
+                  : localizedCopy('m5dee034255', undefined, 'zh-CN')}
                 {hasDates
                   ? (locale === 'en'
-                      ? ` Will query based on trip dates: Depart ${tripDates!.startDate} · Return ${tripDates!.endDate}${destTrimmed ? ` · Destination ${destTrimmed}` : ''}.`
-                      : ` 将按行程日期查询：出发 ${tripDates!.startDate} · 返程 ${tripDates!.endDate}${destTrimmed ? ` · 目的地 ${destTrimmed}` : ''}。`)
+                      ? localizedCopy('mc5c8b48d45', { p0: (tripDates!.startDate), p1: (tripDates!.endDate), p2: (destTrimmed ? ` · Destination ${destTrimmed}` : '') }, 'en')
+                      : localizedCopy('mc5c8b48d45', { p0: (tripDates!.startDate), p1: (tripDates!.endDate), p2: (destTrimmed ? uiCopy('m34b8317f67', { p0: (destTrimmed) }) : '') }, 'zh-CN'))
                   : ''}
               </p>
               {!hasDates && (

@@ -1,3 +1,4 @@
+import { localizedCopy } from '../../../shared/i18n/copy/BackupDialog-d1f801'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -166,7 +167,7 @@ export function BackupDialog({ tripId, open, onClose, onRestored }: Props) {
           <div className="flex items-start gap-2.5 rounded-2xl border border-red-200/80 bg-red-50/70 p-3 text-xs text-red-900 shadow-sm backdrop-blur-md">
             <AlertCircle size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-red-600" />
             <span>{error}</span>
-            <button type="button" disabled={loading} onClick={() => setReload((v) => v + 1)}>{locale === 'en' ? 'Retry' : '重试'}</button>
+            <button type="button" disabled={loading} onClick={() => setReload((v) => v + 1)}>{locale === 'en' ? localizedCopy('m56a418dc24', undefined, 'en') : localizedCopy('m56a418dc24', undefined, 'zh-CN')}</button>
           </div>
         )}
 

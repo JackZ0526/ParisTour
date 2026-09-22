@@ -966,7 +966,7 @@ export const en: I18nSchema = {
     headerProfileTitle: 'View profile and preferences',
     switchTripFailed: 'Switch failed',
     // Brand
-    brandTagline: 'Tour · Travel Planning & Guide',
+    brandTagline: 'Travel Planning & Guide',
     // Share role group aria (cloud-sync/components/ShareDialog)
     roleGroupAria: 'Member role',
     // Trip selector (cloud-sync/components/TripSelectorCapsule)
