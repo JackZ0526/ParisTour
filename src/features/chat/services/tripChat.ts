@@ -885,10 +885,13 @@ function buildTripChatMessages(input: {
   }
 
   const contextPrefix = contextBlocks.join('\n\n')
+  // Keep terse / verbatim user requests inside the reply field. Otherwise
+  // JSON-mode providers may mask a plain-text answer into an empty stream.
+  const requestText = `${contextPrefix}\n\n${input.userMessage}\n\n${chatInstruction('responseEnvelope')}`
 
   if (input.images && input.images.length > 0) {
     const parts: ChatMessageContentPart[] = [
-      { type: 'text', text: `${contextPrefix}\n\n${input.userMessage}` },
+      { type: 'text', text: requestText },
       ...input.images.map((img) => ({
         type: 'image_url' as const,
         image_url: { url: img },
@@ -896,7 +899,7 @@ function buildTripChatMessages(input: {
     ]
     messages.push({ role: 'user', content: parts })
   } else {
-    messages.push({ role: 'user', content: `${contextPrefix}\n\n${input.userMessage}` })
+    messages.push({ role: 'user', content: requestText })
   }
 
   return messages

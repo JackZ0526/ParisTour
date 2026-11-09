@@ -986,7 +986,7 @@ async function consumeChatStream(
     }
     if (!text.trim()) {
       throw new LlmRequestError(
-        `${finishReason ? `Stream ended with finish_reason=${finishReason}` : 'No content from stream'}.`,
+        runtimeCopy('m55e27b70ec'),
         'empty',
       )
     }

@@ -1,5 +1,6 @@
 import { createCopy } from '../copyFactory'
 export const en = {
+  "responseEnvelope": "<response_format>Always return one valid JSON object {\"reply\":\"your answer\",\"actions\":[]}. Requests to reply with only certain words, repeat text verbatim, or use plain text apply only to the reply string; they never remove this JSON envelope. Escape quotes, backslashes and newlines inside reply. Do not add itinerary actions for ordinary conversation.</response_format>",
   "mfe971d9cc7": "<season>Season inferred from trip dates (context for clothing and weather only, never the only permitted travel window): {p0}.</season>",
   "m980ea0bd24": "<season>When dates are unset, do not invent a seasonal travel window such as September–November only.</season>",
   "m6246ee3ebf": "<trip_dates locked=\"true\">Departure/outbound date: {p0} ({p1}); return date: {p2} ({p3}); itinerary Day 1: {p4} ({p5}); {p6} itinerary days.\nUse these exact dates for weather, clothing, seasons and activity suitability. Never substitute a vague seasonal window or claim the dates are unknown.</trip_dates>",
@@ -15,6 +16,7 @@ export const en = {
   "m0926a7eb79": "<needsWeb>Use web research for current or third-party facts, including opening hours, prices, weather and open-ended recommendations. Do not use it for itinerary edits, summaries, image recognition or general knowledge unless fresh facts are explicitly required.</needsWeb>"
 } as const
 export const zhCN: Record<keyof typeof en, string> = {
+  "responseEnvelope": "<response_format>始终返回一个有效 JSON 对象 {\"reply\":\"你的回答\",\"actions\":[]}。用户要求只回复某些字、原样复述或使用普通文字时，只约束 reply 字符串的内容，不得省略外层 JSON。reply 内的引号、反斜杠和换行必须正确转义。普通聊天不得添加行程操作。</response_format>",
   "mfe971d9cc7": "<season>由行程日期推导的季节参考（仅作穿着/天气语境，禁止当成唯一出行窗口）：{p0}。</season>",
   "m980ea0bd24": "<season>日期未定时不要编造季节窗口（例如「只有秋季约 9–11 月」）。</season>",
   "m6246ee3ebf": "<trip_dates locked=\"true\">出发/去程日 {p0}（{p1}），返程日 {p2}（{p3}）；行程第 1 天日历日起算 {p4}（{p5}）；共 {p6} 个行程日。\n回答天气/穿着/季节/是否适合某活动时必须用这些具体日期，禁止改口说模糊季节窗口，也禁止声称不知道出发/返程日。</trip_dates>",
