@@ -28,6 +28,10 @@ describe('operation planning and scope', () => {
     const result = await send('按方案1执行', { reply: '收到', actions: [{ type: 'clear_places', days: [1,2,3,4,5,6], placeTypes: ['cafe','restaurant','attraction'] }] }, [{ role: 'assistant', content: '方案1：清空第1–6天，保留酒店及交通。方案2：只清空第7天。' }])
     expect(result.actions).toEqual([{ type: 'clear_places', days: [1,2,3,4,5,6], placeTypes: ['cafe','restaurant','attraction'] }])
   })
+  it('preserves the selected option when the preceding proposal uses a plain numbered list', async () => {
+    const result = await send('按方案2执行', { reply: '收到', actions: [{ type: 'clear_places', days: [7], placeTypes: ['cafe'] }] }, [{ role: 'assistant', content: '1. 清空第1–6天活动。2. 只清空第7天咖啡馆。' }])
+    expect(result.actions).toEqual([{ type: 'clear_places', days: [7], placeTypes: ['cafe'] }])
+  })
   it('rejects invalid targets and protected bulk categories instead of broadening deletion', async () => {
     const result = await send('删除第1–6天活动', { reply: '无法执行', actions: [{ type: 'clear_places', days: [99], placeTypes: ['cafe'] }, { type: 'clear_places', placeTypes: ['hotel'] }, { type: 'remove_place', day: 99, placeName: 'A' }, { type: 'unknown' }, { type: 'clear_places', days: [1] }] })
     expect(result).toMatchObject({ actions: [], rejectedActions: 5 })

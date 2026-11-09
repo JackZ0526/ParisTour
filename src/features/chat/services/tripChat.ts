@@ -1772,6 +1772,9 @@ function operationScopeMessage(message: string, history: TripChatTurn[]): string
     const sections = proposal.content.split(/(?=(?:方案|option|plan)\s*[123一二三])/i)
     const selected = sections.find(section => new RegExp(`^(?:方案|option|plan)\\s*(?:${n}|${['', '一', '二', '三'][n]})`, 'i').test(section))
     if (selected) return `${message}\n${selected}`
+    // A numbered list may use "1." rather than "Option 1". In that case the
+    // model resolves the choice from history; never borrow a different option's days.
+    return message
   }
   return `${message}\n${proposal.content}`
 }
@@ -1800,7 +1803,8 @@ export function pinActionsToCurrentDay(
 ): TripChatAction[] {
   const scope = explicitDaysFromMessage(userMessage, maxDay)
   // Dates are resolved against trip dates in the model's application context.
-  const calendarScope = /\d{1,2}\s*(?:月|\/|-)\s*\d{1,2}/.test(userMessage)
+  const acceptedPlan = /(?:方案|option|plan)\s*[123一二三]/i.test(userMessage) && /执行|确认|就|按|照|apply|execute|go ahead|use/i.test(userMessage)
+  const calendarScope = acceptedPlan || /\d{1,2}\s*(?:月|\/|-)\s*\d{1,2}/.test(userMessage)
   return actions.flatMap((action): TripChatAction[] => {
     if (action.type === 'clear_places') {
       const days = scope ? (action.days?.filter(day => scope.includes(day)) ?? scope) : (calendarScope ? action.days ?? [currentDay] : [currentDay])
