@@ -2,6 +2,7 @@ import type { DayPlan, Place, SelectedHotel } from '../../../types'
 import { getPlace } from '../../place/constants/places'
 import {
   getDayOrigin,
+  isSamePoint,
   type DayOrigin,
 } from '../../itinerary/utils/dayOrigin'
 import { visibleMapStops, type VisibleMapStop } from './googleMapMarkerStops'
@@ -29,34 +30,15 @@ export function buildDayMapRouteRequest(
   hotel: SelectedHotel,
   customPlaces: Record<string, Place>,
 ): DayMapRouteRequest {
-  const origin = getDayOrigin(day.day, hotel)
-  const stops: Place[] = []
-  for (const stop of day.stops) {
-    try {
-      const place = getPlace(stop.placeId, customPlaces)
-      if (
-        Number.isFinite(place.location.lat) &&
-        Number.isFinite(place.location.lng)
-      ) {
-        stops.push(place)
-      }
-    } catch {
-      /* Ignore stale itinerary references. */
-    }
-  }
-  const markerStops = visibleMapStops(stops, origin)
-  const points: MapRoutePoint[] = [
-    { lat: origin.lat, lng: origin.lng },
-    ...markerStops.map(({ place }) => place.location),
-  ]
-  const profile = preferredMapRouteProfile(points)
+  const route = buildDayMapRouteSegments(day, hotel, customPlaces)
+  const points = route.endpoints.map(endpoint => endpoint.point)
   return {
-    origin,
-    stops,
-    markerStops,
+    origin: route.origin,
+    stops: route.stops,
+    markerStops: route.markerStops,
     points,
-    profile,
-    key: buildMapRouteKey(profile, points),
+    profile: route.profile,
+    key: buildMapRouteKey(route.profile, points),
   }
 }
 
@@ -122,16 +104,17 @@ export function buildDayMapRouteSegments(
   const markerStops = visibleMapStops(stops, origin)
   const profilePoints: MapRoutePoint[] = [
     { lat: origin.lat, lng: origin.lng },
-    ...markerStops.map(({ place }) => place.location),
+    ...stops.map(place => place.location),
   ]
   const profile = preferredMapRouteProfile(profilePoints)
 
   const endpoints: DayMapRouteEndpoint[] = [
     { id: origin.id, point: { lat: origin.lat, lng: origin.lng } },
-    ...markerStops.map((marker) => endpointFor(marker.place, marker.index)),
-  ]
+    ...stops.map(endpointFor),
+  ].filter((endpoint, index, all) => index === 0 || !isSamePoint(endpoint.point, all[index - 1].point, 1))
 
   const segments: DayMapRouteSegment[] = []
+  const occurrences = new Map<string, number>()
   for (let index = 0; index < endpoints.length - 1; index += 1) {
     const from = endpoints[index]
     const to = endpoints[index + 1]
@@ -140,8 +123,11 @@ export function buildDayMapRouteSegments(
     // diverges, unchanged segments lose their `seen` record between renders
     // and re-animate on every edit.
     const cacheKey = buildMapRouteSegmentKey(profile, from.point, to.point)
+    const baseKey = `${profile}|${from.id}->${to.id}`
+    const occurrence = (occurrences.get(baseKey) ?? 0) + 1
+    occurrences.set(baseKey, occurrence)
     segments.push({
-      reactKey: `${profile}|${from.id}->${to.id}`,
+      reactKey: occurrence === 1 ? baseKey : `${baseKey}#${occurrence}`,
       fromId: from.id,
       toId: to.id,
       from: from.point,

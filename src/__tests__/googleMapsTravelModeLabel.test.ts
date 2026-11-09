@@ -42,6 +42,11 @@ describe('googleMapsTravelModeLabel', () => {
     expect(googleMapsTravelModeLabel('transit', 'en')).toBe('Transit')
   })
 
+  it('labels driving in both languages', () => {
+    expect(googleMapsTravelModeLabel('driving', 'en')).toBe('Driving')
+    expect(googleMapsTravelModeLabel('driving', 'zh-CN')).toBe('驾车')
+  })
+
   it('switches back to Chinese when locale is toggled back', () => {
     // Simulate the exact failure case: switch EN → zh-CN and confirm the
     // pill text follows the new locale, not the old one.

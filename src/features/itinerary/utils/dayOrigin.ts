@@ -110,16 +110,14 @@ export function isAirportPlace(
 }
 
 /**
- * Sequence numbers for timeline/map: hotel & airport use special icons and
- * do not consume 1, 2, 3… — only numbered place stops advance the counter.
+ * Map marker labels follow the itinerary's 1-based stop positions. Hotel and
+ * airport markers retain their special icons but still occupy a stop position.
  */
 export function numberedStopIndexes(
   places: Array<Pick<Place, 'id' | 'type'> & { name?: string }>,
 ): (number | null)[] {
-  let n = 0
-  return places.map((place) => {
+  return places.map((place, index) => {
     if (isHotelPlace(place) || isAirportPlace(place)) return null
-    n += 1
-    return n
+    return index + 1
   })
 }

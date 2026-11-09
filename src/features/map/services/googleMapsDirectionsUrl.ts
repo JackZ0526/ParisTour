@@ -2,7 +2,7 @@ import { localizedCopy } from '../../../shared/i18n/copy/googleMapsDirectionsUrl
 import type { Coordinates } from '../../../types'
 import { getLocale, translate, type Locale } from '../../../shared/i18n'
 
-export type GoogleMapsTravelMode = 'walking' | 'transit'
+export type GoogleMapsTravelMode = 'walking' | 'transit' | 'driving'
 
 export interface GoogleMapsDirectionsPoint extends Coordinates {
   placeId?: string
@@ -25,7 +25,7 @@ function pointQuery(point: GoogleMapsDirectionsPoint): string {
   if (!usableGooglePlaceId(point.placeId)) {
     const name = point.query?.trim()
     const city = point.city?.trim()
-    if (name && city) return `${name}, ${city}`
+    if (name && city) return name.toLowerCase().includes(city.toLowerCase()) ? name : `${name}, ${city}`
   }
   return `${point.lat},${point.lng}`
 }
@@ -34,16 +34,29 @@ function pointQuery(point: GoogleMapsDirectionsPoint): string {
 export function inferGoogleMapsTravelMode(
   transport?: string,
   walkLevel?: string,
+  leg?: { origin: Coordinates; destination: Coordinates; preferDriving?: boolean },
 ): GoogleMapsTravelMode {
   const explicit = (transport || '').toLowerCase()
-  if (/metro|subway|rer|train|tram|bus|transit|地铁|公交|巴士|火车|轻轨|电车/.test(explicit)) {
-    return 'transit'
+  const transit = /metro|subway|rer|train|tram|bus|transit|地铁|公交|公共交通|巴士|火车|轻轨|电车/.test(explicit)
+  const walking = /walk|步行|走路|步走/.test(explicit)
+  const driving = /taxi|cab|uber|driv|出租车|打车|驾车|自驾|开车|租车/.test(explicit)
+  // Honor a single explicit mode. Mixed fallback copy ("Metro or walk back")
+  // is not a transit decision; resolve it against the actual leg instead.
+  if (Number(transit) + Number(walking) + Number(driving) === 1) {
+    return transit ? 'transit' : driving ? 'driving' : 'walking'
   }
-  if (/公共交通/.test(explicit)) return 'transit'
-  if (/walk|walking|步行|走路|步走/.test(explicit)) return 'walking'
-  if (/walk|walking|步行|走路|步走/.test((walkLevel || '').toLowerCase())) {
-    return 'walking'
+  if (leg && [leg.origin, leg.destination].every(point => Number.isFinite(point.lat) && Number.isFinite(point.lng) && Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180 && (point.lat !== 0 || point.lng !== 0))) {
+    const rad = (n: number) => n * Math.PI / 180
+    const a = Math.sin(rad(leg.destination.lat - leg.origin.lat) / 2) ** 2 + Math.cos(rad(leg.origin.lat)) * Math.cos(rad(leg.destination.lat)) * Math.sin(rad(leg.destination.lng - leg.origin.lng) / 2) ** 2
+    const meters = 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(a)))
+    // A conservative straight-line threshold, not an advertised walking ETA.
+    if (meters <= 1000 && (!driving || walking)) return 'walking'
+    if (transit) return 'transit'
+    if (driving || leg.preferDriving) return 'driving'
   }
+  if (transit) return 'transit'
+  if (driving) return 'driving'
+  if (/walk|步行|走路|步走/.test((walkLevel || '').toLowerCase())) return 'walking'
   return 'transit'
 }
 
@@ -51,6 +64,7 @@ export function googleMapsTravelModeLabel(
   mode: GoogleMapsTravelMode,
   locale: Locale = getLocale(),
 ): string {
+  if (mode === 'driving') return translate('transport.driving', undefined, locale)
   if (mode === 'walking') {
     return (
       translate('transport.walking' as never, undefined, locale) ||

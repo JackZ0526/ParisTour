@@ -2014,6 +2014,17 @@ body.timeline-dragging {
     0 3px 12px rgba(28, 36, 32, 0.06);
 }
 
+.timeline-route-link--driving {
+  color: var(--copper);
+  border-color: color-mix(in srgb, var(--copper) 35%, transparent);
+  background: color-mix(in srgb, var(--copper) 10%, white);
+}
+
+.dark .timeline-route-link--driving {
+  color: #e3b093;
+  background: color-mix(in srgb, var(--copper) 22%, #151c18);
+}
+
 .dark .timeline-route-link--walking {
   color: #8ebfa8;
   border-color: rgba(70, 126, 94, 0.35);

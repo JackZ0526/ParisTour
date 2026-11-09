@@ -90,6 +90,38 @@ describe('day map route request', () => {
 })
 
 describe('day map route segments', () => {
+  const selectedHotelPlace: Place = { ...place('hotel-selected', hotel.lat, hotel.lng), type: 'hotel' }
+
+  it('preserves the last activity → hotel leg while keeping only one hotel marker', () => {
+    const plan = day(2, ['first', 'last', 'hotel-selected'])
+    const customPlaces = { first: place('first', 48.871, 2.301), last: place('last', 48.872, 2.302), 'hotel-selected': selectedHotelPlace }
+    const route = buildDayMapRouteSegments(plan, hotel, customPlaces)
+    expect(route.markerStops.map(s => s.place.id)).toEqual(['first', 'last'])
+    expect(route.segments.at(-1)).toMatchObject({ fromId: 'last', toId: 'hotel-selected', to: { lat: hotel.lat, lng: hotel.lng } })
+    expect(buildDayMapRouteRequest(plan, hotel, customPlaces).points.at(-1)).toEqual({ lat: hotel.lat, lng: hotel.lng })
+  })
+
+  it('keeps both check-in and evening return on arrival day without stacked markers', () => {
+    const route = buildDayMapRouteSegments(day(1, ['hotel-selected', 'dinner', 'hotel-selected']), hotel, {
+      'hotel-selected': selectedHotelPlace, dinner: place('dinner', 48.872, 2.302),
+    })
+    expect(route.endpoints.map(e => e.id)).toEqual(['attr-cdg', 'hotel-selected', 'dinner', 'hotel-selected'])
+    expect(route.markerStops.filter(s => s.place.type === 'hotel')).toHaveLength(1)
+    expect(route.segments.at(-1)?.fromId).toBe('dinner')
+  })
+
+  it('does not request zero-length legs when only the hotel remains', () => {
+    const route = buildDayMapRouteSegments(day(2, ['hotel-selected']), hotel, { 'hotel-selected': selectedHotelPlace })
+    expect(route.segments).toEqual([])
+  })
+
+  it('retains repeated visits and gives repeated segments distinct React keys', () => {
+    const route = buildDayMapRouteSegments(day(2, ['first', 'hotel-selected', 'first', 'hotel-selected']), hotel, {
+      'hotel-selected': selectedHotelPlace, first: place('first', 48.871, 2.301),
+    })
+    expect(route.segments).toHaveLength(4)
+    expect(new Set(route.segments.map(s => s.reactKey)).size).toBe(4)
+  })
   it('splits an itinerary into per-leg segments with stable ids and a day profile', () => {
     const request = buildDayMapRouteSegments(day(2, ['first', 'second']), hotel, {
       first: place('first', 48.871, 2.301),

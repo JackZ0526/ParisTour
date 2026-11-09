@@ -31,7 +31,40 @@ describe('Google Maps direction links', () => {
   it('prefers explicit transit copy over a generic walking-level hint', () => {
     expect(inferGoogleMapsTravelMode('地铁 8 号线', 'short')).toBe('transit')
     expect(inferGoogleMapsTravelMode('步行 8 分钟', 'short')).toBe('walking')
-    expect(inferGoogleMapsTravelMode('出租车', 'minimal')).toBe('transit')
+    expect(inferGoogleMapsTravelMode('出租车', 'minimal')).toBe('driving')
+  })
+
+  it('resolves generic hotel-return copy using the actual leg rather than always choosing transit', () => {
+    const hotel = { lat: 48.87, lng: 2.3 }
+    const nearby = { origin: { lat: 48.871, lng: 2.301 }, destination: hotel }
+    const distant = { origin: { lat: 48.86, lng: 2.36 }, destination: hotel }
+    for (const copy of ['地铁 / 步行回酒店', 'Metro or walk back to the hotel']) {
+      expect(inferGoogleMapsTravelMode(copy, 'minimal', nearby)).toBe('walking')
+      expect(inferGoogleMapsTravelMode(copy, 'minimal', distant)).toBe('transit')
+    }
+    expect(inferGoogleMapsTravelMode(undefined, 'short', nearby)).toBe('walking')
+    expect(inferGoogleMapsTravelMode(undefined, 'minimal', distant)).toBe('transit')
+  })
+
+  it('preserves explicit travel choices and handles driving instead of treating taxis as transit', () => {
+    const leg = { origin: { lat: 48.871, lng: 2.301 }, destination: { lat: 48.87, lng: 2.3 } }
+    expect(inferGoogleMapsTravelMode('地铁 6 号线', 'short', leg)).toBe('transit')
+    expect(inferGoogleMapsTravelMode('打车回酒店', 'minimal', leg)).toBe('driving')
+    expect(inferGoogleMapsTravelMode('步行回酒店', 'short', leg)).toBe('walking')
+    expect(inferGoogleMapsTravelMode(undefined, 'minimal', { ...leg, origin: { lat: 48.4, lng: 2.7 }, preferDriving: true })).toBe('driving')
+    const url = new URL(googleMapsDirectionsUrl({ ...leg, travelMode: 'driving' }))
+    expect(url.searchParams.get('travelmode')).toBe('driving')
+  })
+
+  it('does not infer a short walk from missing or invalid coordinates', () => {
+    expect(inferGoogleMapsTravelMode(undefined, 'minimal', { origin: { lat: 0, lng: 0 }, destination: { lat: 0, lng: 0 } })).toBe('transit')
+    expect(inferGoogleMapsTravelMode('地铁 / 步行', 'minimal', { origin: { lat: NaN, lng: 2 }, destination: { lat: 48, lng: 2 } })).toBe('transit')
+  })
+
+  it('uses the full hotel address to disambiguate the return destination without duplicating its city', () => {
+    const destination = 'Hôtel Paris France 72 Rue de Turbigo, 75003 Paris, France'
+    const url = new URL(googleMapsDirectionsUrl({ origin: { lat: 48.87, lng: 2.35 }, destination: { lat: 48.8677, lng: 2.3604, query: destination, city: 'Paris, France' }, travelMode: 'walking' }))
+    expect(url.searchParams.get('destination')).toBe(destination)
   })
 
   it('uses Place IDs when valid and disambiguated names otherwise', () => {

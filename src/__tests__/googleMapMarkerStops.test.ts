@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { visibleMapStops } from '../features/map/services/googleMapMarkerStops'
 import type { DayOrigin } from '../features/itinerary/utils/dayOrigin'
+import { numberedStopIndexes } from '../features/itinerary/utils/dayOrigin'
 
 const airportOrigin: DayOrigin = {
   id: 'airport-origin',
@@ -26,6 +27,9 @@ const hotelStop = {
 }
 
 describe('visibleMapStops', () => {
+  it('keeps map numbers aligned with the complete numbered itinerary, including hotel positions', () => {
+    expect(numberedStopIndexes([hotelStop, { ...hotelStop, id: 'coffee', type: 'cafe' }, { ...hotelStop, id: 'dinner', type: 'restaurant' }, hotelStop])).toEqual([null, 2, 3, null])
+  })
   it('renders one marker for repeated hotel stops on arrival day', () => {
     const result = visibleMapStops(
       [hotelStop, { ...hotelStop, id: 'hotel-return' }],

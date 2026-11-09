@@ -1,4 +1,3 @@
-import { localizeStoredUiCopy } from '../../../shared/i18n/storedUiCopy'
 import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { localizedCopy } from '../../../shared/i18n/copy/DayTimeline-7ff932'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
@@ -41,7 +40,6 @@ import {
   getDayOrigin,
   isAirportPlace,
   isHotelPlace,
-  numberedStopIndexes,
   SELECTED_HOTEL_PLACE_ID,
 } from '../utils/dayOrigin'
 import { AddPlaceDialog } from '../../place/components/AddPlaceDialog'
@@ -223,7 +221,7 @@ function LegConnector({
   const tone =
     mode === 'TRANSIT' || routeMode === 'transit'
       ? 'border-sky-300/60 bg-sky-50/75 text-sky-900'
-      : mode === 'DRIVING'
+      : mode === 'DRIVING' || routeMode === 'driving'
         ? 'border-[var(--copper)]/40 bg-[var(--copper)]/10 text-[var(--copper)]'
         : routeMode === 'walking'
           ? 'border-emerald-300/70 bg-emerald-50/75 text-emerald-900'
@@ -1160,6 +1158,11 @@ export function DayTimeline({
       return null
     }
   })
+  const routeModes = routePlaces.map((place, index) => {
+    const origin = index === 0 ? dayOrigin : routePlaces[index - 1]?.location
+    return inferGoogleMapsTravelMode(day.stops[index]?.transport, day.stops[index]?.walkLevel,
+      origin && place ? { origin, destination: place.location, preferDriving: day.pace === 'self-drive' } : undefined)
+  })
   const stopPlaces = routePlaces.map((place, index) =>
     place || {
       id: day.stops[index]?.placeId || `missing-${index}`,
@@ -1167,27 +1170,23 @@ export function DayTimeline({
       name: day.stops[index]?.placeId || t('itinerary.unknownPlace'),
     },
   )
-  const stopNumbers = numberedStopIndexes(stopPlaces)
   const routeCity = 'Paris, France'
   const originRoutePoint = {
     lat: dayOrigin.lat,
     lng: dayOrigin.lng,
     query:
-      dayOrigin.kind === 'airport' ? 'Charles de Gaulle Airport' : hotel.name,
+      dayOrigin.kind === 'airport' ? 'Charles de Gaulle Airport' : `${hotel.name} ${hotel.address}`.trim(),
     city: routeCity,
     placeId: dayOrigin.kind === 'hotel' ? hotel.googlePlaceId : undefined,
   }
   const firstRoutePlace = routePlaces[0]
-  const firstRouteMode = inferGoogleMapsTravelMode(
-    day.stops[0]?.transport,
-    day.stops[0]?.walkLevel,
-  )
+  const firstRouteMode = routeModes[0] ?? 'transit'
   const firstRouteUrl = firstRoutePlace
     ? googleMapsDirectionsUrl({
         origin: originRoutePoint,
         destination: {
           ...firstRoutePlace.location,
-          query: firstRoutePlace.name,
+          query: firstRoutePlace.id === SELECTED_HOTEL_PLACE_ID ? `${hotel.name} ${hotel.address}`.trim() : firstRoutePlace.name,
           city: routeCity,
           placeId: firstRoutePlace.googlePlaceId,
         },
@@ -1768,7 +1767,7 @@ export function DayTimeline({
           }
           const active = selectedPlaceId === place.id
           const n =
-            liveIndex != null ? stopNumbers[liveIndex] : displayIndex + 1
+            liveIndex != null ? liveIndex + 1 : displayIndex + 1
           const isHotelStop = isHotelPlace(place)
           const isAirportStop = isAirportPlace(place)
           const isGhost = liveIndex == null
@@ -1785,12 +1784,7 @@ export function DayTimeline({
               : t('itinerary.hotelOvernightLastHint')
           const legToNext =
             liveIndex != null ? navPlan.betweenStops[liveIndex] : undefined
-          const nextStop =
-            liveIndex != null ? day.stops[liveIndex + 1] : undefined
-          const nextRouteMode = inferGoogleMapsTravelMode(
-            nextStop?.transport,
-            nextStop?.walkLevel,
-          )
+          const nextRouteMode = liveIndex != null ? routeModes[liveIndex + 1] ?? 'transit' : 'transit'
           const legInbound =
             liveIndex == null
               ? null
@@ -1798,7 +1792,7 @@ export function DayTimeline({
                 ? navPlan.hotelToFirst
                 : navPlan.betweenStops[liveIndex - 1]
           const travelChip =
-            travelChipFromLeg(legInbound) || stop.walkLevel || null
+            travelChipFromLeg(legInbound) || (isHotelStop && liveIndex != null ? routeModes[liveIndex] : stop.walkLevel) || null
           const isDragSource = liveIndex != null && drag?.from === liveIndex
           const shiftY =
             drag && liveIndex != null && !isDragSource
@@ -1848,11 +1842,12 @@ export function DayTimeline({
           const cardInner = isReturnAirport ? (
             <div className={`flex w-full min-w-0 max-w-full items-start gap-3 rounded-2xl ${glassCardSurfaceClass} p-3`}>
               <span
-                className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
+                data-stop-number={n}
+                className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
                 title={t('itinerary.airportTitle')}
                 aria-label={t('itinerary.airportAria')}
               >
-                <PlaneIcon />
+                {n}
               </span>
               <div className="min-w-0 flex-1">
                 <span className="text-xs text-[var(--stone)]">{t('itinerary.todayLastStop')}</span>
@@ -1899,27 +1894,9 @@ export function DayTimeline({
                   <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                 </span>
               )}
-              {isHotelStop ? (
-                <span
-                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
-                  title={t('itinerary.hotelStop')}
-                  aria-label={t('itinerary.hotelStop')}
-                >
-                  <HouseIcon />
-                </span>
-              ) : isAirportStop ? (
-                <span
-                  className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60"
-                  title={t('itinerary.airportTitle')}
-                  aria-label={t('itinerary.airportAria')}
-                >
-                  <PlaneIcon />
-                </span>
-              ) : (
-                <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white shadow-sm ring-1 ring-white/60">
-                  {n}
-                </span>
-              )}
+              <span data-stop-number={n} className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isHotelStop || isAirportStop ? 'bg-[var(--copper)]' : 'bg-[var(--sage)]'} text-xs font-semibold text-white shadow-sm ring-1 ring-white/60`}>
+                {n}
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -1930,10 +1907,8 @@ export function DayTimeline({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
-                      {localizeStoredUiCopy(stop.time, locale)}
-                    </span>
-                    <span className="text-xs text-[var(--stone)]">
+                    <span className="inline-flex items-center gap-1 text-xs text-[var(--stone)]">
+                      {isHotelStop ? <HouseIcon /> : isAirportStop ? <PlaneIcon /> : null}
                       {typeLabelKey[place.type] ? t(typeLabelKey[place.type] as never) : place.type}
                     </span>
                   </div>
@@ -2203,13 +2178,13 @@ export function DayTimeline({
                           ? googleMapsDirectionsUrl({
                               origin: {
                                 ...place.location,
-                                query: place.name,
+                                query: place.id === SELECTED_HOTEL_PLACE_ID ? `${hotel.name} ${hotel.address}`.trim() : place.name,
                                 city: routeCity,
                                 placeId: place.googlePlaceId,
                               },
                               destination: {
                                 ...routePlaces[liveIndex + 1]!.location,
-                                query: routePlaces[liveIndex + 1]!.name,
+                                query: routePlaces[liveIndex + 1]!.id === SELECTED_HOTEL_PLACE_ID ? `${hotel.name} ${hotel.address}`.trim() : routePlaces[liveIndex + 1]!.name,
                                 city: routeCity,
                                 placeId:
                                   routePlaces[liveIndex + 1]!.googlePlaceId,
@@ -2249,7 +2224,7 @@ export function DayTimeline({
               const stop = day.stops[drag.from]
               if (!stop) return null
               const place = getPlace(stop.placeId, customPlaces)
-              const n = stopNumbers[drag.from]
+              const n = drag.from + 1
               const isHotelStop = isHotelPlace(place)
               const isAirportStop = isAirportPlace(place)
               const legInbound =
@@ -2257,30 +2232,17 @@ export function DayTimeline({
                   ? navPlan.hotelToFirst
                   : navPlan.betweenStops[drag.from - 1]
               const travelChip =
-                travelChipFromLeg(legInbound) || stop.walkLevel || null
+                travelChipFromLeg(legInbound) || (isHotelStop ? routeModes[drag.from] : stop.walkLevel) || null
               return (
                 <div className="flex w-full min-w-0 max-w-full items-start gap-2 p-2.5 sm:gap-3 sm:p-3">
                   <span className={`mt-1 inline-flex h-7 w-7 cursor-grabbing select-none items-center justify-center rounded-lg ${glassHandleSurfaceClass} text-xs text-[var(--stone)] dark:text-zinc-300`}>
                     <GripVertical size={16} strokeWidth={1.8} aria-hidden />
                   </span>
-                  {isHotelStop ? (
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60">
-                      <HouseIcon />
-                    </span>
-                  ) : isAirportStop ? (
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--copper)] text-white shadow-sm ring-1 ring-white/60">
-                      <PlaneIcon />
-                    </span>
-                  ) : (
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sage)] text-xs font-semibold text-white shadow-sm ring-1 ring-white/60">
-                      {n}
-                    </span>
-                  )}
+                  <span data-stop-number={n} className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isHotelStop || isAirportStop ? 'bg-[var(--copper)]' : 'bg-[var(--sage)]'} text-xs font-semibold text-white shadow-sm ring-1 ring-white/60`}>
+                    {n}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
-                        {localizeStoredUiCopy(stop.time, locale)}
-                      </span>
                       <span className="text-xs text-[var(--stone)]">
                         {typeLabelKey[place.type] ? t(typeLabelKey[place.type] as never) : place.type}
                       </span>
