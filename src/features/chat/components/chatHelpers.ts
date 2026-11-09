@@ -1,3 +1,4 @@
+import { normalizeStopCardIntro, isItineraryOperationCopy } from '../../itinerary/utils/stopCardIntro'
 import { runtimeCopy2 } from '../../../shared/i18n/copy/chatHelpers-runtime2-b143a9'
 import { runtimeCopy } from '../../../shared/i18n/copy/chatHelpers-runtime-b143a9'
 import { localizedCopy } from '../../../shared/i18n/copy/chatHelpers-b143a9'
@@ -62,18 +63,7 @@ export function pendingFallbackReason(pending: PendingPlaceConfirm): string {
 
 /** Chat-model action.note often describes insertion logistics, not the place. */
 export function isOperationalStopNote(note: string | undefined | null): boolean {
-  const t = String(note || '').trim()
-  if (!t) return true
-  if (
-    /顺路插入|按行程路线|加到.*末尾|加到当天|用于替换|计划加入第|按最顺路|按当天节奏/.test(
-      t,
-    )
-  ) {
-    return true
-  }
-  // e.g. 「作为第1天晚餐，…插入/加入/安排」
-  if (/作为第\s*\d+\s*天/.test(t) && /插入|加入|安排|替换/.test(t)) return true
-  return false
+  return !note?.trim() || isItineraryOperationCopy(note)
 }
 
 /** Prefer traveler-facing blurbs over operational chat-action notes. */
@@ -82,14 +72,9 @@ export function pickTravelerStopNote(opts: {
   placeDescription?: string | null
   actionNote?: string | null
 }): string {
-  const candidates = [opts.storyIntro, opts.placeDescription, opts.actionNote]
-  for (const c of candidates) {
-    const t = String(c || '').trim()
-    if (t.length >= 8 && !isOperationalStopNote(t)) return t
-  }
-  for (const c of candidates) {
-    const t = String(c || '').trim()
-    if (t) return t
+  for (const text of [opts.placeDescription, opts.actionNote, opts.storyIntro]) {
+    const intro = normalizeStopCardIntro(text)
+    if (intro) return intro
   }
   return ''
 }

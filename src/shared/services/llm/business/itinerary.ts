@@ -1,3 +1,4 @@
+import { stopCardIntroCopy } from '../../../i18n/copy/stopCardIntro'
 import { openingWindows } from '../../../../features/place/services/openingAvailability'
 import { openingCopy } from '../../../i18n/copy/openingAvailability'
 import { englishPromptFragments, chinesePromptFragments } from '../../../i18n/prompts/itinerary-fragments-146f65'
@@ -534,6 +535,7 @@ export async function generateFullItinerary(
     getCommonRules(locale),
     getPlaceResearchDiscipline(locale),
     getCafeVsRestaurantRule(locale),
+    stopCardIntroCopy('rules', undefined, locale),
     `<output_format>${outputFormat}</output_format>`,
     hardRules,
     jsonContract(jsonShape, jsonExample, locale),
@@ -920,6 +922,7 @@ export async function generateSingleDayItinerary(
     getCommonRules(locale),
     getPlaceResearchDiscipline(locale),
     getCafeVsRestaurantRule(locale),
+    stopCardIntroCopy('rules', undefined, locale),
     openingCopy('rule'),
     input.openingRepair ? openingCopy('repairRule') : '',
     input.compact ? '' : `<output_format>${outputFormat}</output_format>`,

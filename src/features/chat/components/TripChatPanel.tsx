@@ -1426,7 +1426,7 @@ export function TripChatPanel({
           storyIntro: pendingStory?.intro,
           placeDescription: pending.place.description,
           actionNote: pending.note,
-        }) || pending.place.description
+        })
       const place =
         description !== pending.place.description
           ? { ...pending.place, description }

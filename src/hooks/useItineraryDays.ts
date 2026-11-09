@@ -1,3 +1,4 @@
+import { normalizeStopCardIntro } from '../features/itinerary/utils/stopCardIntro'
 import { runtimeCopy } from '../shared/i18n/copy/useItineraryDays-runtime-67327b'
 import {
   useCallback,
@@ -447,7 +448,7 @@ export function useItineraryDays(
         id: makeStopId(dayNum, place.id),
         time: '12:00',
         placeId: place.id,
-        note: place.description,
+        note: normalizeStopCardIntro(place.description, { placeName: place.name, address: place.googleAddress }),
         walkLevel: 'short',
         duration: place.durationHint || runtimeCopy('m1966ba1b9f', undefined),
       }
@@ -595,7 +596,7 @@ export function useItineraryDays(
             id: stopId,
             time: old.time || '12:00',
             placeId: place.id,
-            note: place.description,
+            note: normalizeStopCardIntro(place.description, { placeName: place.name, address: place.googleAddress }),
             walkLevel: old.walkLevel || 'short',
             duration: place.durationHint || old.duration || runtimeCopy('m1966ba1b9f', undefined),
             transport: old.transport,
@@ -613,7 +614,7 @@ export function useItineraryDays(
           place,
           patch: {
             time: dayPlan.stops[oldIdx].time || '12:00',
-            note: place.description,
+            note: normalizeStopCardIntro(place.description, { placeName: place.name, address: place.googleAddress }),
             walkLevel: dayPlan.stops[oldIdx].walkLevel || 'short',
             duration: place.durationHint || dayPlan.stops[oldIdx].duration || runtimeCopy('m1966ba1b9f', undefined),
             transport: dayPlan.stops[oldIdx].transport,

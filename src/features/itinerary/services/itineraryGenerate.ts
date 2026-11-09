@@ -973,7 +973,7 @@ export async function buildGeneratedSingleDay(
           id, name: candidate.name, type: candidate.type,
           googlePlaceId: candidate.id?.startsWith('ta-') ? undefined : candidate.id,
           tripadvisorContentId: candidate.id?.startsWith('ta-') ? candidate.id.slice(3) : undefined,
-          description: row.description || candidate.address || '',
+          description: row.description || '',
           location: candidate.location, image: FALLBACK_IMAGE,
           googleRating: candidate.rating, googleUserRatingCount: candidate.userRatingCount,
           googleAddress: candidate.address, priceHint: candidate.priceLevel,

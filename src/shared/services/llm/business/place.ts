@@ -1,3 +1,5 @@
+import { normalizeStopCardIntro } from '../../../../features/itinerary/utils/stopCardIntro'
+import { stopCardIntroCopy } from '../../../i18n/copy/stopCardIntro'
 import { englishPromptFragments, chinesePromptFragments } from '../../../i18n/prompts/place-fragments-d4bd87'
 import { runtimeCopy4 } from '../../../i18n/copy/place-runtime4-d4bd87'
 import { englishPrompt, chinesePrompt } from '../../../i18n/prompts/place-d4bd87'
@@ -244,7 +246,7 @@ export async function generatePlaceDescription(input: {
   const activeLocale = getLocale()
   const langRule = getLlmLanguageInstruction(activeLocale)
   const isEn = activeLocale === 'en'
-  const key = `place-desc:v3:${activeLocale}:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
+  const key = `place-desc:v4:${activeLocale}:${input.name}|${input.type}|${input.address || ''}|${input.googleSummary || ''}`
   return memoizeLlmCall(
     key,
     async () => {
@@ -262,6 +264,7 @@ export async function generatePlaceDescription(input: {
         }
 </hard_rules>`,
         getCafeVsRestaurantRule(activeLocale),
+        stopCardIntroCopy('rules', undefined, activeLocale),
       )
       const user = isEn
         ? [
@@ -285,7 +288,7 @@ export async function generatePlaceDescription(input: {
 
       const raw = await generateText(system, user, { task: 'placeDescription', userText: input.name })
       if (!raw) return null
-      return raw.trim().replace(/^["']|["']$/g, '')
+      return normalizeStopCardIntro(raw.trim().replace(/^["']|["']$/g, ''), { locale: activeLocale, placeName: input.name, address: input.address }) || null
     },
     { durable: true },
   )

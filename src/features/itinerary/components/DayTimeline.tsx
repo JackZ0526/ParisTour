@@ -1,3 +1,4 @@
+import { StopCardIntro } from './StopCardIntro'
 import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { localizedCopy } from '../../../shared/i18n/copy/DayTimeline-7ff932'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
@@ -1919,14 +1920,12 @@ export function DayTimeline({
                     nameLocal={place.nameLocal}
                     location={place.location}
                   />
-                  {stop.note ? (
-                    <p className="mt-1.5 text-sm text-[var(--stone)] leading-relaxed">{stop.note}</p>
-                  ) : itineraryTranslating ? (
+                  {itineraryTranslating && !stop.note ? (
                     <div className="mt-2 space-y-1.5" aria-hidden>
                       <span className="block h-3.5 w-3/4 rounded-full day-tab-shimmer" />
                       <span className="block h-3.5 w-1/2 rounded-full day-tab-shimmer" />
                     </div>
-                  ) : null}
+                  ) : <StopCardIntro note={stop.note} place={place} />}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                     {travelChip && (
                       <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>
@@ -2103,9 +2102,6 @@ export function DayTimeline({
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.gold} px-2 py-0.5 text-xs text-[var(--stone)]`}>
-                                {swapAnim.oldStop.time}
-                              </span>
                               <span className="text-xs text-[var(--stone)]">
                                 {typeLabelKey[oldSwapPlace.type] ? t(typeLabelKey[oldSwapPlace.type] as never) : oldSwapPlace.type}
                               </span>
@@ -2117,9 +2113,7 @@ export function DayTimeline({
                               nameLocal={oldSwapPlace.nameLocal}
                               location={oldSwapPlace.location}
                             />
-                            <p className="mt-1.5 text-sm text-[var(--stone)]">
-                              {swapAnim.oldStop.note}
-                            </p>
+                            <StopCardIntro note={swapAnim.oldStop.note} place={oldSwapPlace} />
                           </div>
                           <GooglePlacePhoto
                             name={oldSwapPlace.name}
@@ -2254,9 +2248,7 @@ export function DayTimeline({
                       nameLocal={place.nameLocal}
                       location={place.location}
                     />
-                    <p className="mt-1.5 line-clamp-2 text-sm text-[var(--stone)]">
-                      {stop.note}
-                    </p>
+                    <StopCardIntro note={stop.note} place={place} />
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--stone)]">
                       {travelChip && (
                         <span className={`${timelineCapsuleClass} ${glassCapsuleToneClass.blue} px-2 py-1`}>

@@ -1,3 +1,4 @@
+import { normalizeStopCardIntro } from '../../itinerary/utils/stopCardIntro'
 import { samePlace, uniquePlaces } from '../../../shared/utils/placeIdentity'
 import { localizedCopy } from '../../../shared/i18n/copy/AddPlaceDialog-c09b1a'
 import { RankedRecommendationQueue } from '../services/rankedRecommendations'
@@ -762,9 +763,9 @@ export function AddPlaceDialog({
       }
 
       let description =
-        intro || details.summary || details.address || t('place.fallbackDescription')
+        intro || details.summary || ''
       // AI 推荐已有适中长度 intro 时不再二次生成简介，避免重复烧 token。
-      const hasUsefulIntro = Boolean(intro && intro.trim().length >= 12 && intro.trim().length <= 160)
+      const hasUsefulIntro = Boolean(normalizeStopCardIntro(description, { locale, placeName: details.name, address: details.address }))
       if (isLlmConfigured() && !hasUsefulIntro) {
         const blurb = await generatePlaceDescription({
           name: details.name,
@@ -773,11 +774,6 @@ export function AddPlaceDialog({
           googleSummary: details.summary || intro,
         })
         if (blurb) description = blurb
-      } else if (!isLlmConfigured() && description.length > 200) {
-        const sentenceMatch = description.slice(0, 180).match(/^(.*?[.!?。！？])\s/s)
-        if (sentenceMatch?.[1]) {
-          description = sentenceMatch[1].trim()
-        }
       }
 
       const display = await resolvePlaceDisplayPhotos({

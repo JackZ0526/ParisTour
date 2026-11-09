@@ -76,6 +76,20 @@ describe('chat actions against the real itinerary state hook', () => {
     handlers.selectPlace('museum')
     expect(handlers.readState()).toMatchObject({ currentDay: 3, selectedPlaceId: 'museum' })
   })
+  it('bounds new stop notes and cloud mutations while retaining full place descriptions', () => {
+    const handlers = mount()
+    const long = '提供咖啡和手工甜点的小店，适合休息片刻。' + '这里还有很多详细介绍。'.repeat(40)
+    const venue = { ...makePlace('long-intro', 'cafe'), description: long }
+    handlers.addPlace(2, venue, { select: false })
+    const added = hook.days[1].stops.find(stop => stop.placeId === venue.id)!
+    expect([...added.note].length).toBeLessThanOrEqual(80)
+    expect(hook.customPlaces[venue.id].description).toBe(long)
+    expect(onMutation.mock.calls.at(-1)?.[0].payload.stop.note).toBe(added.note)
+    const address = '49 Av. Franklin Delano Roosevelt, 75008 Paris'
+    handlers.replaceStop(2, added.id!, { ...makePlace('address-intro', 'restaurant'), description: address, googleAddress: address }, { select: false })
+    expect(hook.days[1].stops.find(stop => stop.id === added.id)?.note).toBe('')
+    expect(onMutation.mock.calls.at(-1)?.[0].payload.patch.note).toBe('')
+  })
   it('does not create orphaned places for a nonexistent day and rejects silently ignored handlers', () => {
     const handlers = mount()
     expect(() => handlers.addPlace(99, makePlace('orphan', 'cafe'))).toThrow()
