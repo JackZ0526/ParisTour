@@ -81,6 +81,16 @@ describe.each([false, true])('trip chat JSON recovery (stream=%s)', (stream) => 
     vi.mocked(openaiChat).mockResolvedValueOnce(raw.replace(',}', '}'))
     expect(await send({ ...request, ctx: { ...ctx, currentDay: 3 } })).toEqual({ reply: '切换到第三天。', actions: [{ type: 'switch_day', day: 3 }] })
   })
+
+  it('returns place references separately from itinerary actions', async () => {
+    completion(JSON.stringify({ reply: '推荐花神咖啡馆和奥赛博物馆。', actions: [], places: [
+      { name: 'Café de Flore', label: '花神咖啡馆', type: 'cafe' },
+      { name: "Musée d'Orsay", label: '奥赛博物馆', type: 'attraction' },
+    ] }))
+    expect(await send({ ...request, userMessage: '推荐两个地方' })).toMatchObject({
+      actions: [], places: [{ name: 'Café de Flore', label: '花神咖啡馆' }, { name: "Musée d'Orsay", label: '奥赛博物馆' }],
+    })
+  })
 })
 
 afterEach(() => setLocale('zh-CN', { persist: false }))

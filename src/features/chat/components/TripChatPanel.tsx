@@ -2,7 +2,7 @@ import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { localizedCopy } from '../../../shared/i18n/copy/TripChatPanel-2f4379'
 import type { TripChatTurn } from '../services/tripChat'
 import { useChatSession } from '../hooks/useChatSession'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
@@ -82,6 +82,9 @@ import {
 } from '../../../shared/styles/glassCapsule'
 import { useTheme } from '../../../shared/services/themeStore'
 import { InlineMarkdown } from './InlineMarkdown'
+import { ChatPlacePreview } from './ChatPlacePreview'
+import { findKnownChatPlace, referenceFromPlace, type ChatPlaceReference } from '../services/chatPlaceReferences'
+import { getPlace } from '../../place/constants/places'
 import { ChatSelectionAskToolbar } from './ChatSelectionAskToolbar'
 import { CHAT_ASK_SELECTABLE_ATTR, buildAskAboutSendMessage, previewAskExcerpt } from './chatSelectionAsk'
 import { useChatSelectionAsk } from '../hooks/useChatSelectionAsk'
@@ -341,6 +344,29 @@ export function TripChatPanel({
     setPanelEntered(false)
   }, [open])
   const [pendingPlaces, setPendingPlaces] = useState<PendingPlaceConfirm[]>([])
+  const [previewPlace, setPreviewPlace] = useState<ChatPlaceReference | null>(null)
+  const previewScrollTop = useRef<number | null>(null)
+  const knownChatPlaces = useMemo(() => {
+    const places = new Map<string, Place>()
+    Object.values(customPlaces).forEach(place => places.set(place.id, place))
+    days.forEach(day => day.stops.forEach(stop => {
+      const place = getPlace(stop.placeId, customPlaces)
+      if (place) places.set(place.id, place)
+    }))
+    return [...places.values()]
+  }, [customPlaces, days])
+  const knownChatReferences = useMemo(() => knownChatPlaces.map(referenceFromPlace), [knownChatPlaces])
+  const openChatPlace = useCallback((place: ChatPlaceReference) => {
+    previewScrollTop.current = messagesRef.current?.scrollTop ?? 0
+    setPreviewPlace(place)
+    setInternalOpen(false)
+    onClose?.()
+  }, [onClose])
+  const previewDestination = typeof destination === 'string' ? destination : destination?.name || ''
+  const previewSearchLocation = useMemo(() =>
+    Number.isFinite(hotel.lat) && Number.isFinite(hotel.lng) && (hotel.lat !== 0 || hotel.lng !== 0)
+      ? { lat: hotel.lat, lng: hotel.lng } : undefined,
+  [hotel.lat, hotel.lng])
   /** Bumps GooglePlacePage remount when confirm overlay must be forced visible. */
   const [confirmEpoch, setConfirmEpoch] = useState(0)
   const [pendingStory, setPendingStory] = useState<HotelDetailCopy | null>(null)
@@ -817,6 +843,14 @@ export function TripChatPanel({
     // and the scroll container has its final height — otherwise scrollIntoView
     // runs on a still-transforming, possibly detached panel (reopen case).
     if (!panelEntered) return
+    if (!wasOpenRef.current && previewScrollTop.current != null && messagesRef.current) {
+      const messages = messagesRef.current
+      messages.scrollTop = previewScrollTop.current
+      previewScrollTop.current = null
+      followBottomRef.current = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 96
+      wasOpenRef.current = true
+      return
+    }
     // Jump instantly when opening so we don't animate through the whole history.
     if (!wasOpenRef.current) followBottomRef.current = true
     wasOpenRef.current = true
@@ -886,6 +920,7 @@ export function TripChatPanel({
     steps: ChatWorkStep[],
     reasoning: string,
     content?: string,
+    places?: ChatPlaceReference[],
   ) {
     const finished = finishChatWorkSteps(steps)
     const reasoningTrimmed = reasoning.trim()
@@ -897,6 +932,7 @@ export function TripChatPanel({
         {
           ...last,
           ...(content !== undefined ? { content } : {}),
+          ...(places ? { places } : {}),
           steps: finished,
           ...(reasoningTrimmed ? { reasoning: reasoningTrimmed } : {}),
         },
@@ -1648,6 +1684,7 @@ export function TripChatPanel({
         workStepsRef.current,
         reasoningTextRef.current,
         displayReply,
+        result.places,
       )
     } catch (err) {
       if (isAbortError(err) || abortRef.current !== ac) return
@@ -2308,6 +2345,7 @@ export function TripChatPanel({
         workStepsRef.current,
         reasoningTextRef.current,
         ensured.reply,
+        result.places,
       )
     } catch (err) {
       if (isAbortError(err) || abortRef.current !== ac) return
@@ -2761,7 +2799,10 @@ export function TripChatPanel({
                             {userBubbleText ? (
                               <InlineMarkdown
                                 text={userBubbleText}
-                                className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 dark:[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)]"
+                                places={turn.places}
+                                knownPlaces={knownChatReferences}
+                                onPlaceClick={turn.role === 'assistant' && !isStreamingAssistant ? openChatPlace : undefined}
+                                className="space-y-1.5 leading-relaxed [&_p]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_code]:rounded [&_code]:bg-black/5 dark:[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em] [&_hr]:my-2 [&_hr]:border-[var(--mist)] [&_.chat-place-link]:cursor-pointer [&_.chat-place-link]:text-[var(--sage)] [&_.chat-place-link]:underline [&_.chat-place-link]:decoration-dotted [&_.chat-place-link]:underline-offset-[3px] [&_.chat-place-link]:font-[inherit] [&_.chat-place-link:hover]:decoration-solid [&_.chat-place-link:focus-visible]:outline-2 [&_.chat-place-link:focus-visible]:outline-offset-2"
                               />
                             ) : null}
                             {isStreamingAssistant && streamingReply ? (
@@ -3132,6 +3173,14 @@ export function TripChatPanel({
           if (activePending) cancelPending(activePending)
         }}
       />
+      {previewPlace && <ChatPlacePreview
+        key={`${previewPlace.name}|${previewPlace.address || ''}`}
+        reference={previewPlace}
+        knownPlace={findKnownChatPlace(previewPlace, knownChatPlaces)}
+        destination={previewDestination}
+        searchLocation={previewSearchLocation}
+        onClose={() => { setPreviewPlace(null); setInternalOpen(true) }}
+      />}
     </>
   )
 }

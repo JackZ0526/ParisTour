@@ -1,4 +1,6 @@
 import { memo, useMemo } from 'react'
+import type { ChatPlaceReference } from '../services/chatPlaceReferences'
+import { linkChatPlaces } from './chatPlaceLinks'
 
 /**
  * Tiny, safe Markdown renderer for assistant chat bubbles.
@@ -224,14 +226,34 @@ function formatInlineMarkdown(text: string): string {
 export const InlineMarkdown = memo(function InlineMarkdown({
   text,
   className,
+  places,
+  knownPlaces,
+  onPlaceClick,
 }: {
   text: string
   className?: string
+  places?: readonly ChatPlaceReference[]
+  knownPlaces?: readonly ChatPlaceReference[]
+  onPlaceClick?: (place: ChatPlaceReference) => void
 }) {
-  const html = useMemo(() => formatInlineMarkdown(text), [text])
+  const references = useMemo(() => [...(places || []), ...(knownPlaces || [])], [places, knownPlaces])
+  const interactive = Boolean(onPlaceClick)
+  const html = useMemo(() => {
+    const formatted = formatInlineMarkdown(text)
+    return interactive ? linkChatPlaces(formatted, references) : formatted
+  }, [text, references, interactive])
   return (
     <div
       className={className}
+      onClick={onPlaceClick ? event => {
+        if (!(event.target instanceof Element)) return
+        const button = event.target.closest<HTMLButtonElement>('button[data-chat-place]')
+        if (!button || !event.currentTarget.contains(button)) return
+        // Keep selecting / quoting a linked name from opening its detail page.
+        if (event.detail && window.getSelection()?.toString()) return
+        const place = references[Number(button.dataset.chatPlace)]
+        if (place) onPlaceClick(place)
+      } : undefined}
       // Pre-escaped + tagged by formatInlineMarkdown; no user HTML reaches here.
       dangerouslySetInnerHTML={{ __html: html }}
     />

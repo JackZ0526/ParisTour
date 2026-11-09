@@ -4,6 +4,7 @@ import { chatInstruction } from '../../../shared/i18n/copy/chatInstructions'
 import { runtimeCopy } from '../../../shared/i18n/copy/tripChat-runtime-e9ecae'
 import { localizedCopy } from '../../../shared/i18n/copy/tripChat-e9ecae'
 import { budgetChatHistory } from './chatHistoryBudget'
+import { parseChatPlaceReferences, type ChatPlaceReference } from './chatPlaceReferences'
 import { tryJevRoute } from '../../../shared/services/llm/jev-router'
 import { stripLlmJsonWrapper } from '../../../shared/services/llm/json'
 import type {
@@ -126,6 +127,7 @@ export type TripChatAction =
 export interface TripChatResult {
   reply: string
   actions: TripChatAction[]
+  places?: ChatPlaceReference[]
 }
 
 export interface TripChatWorkStep {
@@ -138,6 +140,7 @@ export interface TripChatWorkStep {
 export interface TripChatTurn {
   role: 'user' | 'assistant'
   content: string
+  places?: ChatPlaceReference[]
   images?: string[]
   /** Quoted excerpt shown above the user bubble (Ask about). */
   quoteContext?: string
@@ -1207,7 +1210,8 @@ function parseTripChatResult(
     )
   }
 
-  return { reply: rawReply, actions }
+  const places = parseChatPlaceReferences(parsed.places, rawReply)
+  return { reply: rawReply, actions, ...(places.length ? { places } : {}) }
 }
 
 /**
