@@ -1,3 +1,5 @@
+import { reorderItineraryDays, type DayOrderChange } from '../features/itinerary/utils/dayOrder'
+import { itineraryReplaceDraft } from '../features/cloud-sync/v2/itineraryIds'
 import { normalizeStopCardIntro } from '../features/itinerary/utils/stopCardIntro'
 import { runtimeCopy } from '../shared/i18n/copy/useItineraryDays-runtime-67327b'
 import {
@@ -108,6 +110,7 @@ export interface UseItineraryDaysResult {
     options?: AddOnDayOptions,
   ) => void
   handleSwitchDay: (dayNum: number) => void
+  handleReorderDays: (change: DayOrderChange) => void
   handleReplaceOnDay: (
     dayNum: number,
     stopId: string,
@@ -437,6 +440,16 @@ export function useItineraryDays(
     [customPlaces, onMutation, setCustomPlaces],
   )
 
+  const handleReorderDays = useCallback((change: DayOrderChange) => {
+    const next = reorderItineraryDays(days, change, placesWithHotel)
+    if (next === days) return
+    setDays(next)
+    setDayIndex(next.findIndex(plan => plan.day === change.toDay))
+    setSelectedPlaceId(null)
+    // One existing atomic mutation, rather than two independently saved days.
+    onMutation?.(itineraryReplaceDraft(next, customPlaces))
+  }, [days, placesWithHotel, customPlaces, onMutation])
+
   const handleAddOnDay = useCallback(
     (dayNum: number, place: Place, options?: AddOnDayOptions) => {
       const targetDay = days.find((entry) => entry.day === dayNum)
@@ -655,6 +668,7 @@ export function useItineraryDays(
     handleGoogleIdentityResolved,
     handleAddOnDay,
     handleSwitchDay,
+    handleReorderDays,
     handleReplaceOnDay,
     completeReorderSaveTransaction,
   }

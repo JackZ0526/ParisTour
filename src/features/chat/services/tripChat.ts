@@ -1,3 +1,4 @@
+import { dayOrderCopy } from '../../../shared/i18n/copy/dayOrder'
 import { englishPromptFragments, chinesePromptFragments } from '../../../shared/i18n/prompts/tripChat-fragments-e9ecae'
 import { runtimeCopy5 } from '../../../shared/i18n/copy/tripChat-runtime5-e9ecae'
 import { chatInstruction } from '../../../shared/i18n/copy/chatInstructions'
@@ -44,6 +45,7 @@ import {
 import { getLocale, getLlmLanguageInstruction } from '../../../shared/i18n'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
+  | { type: 'move_day' | 'swap_days'; fromDay: number; toDay: number }
   | { type: 'clear_places'; days?: number[]; placeTypes?: Array<'cafe' | 'restaurant' | 'attraction'> }
   | { type: 'select_place'; placeName: string }
   | {
@@ -568,6 +570,7 @@ function systemPrompt(ctx: TripChatContext, plan: TripChatRequestPlan): string {
           getPlaceResearchDiscipline(activeLocale),
           getNoHallucinationRule(activeLocale),
           itineraryRules,
+          dayOrderCopy('tool', undefined, activeLocale),
           examples,
         ]
           .filter(Boolean)
@@ -891,7 +894,7 @@ function buildTripChatMessages(input: {
   const contextPrefix = contextBlocks.join('\n\n')
   // Keep terse / verbatim user requests inside the reply field. Otherwise
   // JSON-mode providers may mask a plain-text answer into an empty stream.
-  const requestText = `${contextPrefix}\n\n${input.userMessage}\n\n${chatInstruction('executionContract')}\n${chatInstruction('responseEnvelope')}`
+  const requestText = `${contextPrefix}\n\n${input.userMessage}\n\n${dayOrderCopy('tool')}\n${chatInstruction('executionContract')}\n${chatInstruction('responseEnvelope')}`
 
   if (input.images && input.images.length > 0) {
     const parts: ChatMessageContentPart[] = [
@@ -951,6 +954,8 @@ function normalizeActionType(raw: unknown): string {
   if (v === 'refreshhotels' || v === 'refresh_hotel') return 'refresh_hotels'
   if (v === 'replacehotel') return 'replace_hotel'
   if (v === 'replacehotels') return 'replace_hotels'
+  if (['swap_day', 'swapdays', 'exchange_days'].includes(v)) return 'swap_days'
+  if (['move_days', 'moveday', 'reorder_day'].includes(v)) return 'move_day'
   if (['clear_itinerary', 'clear_days', 'clear_stops', 'remove_all_places', 'delete_all_places'].includes(v)) return 'clear_places'
   return v
 }
@@ -990,6 +995,13 @@ function parseActions(raw: unknown, maxDay = 30): TripChatAction[] {
     const type = normalizeActionType(row.type)
     // Invalid explicit targets must never become an edit to the current day.
     if (row.day != null && !dayOk(Number(row.day))) continue
+
+    if (type === 'move_day' || type === 'swap_days') {
+      const fromDay = Number(row.fromDay ?? row.dayA)
+      const toDay = Number(row.toDay ?? row.dayB)
+      if (dayOk(fromDay) && dayOk(toDay)) out.push({ type, fromDay, toDay })
+      continue
+    }
 
     if (type === 'clear_places') {
       const rawDays = row.days ?? (row.day != null ? [row.day] : undefined)
@@ -1205,13 +1217,15 @@ function parseTripChatResult(
     parsed.action ??
     (Array.isArray(parsed.ops) ? parsed.ops : undefined)
   const parsedActions = parseActions(rawActions, maxDay)
-  const rejectedActions = coerceActionsArray(rawActions).length - parsedActions.length
+  let rejectedActions = coerceActionsArray(rawActions).length - parsedActions.length
   const actions = pinActionsToCurrentDay(
     parsedActions,
     operationScopeMessage(userMessage, history),
     currentDay,
     maxDay,
   )
+  const wholeDays = (list: TripChatAction[]) => list.filter(action => action.type === 'move_day' || action.type === 'swap_days').length
+  rejectedActions += wholeDays(parsedActions) - wholeDays(actions)
 
   if (!rawReply) {
     if (actions.length > 0) {
@@ -1360,7 +1374,7 @@ function fallbackTripChatIntent(text: string): TripChatRequestPlan['intent'] {
   if (isLivePlaceRecommendationRequest(text) || /推荐|比较|哪家更好|住哪里/.test(text)) {
     return 'recommend'
   }
-  if (/添加|加上|新增|删除|去掉|移除|清空|清理|执行|替换|换成|重排|调整|修改|选中|切换|移到|移动|挪到|\b(?:add|remove|delete|clear|replace|reorder|apply|execute)\b/i.test(text)) {
+  if (/添加|加上|新增|删除|去掉|移除|清空|清理|执行|互换|交换|对调|整天|替换|换成|重排|调整|修改|选中|切换|移到|移动|挪到|\b(?:add|remove|delete|clear|replace|reorder|swap|exchange|apply|execute)\b/i.test(text)) {
     return 'mutate'
   }
   return 'answer'
@@ -1690,7 +1704,7 @@ export async function sendTripChatMessageStream(input: {
 export function replyClaimsItineraryApplied(reply: string): boolean {
   const text = reply.trim()
   if (!text) return false
-  return /已(经)?(正式)?加入|已经加[入进]|已加到|已添加到|已插入|已帮你加|已经帮你加|已写入行程|已更新行程|已放进行程|已(经)?替换|已经换[成好]|(?:已|都|全部|一并).{0,8}(?:删除|移除|清空|清理|清掉|删掉|移到|重排)|(?:删除|清空|清掉|删掉)了|清理后|已(?:经)?(?:切换|选中|设为)|已(?:经)?.{0,8}完成|(?:按|照)方案.{0,8}执行|\b(?:removed|deleted|cleared|added|replaced|reordered|updated|switched|selected)\b/i.test(
+  return /已(经)?(正式)?加入|已经加[入进]|已加到|已添加到|已插入|已帮你加|已经帮你加|已写入行程|已更新行程|已放进行程|已(经)?替换|已经换[成好]|(?:已|都|全部|一并).{0,8}(?:删除|移除|清空|清理|清掉|删掉|移到|重排)|(?:删除|清空|清掉|删掉)了|清理后|已(?:经)?(?:互换|交换|移动|对调|调换)|已(?:经)?(?:切换|选中|设为)|已(?:经)?.{0,8}完成|(?:按|照)方案.{0,8}执行|\b(?:removed|deleted|cleared|added|replaced|reordered|updated|switched|selected|swapped|moved)\b/i.test(
     text,
   )
 }
@@ -1791,7 +1805,7 @@ export function explicitDaysFromMessage(message: string, maxDay = 30): number[] 
   }
   const list = message.match(/(?:第|days?\s*)([\d一二三四五六七八九十、,，和及\s]+)天/i)
   if (list && /[、,，和及]/.test(list[1])) return [...new Set(list[1].split(/[、,，和及\s]+/).filter(Boolean).map(number))].filter(n => n >= 1 && n <= maxDay)
-  const matches = [...message.matchAll(/第\s*([\d一二三四五六七八九十]{1,2})\s*天|day\s*(\d{1,2})/gi)]
+  const matches = [...message.matchAll(/第\s*([\d一二三四五六七八九十]{1,2})\s*天|\b(?:day|d)\s*(\d{1,2})\b/gi)]
   return matches.length ? [...new Set(matches.map(m => number(m[1] || m[2])))].filter(n => n >= 1 && n <= maxDay) : null
 }
 
@@ -1806,6 +1820,12 @@ export function pinActionsToCurrentDay(
   const acceptedPlan = /(?:方案|option|plan)\s*[123一二三]/i.test(userMessage) && /执行|确认|就|按|照|apply|execute|go ahead|use/i.test(userMessage)
   const calendarScope = acceptedPlan || /\d{1,2}\s*(?:月|\/|-)\s*\d{1,2}/.test(userMessage)
   return actions.flatMap((action): TripChatAction[] => {
+    if (action.type === 'move_day' || action.type === 'swap_days') {
+      // Whole-day tools must retain both explicit targets; never silently edit
+      // a different pair or collapse an operation onto the currently viewed day.
+      if (scope && scope.length >= 2 && (!scope.includes(action.fromDay) || !scope.includes(action.toDay))) return []
+      return [action]
+    }
     if (action.type === 'clear_places') {
       const days = scope ? (action.days?.filter(day => scope.includes(day)) ?? scope) : (calendarScope ? action.days ?? [currentDay] : [currentDay])
       return days.length ? [{ ...action, days }] : []

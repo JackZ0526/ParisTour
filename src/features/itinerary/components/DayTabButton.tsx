@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useLayoutEffect, useRef, useState } from 'react'
+import { DayReorderContext } from './dayReorderContext'
 import { useTranslation } from '../../../shared/i18n'
 import { BoundedLiquidPill } from '../../../shared/components/BoundedLiquidPill'
 import type { LiquidPillEdge } from '../../../shared/animations/liquidPillMotion'
@@ -34,6 +35,8 @@ export function DayTabButton({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
   const { t } = useTranslation()
+  const reorder = useContext(DayReorderContext)
+  const canReorder = reorder && !reorder.disabled && !pending
 
   useLayoutEffect(() => {
     if (!pending) {
@@ -69,10 +72,16 @@ export function DayTabButton({
       ref={buttonRef}
       type="button"
       onClick={onSelect}
+      data-day-number={dayNumber}
+      aria-describedby={canReorder ? reorder.describedBy : undefined}
+      onPointerDown={event => { if (canReorder) reorder.start(event, dayNumber) }}
+      onKeyDown={event => { if (canReorder) reorder.keyDown(event, dayNumber) }}
+      onDragStart={event => event.preventDefault()}
+      onContextMenu={event => { if (reorder?.dragging != null) event.preventDefault() }}
       aria-busy={pending || undefined}
       aria-label={pending ? t('itinerary.dayPendingAria', { day: dayNumber }) : undefined}
-      style={box ? { width: box.w, height: box.h } : undefined}
-      className={`day-tab-button relative isolate snap-start shrink-0 rounded-full border border-transparent px-3.5 py-2 text-sm outline-none transition-[color,background-color,border-color,box-shadow] duration-200 sm:px-4 ${
+      style={{ ...(box ? { width: box.w, height: box.h } : {}), ...(canReorder ? { touchAction: 'pan-y pinch-zoom' } : {}) }}
+      className={`day-tab-button relative isolate snap-start shrink-0 select-none rounded-full border border-transparent px-3.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)] transition-[color,background-color,border-color,box-shadow] duration-200 sm:px-4 ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''} ${reorder?.dragging === dayNumber ? 'opacity-40' : ''} ${reorder?.dragging != null && reorder.over === dayNumber && reorder.dragging !== dayNumber ? 'ring-2 ring-[var(--copper)]' : ''} ${
         active
           ? ''
           : 'border-white/75 dark:border-white/10 bg-white/65 dark:bg-[#18201c]/80 shadow-xs hover:border-white dark:hover:border-white/20 hover:bg-white/85 dark:hover:bg-[#202b26] hover:shadow-sm'

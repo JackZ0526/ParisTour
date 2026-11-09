@@ -26,6 +26,7 @@ function Harness() {
   hook = useItineraryDays(PENDING_HOTEL, { days: sample(), customPlaces }, { numberOfDaysRef: useRef(6), onMutation })
   raw = {
     readState: () => ({ days: hook.days, customPlaces: hook.placesWithHotel, hotel: PENDING_HOTEL, hotelCandidates: [], currentDay: hook.day.day, selectedPlaceId: hook.selectedPlaceId }),
+    reorderDays: hook.handleReorderDays,
     removeStop: hook.handleDeleteOnDay, addPlace: hook.handleAddOnDay, replaceStop: hook.handleReplaceOnDay, reorderStop: hook.handleReorderOnDay,
     switchDay: hook.handleSwitchDay, selectPlace: hook.setSelectedPlaceId, setHotel: () => {}, setHotelCandidates: () => {},
   }
@@ -75,6 +76,21 @@ describe('chat actions against the real itinerary state hook', () => {
     handlers.switchDay(3)
     handlers.selectPlace('museum')
     expect(handlers.readState()).toMatchObject({ currentDay: 3, selectedPlaceId: 'museum' })
+  })
+  it('executes verified whole-day swaps and moves as one cloud mutation each', () => {
+    const handlers = mount()
+    const activities = (stops: typeof hook.days[number]['stops']) => stops.filter(stop => stop.placeId !== SELECTED_HOTEL_PLACE_ID && stop.placeId !== 'airport').map(stop => stop.id)
+    const before = hook.days.map(day => activities(day.stops))
+    handlers.reorderDays({ mode: 'swap', fromDay: 4, toDay: 2 })
+    expect(activities(hook.days[1].stops)).toEqual(before[3])
+    expect(activities(hook.days[3].stops)).toEqual(before[1])
+    expect(onMutation.mock.calls.map(([m]) => m.type)).toEqual(['itinerary.replace'])
+    expect(hook.day.day).toBe(2)
+    handlers.reorderDays({ mode: 'move', fromDay: 2, toDay: 5 })
+    expect(activities(hook.days[4].stops)).toEqual(before[3])
+    expect(onMutation).toHaveBeenCalledTimes(2)
+    raw = { ...raw, reorderDays: () => {} }
+    expect(() => handlers.reorderDays({ mode: 'swap', fromDay: 2, toDay: 3 })).toThrow()
   })
   it('bounds new stop notes and cloud mutations while retaining full place descriptions', () => {
     const handlers = mount()

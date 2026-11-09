@@ -14,6 +14,17 @@ function send(userMessage: string, raw: unknown, history: Array<{ role: 'assista
 }
 describe('operation planning and scope', () => {
   it.each(['清空第1–6天', '清空第一到第六天', 'clear days 1-6'])('recognizes ranges: %s', message => { expect(explicitDaysFromMessage(message, 7)).toEqual([1, 2, 3, 4, 5, 6]) })
+  it('recognizes D labels and parses executable whole-day tools without pinning them to today', async () => {
+    expect(explicitDaysFromMessage('把D4和D2互换', 7)).toEqual([4, 2])
+    expect(explicitDaysFromMessage('added2 items', 7)).toBeNull()
+    expect(pinActionsToCurrentDay([{ type: 'swap_days', fromDay: 5, toDay: 1 }], '把D4和D2互换', 3, 7)).toEqual([])
+    const result = await send('把 D4 和 D2 互换', { reply: '准备互换', actions: [{ type: 'swap_days', fromDay: 4, toDay: 2 }] })
+    expect(result.actions).toEqual([{ type: 'swap_days', fromDay: 4, toDay: 2 }])
+    const moved = await send('把第4天移到第2天的位置，中间顺延', { reply: '准备移动', actions: [{ type: 'move_day', fromDay: 4, toDay: 2 }] })
+    expect(moved.actions).toEqual([{ type: 'move_day', fromDay: 4, toDay: 2 }])
+    const invalid = await send('互换两天', { reply: '目标无效', actions: [{ type: 'swap_days', fromDay: 4, toDay: 99 }] })
+    expect(invalid).toMatchObject({ actions: [], rejectedActions: 1 })
+  })
   it('recognizes lists and all days while rejecting invalid ranges', () => {
     expect(explicitDaysFromMessage('第1、3、5天', 7)).toEqual([1, 3, 5])
     expect(explicitDaysFromMessage('所有天', 6)).toEqual([1, 2, 3, 4, 5, 6])

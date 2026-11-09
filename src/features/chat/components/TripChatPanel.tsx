@@ -1,3 +1,5 @@
+import { dayOrderCopy } from '../../../shared/i18n/copy/dayOrder'
+import type { DayOrderChange } from '../../itinerary/utils/dayOrder'
 import { uiCopy } from '../../../shared/i18n/copy/ui'
 import { localizedCopy } from '../../../shared/i18n/copy/TripChatPanel-2f4379'
 import type { TripChatTurn } from '../services/tripChat'
@@ -198,6 +200,7 @@ function useMediaQuery(query: string): boolean {
 
 export interface TripChatHandlers {
   readState: () => ChatExecutionState
+  reorderDays: (change: DayOrderChange) => void
   switchDay: (day: number) => void
   selectPlace: (placeId: string) => void
   removeStop: (day: number, stopId: string) => void
@@ -1781,6 +1784,12 @@ export function TripChatPanel({
       workingCandidates = [...actual.hotelCandidates]
       workingHotel = actual.hotel
       try {
+        if (action.type === 'move_day' || action.type === 'swap_days') {
+          handlers.reorderDays({ mode: action.type === 'swap_days' ? 'swap' : 'move', fromDay: action.fromDay, toDay: action.toDay })
+          notes.push(dayOrderCopy(action.type === 'swap_days' ? 'swapped' : 'moved', { p0: action.fromDay, p1: action.toDay }, locale))
+          activeDay = action.toDay
+          continue
+        }
         if (action.type === 'clear_places') {
           const targetDays = action.days ?? [activeDay]
           const targets = stopsToClear(actual, targetDays, action.placeTypes ?? ['cafe', 'restaurant', 'attraction'])

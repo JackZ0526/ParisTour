@@ -1,3 +1,6 @@
+import { DayReorderRail } from './features/itinerary/components/DayReorderRail'
+import { dayOrderCopy } from './shared/i18n/copy/dayOrder'
+import type { DayOrderChange } from './features/itinerary/utils/dayOrder'
 import { uiCopy } from './shared/i18n/copy/ui'
 import { localizedCopy } from './shared/i18n/copy/App-835da5'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -217,6 +220,7 @@ export default function App() {
     handleGoogleIdentityResolved,
     handleAddOnDay,
     handleSwitchDay,
+    handleReorderDays,
     handleReplaceOnDay,
     completeReorderSaveTransaction,
     day,
@@ -602,6 +606,18 @@ export default function App() {
       remoteHydrationRenderKeyRef,
     },
   )
+
+  const dayReorderDisabled = readOnly || itineraryGenerating || itineraryTranslating || days.some(plan => isDayGenerationPending(plan.day))
+  const handleDayOrderChange = (change: DayOrderChange) => {
+    if (readOnly) throw new Error(dayOrderCopy('readOnly', undefined, locale))
+    if (dayReorderDisabled) throw new Error(dayOrderCopy('busy', undefined, locale))
+    // A copy request for the old date must not overwrite the moved day's title.
+    copyRequestIdRef.current += 1
+    suppressCopyRef.current = true
+    setCopyRefreshing(false)
+    completeReorderSaveTransaction()
+    handleReorderDays(change)
+  }
 
   const lastDayNum = numberOfDays
 
@@ -1000,8 +1016,11 @@ export default function App() {
                     <>
                       <div className="flex flex-col gap-3 sm:gap-3.5">
                         <LayoutGroup id="itinerary-days-rail">
-                          <div
-                            className={`mobile-scroll-edge-fade flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                          <DayReorderRail
+                            days={days}
+                            disabled={dayReorderDisabled}
+                            onMoveDay={(fromDay, toDay) => handleDayOrderChange({ mode: 'move', fromDay, toDay })}
+                            className={`mobile-scroll-edge-fade flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1.5 py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                               dayRailHasLeftOverflow ? 'has-left-overflow' : ''
                             }`}
                             onScroll={(event) => {
@@ -1039,7 +1058,7 @@ export default function App() {
                                 />
                               )
                             })}
-                          </div>
+                          </DayReorderRail>
                         </LayoutGroup>
 
                         <LayoutGroup id="itinerary-mobile-pane-toggle">
@@ -1585,6 +1604,7 @@ export default function App() {
           handlers={{
             readState: () => chatExecutionStateRef.current,
             switchDay: handleSwitchDay,
+            reorderDays: handleDayOrderChange,
             selectPlace: handleSelectPlace,
             removeStop: handleDeleteOnDay,
             addPlace: handleAddOnDay,

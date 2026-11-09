@@ -1,3 +1,4 @@
+import { reorderItineraryDays, dayOrderSignature } from '../../itinerary/utils/dayOrder'
 import type { DayPlan, HotelCandidate, Place, SelectedHotel } from '../../../types'
 import { ensureStopId } from '../../../appHelpers'
 import { getPlace } from '../../place/constants/places'
@@ -42,6 +43,11 @@ export function verifiedChatHandlers(
   }
   return {
     readState: state,
+    reorderDays: change => {
+      const before = state()
+      const expected = reorderItineraryDays(before.days, change, before.customPlaces)
+      run(() => latest().reorderDays(change), after => dayOrderSignature(after.days) === dayOrderSignature(expected))
+    },
     switchDay: day => run(() => latest().switchDay(day), after => after.currentDay === day),
     selectPlace: id => run(() => latest().selectPlace(id), after => after.selectedPlaceId === id),
     removeStop: (day, id) => {
