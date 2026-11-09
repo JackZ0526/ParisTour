@@ -438,6 +438,8 @@ export function useItineraryDays(
 
   const handleAddOnDay = useCallback(
     (dayNum: number, place: Place, options?: AddOnDayOptions) => {
+      const targetDay = days.find((entry) => entry.day === dayNum)
+      if (!targetDay) return
       const mode = options?.mode || 'best'
       setCustomPlaces((prev) => ({ ...prev, [place.id]: place }))
 
@@ -497,8 +499,6 @@ export function useItineraryDays(
         return keepFixedHotelPositions(d.day, next, lastDayNum)
       }
 
-      const targetDay = days.find((entry) => entry.day === dayNum)
-      if (!targetDay) return
       const nextStops = insertIntoDay(targetDay)
       const insertedAt = nextStops.findIndex((stop) => stop.id === newStop.id)
       if (insertedAt < 0) return

@@ -8,7 +8,8 @@ import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useEnterExit } from '../../../shared/hooks/useEnterExit'
 import { useReducedMotion } from '../../../shared/hooks/useReducedMotion'
 import { useTranslation } from '../../../shared/i18n'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
+import { verifiedChatHandlers, stopsToClear, formatChatExecutionReply, type ChatExecutionState } from '../services/chatExecution'
 import {
   fetchGooglePlaceDetails,
 } from '../../map/services/googlePlaceDetails'
@@ -196,6 +197,7 @@ function useMediaQuery(query: string): boolean {
 }
 
 export interface TripChatHandlers {
+  readState: () => ChatExecutionState
   switchDay: (day: number) => void
   selectPlace: (placeId: string) => void
   removeStop: (day: number, stopId: string) => void
@@ -278,10 +280,13 @@ export function TripChatPanel({
   outbound = null,
   returnFlight = null,
   viewing = null,
-  handlers,
+  handlers: rawHandlers,
   forceOpen,
   onClose,
 }: Props) {
+  const handlersRef = useRef(rawHandlers)
+  handlersRef.current = rawHandlers
+  const handlers = useMemo(() => verifiedChatHandlers(() => handlersRef.current, flushSync), [])
   const [internalOpen, setInternalOpen] = useState(false)
   const open = forceOpen ?? internalOpen
   const setOpen = (next: boolean | ((prev: boolean) => boolean)) => {
@@ -1178,9 +1183,9 @@ export function TripChatPanel({
 
     const hit =
       (action.fromPlaceName
-        ? matchPlaceInDay(day, customPlaces, action.fromPlaceName)
+        ? matchPlaceInDay(day, handlers.readState().customPlaces, action.fromPlaceName)
         : null) ||
-      findReplaceTargetInDay(day, customPlaces, {
+      findReplaceTargetInDay(day, handlers.readState().customPlaces, {
         fromPlaceName: action.fromPlaceName,
         placeType: action.placeType,
         userMessage,
@@ -1468,6 +1473,8 @@ export function TripChatPanel({
                 ? localizedCopy('m34866db529', { p0: (place.name), p1: (pending.dayNum) }, 'en')
                 : localizedCopy('m34866db529', { p0: (place.name), p1: (pending.dayNum) }, 'zh-CN'))),
       ])
+    } catch (err) {
+      setActionNotes(prev => [...prev, err instanceof Error ? err.message : noActionAppliedNote(locale)])
     } finally {
       setConfirmBusy(false)
     }
@@ -1659,7 +1666,7 @@ export function TripChatPanel({
 
       notes = ensured.notes
       pending = ensured.pending
-      const displayReply = ensured.reply
+      const displayReply = executionReply(result, ensured.reply, notes)
       setActionNotes(
         notes.length
           ? notes
@@ -1768,7 +1775,30 @@ export function TripChatPanel({
 
     for (let i = 0; i < actions.length; i++) {
       const action = actions[i]
+      // Every action sees committed state, including earlier edits in this batch.
+      const actual = handlers.readState()
+      workingDays = actual.days.map(d => ({ ...d, stops: [...d.stops] }))
+      workingCandidates = [...actual.hotelCandidates]
+      workingHotel = actual.hotel
       try {
+        if (action.type === 'clear_places') {
+          const targetDays = action.days ?? [activeDay]
+          const targets = stopsToClear(actual, targetDays, action.placeTypes ?? ['cafe', 'restaurant', 'attraction'])
+          const failures: string[] = []
+          for (const target of targets) {
+            try { handlers.removeStop(target.day, target.stopId) }
+            catch { failures.push(target.name) }
+          }
+          const remaining = stopsToClear(handlers.readState(), targetDays, action.placeTypes ?? ['cafe', 'restaurant', 'attraction'])
+          const removed = targets.filter(target => !remaining.some(stop => stop.day === target.day && stop.stopId === target.stopId))
+          const perDay = targetDays.map(day => locale === 'en'
+            ? `Day ${day}: ${removed.filter(s => s.day === day).length} removed`
+            : `第 ${day} 天删除 ${removed.filter(s => s.day === day).length} 个停点`).join(locale === 'en' ? '; ' : '；')
+          notes.push(locale === 'en'
+            ? `Verified itinerary: ${perDay}. Hotels and transport preserved.${remaining.length || failures.length ? ` ${remaining.length} matching stops remain; clearing is incomplete.` : ' No matching activity stops remain.'}`
+            : `已核对实际行程：${perDay}。酒店和交通已保留。${remaining.length || failures.length ? `仍有 ${remaining.length} 个目标停点，尚未全部清空。` : '目标类别的停点已清空。'}`)
+          continue
+        }
         if (action.type === 'switch_day') {
           activeDay = action.day
           handlers.switchDay(action.day)
@@ -1778,7 +1808,7 @@ export function TripChatPanel({
 
         if (action.type === 'select_place') {
           const day = workingDays.find((d) => d.day === activeDay) || workingDays[0]
-          const hit = matchPlaceInDay(day, customPlaces, action.placeName)
+          const hit = matchPlaceInDay(day, actual.customPlaces, action.placeName)
           if (!hit) {
             notes.push(
               uiCopy('m00b79ad799', { p0: (activeDay), p1: (action.placeName) }),
@@ -1825,7 +1855,7 @@ export function TripChatPanel({
             notes.push(uiCopy('mae0cc9db4e', { p0: (dayNum) }))
             continue
           }
-          const hit = matchPlaceInDay(day, customPlaces, action.placeName)
+          const hit = matchPlaceInDay(day, actual.customPlaces, action.placeName)
           if (!hit) {
             notes.push(uiCopy('mc58388823e', { p0: (dayNum), p1: (action.placeName) }))
             continue
@@ -1861,7 +1891,7 @@ export function TripChatPanel({
             notes.push(uiCopy('mae0cc9db4e', { p0: (dayNum) }))
             continue
           }
-          const hit = matchPlaceInDay(day, customPlaces, action.placeName)
+          const hit = matchPlaceInDay(day, actual.customPlaces, action.placeName)
           if (!hit) {
             notes.push(uiCopy('mc58388823e', { p0: (dayNum), p1: (action.placeName) }))
             continue
@@ -1878,7 +1908,7 @@ export function TripChatPanel({
           if (replaceIntent) {
             const day = workingDays.find((d) => d.day === dayNum)
             const target = day
-              ? findReplaceTargetInDay(day, customPlaces, {
+              ? findReplaceTargetInDay(day, actual.customPlaces, {
                   placeType: action.placeType,
                   userMessage,
                   excludePlaceName: action.placeName,
@@ -2071,6 +2101,10 @@ export function TripChatPanel({
     return { notes, pending: pendingBatch }
   }
 
+  function executionReply(result: { actions: TripChatAction[]; reply: string; rejectedActions?: number }, reply: string, notes: string[], operationRequested = false): string {
+    return formatChatExecutionReply(result, reply, notes, noActionAppliedNote(locale), locale, operationRequested)
+  }
+
   async function submit(text: string, retry?: RetryRequest) {
     if (!sessionReady || storageConflict) return
     followBottomRef.current = true
@@ -2121,6 +2155,7 @@ export function TripChatPanel({
     ])
     const ac = beginChatRequest()
     let generationComplete = false
+    let operationRequested = false
     try {
       const result = await sendTripChatMessageStream({
         ctx: buildChatContext(),
@@ -2130,6 +2165,7 @@ export function TripChatPanel({
         signal: ac.signal,
         onRequestPlan: (phase, plan) => {
           if (abortRef.current !== ac || phase !== 'done' || !plan) return
+          operationRequested = plan.intent === 'mutate'
           setRequestThinkingEnabled(plan.thinking.enabled)
           setShowReasoningUi(plan.thinking.enabled)
           setWorkSteps((prev) => {
@@ -2261,6 +2297,7 @@ export function TripChatPanel({
           }
         },
         onReplyDelta: (reply) => {
+          if (operationRequested) return
           setStreamingReply(true)
           setWorkSteps((prev) => activateChatWorkStep(prev, 'generate'))
           updateLastAssistantContent(reply)
@@ -2344,7 +2381,7 @@ export function TripChatPanel({
       persistWorkOnLastAssistant(
         workStepsRef.current,
         reasoningTextRef.current,
-        ensured.reply,
+        executionReply(result, ensured.reply, ensured.notes, operationRequested),
         result.places,
       )
     } catch (err) {

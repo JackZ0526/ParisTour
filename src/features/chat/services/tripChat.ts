@@ -18,7 +18,6 @@ import type {
 import { getPlace } from '../../place/constants/places'
 import {
   extractLlmJsonObject,
-  extractPartialJsonStringField,
   getThinkingMode,
   LlmRequestError,
   openaiChat,
@@ -45,6 +44,7 @@ import {
 import { getLocale, getLlmLanguageInstruction } from '../../../shared/i18n'
 export type TripChatAction =
   | { type: 'switch_day'; day: number }
+  | { type: 'clear_places'; days?: number[]; placeTypes?: Array<'cafe' | 'restaurant' | 'attraction'> }
   | { type: 'select_place'; placeName: string }
   | {
       type: 'remove_place'
@@ -128,6 +128,7 @@ export interface TripChatResult {
   reply: string
   actions: TripChatAction[]
   places?: ChatPlaceReference[]
+  rejectedActions?: number
 }
 
 export interface TripChatWorkStep {
@@ -890,7 +891,7 @@ function buildTripChatMessages(input: {
   const contextPrefix = contextBlocks.join('\n\n')
   // Keep terse / verbatim user requests inside the reply field. Otherwise
   // JSON-mode providers may mask a plain-text answer into an empty stream.
-  const requestText = `${contextPrefix}\n\n${input.userMessage}\n\n${chatInstruction('responseEnvelope')}`
+  const requestText = `${contextPrefix}\n\n${input.userMessage}\n\n${chatInstruction('executionContract')}\n${chatInstruction('responseEnvelope')}`
 
   if (input.images && input.images.length > 0) {
     const parts: ChatMessageContentPart[] = [
@@ -950,6 +951,7 @@ function normalizeActionType(raw: unknown): string {
   if (v === 'refreshhotels' || v === 'refresh_hotel') return 'refresh_hotels'
   if (v === 'replacehotel') return 'replace_hotel'
   if (v === 'replacehotels') return 'replace_hotels'
+  if (['clear_itinerary', 'clear_days', 'clear_stops', 'remove_all_places', 'delete_all_places'].includes(v)) return 'clear_places'
   return v
 }
 
@@ -980,12 +982,24 @@ function coerceActionsArray(raw: unknown): unknown[] {
 function parseActions(raw: unknown, maxDay = 30): TripChatAction[] {
   const list = coerceActionsArray(raw)
   const out: TripChatAction[] = []
-  const dayOk = (day: number) => day >= 1 && day <= maxDay
+  const dayOk = (day: number) => Number.isInteger(day) && day >= 1 && day <= maxDay
 
   for (const item of list) {
     if (!item || typeof item !== 'object') continue
     const row = item as Record<string, unknown>
     const type = normalizeActionType(row.type)
+    // Invalid explicit targets must never become an edit to the current day.
+    if (row.day != null && !dayOk(Number(row.day))) continue
+
+    if (type === 'clear_places') {
+      const rawDays = row.days ?? (row.day != null ? [row.day] : undefined)
+      if (!Array.isArray(rawDays) || !rawDays.length || !rawDays.every(d => dayOk(Number(d)))) continue
+      const rawTypes = row.placeTypes
+      // An omitted category must not accidentally broaden "clear cafes" to all activities.
+      if (!Array.isArray(rawTypes) || !rawTypes.length || !rawTypes.every(t => ['cafe', 'restaurant', 'attraction'].includes(String(t)))) continue
+      out.push({ type, ...(rawDays ? { days: [...new Set((rawDays as unknown[]).map(Number))] } : {}), ...(rawTypes ? { placeTypes: rawTypes as Array<'cafe' | 'restaurant' | 'attraction'> } : {}) })
+      continue
+    }
 
     if (type === 'switch_day') {
       const day = Number(row.day)
@@ -1158,6 +1172,7 @@ function parseTripChatResult(
   userMessage: string,
   currentDay: number,
   maxDay = 30,
+  history: TripChatTurn[] = [],
 ): TripChatResult {
   const parsed = extractLlmJsonObject(text)
   const activeLocale = getLocale()
@@ -1189,10 +1204,13 @@ function parseTripChatResult(
     parsed.actions ??
     parsed.action ??
     (Array.isArray(parsed.ops) ? parsed.ops : undefined)
+  const parsedActions = parseActions(rawActions, maxDay)
+  const rejectedActions = coerceActionsArray(rawActions).length - parsedActions.length
   const actions = pinActionsToCurrentDay(
-    parseActions(rawActions, maxDay),
-    userMessage,
+    parsedActions,
+    operationScopeMessage(userMessage, history),
     currentDay,
+    maxDay,
   )
 
   if (!rawReply) {
@@ -1211,7 +1229,7 @@ function parseTripChatResult(
   }
 
   const places = parseChatPlaceReferences(parsed.places, rawReply)
-  return { reply: rawReply, actions, ...(places.length ? { places } : {}) }
+  return { reply: rawReply, actions, ...(places.length ? { places } : {}), ...(rejectedActions ? { rejectedActions } : {}) }
 }
 
 /**
@@ -1342,7 +1360,7 @@ function fallbackTripChatIntent(text: string): TripChatRequestPlan['intent'] {
   if (isLivePlaceRecommendationRequest(text) || /推荐|比较|哪家更好|住哪里/.test(text)) {
     return 'recommend'
   }
-  if (/添加|加上|新增|删除|去掉|移除|替换|换成|重排|调整|修改|选中|切换|移到|移动|挪到/.test(text)) {
+  if (/添加|加上|新增|删除|去掉|移除|清空|清理|执行|替换|换成|重排|调整|修改|选中|切换|移到|移动|挪到|\b(?:add|remove|delete|clear|replace|reorder|apply|execute)\b/i.test(text)) {
     return 'mutate'
   }
   return 'answer'
@@ -1583,12 +1601,13 @@ export async function sendTripChatMessage(input: {
     input.userMessage,
     input.ctx.currentDay,
     maxDayFromContext(input.ctx),
+    input.history,
   )
 }
 
 /**
- * Stream trip-chat JSON: progressively surface the growing `reply` string,
- * then parse full JSON for actions when the stream completes.
+ * Receive trip-chat JSON over a stream, then parse it before surfacing a reply.
+ * Mutation replies wait for the UI executor's verified receipts.
  * Optional `onReasoningDelta` surfaces model CoT when the API sends it
  * (thinking mode); never mixed into reply parsing.
  *
@@ -1610,7 +1629,7 @@ export async function sendTripChatMessageStream(input: {
     detail?: TripChatVisualAnalysisDetail,
   ) => void
   onWebSearch?: (phase: TripChatWebSearchPhase, detail?: TripChatWebSearchDetail) => void
-  /** Progressive user-visible reply extracted from the streaming JSON buffer. */
+  /** Parsed, non-operational reply; mutation receipts are supplied by the UI. */
   onReplyDelta?: (reply: string) => void
   /** Model reasoning tokens when thinking is enabled and the API emits them. */
   onReasoningDelta?: (delta: string, fullReasoning: string) => void
@@ -1623,8 +1642,6 @@ export async function sendTripChatMessageStream(input: {
   if (imageCount) input.onVisualAnalysis?.('start', { imageCount, isProxy: false })
   else input.onVisualAnalysis?.('skip')
   const messages = buildTripChatMessages({ ...input, webResearch, plan })
-  let lastEmitted = ''
-
   const rawText = await openaiChatStream(messages, {
     task: 'tripChat',
     userText: input.userMessage,
@@ -1633,14 +1650,8 @@ export async function sendTripChatMessageStream(input: {
     webSearch: false,
     responseFormat: 'json_object',
     signal: input.signal,
-    onDelta: (_delta, fullText) => {
-      const partial =
-        extractPartialJsonStringField(fullText, 'reply') ??
-        extractPartialJsonStringField(fullText, 'message')
-      if (partial == null || partial === lastEmitted) return
-      lastEmitted = partial
-      input.onReplyDelta?.(partial)
-    },
+    // The reply can predict successful edits before actions even arrive. Only
+    // expose it after parsing; mutation replies are replaced by execution receipts.
     onReasoningDelta: (delta, fullReasoning) => {
       input.onReasoningDelta?.(delta, fullReasoning)
     },
@@ -1648,13 +1659,28 @@ export async function sendTripChatMessageStream(input: {
   if (imageCount) input.onVisualAnalysis?.('done', { imageCount, isProxy: false })
   const text = await repairTripChatJson(rawText, input.signal)
 
-  const result = parseTripChatResult(
+  let result = parseTripChatResult(
     text,
     input.userMessage,
     input.ctx.currentDay,
     maxDayFromContext(input.ctx),
+    input.history,
   )
-  if (result.reply !== lastEmitted) {
+  const needsActions = plan.intent === 'mutate' && input.ctx.days.length > 0
+  if (!result.actions.length && (needsActions || ((plan.intent === 'mutate' || fallbackTripChatIntent(input.userMessage) === 'mutate') && replyClaimsItineraryApplied(result.reply)))) {
+    // One bounded retry using the original request, history and current state.
+    // Never derive deletions by scraping the model's purported success summary.
+    try {
+      const recovery = await openaiChat([...messages, { role: 'assistant', content: JSON.stringify(result) }, {
+        role: 'user', content: chatInstruction('missingActions'),
+      }], { task: 'tripChat', userText: input.userMessage, thinking: plan.thinking, preflight: false, webSearch: false, responseFormat: 'json_object', signal: input.signal })
+      result = parseTripChatResult(await repairTripChatJson(recovery, input.signal), input.userMessage, input.ctx.currentDay, maxDayFromContext(input.ctx), input.history)
+    } catch (error) {
+      if (input.signal?.aborted) throw error
+      // Preserve the no-actions result so the UI reports no change honestly.
+    }
+  }
+  if (!result.actions.length && !result.rejectedActions && !replyClaimsItineraryApplied(result.reply)) {
     input.onReplyDelta?.(result.reply)
   }
   return result
@@ -1664,7 +1690,7 @@ export async function sendTripChatMessageStream(input: {
 export function replyClaimsItineraryApplied(reply: string): boolean {
   const text = reply.trim()
   if (!text) return false
-  return /已(经)?(正式)?加入|已经加[入进]|已加到|已添加到|已插入|已帮你加|已经帮你加|已写入行程|已更新行程|已放进行程|已(经)?替换|已经换[成好]/.test(
+  return /已(经)?(正式)?加入|已经加[入进]|已加到|已添加到|已插入|已帮你加|已经帮你加|已写入行程|已更新行程|已放进行程|已(经)?替换|已经换[成好]|(?:已|都|全部|一并).{0,8}(?:删除|移除|清空|清理|清掉|删掉|移到|重排)|(?:删除|清空|清掉|删掉)了|清理后|已(?:经)?(?:切换|选中|设为)|已(?:经)?.{0,8}完成|(?:按|照)方案.{0,8}执行|\b(?:removed|deleted|cleared|added|replaced|reordered|updated|switched|selected)\b/i.test(
     text,
   )
 }
@@ -1735,46 +1761,60 @@ export function explicitDayFromMessage(message: string): number | null {
   return null
 }
 
-/**
- * Unless the user named another day, strip action.day / drop switch_day so
- * apply logic falls back to the currently selected day.
- */
+/** A short acceptance inherits the most recent proposed operation's scope. */
+function operationScopeMessage(message: string, history: TripChatTurn[]): string {
+  if (!/^(?:好[的]?|可以|确认|按|就|执行|照|用|yes|ok|do it|go ahead|apply)/i.test(message.trim()) || explicitDaysFromMessage(message) != null) return message
+  const proposal = [...history].reverse().find(turn => turn.role === 'assistant')
+  if (!proposal) return message
+  const choice = message.match(/(?:方案|option|plan)\s*([123一二三])/i)
+  if (choice) {
+    const n = CN_DAY[choice[1]] ?? Number(choice[1])
+    const sections = proposal.content.split(/(?=(?:方案|option|plan)\s*[123一二三])/i)
+    const selected = sections.find(section => new RegExp(`^(?:方案|option|plan)\\s*(?:${n}|${['', '一', '二', '三'][n]})`, 'i').test(section))
+    if (selected) return `${message}\n${selected}`
+  }
+  return `${message}\n${proposal.content}`
+}
+
+/** Explicit ranges and lists are scopes, never a reason to collapse to today's day. */
+export function explicitDaysFromMessage(message: string, maxDay = 30): number[] | null {
+  if (/所有(?:日期|天|行程)|全部(?:日期|天|行程)|每一天|每天|全程|all\s+(?:days|itinerary)|entire\s+(?:trip|itinerary)/i.test(message)) return Array.from({ length: maxDay }, (_, i) => i + 1)
+  const number = (s: string) => CN_DAY[s] ?? Number(s)
+  const range = message.match(/(?:第|days?\s*)([一二三四五六七八九十\d]{1,2})\s*(?:天)?\s*[-–—~～至到]\s*(?:第|day\s*)?([一二三四五六七八九十\d]{1,2})\s*天?/i)
+  if (range) {
+    const from = number(range[1]), to = number(range[2])
+    if (from >= 1 && to >= from && to <= maxDay) return Array.from({ length: to - from + 1 }, (_, i) => from + i)
+    return []
+  }
+  const list = message.match(/(?:第|days?\s*)([\d一二三四五六七八九十、,，和及\s]+)天/i)
+  if (list && /[、,，和及]/.test(list[1])) return [...new Set(list[1].split(/[、,，和及\s]+/).filter(Boolean).map(number))].filter(n => n >= 1 && n <= maxDay)
+  const matches = [...message.matchAll(/第\s*([\d一二三四五六七八九十]{1,2})\s*天|day\s*(\d{1,2})/gi)]
+  return matches.length ? [...new Set(matches.map(m => number(m[1] || m[2])))].filter(n => n >= 1 && n <= maxDay) : null
+}
+
 export function pinActionsToCurrentDay(
   actions: TripChatAction[],
   userMessage: string,
   currentDay: number,
+  maxDay = 30,
 ): TripChatAction[] {
-  const explicit = explicitDayFromMessage(userMessage)
-  if (explicit != null) {
-    return actions.map((action) => {
-      if (action.type === 'switch_day') return action
-      if (
-        action.type === 'remove_place' ||
-        action.type === 'add_place' ||
-        action.type === 'replace_place' ||
-        action.type === 'reorder_place'
-      ) {
-        return { ...action, day: action.day ?? explicit }
-      }
-      return action
-    })
-  }
-
-  const out: TripChatAction[] = []
-  for (const action of actions) {
-    if (action.type === 'switch_day') continue
-    if (
-      action.type === 'remove_place' ||
-      action.type === 'add_place' ||
-      action.type === 'replace_place' ||
-      action.type === 'reorder_place'
-    ) {
-      out.push({ ...action, day: currentDay })
-      continue
+  const scope = explicitDaysFromMessage(userMessage, maxDay)
+  // Dates are resolved against trip dates in the model's application context.
+  const calendarScope = /\d{1,2}\s*(?:月|\/|-)\s*\d{1,2}/.test(userMessage)
+  return actions.flatMap((action): TripChatAction[] => {
+    if (action.type === 'clear_places') {
+      const days = scope ? (action.days?.filter(day => scope.includes(day)) ?? scope) : (calendarScope ? action.days ?? [currentDay] : [currentDay])
+      return days.length ? [{ ...action, days }] : []
     }
-    out.push(action)
-  }
-  return out
+    if (action.type === 'switch_day') return scope || calendarScope ? [action] : []
+    if (['remove_place', 'add_place', 'replace_place', 'reorder_place'].includes(action.type)) {
+      const edit = action as Extract<TripChatAction, { day?: number }>
+      const day = scope ? (scope.length === 1 ? scope[0] : edit.day ?? scope[0]) : calendarScope ? edit.day ?? currentDay : currentDay
+      if (scope && !scope.includes(day)) return []
+      return [{ ...edit, day }]
+    }
+    return [action]
+  })
 }
 
 function normalizeHotelQuery(hotelName: string): string {

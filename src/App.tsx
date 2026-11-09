@@ -231,6 +231,8 @@ export default function App() {
       onMutation: (mutation) => mutationSinkRef.current(mutation),
     },
   )
+  const chatExecutionStateRef = useRef({ days, customPlaces: placesWithHotel, hotel, hotelCandidates, currentDay: day.day, selectedPlaceId })
+  chatExecutionStateRef.current = { days, customPlaces: placesWithHotel, hotel, hotelCandidates, currentDay: day.day, selectedPlaceId }
   const [daySlideDirection, setDaySlideDirection] = useState<1 | -1>(1)
   const [activeTab, setActiveTab] = useState<AppTab>(() =>
     hasTripDates(loadTripDates()) ? 'itinerary' : 'logistics',
@@ -1581,6 +1583,7 @@ export default function App() {
             recommendationPreferences,
           ).join('；')}
           handlers={{
+            readState: () => chatExecutionStateRef.current,
             switchDay: handleSwitchDay,
             selectPlace: handleSelectPlace,
             removeStop: handleDeleteOnDay,
