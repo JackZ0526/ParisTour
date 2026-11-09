@@ -11,7 +11,7 @@ function stream(chunks: string[]) {
   } }), { headers: { 'content-type': 'text/event-stream' } })
 }
 const frame = (text: string) => `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}`
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => vi.mocked(authFetch).mockReset())
 describe('chat streaming', () => {
   it('accepts CRLF boundaries split across network chunks and final unterminated frame', async () => {
     vi.mocked(authFetch).mockResolvedValue(stream([frame('hello') + '\r', '\n\r', '\n' + frame(' world')]))
@@ -24,6 +24,17 @@ describe('chat streaming', () => {
     expect(authFetch).toHaveBeenCalledTimes(2)
     const body = JSON.parse(String(vi.mocked(authFetch).mock.calls[1][1]?.body))
     expect(body.thinking?.type ?? body.reasoning_effort).toMatch(/disabled|none/)
+  })
+  it('retries whitespace-only output instead of sending it to JSON repair', async () => {
+    vi.mocked(authFetch).mockResolvedValueOnce(stream([frame(' \n\t') + '\n\n']))
+      .mockResolvedValueOnce(stream([frame('{"reply":"你好","actions":[]}') + '\n\n']))
+    expect(await openaiChatStream(messages, options)).toBe('{"reply":"你好","actions":[]}')
+    expect(authFetch).toHaveBeenCalledTimes(2)
+  })
+  it('rejects repeated whitespace-only completions after one retry', async () => {
+    vi.mocked(authFetch).mockImplementation(async () => stream([frame(' \n') + '\n\n']))
+    await expect(openaiChatStream(messages, options)).rejects.toMatchObject({ code: 'empty' })
+    expect(authFetch).toHaveBeenCalledTimes(2)
   })
   it('does not loop on an empty provider or retry cancelled requests', async () => {
     vi.mocked(authFetch).mockImplementation(async () => stream(['data: [DONE]\n\n']))

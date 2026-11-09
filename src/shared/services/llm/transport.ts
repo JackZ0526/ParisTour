@@ -878,7 +878,7 @@ export async function callOpenAIMessagesStream(
     return await consumeChatStream(res, messages, {
       ...options,
       onDelta: (delta, fullText) => {
-        receivedContent = true
+        if (fullText.trim()) receivedContent = true
         options?.onDelta?.(delta, fullText)
       },
     })
@@ -971,7 +971,7 @@ async function consumeChatStream(
     if (options?.signal) options.signal.removeEventListener('abort', onAbort)
   }
 
-  if (!text) {
+  if (!text.trim()) {
     if (dataJson) {
       try {
         const data = JSON.parse(dataJson) as {
@@ -984,7 +984,7 @@ async function consumeChatStream(
         /* ignore */
       }
     }
-    if (!text) {
+    if (!text.trim()) {
       throw new LlmRequestError(
         `${finishReason ? `Stream ended with finish_reason=${finishReason}` : 'No content from stream'}.`,
         'empty',

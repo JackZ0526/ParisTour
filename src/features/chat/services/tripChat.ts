@@ -5,6 +5,7 @@ import { runtimeCopy } from '../../../shared/i18n/copy/tripChat-runtime-e9ecae'
 import { localizedCopy } from '../../../shared/i18n/copy/tripChat-e9ecae'
 import { budgetChatHistory } from './chatHistoryBudget'
 import { tryJevRoute } from '../../../shared/services/llm/jev-router'
+import { stripLlmJsonWrapper } from '../../../shared/services/llm/json'
 import type {
   DayPlan,
   FlightInfo,
@@ -1261,9 +1262,18 @@ async function repairTripChatJson(
   text: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  text = stripLlmJsonWrapper(text)
+  if (!text) {
+    throw new LlmRequestError(localizedCopy('mb308fc9ad1'), 'empty_reply')
+  }
   if (extractLlmJsonObject(text)) return text
+  // Plain prose is already supported by the result parser. Sending it to a
+  // JSON fixer can replace the actual answer with a request for JSON input.
+  const looksLikeJson = /^(?:```(?:json)?\s*)?[{[]/i.test(text) ||
+    /"(?:reply|message|actions)"\s*:/.test(text)
+  if (!looksLikeJson) return text
   try {
-    return await openaiChat(
+    const repaired = await openaiChat(
       [
         {
           role: 'system',
@@ -1281,7 +1291,13 @@ async function repairTripChatJson(
         signal,
       },
     )
-  } catch {
+    // Repair output is internal: never display its plain-text explanation as
+    // the assistant's answer. Fall back to salvaging the original reply.
+    const parsed = extractLlmJsonObject(repaired)
+    return parsed && (pickChatReplyText(parsed) ||
+      (Array.isArray(parsed.actions) && parsed.actions.length > 0)) ? repaired : text
+  } catch (error) {
+    if (signal?.aborted) throw error
     return text
   }
 }

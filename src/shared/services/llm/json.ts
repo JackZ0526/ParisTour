@@ -21,7 +21,7 @@ const PLACE_LIST_KEYS = [
   '结果',
 ]
 
-function stripLlmJsonWrapper(text: string): string {
+export function stripLlmJsonWrapper(text: string): string {
   return text
     .replace(/<think>[\s\S]*?(<\/think>|$)/gi, '')
     .replace(/<thought>[\s\S]*?(<\/thought>|$)/gi, '')
