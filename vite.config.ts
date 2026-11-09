@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 
 const PAID_API_PREFIXES = [
   '/api/openai',
@@ -389,10 +391,21 @@ export default defineConfig(({ mode }) => {
           'splash.png',
         ],
         workbox: {
+          // Retire caches that may already contain HTML under a script URL.
+          cacheId: 'paristour-verified-assets-v2',
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
           globIgnores: ['**/heic-to-*.js', '**/TripMap-*.js'],
           cleanupOutdatedCaches: true,
+          // Reject a fallback HTML page or stale bytes during installation,
+          // rather than permanently caching them as a successful JS response.
+          manifestTransforms: [(entries) => ({
+            manifest: entries.map((entry) => ({
+              ...entry,
+              integrity: `sha384-${createHash('sha384').update(readFileSync(path.resolve('dist', entry.url))).digest('base64')}`,
+            })),
+            warnings: [],
+          })],
           // Activate only after the user accepts the update prompt.
           clientsClaim: true,
           skipWaiting: false,
