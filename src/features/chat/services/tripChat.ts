@@ -1263,6 +1263,9 @@ async function repairTripChatJson(
   signal?: AbortSignal,
 ): Promise<string> {
   text = stripLlmJsonWrapper(text)
+  if (/^```(?:json)?(?:\s|$)/i.test(text)) {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+  }
   if (!text) {
     throw new LlmRequestError(localizedCopy('mb308fc9ad1'), 'empty_reply')
   }
@@ -1294,8 +1297,9 @@ async function repairTripChatJson(
     // Repair output is internal: never display its plain-text explanation as
     // the assistant's answer. Fall back to salvaging the original reply.
     const parsed = extractLlmJsonObject(repaired)
-    return parsed && (pickChatReplyText(parsed) ||
-      (Array.isArray(parsed.actions) && parsed.actions.length > 0)) ? repaired : text
+    if (parsed && typeof parsed.reply === 'string' && (parsed.reply.trim() ||
+      (Array.isArray(parsed.actions) && parsed.actions.length > 0))) return repaired
+    return text
   } catch (error) {
     if (signal?.aborted) throw error
     return text

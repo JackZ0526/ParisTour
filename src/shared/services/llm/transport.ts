@@ -991,6 +991,14 @@ async function consumeChatStream(
       )
     }
   }
+  // A provider can emit a valid-looking prefix before hitting its output cap.
+  // Do not repair or apply actions from an explicitly incomplete completion.
+  if (finishReason === 'length') {
+    throw new LlmRequestError(
+      runtimeCopy('mf36fb17e4a', { p0: `finish_reason=length · content_chars=${text.length}` }),
+      'truncated',
+    )
+  }
   // Touch the unused warning so TS doesn't strip the variable; the param
   // documents intent (the messages we just streamed) and is relied on by
   // error paths in the outer call site.

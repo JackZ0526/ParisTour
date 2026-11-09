@@ -56,3 +56,11 @@ it('can retry empty output when reasoning was already off', async () => {
   expect(await openaiChatStream(messages, { ...options, thinking: { enabled: false, effort: 'off' } })).toBe('ok')
   expect(authFetch).toHaveBeenCalledTimes(2)
 })
+
+it('does not treat a length-limited stream as a completed action response', async () => {
+  const raw = '{"reply":"切换到第三天。","actions":[{"type":"switch_day","day":3}]}'
+  const ended = `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'length' }] })}\n\n`
+  vi.mocked(authFetch).mockResolvedValue(stream([frame(raw) + '\n\n', ended, 'data: [DONE]\n\n']))
+  await expect(openaiChatStream(messages, options)).rejects.toMatchObject({ code: 'truncated' })
+  expect(authFetch).toHaveBeenCalledTimes(1)
+})

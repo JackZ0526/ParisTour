@@ -32,7 +32,7 @@ describe.each([false, true])('trip chat JSON recovery (stream=%s)', (stream) => 
     vi.mocked(openaiChat).mockResolvedValue('未收到可解析的 JSON 内容。请提供需要修复的原始 JSON 字符串。')
   })
 
-  it.each(['', ' \n\t', '<think>internal reasoning only</think>'])('rejects unusable content without asking the JSON fixer for a reply (%j)', async (raw) => {
+  it.each(['', ' \n\t', '<think>internal reasoning only</think>', '```json\n \n```', '```json\n'])('rejects unusable content without asking the JSON fixer for a reply (%j)', async (raw) => {
     completion(raw)
     await expect(send(request)).rejects.toMatchObject({ code: 'empty_reply' })
     expect(openaiChat).toHaveBeenCalledTimes(stream ? 0 : 1)
@@ -50,6 +50,28 @@ describe.each([false, true])('trip chat JSON recovery (stream=%s)', (stream) => 
     else vi.mocked(openaiChat).mockResolvedValueOnce(raw)
     vi.mocked(openaiChat).mockResolvedValueOnce('未收到可解析的 JSON 内容。请提供需要修复的原始 JSON 字符串。')
     expect(await send(request)).toEqual({ reply: '你好！', actions: [] })
+  })
+
+  it('does not interpret an internal error object as a repaired answer', async () => {
+    completion('{"reply":"你好！","actions":[')
+    vi.mocked(openaiChat).mockResolvedValueOnce('{"error":"No parseable JSON content was received. Please provide the original JSON string."}')
+    expect(await send(request)).toEqual({ reply: '你好！', actions: [] })
+  })
+
+  it('keeps the original reply when repair fails or has no usable content', async () => {
+    completion('{"reply":"你好！","actions":[')
+    vi.mocked(openaiChat).mockRejectedValueOnce(new Error('repair offline'))
+    expect(await send(request)).toEqual({ reply: '你好！', actions: [] })
+  })
+
+  it('propagates cancellation during repair instead of applying a recovered result', async () => {
+    const controller = new AbortController()
+    completion('{"reply":"你好！","actions":[')
+    vi.mocked(openaiChat).mockImplementationOnce(async () => {
+      controller.abort()
+      throw Object.assign(new Error('cancelled'), { code: 'aborted' })
+    })
+    await expect(send({ ...request, signal: controller.signal })).rejects.toMatchObject({ code: 'aborted' })
   })
 
   it('repairs malformed JSON and preserves valid actions', async () => {
